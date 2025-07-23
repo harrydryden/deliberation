@@ -61,7 +61,19 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
-				}
+				},
+				'bill-agent': 'hsl(var(--bill-agent))',
+				'bill-agent-bg': 'hsl(var(--bill-agent-bg))',
+				'peer-agent': 'hsl(var(--peer-agent))',
+				'peer-agent-bg': 'hsl(var(--peer-agent-bg))',
+				'flow-agent': 'hsl(var(--flow-agent))',
+				'flow-agent-bg': 'hsl(var(--flow-agent-bg))',
+				'user-message': 'hsl(var(--user-message))',
+				'user-message-bg': 'hsl(var(--user-message-bg))',
+				'democratic-blue': 'hsl(var(--democratic-blue))',
+				'democratic-green': 'hsl(var(--democratic-green))',
+				'civic-gold': 'hsl(var(--civic-gold))',
+				'deliberation-bg': 'hsl(var(--deliberation-bg))'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',

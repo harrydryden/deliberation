@@ -7,34 +7,61 @@ All colors MUST be HSL.
 */
 
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+:root {
+    --background: 246 100% 98%;
+    --foreground: 215 25% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 215 25% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 215 25% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 212 92% 46%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 215 25% 15%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 210 15% 95%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 212 92% 95%;
+    --accent-foreground: 212 92% 46%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 214 20% 90%;
+    --input: 214 20% 95%;
+    --ring: 212 92% 46%;
+
+    /* Agent Colors */
+    --bill-agent: 212 92% 46%;
+    --bill-agent-bg: 212 92% 95%;
+    --peer-agent: 140 70% 42%;
+    --peer-agent-bg: 140 70% 95%;
+    --flow-agent: 45 93% 47%;
+    --flow-agent-bg: 45 93% 95%;
+    --user-message: 215 15% 50%;
+    --user-message-bg: 215 15% 95%;
+
+    /* Democratic Theme Colors */
+    --democratic-blue: 212 92% 46%;
+    --democratic-green: 140 70% 42%;
+    --civic-gold: 45 93% 47%;
+    --deliberation-bg: 246 100% 98%;
+    
+    /* Gradients */
+    --gradient-democratic: linear-gradient(135deg, hsl(212 92% 46%), hsl(140 70% 42%));
+    --gradient-subtle: linear-gradient(180deg, hsl(246 100% 98%), hsl(210 15% 95%));
+    
+    /* Shadows */
+    --shadow-deliberation: 0 4px 12px -4px hsl(212 92% 46% / 0.15);
+    --shadow-message: 0 2px 8px -2px hsl(215 25% 15% / 0.1);
+    
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     --radius: 0.5rem;
 
