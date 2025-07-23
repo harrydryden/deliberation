@@ -23,7 +23,9 @@ export const Header = () => {
                   <User className="h-4 w-4" />
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm font-medium">{user.email}</span>
+              <span className="text-sm font-medium">
+                {user.user_metadata?.user_role === 'admin' ? 'Administrator' : 'Participant'}
+              </span>
             </div>
             <Button
               variant="outline"
