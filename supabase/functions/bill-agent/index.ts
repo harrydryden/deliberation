@@ -31,6 +31,17 @@ serve(async (req) => {
       .eq('id', deliberationId)
       .single();
 
+    // Get agent configuration
+    const { data: agentConfig } = await supabase
+      .from('agent_configurations')
+      .select('*')
+      .eq('agent_type', 'bill_agent')
+      .or(`deliberation_id.eq.${deliberationId},and(is_default.eq.true,deliberation_id.is.null)`)
+      .eq('is_active', true)
+      .order('deliberation_id', { ascending: false })
+      .limit(1)
+      .single();
+
     // Get recent messages for context
     const { data: recentMessages } = await supabase
       .from('messages')
@@ -43,38 +54,33 @@ serve(async (req) => {
       `[${m.message_type}]: ${m.content}`
     ).join('\n') || '';
 
-    const billAgentPrompt = `You are the Bill Agent, a specialized AI facilitator for democratic deliberation using the IBIS (Issue-Based Information System) framework.
-
-DELIBERATION TOPIC: ${deliberation?.title}
-DESCRIPTION: ${deliberation?.description}
+    // Build dynamic prompt from configuration
+    const systemPrompt = agentConfig?.system_prompt || `You are the Bill Agent, a specialized AI facilitator for democratic deliberation using the IBIS (Issue-Based Information System) framework.
 
 YOUR ROLE:
 - Synthesize user input into clear IBIS Issues (core problems/questions)
 - Identify and articulate different Positions (solutions/stances) 
 - Extract Arguments (supporting/opposing evidence)
-- Maintain a structured overview of the deliberation
+- Maintain a structured overview of the deliberation`;
 
-RECENT CONTEXT:
+    const goals = agentConfig?.goals?.length ? 
+      `GOALS:\n${agentConfig.goals.map(goal => `- ${goal}`).join('\n')}\n\n` : '';
+
+    const responseStyle = agentConfig?.response_style ? 
+      `RESPONSE STYLE:\n${agentConfig.response_style}\n\n` : 
+      `RESPONSE STYLE:\n- Professional yet conversational\n- Focus on the structural aspects of the argument\n- Encourage deeper thinking\n- Keep responses concise (2-3 paragraphs max)\n\n`;
+
+    const billAgentPrompt = `${systemPrompt}
+
+DELIBERATION TOPIC: ${deliberation?.title}
+DESCRIPTION: ${deliberation?.description}
+
+${goals}RECENT CONTEXT:
 ${context}
 
 NEW USER MESSAGE: "${message}"
 
-INSTRUCTIONS:
-1. Analyze the user's message for IBIS elements
-2. Identify if this introduces a new Issue, Position, or Argument
-3. Provide a thoughtful response that:
-   - Acknowledges their contribution
-   - Clarifies the IBIS structure they've added
-   - Asks follow-up questions to deepen the deliberation
-   - Synthesizes with previous contributions when relevant
-
-RESPONSE STYLE:
-- Professional yet conversational
-- Focus on the structural aspects of the argument
-- Encourage deeper thinking
-- Keep responses concise (2-3 paragraphs max)
-
-Respond as the Bill Agent:`;
+${responseStyle}Respond as the Bill Agent:`;
 
     console.log('Calling Anthropic API...');
     

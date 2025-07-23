@@ -44,6 +44,54 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_configurations: {
+        Row: {
+          agent_type: string
+          created_at: string
+          created_by: string | null
+          deliberation_id: string | null
+          description: string | null
+          goals: string[] | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          response_style: string | null
+          system_prompt: string
+          updated_at: string
+        }
+        Insert: {
+          agent_type: string
+          created_at?: string
+          created_by?: string | null
+          deliberation_id?: string | null
+          description?: string | null
+          goals?: string[] | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name: string
+          response_style?: string | null
+          system_prompt: string
+          updated_at?: string
+        }
+        Update: {
+          agent_type?: string
+          created_at?: string
+          created_by?: string | null
+          deliberation_id?: string | null
+          description?: string | null
+          goals?: string[] | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name?: string
+          response_style?: string | null
+          system_prompt?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       agent_interactions: {
         Row: {
           agent_type: Database["public"]["Enums"]["message_type"]

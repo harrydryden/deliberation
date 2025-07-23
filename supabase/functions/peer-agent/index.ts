@@ -31,6 +31,17 @@ serve(async (req) => {
       .eq('id', deliberationId)
       .single();
 
+    // Get agent configuration
+    const { data: agentConfig } = await supabase
+      .from('agent_configurations')
+      .select('*')
+      .eq('agent_type', 'peer_agent')
+      .or(`deliberation_id.eq.${deliberationId},and(is_default.eq.true,deliberation_id.is.null)`)
+      .eq('is_active', true)
+      .order('deliberation_id', { ascending: false })
+      .limit(1)
+      .single();
+
     // Get user messages from other participants (excluding current user)
     const { data: otherMessages } = await supabase
       .from('messages')
@@ -58,18 +69,28 @@ serve(async (req) => {
       `[${m.message_type}]: ${m.content}`
     ).join('\n') || '';
 
-    const peerAgentPrompt = `You are the Peer Agent, facilitating communication between participants in a democratic deliberation using IBIS framework.
-
-DELIBERATION TOPIC: ${deliberation?.title}
-DESCRIPTION: ${deliberation?.description}
+    // Build dynamic prompt from configuration
+    const systemPrompt = agentConfig?.system_prompt || `You are the Peer Agent, facilitating communication between participants in a democratic deliberation using IBIS framework.
 
 YOUR ROLE:
 - Mediate between participants by contextualizing their contributions
 - Highlight connections, agreements, and tensions between different viewpoints
 - Translate perspectives to promote mutual understanding
-- Encourage productive dialogue while maintaining participant privacy
+- Encourage productive dialogue while maintaining participant privacy`;
 
-CURRENT PARTICIPANT'S MESSAGE: "${message}"
+    const goals = agentConfig?.goals?.length ? 
+      `GOALS:\n${agentConfig.goals.map(goal => `- ${goal}`).join('\n')}\n\n` : '';
+
+    const responseStyle = agentConfig?.response_style ? 
+      `RESPONSE STYLE:\n${agentConfig.response_style}\n\n` : 
+      `RESPONSE STYLE:\n- Warm and encouraging\n- Focus on building bridges between perspectives\n- Maintain participant anonymity\n- Keep responses focused and actionable (2-3 paragraphs max)\n\n`;
+
+    const peerAgentPrompt = `${systemPrompt}
+
+DELIBERATION TOPIC: ${deliberation?.title}
+DESCRIPTION: ${deliberation?.description}
+
+${goals}CURRENT PARTICIPANT'S MESSAGE: "${message}"
 
 OTHER PARTICIPANTS' RECENT CONTRIBUTIONS:
 ${otherParticipantContext}
@@ -77,22 +98,7 @@ ${otherParticipantContext}
 RECENT AGENT INSIGHTS:
 ${agentContext}
 
-INSTRUCTIONS:
-1. Analyze how this participant's message relates to others' contributions
-2. Identify areas of potential agreement or constructive disagreement
-3. Provide a response that:
-   - Validates the participant's perspective
-   - Connects it to the broader discussion (without revealing specific participants)
-   - Poses questions that encourage engagement with other viewpoints
-   - Maintains anonymity while facilitating understanding
-
-RESPONSE STYLE:
-- Warm and encouraging
-- Focus on building bridges between perspectives
-- Maintain participant anonymity
-- Keep responses focused and actionable (2-3 paragraphs max)
-
-Respond as the Peer Agent:`;
+${responseStyle}Respond as the Peer Agent:`;
 
     console.log('Calling Anthropic API for Peer Agent...');
     

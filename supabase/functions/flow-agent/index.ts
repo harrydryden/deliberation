@@ -31,6 +31,17 @@ serve(async (req) => {
       .eq('id', deliberationId)
       .single();
 
+    // Get agent configuration
+    const { data: agentConfig } = await supabase
+      .from('agent_configurations')
+      .select('*')
+      .eq('agent_type', 'flow_agent')
+      .or(`deliberation_id.eq.${deliberationId},and(is_default.eq.true,deliberation_id.is.null)`)
+      .eq('is_active', true)
+      .order('deliberation_id', { ascending: false })
+      .limit(1)
+      .single();
+
     // Get overall message count and participation patterns
     const { data: messageStats } = await supabase
       .from('messages')
@@ -54,19 +65,29 @@ serve(async (req) => {
       `[${m.message_type}]: ${m.content}`
     ).join('\n') || '';
 
-    const flowAgentPrompt = `You are the Flow Agent, managing the overall process and rhythm of democratic deliberation using IBIS framework.
-
-DELIBERATION TOPIC: ${deliberation?.title}
-DESCRIPTION: ${deliberation?.description}
+    // Build dynamic prompt from configuration
+    const systemPrompt = agentConfig?.system_prompt || `You are the Flow Agent, managing the overall process and rhythm of democratic deliberation using IBIS framework.
 
 YOUR ROLE:
 - Guide the overall deliberation process
 - Identify when to deepen discussion vs. move to new topics
 - Recognize patterns of agreement, disagreement, or stagnation
 - Facilitate productive flow and maintain engagement
-- Suggest process improvements and next steps
+- Suggest process improvements and next steps`;
 
-CURRENT PARTICIPANT'S MESSAGE: "${message}"
+    const goals = agentConfig?.goals?.length ? 
+      `GOALS:\n${agentConfig.goals.map(goal => `- ${goal}`).join('\n')}\n\n` : '';
+
+    const responseStyle = agentConfig?.response_style ? 
+      `RESPONSE STYLE:\n${agentConfig.response_style}\n\n` : 
+      `RESPONSE STYLE:\n- Authoritative yet supportive\n- Process-focused and strategic\n- Clear about next steps\n- Encouraging of continued participation (2-3 paragraphs max)\n\n`;
+
+    const flowAgentPrompt = `${systemPrompt}
+
+DELIBERATION TOPIC: ${deliberation?.title}
+DESCRIPTION: ${deliberation?.description}
+
+${goals}CURRENT PARTICIPANT'S MESSAGE: "${message}"
 
 DELIBERATION STATISTICS:
 - Total user messages: ${userMessageCount}
@@ -76,26 +97,7 @@ DELIBERATION STATISTICS:
 RECENT DISCUSSION FLOW:
 ${flowContext}
 
-INSTRUCTIONS:
-1. Assess the current state of the deliberation process
-2. Determine if the discussion needs:
-   - Deeper exploration of current topics
-   - Transition to new aspects
-   - Clarification or refocusing
-   - Summary and synthesis
-3. Provide guidance that:
-   - Acknowledges the current contribution
-   - Suggests productive next steps
-   - Maintains momentum and engagement
-   - Identifies opportunities for consensus or deeper exploration
-
-RESPONSE STYLE:
-- Authoritative yet supportive
-- Process-focused and strategic
-- Clear about next steps
-- Encouraging of continued participation (2-3 paragraphs max)
-
-Respond as the Flow Agent:`;
+${responseStyle}Respond as the Flow Agent:`;
 
     console.log('Calling Anthropic API for Flow Agent...');
     
