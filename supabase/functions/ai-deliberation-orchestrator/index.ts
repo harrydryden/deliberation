@@ -13,19 +13,19 @@ serve(async (req) => {
   }
 
   try {
-    const { message, deliberationId, userId } = await req.json();
+    const { message_id, user_id, content } = await req.json();
     
-    console.log('AI Orchestrator processing message:', { message, deliberationId, userId });
+    console.log('AI Orchestrator processing message:', { message_id, user_id, content });
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get message count to determine which agents to trigger
+    // Get message count for this user to determine which agents to trigger
     const { data: messageCount } = await supabase
       .from('messages')
       .select('id')
-      .eq('deliberation_id', deliberationId)
+      .eq('user_id', user_id)
       .eq('message_type', 'user');
 
     const totalUserMessages = messageCount?.length || 0;
@@ -33,15 +33,15 @@ serve(async (req) => {
     // Determine which agents to call based on message patterns
     const agentsToCall = [];
     
-    // Bill Agent: Always analyzes for IBIS structure
+    // Bill Agent: Always analyzes for IBIS structure and content analysis
     agentsToCall.push('bill-agent');
     
-    // Peer Agent: Calls when there are other participants (every 2nd message)
+    // Peer Agent: Provides perspective and alternative viewpoints (every 2nd message)
     if (totalUserMessages > 1 && totalUserMessages % 2 === 0) {
       agentsToCall.push('peer-agent');
     }
     
-    // Flow Agent: Calls periodically to manage process (every 3rd message)
+    // Flow Agent: Manages conversation flow and suggests next steps (every 3rd message)
     if (totalUserMessages > 2 && totalUserMessages % 3 === 0) {
       agentsToCall.push('flow-agent');
     }
@@ -58,9 +58,9 @@ serve(async (req) => {
             'Authorization': `Bearer ${supabaseKey}`,
           },
           body: JSON.stringify({
-            message,
-            deliberationId,
-            userId
+            message_id,
+            content,
+            user_id
           })
         });
 

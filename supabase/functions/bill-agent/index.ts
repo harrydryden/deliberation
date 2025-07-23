@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, deliberationId, userId } = await req.json();
+    const { message_id, content, user_id } = await req.json();
     
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     if (!ANTHROPIC_API_KEY) {
@@ -24,31 +24,22 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get deliberation context
-    const { data: deliberation } = await supabase
-      .from('deliberations')
-      .select('title, description')
-      .eq('id', deliberationId)
-      .single();
+    // Get user's recent messages for context (no deliberation needed for single-user chat)
+    const { data: recentMessages } = await supabase
+      .from('messages')
+      .select('content, message_type, created_at')
+      .eq('user_id', user_id)
+      .order('created_at', { ascending: false })
+      .limit(10);
 
-    // Get agent configuration
+    // Get default agent configuration
     const { data: agentConfig } = await supabase
       .from('agent_configurations')
       .select('*')
       .eq('agent_type', 'bill_agent')
-      .or(`deliberation_id.eq.${deliberationId},and(is_default.eq.true,deliberation_id.is.null)`)
+      .eq('is_default', true)
       .eq('is_active', true)
-      .order('deliberation_id', { ascending: false })
-      .limit(1)
       .single();
-
-    // Get recent messages for context
-    const { data: recentMessages } = await supabase
-      .from('messages')
-      .select('content, message_type, created_at')
-      .eq('deliberation_id', deliberationId)
-      .order('created_at', { ascending: false })
-      .limit(10);
 
     const context = recentMessages?.reverse().map(m => 
       `[${m.message_type}]: ${m.content}`
@@ -61,7 +52,8 @@ YOUR ROLE:
 - Synthesize user input into clear IBIS Issues (core problems/questions)
 - Identify and articulate different Positions (solutions/stances) 
 - Extract Arguments (supporting/opposing evidence)
-- Maintain a structured overview of the deliberation`;
+- Maintain a structured overview of the deliberation
+- Help users explore and develop their ideas through thoughtful questions`;
 
     const goals = agentConfig?.goals?.length ? 
       `GOALS:\n${agentConfig.goals.map(goal => `- ${goal}`).join('\n')}\n\n` : '';
@@ -72,13 +64,10 @@ YOUR ROLE:
 
     const billAgentPrompt = `${systemPrompt}
 
-DELIBERATION TOPIC: ${deliberation?.title}
-DESCRIPTION: ${deliberation?.description}
-
-${goals}RECENT CONTEXT:
+${goals}CONVERSATION CONTEXT:
 ${context}
 
-NEW USER MESSAGE: "${message}"
+NEW USER MESSAGE: "${content}"
 
 ${responseStyle}Respond as the Bill Agent:`;
 
@@ -92,7 +81,7 @@ ${responseStyle}Respond as the Bill Agent:`;
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
         messages: [
           {
@@ -117,8 +106,7 @@ ${responseStyle}Respond as the Bill Agent:`;
       .from('messages')
       .insert({
         content: agentResponse,
-        deliberation_id: deliberationId,
-        user_id: null,
+        user_id: user_id,
         message_type: 'bill_agent'
       });
 
