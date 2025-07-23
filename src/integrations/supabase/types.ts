@@ -370,7 +370,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      mark_access_code_used: {
+        Args: { access_code: string; user_uuid: string }
+        Returns: boolean
+      }
     }
     Enums: {
       deliberation_status: "draft" | "active" | "concluded" | "archived"

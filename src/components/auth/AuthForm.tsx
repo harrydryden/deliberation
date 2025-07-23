@@ -55,17 +55,29 @@ export const AuthForm = () => {
       if (signUpError) throw signUpError;
       if (!signUpData.user) throw new Error("Failed to create user");
 
-      // Mark the access code as used
-      const { error: updateError } = await supabase
-        .from("access_codes")
-        .update({
-          is_used: true,
-          used_by: signUpData.user.id,
-          used_at: new Date().toISOString()
-        })
-        .eq("code", accessCode);
+      // Mark the access code as used using the security definer function
+      const { data: markUsedResult, error: functionError } = await supabase
+        .rpc('mark_access_code_used', {
+          access_code: accessCode,
+          user_uuid: signUpData.user.id
+        });
 
-      if (updateError) throw updateError;
+      if (functionError) {
+        console.error('Function call error:', functionError);
+        // Fallback to direct update if function fails
+        const { error: updateError } = await supabase
+          .from("access_codes")
+          .update({
+            is_used: true,
+            used_by: signUpData.user.id,
+            used_at: new Date().toISOString()
+          })
+          .eq("code", accessCode);
+
+        if (updateError) throw updateError;
+      } else if (!markUsedResult) {
+        throw new Error("Failed to mark access code as used");
+      }
 
       toast({
         title: "Access granted!",
