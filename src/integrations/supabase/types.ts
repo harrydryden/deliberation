@@ -14,7 +14,279 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agent_interactions: {
+        Row: {
+          agent_type: Database["public"]["Enums"]["message_type"]
+          created_at: string | null
+          deliberation_id: string | null
+          id: string
+          input_context: Json | null
+          message_id: string | null
+          output_response: string | null
+          processing_time: number | null
+        }
+        Insert: {
+          agent_type: Database["public"]["Enums"]["message_type"]
+          created_at?: string | null
+          deliberation_id?: string | null
+          id?: string
+          input_context?: Json | null
+          message_id?: string | null
+          output_response?: string | null
+          processing_time?: number | null
+        }
+        Update: {
+          agent_type?: Database["public"]["Enums"]["message_type"]
+          created_at?: string | null
+          deliberation_id?: string | null
+          id?: string
+          input_context?: Json | null
+          message_id?: string | null
+          output_response?: string | null
+          processing_time?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_interactions_deliberation_id_fkey"
+            columns: ["deliberation_id"]
+            isOneToOne: false
+            referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_interactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deliberations: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          end_time: string | null
+          facilitator_id: string | null
+          id: string
+          is_public: boolean | null
+          max_participants: number | null
+          start_time: string | null
+          status: Database["public"]["Enums"]["deliberation_status"] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          end_time?: string | null
+          facilitator_id?: string | null
+          id?: string
+          is_public?: boolean | null
+          max_participants?: number | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["deliberation_status"] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          end_time?: string | null
+          facilitator_id?: string | null
+          id?: string
+          is_public?: boolean | null
+          max_participants?: number | null
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["deliberation_status"] | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ibis_nodes: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          deliberation_id: string | null
+          description: string | null
+          id: string
+          message_id: string | null
+          node_type: Database["public"]["Enums"]["ibis_node_type"]
+          parent_node_id: string | null
+          position_x: number | null
+          position_y: number | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          deliberation_id?: string | null
+          description?: string | null
+          id?: string
+          message_id?: string | null
+          node_type: Database["public"]["Enums"]["ibis_node_type"]
+          parent_node_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          deliberation_id?: string | null
+          description?: string | null
+          id?: string
+          message_id?: string | null
+          node_type?: Database["public"]["Enums"]["ibis_node_type"]
+          parent_node_id?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ibis_nodes_deliberation_id_fkey"
+            columns: ["deliberation_id"]
+            isOneToOne: false
+            referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ibis_nodes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ibis_nodes_parent_node_id_fkey"
+            columns: ["parent_node_id"]
+            isOneToOne: false
+            referencedRelation: "ibis_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          agent_context: Json | null
+          content: string
+          created_at: string | null
+          deliberation_id: string | null
+          id: string
+          message_type: Database["public"]["Enums"]["message_type"] | null
+          parent_message_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          agent_context?: Json | null
+          content: string
+          created_at?: string | null
+          deliberation_id?: string | null
+          id?: string
+          message_type?: Database["public"]["Enums"]["message_type"] | null
+          parent_message_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          agent_context?: Json | null
+          content?: string
+          created_at?: string | null
+          deliberation_id?: string | null
+          id?: string
+          message_type?: Database["public"]["Enums"]["message_type"] | null
+          parent_message_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_deliberation_id_fkey"
+            columns: ["deliberation_id"]
+            isOneToOne: false
+            referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_parent_message_id_fkey"
+            columns: ["parent_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      participants: {
+        Row: {
+          deliberation_id: string | null
+          id: string
+          joined_at: string | null
+          last_active: string | null
+          role: Database["public"]["Enums"]["participant_role"] | null
+          user_id: string | null
+        }
+        Insert: {
+          deliberation_id?: string | null
+          id?: string
+          joined_at?: string | null
+          last_active?: string | null
+          role?: Database["public"]["Enums"]["participant_role"] | null
+          user_id?: string | null
+        }
+        Update: {
+          deliberation_id?: string | null
+          id?: string
+          joined_at?: string | null
+          last_active?: string | null
+          role?: Database["public"]["Enums"]["participant_role"] | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participants_deliberation_id_fkey"
+            columns: ["deliberation_id"]
+            isOneToOne: false
+            referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string | null
+          display_name: string | null
+          expertise_areas: string[] | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          expertise_areas?: string[] | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          expertise_areas?: string[] | null
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +295,10 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      deliberation_status: "draft" | "active" | "concluded" | "archived"
+      ibis_node_type: "issue" | "position" | "argument" | "question"
+      message_type: "user" | "bill_agent" | "peer_agent" | "flow_agent"
+      participant_role: "facilitator" | "participant" | "observer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +425,11 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      deliberation_status: ["draft", "active", "concluded", "archived"],
+      ibis_node_type: ["issue", "position", "argument", "question"],
+      message_type: ["user", "bill_agent", "peer_agent", "flow_agent"],
+      participant_role: ["facilitator", "participant", "observer"],
+    },
   },
 } as const
