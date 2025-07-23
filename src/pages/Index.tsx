@@ -91,10 +91,16 @@ const Index = () => {
             Ready to start deliberating?
           </h2>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button className="bg-democratic-blue hover:bg-democratic-blue/90">
+            <Button 
+              className="bg-democratic-blue hover:bg-democratic-blue/90"
+              onClick={() => navigate("/deliberations")}
+            >
               Create New Deliberation
             </Button>
-            <Button variant="outline">
+            <Button 
+              variant="outline"
+              onClick={() => navigate("/deliberations")}
+            >
               Join Existing Discussion
             </Button>
           </div>

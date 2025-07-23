@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ export const AuthForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleAccessCodeAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +53,7 @@ export const AuthForm = () => {
           title: "Welcome back!",
           description: codeData.code_type === 'admin' ? "Welcome, Administrator!" : "Welcome to Democratic Deliberation!",
         });
+        navigate("/deliberations");
         return;
       }
 
@@ -85,6 +88,7 @@ export const AuthForm = () => {
             title: "Welcome back!",
             description: codeData.code_type === 'admin' ? "Welcome, Administrator!" : "Welcome to Democratic Deliberation!",
           });
+          navigate("/deliberations");
           return;
         }
         throw signUpError;
@@ -118,6 +122,7 @@ export const AuthForm = () => {
         title: "Access granted!",
         description: codeData.code_type === 'admin' ? "Welcome, Administrator!" : "Welcome to Democratic Deliberation!",
       });
+      navigate("/deliberations");
     } catch (error: any) {
       toast({
         variant: "destructive",
