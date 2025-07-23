@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, deliberationId, userId } = await req.json();
+    const { message_id, content, user_id } = await req.json();
     
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     if (!ANTHROPIC_API_KEY) {
@@ -24,79 +24,50 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get deliberation context
-    const { data: deliberation } = await supabase
-      .from('deliberations')
-      .select('title, description')
-      .eq('id', deliberationId)
-      .single();
+    // Get user's recent messages for context (no deliberation needed for single-user chat)
+    const { data: recentMessages } = await supabase
+      .from('messages')
+      .select('content, message_type, created_at')
+      .eq('user_id', user_id)
+      .order('created_at', { ascending: false })
+      .limit(10);
 
-    // Get agent configuration
+    // Get default agent configuration
     const { data: agentConfig } = await supabase
       .from('agent_configurations')
       .select('*')
       .eq('agent_type', 'peer_agent')
-      .or(`deliberation_id.eq.${deliberationId},and(is_default.eq.true,deliberation_id.is.null)`)
+      .eq('is_default', true)
       .eq('is_active', true)
-      .order('deliberation_id', { ascending: false })
-      .limit(1)
       .single();
 
-    // Get user messages from other participants (excluding current user)
-    const { data: otherMessages } = await supabase
-      .from('messages')
-      .select('content, message_type, created_at, profiles(display_name)')
-      .eq('deliberation_id', deliberationId)
-      .eq('message_type', 'user')
-      .neq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    // Get recent agent responses for context
-    const { data: agentResponses } = await supabase
-      .from('messages')
-      .select('content, message_type')
-      .eq('deliberation_id', deliberationId)
-      .in('message_type', ['bill_agent', 'flow_agent'])
-      .order('created_at', { ascending: false })
-      .limit(3);
-
-    const otherParticipantContext = otherMessages?.map(m => 
-      `[Participant]: ${m.content}`
-    ).join('\n') || 'No other participant messages yet.';
-
-    const agentContext = agentResponses?.map(m => 
+    const context = recentMessages?.reverse().map(m => 
       `[${m.message_type}]: ${m.content}`
     ).join('\n') || '';
 
     // Build dynamic prompt from configuration
-    const systemPrompt = agentConfig?.system_prompt || `You are the Peer Agent, facilitating communication between participants in a democratic deliberation using IBIS framework.
+    const systemPrompt = agentConfig?.system_prompt || `You are the Peer Agent, representing diverse perspectives and alternative viewpoints in democratic deliberation.
 
 YOUR ROLE:
-- Mediate between participants by contextualizing their contributions
-- Highlight connections, agreements, and tensions between different viewpoints
-- Translate perspectives to promote mutual understanding
-- Encourage productive dialogue while maintaining participant privacy`;
+- Present thoughtful counterpoints and alternative perspectives
+- Ask challenging but constructive questions
+- Help explore the full spectrum of an issue
+- Encourage critical thinking and deeper analysis
+- Represent voices that might not otherwise be heard`;
 
     const goals = agentConfig?.goals?.length ? 
       `GOALS:\n${agentConfig.goals.map(goal => `- ${goal}`).join('\n')}\n\n` : '';
 
     const responseStyle = agentConfig?.response_style ? 
       `RESPONSE STYLE:\n${agentConfig.response_style}\n\n` : 
-      `RESPONSE STYLE:\n- Warm and encouraging\n- Focus on building bridges between perspectives\n- Maintain participant anonymity\n- Keep responses focused and actionable (2-3 paragraphs max)\n\n`;
+      `RESPONSE STYLE:\n- Thoughtful and challenging\n- Present alternative viewpoints respectfully\n- Ask probing questions\n- Keep responses concise (2-3 paragraphs max)\n\n`;
 
     const peerAgentPrompt = `${systemPrompt}
 
-DELIBERATION TOPIC: ${deliberation?.title}
-DESCRIPTION: ${deliberation?.description}
+${goals}CONVERSATION CONTEXT:
+${context}
 
-${goals}CURRENT PARTICIPANT'S MESSAGE: "${message}"
-
-OTHER PARTICIPANTS' RECENT CONTRIBUTIONS:
-${otherParticipantContext}
-
-RECENT AGENT INSIGHTS:
-${agentContext}
+NEW USER MESSAGE: "${content}"
 
 ${responseStyle}Respond as the Peer Agent:`;
 
@@ -135,8 +106,7 @@ ${responseStyle}Respond as the Peer Agent:`;
       .from('messages')
       .insert({
         content: agentResponse,
-        deliberation_id: deliberationId,
-        user_id: null,
+        user_id: user_id,
         message_type: 'peer_agent'
       });
 

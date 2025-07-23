@@ -37,7 +37,13 @@ export const useChat = () => {
           },
           (payload) => {
             const newMessage = payload.new as ChatMessage;
-            setMessages(prev => [...prev, newMessage]);
+            setMessages(prev => {
+              // Avoid duplicates by checking if message already exists
+              if (prev.some(msg => msg.id === newMessage.id)) {
+                return prev;
+              }
+              return [...prev, newMessage];
+            });
             setIsTyping(false);
           }
         )
@@ -91,8 +97,7 @@ export const useChat = () => {
 
       if (messageError) throw messageError;
 
-      // Add message to local state immediately
-      setMessages(prev => [...prev, userMessage]);
+      // Don't add to local state here - real-time subscription will handle it
       setIsTyping(true);
 
       // Trigger AI response via edge function
