@@ -100,6 +100,22 @@ export function useRealtimeMessages(deliberationId: string | undefined, currentU
         });
 
       if (error) throw error;
+
+      // Trigger AI agents to respond
+      console.log('Triggering AI orchestrator...');
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('ai-deliberation-orchestrator', {
+        body: {
+          message: content.trim(),
+          deliberationId,
+          userId
+        }
+      });
+
+      if (aiError) {
+        console.error('AI orchestrator error:', aiError);
+      } else {
+        console.log('AI orchestrator response:', aiResponse);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;

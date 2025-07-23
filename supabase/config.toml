@@ -1,1 +1,13 @@
 project_id = "iowsxuxkgvpgrvvklwyt"
+
+[functions.bill-agent]
+verify_jwt = false
+
+[functions.peer-agent]  
+verify_jwt = false
+
+[functions.flow-agent]
+verify_jwt = false
+
+[functions.ai-deliberation-orchestrator]
+verify_jwt = false
