@@ -12,15 +12,15 @@ interface Message {
   } | null;
 }
 
-export function useRealtimeMessages(deliberationId: string | undefined) {
+export function useRealtimeMessages(deliberationId: string | undefined, currentUserId: string | undefined) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!deliberationId) return;
+    if (!deliberationId || !currentUserId) return;
 
-    // Initial fetch
-    const fetchMessages = async () => {
+    // Initial fetch - only user's own messages and agent responses
+    const fetchMessages = async (currentUserId: string) => {
       try {
         const { data, error } = await supabase
           .from('messages')
@@ -29,6 +29,7 @@ export function useRealtimeMessages(deliberationId: string | undefined) {
             profiles(display_name)
           `)
           .eq('deliberation_id', deliberationId)
+          .or(`user_id.eq.${currentUserId},message_type.in.(bill_agent,peer_agent,flow_agent)`)
           .order('created_at', { ascending: true });
 
         if (error) throw error;
@@ -40,7 +41,7 @@ export function useRealtimeMessages(deliberationId: string | undefined) {
       }
     };
 
-    fetchMessages();
+    fetchMessages(currentUserId);
 
     // Set up realtime subscription
     const channel = supabase
@@ -57,20 +58,25 @@ export function useRealtimeMessages(deliberationId: string | undefined) {
           console.log('New message received:', payload);
           const newMessage = payload.new as any;
           
-          // Fetch the complete message with profile data
-          supabase
-            .from('messages')
-            .select(`
-              *,
-              profiles(display_name)
-            `)
-            .eq('id', newMessage.id)
-            .single()
-            .then(({ data }) => {
-              if (data) {
-                setMessages(prev => [...prev, data as unknown as Message]);
-              }
-            });
+          // Only show if it's the current user's message or an agent message
+          if (newMessage.user_id === currentUserId || 
+              ['bill_agent', 'peer_agent', 'flow_agent'].includes(newMessage.message_type)) {
+            
+            // Fetch the complete message with profile data
+            supabase
+              .from('messages')
+              .select(`
+                *,
+                profiles(display_name)
+              `)
+              .eq('id', newMessage.id)
+              .single()
+              .then(({ data }) => {
+                if (data) {
+                  setMessages(prev => [...prev, data as unknown as Message]);
+                }
+              });
+          }
         }
       )
       .subscribe();
@@ -78,7 +84,7 @@ export function useRealtimeMessages(deliberationId: string | undefined) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [deliberationId]);
+  }, [deliberationId, currentUserId]);
 
   const sendMessage = async (content: string, userId: string) => {
     if (!deliberationId || !content.trim()) return;

@@ -2,14 +2,12 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
-import { usePresence } from "@/hooks/usePresence";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, Users, ArrowLeft, Circle } from "lucide-react";
+import { Send, Users, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -38,8 +36,8 @@ export default function DeliberationChat() {
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
 
   // Use custom hooks for realtime functionality
-  const { messages, loading: messagesLoading, sendMessage } = useRealtimeMessages(id);
-  const { onlineUsers } = usePresence(id, user?.id, userProfile?.display_name);
+  const { messages, loading: messagesLoading, sendMessage } = useRealtimeMessages(id, user?.id);
+  // Remove presence hook since participants shouldn't see each other
 
   useEffect(() => {
     if (!user) {
@@ -188,10 +186,6 @@ export default function DeliberationChat() {
               <Users className="h-3 w-3 mr-1" />
               {deliberation.participant_count} participants
             </Badge>
-            <Badge variant="outline" className="flex items-center">
-              <Circle className="h-2 w-2 mr-1 fill-green-500 text-green-500" />
-              {onlineUsers.length} online
-            </Badge>
             <Badge>{deliberation.status}</Badge>
           </div>
         </div>
@@ -209,7 +203,7 @@ export default function DeliberationChat() {
                 <div className="flex-1 overflow-y-auto space-y-4 mb-4">
                   {messages.length === 0 ? (
                     <div className="text-center text-muted-foreground py-8">
-                      <p>No messages yet. Start the conversation!</p>
+                      <p>Send a message to start the AI-mediated discussion!</p>
                     </div>
                   ) : (
                     messages.map((message) => (
@@ -221,8 +215,8 @@ export default function DeliberationChat() {
                           <div className="flex items-center space-x-2">
                             <span className="font-medium text-sm">
                               {['bill_agent', 'peer_agent', 'flow_agent'].includes(message.message_type)
-                                ? 'AI Mediator' 
-                                : message.profiles?.display_name || 'Anonymous'
+                                ? `AI ${message.message_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}` 
+                                : 'You'
                               }
                             </span>
                             <Badge variant="outline" className="text-xs">
@@ -262,54 +256,26 @@ export default function DeliberationChat() {
           </div>
 
           {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-4">
-            {/* Online Users */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center">
-                  <Circle className="h-3 w-3 mr-2 fill-green-500 text-green-500" />
-                  Online ({onlineUsers.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {onlineUsers.map((user) => (
-                    <div key={user.user_id} className="flex items-center space-x-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-xs">
-                          {user.display_name?.charAt(0)?.toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">{user.display_name || 'Anonymous'}</span>
-                    </div>
-                  ))}
-                  {onlineUsers.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No users online</p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Information Card */}
+          <div className="lg:col-span-1">
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h4 className="font-medium mb-2">About this deliberation</h4>
+                  <h4 className="font-medium mb-2">AI-Mediated Discussion</h4>
                   <p className="text-sm text-muted-foreground">
-                    {deliberation.description}
+                    Your messages are processed by AI agents that facilitate structured deliberation. You'll only see your own messages and AI responses.
                   </p>
                 </div>
                 
                 <div>
                   <h4 className="font-medium mb-2">Guidelines</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Be respectful and constructive</li>
-                    <li>• Stay on topic</li>
-                    <li>• Consider multiple perspectives</li>
-                    <li>• Build on others' ideas</li>
+                    <li>• Express your views clearly</li>
+                    <li>• AI agents will synthesize perspectives</li>
+                    <li>• Focus on the deliberation topic</li>
+                    <li>• Build constructive arguments</li>
                   </ul>
                 </div>
               </CardContent>
