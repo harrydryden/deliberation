@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { LogOut, User, MessageSquare, Settings } from "lucide-react";
+import { LogOut, User, MessageSquare } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 
@@ -22,23 +22,12 @@ export const Header = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/deliberations')}
+              onClick={() => navigate('/chat')}
               className="flex items-center space-x-1"
             >
               <MessageSquare className="h-4 w-4" />
-              <span>Deliberations</span>
+              <span>Chat</span>
             </Button>
-            {user.user_metadata?.user_role === 'admin' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/agent-config')}
-                className="flex items-center space-x-1"
-              >
-                <Settings className="h-4 w-4" />
-                <span>Agent Config</span>
-              </Button>
-            )}
             <div className="flex items-center space-x-2">
               <Avatar className="h-8 w-8">
                 <AvatarFallback>

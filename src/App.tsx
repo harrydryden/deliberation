@@ -7,9 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import Deliberations from "./pages/Deliberations";
-import DeliberationChat from "./pages/DeliberationChat";
-import AgentConfiguration from "./pages/AgentConfiguration";
+import Chat from "./pages/Chat";
 
 const queryClient = new QueryClient();
 
@@ -23,9 +21,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/deliberations" element={<Deliberations />} />
-            <Route path="/deliberations/:id" element={<DeliberationChat />} />
-            <Route path="/agent-config" element={<AgentConfiguration />} />
+            <Route path="/chat" element={<Chat />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

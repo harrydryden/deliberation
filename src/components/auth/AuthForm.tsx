@@ -53,7 +53,7 @@ export const AuthForm = () => {
           title: "Welcome back!",
           description: codeData.code_type === 'admin' ? "Welcome, Administrator!" : "Welcome to Democratic Deliberation!",
         });
-        navigate("/deliberations");
+        navigate("/chat");
         return;
       }
 
@@ -88,7 +88,7 @@ export const AuthForm = () => {
             title: "Welcome back!",
             description: codeData.code_type === 'admin' ? "Welcome, Administrator!" : "Welcome to Democratic Deliberation!",
           });
-          navigate("/deliberations");
+          navigate("/chat");
           return;
         }
         throw signUpError;
@@ -122,7 +122,7 @@ export const AuthForm = () => {
         title: "Access granted!",
         description: codeData.code_type === 'admin' ? "Welcome, Administrator!" : "Welcome to Democratic Deliberation!",
       });
-      navigate("/deliberations");
+      navigate("/chat");
     } catch (error: any) {
       toast({
         variant: "destructive",

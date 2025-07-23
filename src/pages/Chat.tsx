@@ -1,22 +1,22 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { AuthForm } from "@/components/auth/AuthForm";
+import { ChatInterface } from "@/components/chat/ChatInterface";
 
-const Auth = () => {
+const Chat = () => {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isLoading && user) {
-      navigate("/chat");
+    if (!isLoading && !user) {
+      navigate("/auth");
     }
   }, [user, isLoading, navigate]);
 
   if (isLoading) return null;
-  if (user) return null;
+  if (!user) return null;
 
-  return <AuthForm />;
+  return <ChatInterface />;
 };
 
-export default Auth;
+export default Chat;

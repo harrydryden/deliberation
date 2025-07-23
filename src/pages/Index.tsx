@@ -13,6 +13,8 @@ const Index = () => {
   useEffect(() => {
     if (!user) {
       navigate("/auth");
+    } else {
+      navigate("/chat");
     }
   }, [user, navigate]);
 
