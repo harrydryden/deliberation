@@ -22,25 +22,44 @@ export const AuthForm = () => {
         throw new Error("Access code must be exactly 10 digits");
       }
 
-      // Check if access code exists and is unused
+      // Check if access code exists
       const { data: codeData, error: codeError } = await supabase
         .from("access_codes")
         .select("id, code_type, is_used")
         .eq("code", accessCode)
-        .eq("is_used", false)
         .maybeSingle();
 
       if (codeError) throw codeError;
       
       if (!codeData) {
-        throw new Error("Invalid or already used access code");
+        throw new Error("Invalid access code");
       }
 
-      // Create a temporary email for the user based on access code
+      // Create temporary credentials
       const tempEmail = `user-${accessCode}@democraticdeliberation.app`;
       const tempPassword = `temp-${accessCode}-password`;
 
-      // Sign up the user with temporary credentials
+      // Try to sign in first (if user already exists)
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: tempEmail,
+        password: tempPassword,
+      });
+
+      if (signInData.user && !signInError) {
+        // Successfully signed in existing user
+        toast({
+          title: "Welcome back!",
+          description: codeData.code_type === 'admin' ? "Welcome, Administrator!" : "Welcome to Democratic Deliberation!",
+        });
+        return;
+      }
+
+      // If sign in failed and access code is already used, throw error
+      if (codeData.is_used) {
+        throw new Error("This access code has already been used by another user");
+      }
+
+      // If user doesn't exist, sign them up
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: tempEmail,
         password: tempPassword,
@@ -52,10 +71,28 @@ export const AuthForm = () => {
         }
       });
 
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        // If error is "user already exists", try signing in again
+        if (signUpError.message.includes("User already registered")) {
+          const { data: retrySignIn, error: retryError } = await supabase.auth.signInWithPassword({
+            email: tempEmail,
+            password: tempPassword,
+          });
+          
+          if (retryError) throw new Error("Authentication failed. Please try again.");
+          
+          toast({
+            title: "Welcome back!",
+            description: codeData.code_type === 'admin' ? "Welcome, Administrator!" : "Welcome to Democratic Deliberation!",
+          });
+          return;
+        }
+        throw signUpError;
+      }
+
       if (!signUpData.user) throw new Error("Failed to create user");
 
-      // Mark the access code as used using the security definer function
+      // Mark the access code as used (only for new signups)
       const { data: markUsedResult, error: functionError } = await supabase
         .rpc('mark_access_code_used', {
           access_code: accessCode,
@@ -74,9 +111,7 @@ export const AuthForm = () => {
           })
           .eq("code", accessCode);
 
-        if (updateError) throw updateError;
-      } else if (!markUsedResult) {
-        throw new Error("Failed to mark access code as used");
+        if (updateError) console.error('Direct update error:', updateError);
       }
 
       toast({
