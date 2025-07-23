@@ -1,25 +1,17 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useRealtimeMessages } from "@/hooks/useRealtimeMessages";
+import { usePresence } from "@/hooks/usePresence";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Send, Users, ArrowLeft } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Send, Users, ArrowLeft, Circle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-
-interface Message {
-  id: string;
-  content: string;
-  message_type: 'user' | 'bill_agent' | 'peer_agent' | 'flow_agent';
-  created_at: string;
-  user_id: string | null;
-  profiles?: {
-    display_name: string;
-  } | null;
-}
 
 interface Deliberation {
   id: string;
@@ -29,6 +21,11 @@ interface Deliberation {
   participant_count?: number;
 }
 
+interface Profile {
+  id: string;
+  display_name: string;
+}
+
 export default function DeliberationChat() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -36,10 +33,13 @@ export default function DeliberationChat() {
   const { toast } = useToast();
   
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
+
+  // Use custom hooks for realtime functionality
+  const { messages, loading: messagesLoading, sendMessage } = useRealtimeMessages(id);
+  const { onlineUsers } = usePresence(id, user?.id, userProfile?.display_name);
 
   useEffect(() => {
     if (!user) {
@@ -52,8 +52,25 @@ export default function DeliberationChat() {
     }
     
     fetchDeliberation();
-    fetchMessages();
+    fetchUserProfile();
   }, [user, id, navigate]);
+
+  const fetchUserProfile = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      setUserProfile(data);
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+  };
 
   const fetchDeliberation = async () => {
     if (!id) return;
@@ -85,53 +102,14 @@ export default function DeliberationChat() {
     }
   };
 
-  const fetchMessages = async () => {
-    if (!id) return;
-    
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('messages')
-        .select(`
-          *,
-          profiles(display_name)
-        `)
-        .eq('deliberation_id', id)
-        .order('created_at', { ascending: true });
 
-      if (error) throw error;
-
-      setMessages((data || []) as unknown as Message[]);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load messages",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !id || !user) return;
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !user) return;
 
     try {
       setSending(true);
-      const { error } = await supabase
-        .from('messages')
-        .insert({
-          content: newMessage.trim(),
-          deliberation_id: id,
-          user_id: user.id,
-          message_type: 'user'
-        });
-
-      if (error) throw error;
-
+      await sendMessage(newMessage, user.id);
       setNewMessage("");
-      fetchMessages(); // Refresh messages
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -147,7 +125,7 @@ export default function DeliberationChat() {
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      handleSendMessage();
     }
   };
 
@@ -160,7 +138,7 @@ export default function DeliberationChat() {
     }
   };
 
-  if (loading) {
+  if (messagesLoading) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[50vh]">
@@ -209,6 +187,10 @@ export default function DeliberationChat() {
             <Badge variant="secondary" className="flex items-center">
               <Users className="h-3 w-3 mr-1" />
               {deliberation.participant_count} participants
+            </Badge>
+            <Badge variant="outline" className="flex items-center">
+              <Circle className="h-2 w-2 mr-1 fill-green-500 text-green-500" />
+              {onlineUsers.length} online
             </Badge>
             <Badge>{deliberation.status}</Badge>
           </div>
@@ -268,7 +250,7 @@ export default function DeliberationChat() {
                     className="flex-1"
                   />
                   <Button 
-                    onClick={sendMessage} 
+                    onClick={handleSendMessage} 
                     disabled={!newMessage.trim() || sending}
                     size="sm"
                   >
@@ -280,7 +262,35 @@ export default function DeliberationChat() {
           </div>
 
           {/* Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-4">
+            {/* Online Users */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <Circle className="h-3 w-3 mr-2 fill-green-500 text-green-500" />
+                  Online ({onlineUsers.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {onlineUsers.map((user) => (
+                    <div key={user.user_id} className="flex items-center space-x-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs">
+                          {user.display_name?.charAt(0)?.toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm">{user.display_name || 'Anonymous'}</span>
+                    </div>
+                  ))}
+                  {onlineUsers.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No users online</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Information Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Information</CardTitle>
