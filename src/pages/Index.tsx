@@ -1,13 +1,106 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useAuth } from "@/hooks/useAuth";
+import { Layout } from "@/components/layout/Layout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { MessageSquare, Users, Vote, Brain } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 
 const Index = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user) {
+      navigate("/auth");
+    }
+  }, [user, navigate]);
+
+  if (!user) {
+    return null;
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <Layout>
+      <div className="max-w-4xl mx-auto space-y-8">
+        {/* Hero Section */}
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-bold text-democratic-blue">
+            Welcome to Democratic Deliberation
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Engage in meaningful conversations that shape our collective future. 
+            Our AI-mediated platform facilitates structured dialogue using the IBIS framework.
+          </p>
+        </div>
+
+        {/* Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="border-l-4 border-l-democratic-blue">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <MessageSquare className="h-5 w-5 text-democratic-blue" />
+                <span>Structured Discussions</span>
+              </CardTitle>
+              <CardDescription>
+                Participate in deliberations guided by AI agents that facilitate productive dialogue
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="border-l-4 border-l-democratic-green">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Brain className="h-5 w-5 text-democratic-green" />
+                <span>AI Mediation</span>
+              </CardTitle>
+              <CardDescription>
+                Three specialized AI agents help structure arguments and maintain focus
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="border-l-4 border-l-civic-gold">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Users className="h-5 w-5 text-civic-gold" />
+                <span>Collaborative Thinking</span>
+              </CardTitle>
+              <CardDescription>
+                Build on each other's ideas in a respectful, structured environment
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="border-l-4 border-l-primary">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Vote className="h-5 w-5 text-primary" />
+                <span>IBIS Framework</span>
+              </CardTitle>
+              <CardDescription>
+                Organize thoughts using Issues, Positions, and Arguments for clarity
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+
+        {/* Call to Action */}
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-semibold text-foreground">
+            Ready to start deliberating?
+          </h2>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button className="bg-democratic-blue hover:bg-democratic-blue/90">
+              Create New Deliberation
+            </Button>
+            <Button variant="outline">
+              Join Existing Discussion
+            </Button>
+          </div>
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 };
 
