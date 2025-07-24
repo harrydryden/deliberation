@@ -486,6 +486,26 @@ export type Database = {
         Args: { access_code: string; user_uuid: string }
         Returns: boolean
       }
+      match_agent_knowledge: {
+        Args: {
+          input_agent_id: string
+          query_embedding: string
+          match_threshold: number
+          match_count: number
+        }
+        Returns: {
+          id: string
+          agent_id: string
+          title: string
+          content: string
+          content_type: string
+          file_name: string
+          chunk_index: number
+          metadata: Json
+          similarity: number
+          created_at: string
+        }[]
+      }
       sparsevec_out: {
         Args: { "": unknown }
         Returns: unknown

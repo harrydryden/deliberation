@@ -41,6 +41,28 @@ serve(async (req) => {
       .eq('is_active', true)
       .single();
 
+    // Search for relevant knowledge
+    let knowledgeContext = '';
+    if (agentConfig?.id) {
+      try {
+        const { data: knowledgeResults } = await supabase.functions.invoke('search-knowledge', {
+          body: {
+            query: content,
+            agentId: agentConfig.id,
+            limit: 3
+          }
+        });
+
+        if (knowledgeResults?.results && knowledgeResults.results.length > 0) {
+          knowledgeContext = `\n\nRELEVANT KNOWLEDGE:\n${knowledgeResults.results.map((item: any, index: number) => 
+            `[${index + 1}] ${item.title}: ${item.content.substring(0, 500)}...`
+          ).join('\n\n')}\n\n`;
+        }
+      } catch (error) {
+        console.log('Knowledge search failed, continuing without:', error);
+      }
+    }
+
     const context = recentMessages?.reverse().map(m => 
       `[${m.message_type}]: ${m.content}`
     ).join('\n') || '';
@@ -53,23 +75,24 @@ YOUR ROLE:
 - Identify and articulate different Positions (solutions/stances) 
 - Extract Arguments (supporting/opposing evidence)
 - Maintain a structured overview of the deliberation
-- Help users explore and develop their ideas through thoughtful questions`;
+- Help users explore and develop their ideas through thoughtful questions
+- Use relevant knowledge from documents and sources to provide context and insights`;
 
     const goals = agentConfig?.goals?.length ? 
       `GOALS:\n${agentConfig.goals.map(goal => `- ${goal}`).join('\n')}\n\n` : '';
 
     const responseStyle = agentConfig?.response_style ? 
       `RESPONSE STYLE:\n${agentConfig.response_style}\n\n` : 
-      `RESPONSE STYLE:\n- Professional yet conversational\n- Focus on the structural aspects of the argument\n- Encourage deeper thinking\n- Keep responses concise (2-3 paragraphs max)\n\n`;
+      `RESPONSE STYLE:\n- Professional yet conversational\n- Focus on the structural aspects of the argument\n- Encourage deeper thinking\n- Keep responses concise (2-3 paragraphs max)\n- Reference relevant knowledge when helpful\n\n`;
 
     const billAgentPrompt = `${systemPrompt}
 
 ${goals}CONVERSATION CONTEXT:
 ${context}
-
+${knowledgeContext}
 NEW USER MESSAGE: "${content}"
 
-${responseStyle}Respond as the Bill Agent:`;
+${responseStyle}${knowledgeContext ? 'Use the relevant knowledge above to inform your response when appropriate. ' : ''}Respond as the Bill Agent:`;
 
     console.log('Calling Anthropic API...');
     

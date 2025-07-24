@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AgentConfigManager } from "./AgentConfigManager";
 import { AgentTester } from "./AgentTester";
 import { ConfigBackupManager } from "./ConfigBackupManager";
-import { Settings, TestTube, Archive } from "lucide-react";
+import { KnowledgeManager } from "./KnowledgeManager";
+import { Settings, TestTube, Archive, Brain } from "lucide-react";
 
 export const AdminInterface = () => {
   const [activeTab, setActiveTab] = useState("configurations");
@@ -19,10 +20,14 @@ export const AdminInterface = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="configurations" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Agent Configurations
+          </TabsTrigger>
+          <TabsTrigger value="knowledge" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Knowledge Base
           </TabsTrigger>
           <TabsTrigger value="testing" className="flex items-center gap-2">
             <TestTube className="h-4 w-4" />
@@ -44,6 +49,20 @@ export const AdminInterface = () => {
             </CardHeader>
             <CardContent>
               <AgentConfigManager />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="knowledge" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Agent Knowledge Management</CardTitle>
+              <CardDescription>
+                Add, edit and manage knowledge sources for agents. Upload PDFs or add text content for agents to reference during conversations.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <KnowledgeManager />
             </CardContent>
           </Card>
         </TabsContent>
