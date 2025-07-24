@@ -7,31 +7,101 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Function to generate embeddings using OpenAI
-async function generateEmbedding(text: string): Promise<number[]> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'text-embedding-3-small',
-      input: text,
-    }),
+// Use Anthropic to find relevant knowledge chunks
+async function findRelevantKnowledge(query: string, knowledge: any[], limit: number) {
+  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+  
+  // First, do basic text matching for quick filtering
+  const queryWords = query.toLowerCase().split(/\s+/);
+  
+  // Score knowledge chunks based on keyword overlap and content relevance
+  const scoredKnowledge = knowledge.map((item, index) => {
+    let score = 0;
+    const itemText = (item.title + ' ' + item.content + ' ' + (item.metadata?.keywords?.join(' ') || '')).toLowerCase();
+    
+    // Basic keyword matching
+    queryWords.forEach(word => {
+      if (itemText.includes(word)) {
+        score += 1;
+      }
+    });
+    
+    // Keyword matching from metadata
+    if (item.metadata?.keywords) {
+      item.metadata.keywords.forEach((keyword: string) => {
+        queryWords.forEach(word => {
+          if (keyword.toLowerCase().includes(word) || word.includes(keyword.toLowerCase())) {
+            score += 2; // Higher weight for metadata keywords
+          }
+        });
+      });
+    }
+    
+    return { ...item, relevanceScore: score, originalIndex: index };
   });
-
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${await response.text()}`);
+  
+  // Filter and sort by relevance
+  const relevantItems = scoredKnowledge
+    .filter(item => item.relevanceScore > 0)
+    .sort((a, b) => b.relevanceScore - a.relevanceScore)
+    .slice(0, Math.min(limit * 2, 10)); // Get more candidates for AI filtering
+  
+  if (relevantItems.length === 0) {
+    return [];
   }
+  
+  // If we have many candidates and Anthropic is available, use it to select the most relevant ones
+  if (relevantItems.length > limit && anthropicKey) {
+    try {
+      const candidates = relevantItems.map((item, idx) => ({
+        index: idx,
+        title: item.title,
+        summary: item.metadata?.summary || item.content.substring(0, 200) + '...'
+      }));
+      
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 300,
+          messages: [
+            {
+              role: 'user',
+              content: `Given this search query: "${query}"
 
-  const data = await response.json();
-  return data.data[0].embedding;
+Please select the ${limit} most relevant knowledge chunks from these candidates:
+
+${candidates.map(c => `${c.index}: ${c.title} - ${c.summary}`).join('\n')}
+
+Respond with only the indices of the most relevant chunks, separated by commas (e.g., "0,2,4").`
+            }
+          ]
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const selectedIndices = data.content[0].text
+          .split(',')
+          .map((idx: string) => parseInt(idx.trim()))
+          .filter((idx: number) => !isNaN(idx) && idx < relevantItems.length);
+        
+        if (selectedIndices.length > 0) {
+          return selectedIndices.map(idx => relevantItems[idx]).slice(0, limit);
+        }
+      }
+    } catch (error) {
+      console.error('Anthropic selection error:', error);
+      // Fall back to score-based selection
+    }
+  }
+  
+  return relevantItems.slice(0, limit);
 }
 
 serve(async (req) => {
@@ -48,45 +118,35 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Generate embedding for the query
-    const queryEmbedding = await generateEmbedding(query);
+    // Get all knowledge for the agent
+    const { data: allKnowledge, error: fetchError } = await supabase
+      .from('agent_knowledge')
+      .select('*')
+      .eq('agent_id', agentId);
 
-    // Search for similar content using vector similarity
-    const { data: knowledgeResults, error } = await supabase.rpc('match_agent_knowledge', {
-      agent_id: agentId,
-      query_embedding: queryEmbedding,
-      match_threshold: 0.7,
-      match_count: limit
-    });
+    if (fetchError) {
+      console.error('Database fetch error:', fetchError);
+      throw fetchError;
+    }
 
-    if (error) {
-      console.error('Error searching knowledge:', error);
-      // Fallback to text search if vector search fails
-      const { data: fallbackResults, error: fallbackError } = await supabase
-        .from('agent_knowledge')
-        .select('*')
-        .eq('agent_id', agentId)
-        .ilike('content', `%${query}%`)
-        .limit(limit);
-
-      if (fallbackError) {
-        throw fallbackError;
-      }
-
+    if (!allKnowledge || allKnowledge.length === 0) {
       return new Response(
         JSON.stringify({ 
-          results: fallbackResults || [],
-          fallback: true,
-          message: 'Used text search fallback'
+          results: [],
+          message: 'No knowledge found for this agent'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // Use text-based search with Anthropic assistance
+    const relevantKnowledge = await findRelevantKnowledge(query, allKnowledge, limit);
+
     return new Response(
       JSON.stringify({ 
-        results: knowledgeResults || [],
-        fallback: false
+        results: relevantKnowledge,
+        total: allKnowledge.length,
+        found: relevantKnowledge.length
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

@@ -31,31 +31,76 @@ async function extractTextFromPDF(pdfBuffer: ArrayBuffer): Promise<string> {
              .trim();
 }
 
-// Function to generate embeddings using OpenAI
-async function generateEmbedding(text: string): Promise<number[]> {
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openaiKey) {
-    throw new Error('OpenAI API key not configured');
+// Generate search data using Anthropic (keywords and summary for text-based search)
+async function generateSearchData(text: string): Promise<{keywords: string[], summary: string}> {
+  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!anthropicKey) {
+    // Fallback: extract basic keywords from text
+    const words = text.toLowerCase().match(/\b\w{4,}\b/g) || [];
+    const uniqueWords = [...new Set(words)].slice(0, 10);
+    return {
+      keywords: uniqueWords,
+      summary: text.substring(0, 200) + '...'
+    };
   }
 
-  const response = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openaiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'text-embedding-3-small',
-      input: text,
-    }),
-  });
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 500,
+        messages: [
+          {
+            role: 'user',
+            content: `Analyze this text and extract:
+1. A list of 5-10 key keywords/phrases that would be useful for searching
+2. A concise 1-2 sentence summary
 
-  if (!response.ok) {
-    throw new Error(`OpenAI API error: ${await response.text()}`);
+Text: "${text}"
+
+Respond in JSON format:
+{
+  "keywords": ["keyword1", "keyword2", ...],
+  "summary": "Brief summary here"
+}`
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const responseText = data.content[0].text;
+    
+    try {
+      const parsed = JSON.parse(responseText);
+      return {
+        keywords: parsed.keywords || [],
+        summary: parsed.summary || ''
+      };
+    } catch (parseError) {
+      console.error('Failed to parse Anthropic response:', responseText);
+      throw parseError;
+    }
+  } catch (error) {
+    console.error('Anthropic API error, using fallback:', error);
+    // Fallback: extract basic keywords from text
+    const words = text.toLowerCase().match(/\b\w{4,}\b/g) || [];
+    const uniqueWords = [...new Set(words)].slice(0, 10);
+    return {
+      keywords: uniqueWords,
+      summary: text.substring(0, 200) + '...'
+    };
   }
-
-  const data = await response.json();
-  return data.data[0].embedding;
 }
 
 // Function to chunk text into smaller pieces
@@ -136,8 +181,8 @@ serve(async (req) => {
       const chunk = chunks[i];
       
       try {
-        // Generate embedding for this chunk
-        const embedding = await generateEmbedding(chunk);
+        // Generate keywords and summary using Anthropic for search capability
+        const searchData = await generateSearchData(chunk);
         
         // Create knowledge entry
         const { data, error } = await supabase
@@ -150,11 +195,12 @@ serve(async (req) => {
             file_name: fileName,
             file_size: fileSize,
             chunk_index: i,
-            embedding: embedding,
             metadata: {
               total_chunks: chunks.length,
               chunk_size: chunk.length,
-              processed_at: new Date().toISOString()
+              processed_at: new Date().toISOString(),
+              keywords: searchData.keywords,
+              summary: searchData.summary
             },
             created_by: (await supabase.auth.getUser()).data.user?.id
           })
