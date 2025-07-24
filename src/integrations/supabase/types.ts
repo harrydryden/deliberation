@@ -140,6 +140,62 @@ export type Database = {
           },
         ]
       }
+      agent_knowledge: {
+        Row: {
+          agent_id: string | null
+          chunk_index: number | null
+          content: string
+          content_type: string
+          created_at: string
+          created_by: string | null
+          embedding: string | null
+          file_name: string | null
+          file_size: number | null
+          id: string
+          metadata: Json | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id?: string | null
+          chunk_index?: number | null
+          content: string
+          content_type: string
+          created_at?: string
+          created_by?: string | null
+          embedding?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          metadata?: Json | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string | null
+          chunk_index?: number | null
+          content?: string
+          content_type?: string
+          created_at?: string
+          created_by?: string | null
+          embedding?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          id?: string
+          metadata?: Json | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_knowledge_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agent_configurations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deliberations: {
         Row: {
           created_at: string | null
@@ -370,9 +426,101 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      binary_quantize: {
+        Args: { "": string } | { "": unknown }
+        Returns: unknown
+      }
+      halfvec_avg: {
+        Args: { "": number[] }
+        Returns: unknown
+      }
+      halfvec_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      halfvec_send: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      halfvec_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
+      }
+      hnsw_bit_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnsw_halfvec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnsw_sparsevec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      hnswhandler: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ivfflat_bit_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ivfflat_halfvec_support: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      ivfflathandler: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      l2_norm: {
+        Args: { "": unknown } | { "": unknown }
+        Returns: number
+      }
+      l2_normalize: {
+        Args: { "": string } | { "": unknown } | { "": unknown }
+        Returns: string
+      }
       mark_access_code_used: {
         Args: { access_code: string; user_uuid: string }
         Returns: boolean
+      }
+      sparsevec_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      sparsevec_send: {
+        Args: { "": unknown }
+        Returns: string
+      }
+      sparsevec_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
+      }
+      vector_avg: {
+        Args: { "": number[] }
+        Returns: string
+      }
+      vector_dims: {
+        Args: { "": string } | { "": unknown }
+        Returns: number
+      }
+      vector_norm: {
+        Args: { "": string }
+        Returns: number
+      }
+      vector_out: {
+        Args: { "": string }
+        Returns: unknown
+      }
+      vector_send: {
+        Args: { "": string }
+        Returns: string
+      }
+      vector_typmod_in: {
+        Args: { "": unknown[] }
+        Returns: number
       }
     }
     Enums: {
