@@ -82,6 +82,38 @@ YOUR ROLE:
       `RESPONSE STYLE:\n${agentConfig.response_style}\n\n` : 
       `RESPONSE STYLE:\n- Authoritative yet supportive\n- Process-focused and strategic\n- Clear about next steps\n- Encouraging of continued participation (2-3 paragraphs max)\n\n`;
 
+    // Handle preset questions
+    let selectedQuestion = '';
+    const presetQuestions = agentConfig?.preset_questions || [];
+    
+    if (presetQuestions.length > 0) {
+      // Simple question selection logic based on message content and conversation flow
+      const messageContent = message.toLowerCase();
+      
+      // If discussion seems stagnant or there are few recent messages
+      if (recentFlow && recentFlow.length <= 3) {
+        selectedQuestion = presetQuestions[0] || '';
+      }
+      // If message contains agreement terms, ask about different perspectives
+      else if (messageContent.includes('agree') || messageContent.includes('yes') || messageContent.includes('exactly')) {
+        const questionIndex = Math.min(1, presetQuestions.length - 1);
+        selectedQuestion = presetQuestions[questionIndex] || '';
+      }
+      // If message shows disagreement, ask about finding common ground
+      else if (messageContent.includes('disagree') || messageContent.includes('no') || messageContent.includes('but')) {
+        const questionIndex = Math.min(2, presetQuestions.length - 1);
+        selectedQuestion = presetQuestions[questionIndex] || '';
+      }
+      // For other cases, use a random question
+      else if (presetQuestions.length > 3) {
+        const questionIndex = Math.floor(Math.random() * presetQuestions.length);
+        selectedQuestion = presetQuestions[questionIndex] || '';
+      }
+    }
+
+    const questionPrompt = selectedQuestion ? 
+      `\n\nCONSIDER USING THIS QUESTION TO GUIDE DISCUSSION:\n"${selectedQuestion}"\n\nYou may incorporate this question naturally into your response if it fits the context, or use it as inspiration for guiding the conversation.` : '';
+
     const flowAgentPrompt = `${systemPrompt}
 
 DELIBERATION TOPIC: ${deliberation?.title}
@@ -97,7 +129,9 @@ DELIBERATION STATISTICS:
 RECENT DISCUSSION FLOW:
 ${flowContext}
 
-${responseStyle}Respond as the Flow Agent:`;
+${responseStyle}${questionPrompt}
+
+Respond as the Flow Agent:`;
 
     console.log('Calling Anthropic API for Flow Agent...');
     

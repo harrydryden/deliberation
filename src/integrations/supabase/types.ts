@@ -56,6 +56,7 @@ export type Database = {
           is_active: boolean
           is_default: boolean
           name: string
+          preset_questions: Json | null
           response_style: string | null
           system_prompt: string
           updated_at: string
@@ -71,6 +72,7 @@ export type Database = {
           is_active?: boolean
           is_default?: boolean
           name: string
+          preset_questions?: Json | null
           response_style?: string | null
           system_prompt: string
           updated_at?: string
@@ -86,6 +88,7 @@ export type Database = {
           is_active?: boolean
           is_default?: boolean
           name?: string
+          preset_questions?: Json | null
           response_style?: string | null
           system_prompt?: string
           updated_at?: string

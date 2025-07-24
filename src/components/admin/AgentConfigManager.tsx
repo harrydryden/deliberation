@@ -19,6 +19,7 @@ type AgentConfig = {
   description?: string;
   system_prompt: string;
   goals?: string[];
+  preset_questions?: string[];
   response_style?: string;
   is_default: boolean;
   is_active: boolean;
@@ -54,6 +55,7 @@ export const AgentConfigManager = () => {
           description: config.description,
           system_prompt: config.system_prompt,
           goals: config.goals,
+          preset_questions: config.preset_questions,
           response_style: config.response_style,
         })
         .eq("id", config.id);
@@ -116,6 +118,27 @@ export const AgentConfigManager = () => {
     if (!editingConfig) return;
     const newGoals = editingConfig.goals?.filter((_, i) => i !== index) || [];
     setEditingConfig({ ...editingConfig, goals: newGoals });
+  };
+
+  const handleQuestionChange = (index: number, value: string) => {
+    if (!editingConfig) return;
+    const newQuestions = [...(editingConfig.preset_questions || [])];
+    newQuestions[index] = value;
+    setEditingConfig({ ...editingConfig, preset_questions: newQuestions });
+  };
+
+  const addQuestion = () => {
+    if (!editingConfig) return;
+    setEditingConfig({
+      ...editingConfig,
+      preset_questions: [...(editingConfig.preset_questions || []), ""]
+    });
+  };
+
+  const removeQuestion = (index: number) => {
+    if (!editingConfig) return;
+    const newQuestions = editingConfig.preset_questions?.filter((_, i) => i !== index) || [];
+    setEditingConfig({ ...editingConfig, preset_questions: newQuestions });
   };
 
   if (isLoading) {
@@ -220,6 +243,35 @@ export const AgentConfigManager = () => {
                   Add Goal
                 </Button>
               </div>
+
+              {selectedAgent === "flow_agent" && (
+                <div className="space-y-2">
+                  <Label>Preset Questions</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Questions the Flow Agent can use to guide discussion when needed
+                  </p>
+                  {(editingConfig.preset_questions || []).map((question, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={question}
+                        onChange={(e) => handleQuestionChange(index, e.target.value)}
+                        placeholder={`Question ${index + 1}`}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeQuestion(index)}
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={addQuestion}>
+                    Add Question
+                  </Button>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="response_style">Response Style</Label>
