@@ -80,10 +80,10 @@ export const AgentConfigManager = () => {
   const currentConfig = configs?.find(c => c.agent_type === selectedAgent);
 
   useEffect(() => {
-    if (currentConfig && !editingConfig) {
+    if (currentConfig) {
       setEditingConfig({ ...currentConfig });
     }
-  }, [currentConfig, editingConfig]);
+  }, [currentConfig]);
 
   const handleSave = () => {
     if (editingConfig) {
