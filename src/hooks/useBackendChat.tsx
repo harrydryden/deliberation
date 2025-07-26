@@ -3,6 +3,8 @@ import { useBackendAuth } from "./useBackendAuth";
 import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import type { ChatMessage } from "@/types/chat";
+import { convertApiMessagesToChatMessages, convertApiMessageToChatMessage } from "@/utils/chat";
+import { getErrorMessage } from "@/utils/errors";
 
 export const useBackendChat = () => {
   const { user, isAuthenticated } = useBackendAuth();
@@ -69,9 +71,9 @@ export const useBackendChat = () => {
     setIsLoading(true);
     try {
       const data = await apiClient.getMessages();
-      setMessages(data || []);
+      setMessages(convertApiMessagesToChatMessages(data || []));
     } catch (error: any) {
-      console.error('Error loading chat history:', error);
+      console.error('Error loading chat history:', getErrorMessage(error));
       toast({
         variant: "destructive",
         title: "Error",
@@ -93,7 +95,7 @@ export const useBackendChat = () => {
       
       // The real-time update will handle adding the message to the UI
     } catch (error: any) {
-      console.error('Error sending message:', error);
+      console.error('Error sending message:', getErrorMessage(error));
       setIsTyping(false);
       toast({
         variant: "destructive",

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { getErrorMessage, ValidationError } from "@/utils/errors";
 
 export const AuthForm = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -17,6 +18,16 @@ export const AuthForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (accessCode.length !== 10) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Access Code",
+        description: "Access code must be exactly 10 digits"
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -30,7 +41,7 @@ export const AuthForm = () => {
       toast({
         variant: "destructive",
         title: "Authentication Failed",
-        description: error.message || "Invalid access code"
+        description: getErrorMessage(error)
       });
     } finally {
       setIsLoading(false);

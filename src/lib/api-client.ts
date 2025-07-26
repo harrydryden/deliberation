@@ -1,3 +1,7 @@
+import { AuthResponse, User, Message, Agent, Deliberation, ApiError } from '@/types/api';
+import { handleApiError, NetworkError } from '@/utils/errors';
+import { authService } from '@/services/auth.service';
+
 interface ApiConfig {
   baseUrl: string;
   timeout: number;
@@ -5,20 +9,17 @@ interface ApiConfig {
 
 class ApiClient {
   private config: ApiConfig;
-  private token: string | null = null;
 
   constructor(config: ApiConfig) {
     this.config = config;
-    this.token = localStorage.getItem('auth_token');
   }
 
-  setToken(token: string | null) {
-    this.token = token;
-    if (token) {
-      localStorage.setItem('auth_token', token);
-    } else {
-      localStorage.removeItem('auth_token');
-    }
+  setToken(token: string | null): void {
+    authService.setToken(token);
+  }
+
+  getToken(): string | null {
+    return authService.getToken();
   }
 
   private async request<T>(
@@ -32,89 +33,111 @@ class ApiClient {
       ...options.headers as Record<string, string>,
     };
 
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+    const token = authService.getToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
     }
 
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      signal: AbortSignal.timeout(this.config.timeout),
-    });
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: AbortSignal.timeout(this.config.timeout),
+      });
 
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `API request failed: ${response.status} ${response.statusText}`;
+        
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // Use default error message if response is not JSON
+        }
+        
+        throw new NetworkError(errorMessage);
+      }
+
+      return response.json();
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        throw error;
+      }
+      throw new NetworkError(`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    return response.json();
   }
 
   // Authentication endpoints
-  async authenticate(accessCode: string) {
-    return this.request<{ token: string; user: any }>('/auth/auth', {
+  async authenticate(accessCode: string): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/auth/auth', {
       method: 'POST',
       body: JSON.stringify({ accessCode }),
     });
   }
 
-  async signOut() {
+  async signOut(): Promise<void> {
     try {
       await this.request('/auth/logout', { method: 'POST' });
     } finally {
-      this.setToken(null);
+      authService.clearAuth();
     }
   }
 
-  async refreshToken() {
+  async refreshToken(): Promise<{ token: string }> {
     return this.request<{ token: string }>('/auth/refresh', {
       method: 'POST',
     });
   }
 
-  // Message endpoints
-  async getMessages() {
-    return this.request<any[]>('/messages');
+  async getCurrentUser(): Promise<User> {
+    return this.request<User>('/auth/me');
   }
 
-  async sendMessage(content: string, messageType: string = 'user') {
-    return this.request<any>('/messages', {
+  // Message endpoints
+  async getMessages(): Promise<Message[]> {
+    return this.request<Message[]>('/messages');
+  }
+
+  async sendMessage(content: string, messageType: string = 'user'): Promise<Message> {
+    return this.request<Message>('/messages', {
       method: 'POST',
       body: JSON.stringify({ content, messageType }),
     });
   }
 
   // Agent endpoints
-  async getAgents() {
-    return this.request<any[]>('/agents');
+  async getAgents(): Promise<Agent[]> {
+    return this.request<Agent[]>('/agents');
   }
 
-  async createAgent(config: any) {
-    return this.request<any>('/agents', {
+  async createAgent(config: Record<string, any>): Promise<Agent> {
+    return this.request<Agent>('/agents', {
       method: 'POST',
       body: JSON.stringify(config),
     });
   }
 
-  async updateAgent(id: string, config: any) {
-    return this.request<any>(`/agents/${id}`, {
+  async updateAgent(id: string, config: Record<string, any>): Promise<Agent> {
+    return this.request<Agent>(`/agents/${id}`, {
       method: 'PUT',
       body: JSON.stringify(config),
     });
   }
 
-  async deleteAgent(id: string) {
+  async deleteAgent(id: string): Promise<void> {
     return this.request<void>(`/agents/${id}`, {
       method: 'DELETE',
     });
   }
 
   // Deliberation endpoints
-  async getDeliberations() {
-    return this.request<any[]>('/deliberations');
+  async getDeliberations(): Promise<Deliberation[]> {
+    return this.request<Deliberation[]>('/deliberations');
   }
 
-  async createDeliberation(data: any) {
-    return this.request<any>('/deliberations', {
+  async createDeliberation(data: Record<string, any>): Promise<Deliberation> {
+    return this.request<Deliberation>('/deliberations', {
       method: 'POST',
       body: JSON.stringify(data),
     });

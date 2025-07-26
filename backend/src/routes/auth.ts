@@ -1,6 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 
 const authSchema = z.object({
