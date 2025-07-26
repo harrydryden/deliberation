@@ -75,7 +75,10 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
       
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         async (event: string, session: any) => {
+          console.log('🔄 Auth state change:', event, session ? 'with session' : 'no session');
+          
           if (event === 'SIGNED_OUT' || !session) {
+            console.log('🚪 Signing out user');
             setUser(null);
             setIsLoading(false);
           } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {

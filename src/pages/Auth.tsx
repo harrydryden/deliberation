@@ -14,8 +14,21 @@ const Auth = () => {
     }
   }, [user, isLoading, navigate]);
 
-  if (isLoading) return null;
-  if (user) return null;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+  
+  if (user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div>Redirecting to deliberations...</div>
+      </div>
+    );
+  }
 
   return <AuthForm />;
 };

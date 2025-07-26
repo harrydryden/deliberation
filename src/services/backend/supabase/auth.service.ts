@@ -103,13 +103,19 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async getCurrentUser(): Promise<User> {
+    console.log('🔍 Getting current user...');
     const { data: { user }, error } = await supabase.auth.getUser();
+    console.log('🔍 Supabase getUser result:', { user, error });
+    
     if (error || !user) {
+      console.error('❌ getCurrentUser failed:', error);
       throw new AuthenticationError('No authenticated user');
     }
 
     const accessCode = user.user_metadata?.access_code || 'unknown';
-    return this.mapSupabaseUser(user, accessCode);
+    const mappedUser = this.mapSupabaseUser(user, accessCode);
+    console.log('✅ User mapped successfully:', mappedUser);
+    return mappedUser;
   }
 
   async refreshToken(): Promise<{ user: User; token: string }> {
