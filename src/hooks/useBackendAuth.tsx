@@ -86,6 +86,7 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
               setUser(currentUser);
             } catch (error) {
               console.error('❌ Failed to get current user:', error);
+              console.error('❌ Error details:', error);
               setUser(null);
             }
             setIsLoading(false);
