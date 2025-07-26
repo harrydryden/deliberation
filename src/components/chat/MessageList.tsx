@@ -125,6 +125,16 @@ export const MessageList = ({ messages, isLoading, isTyping }: MessageListProps)
                     {message.content}
                   </div>
                   
+                  {/* Proactive engagement indicator */}
+                  {!isUser && message.agent_context?.isProactive && (
+                    <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Workflow className="h-3 w-3" />
+                        <span>Proactive facilitation</span>
+                      </div>
+                    </div>
+                  )}
+                  
                   {isUser && (
                     <div className="mt-3 pt-3 border-t border-white/20">
                       {message.submitted_to_ibis ? (
