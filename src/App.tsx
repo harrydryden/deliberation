@@ -11,23 +11,6 @@ import NotFound from "./pages/NotFound";
 import Chat from "./pages/Chat";
 import Admin from "./pages/Admin";
 
-// Component that uses the token refresh hook
-const AppWithAuth = () => {
-  useTokenRefresh();
-  
-  return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/auth" element={<Auth />} />
-      <Route path="/chat" element={<Chat />} />
-      <Route path="/admin" element={<Admin />} />
-      <Route path="/deliberations" element={<Chat />} />
-      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-};
-
 const App = () => (
   <ErrorBoundary>
     <BackendAuthProvider>
@@ -35,7 +18,14 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AppWithAuth />
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/deliberations" element={<Chat />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
         </BrowserRouter>
       </TooltipProvider>
     </BackendAuthProvider>
