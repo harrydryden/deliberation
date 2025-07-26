@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { RefreshCw, Settings, Edit } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RefreshCw, Settings, Edit, Plus, X } from 'lucide-react';
 import { Agent } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
@@ -27,7 +28,10 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
     description: '',
     isActive: false,
     system_prompt: '',
-    response_style: ''
+    response_style: '',
+    goals: [] as string[],
+    agent_type: '',
+    is_default: false
   });
 
   useEffect(() => {
@@ -43,7 +47,10 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
       description: agent.description,
       isActive: agent.isActive,
       system_prompt: agent.configuration?.system_prompt || '',
-      response_style: agent.configuration?.response_style || ''
+      response_style: agent.configuration?.response_style || '',
+      goals: agent.configuration?.goals || [],
+      agent_type: agent.configuration?.agent_type || '',
+      is_default: agent.configuration?.is_default || false
     });
   };
 
@@ -68,13 +75,34 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
         configuration: {
           ...editingAgent.configuration,
           system_prompt: editForm.system_prompt,
-          response_style: editForm.response_style
+          response_style: editForm.response_style,
+          goals: editForm.goals,
+          agent_type: editForm.agent_type,
+          is_default: editForm.is_default
         }
       });
       setEditingAgent(null);
     } finally {
       setUpdating(null);
     }
+  };
+
+  const addGoal = () => {
+    setEditForm(prev => ({ ...prev, goals: [...prev.goals, ''] }));
+  };
+
+  const removeGoal = (index: number) => {
+    setEditForm(prev => ({ 
+      ...prev, 
+      goals: prev.goals.filter((_, i) => i !== index) 
+    }));
+  };
+
+  const updateGoal = (index: number, value: string) => {
+    setEditForm(prev => ({
+      ...prev,
+      goals: prev.goals.map((goal, i) => i === index ? value : goal)
+    }));
   };
 
   const getAgentTypeBadge = (type: string) => {
@@ -181,6 +209,19 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
                               />
                             </div>
                             <div>
+                              <Label htmlFor="agent-type">Agent Type</Label>
+                              <Select value={editForm.agent_type} onValueChange={(value) => setEditForm(prev => ({ ...prev, agent_type: value }))}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select agent type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="bill_agent">Bill Agent</SelectItem>
+                                  <SelectItem value="peer_agent">Peer Agent</SelectItem>
+                                  <SelectItem value="flow_agent">Flow Agent</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
                               <Label htmlFor="system-prompt">System Prompt</Label>
                               <Textarea
                                 id="system-prompt"
@@ -198,12 +239,50 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
                                 rows={2}
                               />
                             </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <Label>Goals</Label>
+                                <Button type="button" variant="outline" size="sm" onClick={addGoal}>
+                                  <Plus className="h-4 w-4 mr-1" />
+                                  Add Goal
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                {editForm.goals.map((goal, index) => (
+                                  <div key={index} className="flex gap-2">
+                                    <Input
+                                      value={goal}
+                                      onChange={(e) => updateGoal(index, e.target.value)}
+                                      placeholder="Enter goal"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => removeGoal(index)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                {editForm.goals.length === 0 && (
+                                  <p className="text-sm text-muted-foreground">No goals set</p>
+                                )}
+                              </div>
+                            </div>
                             <div className="flex items-center space-x-2">
                               <Switch
                                 checked={editForm.isActive}
                                 onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, isActive: checked }))}
                               />
                               <Label>Active</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                checked={editForm.is_default}
+                                onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, is_default: checked }))}
+                              />
+                              <Label>Default Agent</Label>
                             </div>
                             <div className="flex justify-end gap-2">
                               <Button variant="outline" onClick={() => setEditingAgent(null)}>
