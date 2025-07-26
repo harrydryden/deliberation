@@ -33,3 +33,45 @@ export interface IRealtimeService {
   subscribeToMessages(callback: (message: Message) => void): () => void;
   subscribeToDeliberations(callback: (deliberation: Deliberation) => void): () => void;
 }
+
+export interface AccessCode {
+  id: string;
+  code: string;
+  code_type: string;
+  is_used: boolean;
+  used_by?: string;
+  used_at?: string;
+  created_at: string;
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  totalDeliberations: number;
+  totalMessages: number;
+  activeDeliberations: number;
+  totalAccessCodes: number;
+  usedAccessCodes: number;
+}
+
+export interface IAdminService {
+  // Users
+  getUsers(): Promise<User[]>;
+  updateUserRole(userId: string, role: string): Promise<void>;
+  deleteUser(userId: string): Promise<void>;
+  
+  // Access Codes
+  getAccessCodes(): Promise<AccessCode[]>;
+  createAccessCode(codeType: string): Promise<AccessCode>;
+  deleteAccessCode(id: string): Promise<void>;
+  
+  // Agents
+  getAgentConfigurations(): Promise<Agent[]>;
+  updateAgentConfiguration(id: string, config: Partial<Agent>): Promise<Agent>;
+  
+  // Deliberations
+  getAllDeliberations(): Promise<Deliberation[]>;
+  updateDeliberationStatus(id: string, status: string): Promise<void>;
+  
+  // Statistics
+  getSystemStats(): Promise<AdminStats>;
+}

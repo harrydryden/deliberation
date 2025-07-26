@@ -156,6 +156,67 @@ class ApiClient {
     const wsUrl = `${protocol}://${new URL(this.config.baseUrl).host}/ws`;
     return new WebSocket(wsUrl);
   }
+
+  // Admin endpoints
+  async adminGetUsers(): Promise<any[]> {
+    return this.request<any[]>('/admin/users');
+  }
+
+  async adminUpdateUserRole(userId: string, role: string): Promise<void> {
+    return this.request<void>(`/admin/users/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  async adminDeleteUser(userId: string): Promise<void> {
+    return this.request<void>(`/admin/users/${userId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async adminGetAccessCodes(): Promise<any[]> {
+    return this.request<any[]>('/admin/access-codes');
+  }
+
+  async adminCreateAccessCode(codeType: string): Promise<any> {
+    return this.request<any>('/admin/access-codes', {
+      method: 'POST',
+      body: JSON.stringify({ code_type: codeType }),
+    });
+  }
+
+  async adminDeleteAccessCode(id: string): Promise<void> {
+    return this.request<void>(`/admin/access-codes/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async adminGetAgentConfigurations(): Promise<any[]> {
+    return this.request<any[]>('/admin/agents');
+  }
+
+  async adminUpdateAgentConfiguration(id: string, config: any): Promise<any> {
+    return this.request<any>(`/admin/agents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async adminGetAllDeliberations(): Promise<any[]> {
+    return this.request<any[]>('/admin/deliberations');
+  }
+
+  async adminUpdateDeliberationStatus(id: string, status: string): Promise<void> {
+    return this.request<void>(`/admin/deliberations/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async adminGetSystemStats(): Promise<any> {
+    return this.request<any>('/admin/stats');
+  }
 }
 
 // Default configuration - adjust for your environment
