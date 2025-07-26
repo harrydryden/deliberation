@@ -160,7 +160,7 @@ class ApiClient {
 
 // Default configuration - adjust for your environment
 const config: ApiConfig = {
-  baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3000',
   timeout: 30000,
 };
 
