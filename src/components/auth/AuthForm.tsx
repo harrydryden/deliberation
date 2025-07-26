@@ -33,12 +33,12 @@ export const AuthForm = () => {
     
     try {
       await authenticate(accessCode);
-      console.log('✅ Authentication successful, navigating to chat...');
+      console.log('✅ Authentication successful, letting Auth page handle redirect...');
       toast({
         title: "Welcome!",
         description: "Successfully authenticated"
       });
-      navigate("/chat");
+      // Remove manual navigation - let Auth page handle redirect
     } catch (error: any) {
       console.error('❌ Authentication failed:', error);
       toast({
