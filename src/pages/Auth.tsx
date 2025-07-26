@@ -1,11 +1,18 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useBackendAuth } from "@/hooks/useBackendAuth";
+import { useBackend } from "@/contexts/BackendContext";
 import { AuthForm } from "@/components/auth/AuthForm";
 
 const Auth = () => {
-  const { user, isLoading } = useAuth();
+  const { useNodeBackend } = useBackend();
+  const supabaseAuth = useAuth();
+  const backendAuth = useBackendAuth();
   const navigate = useNavigate();
+  
+  // Use the appropriate auth based on backend selection
+  const { user, isLoading } = useNodeBackend ? backendAuth : supabaseAuth;
 
   useEffect(() => {
     if (!isLoading && user) {
