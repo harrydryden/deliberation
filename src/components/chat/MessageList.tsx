@@ -5,16 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Bot, User, Users, Workflow, FileText, Send, CheckCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIbisSubmission } from "@/hooks/useIbisSubmission";
-
-interface ChatMessage {
-  id: string;
-  content: string;
-  message_type: 'user' | 'bill_agent' | 'peer_agent' | 'flow_agent';
-  created_at: string;
-  user_id?: string;
-  agent_context?: any;
-  submitted_to_ibis?: boolean;
-}
+import type { ChatMessage } from "@/types/chat";
 
 interface MessageListProps {
   messages: ChatMessage[];

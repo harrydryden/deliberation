@@ -1,17 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-
-interface ChatMessage {
-  id: string;
-  content: string;
-  message_type: 'user' | 'bill_agent' | 'peer_agent' | 'flow_agent';
-  created_at: string;
-  user_id?: string;
-  agent_context?: any;
-  submitted_to_ibis?: boolean;
-}
+import { useSessionState } from "./useSessionState";
+import { useProactiveEngagement } from "./useProactiveEngagement";
+import type { ChatMessage } from "@/types/chat";
 
 export const useChat = () => {
   const { user } = useAuth();
@@ -19,7 +12,13 @@ export const useChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [lastActivityTime, setLastActivityTime] = useState(Date.now());
+  
+  const { 
+    sessionState, 
+    updateActivity, 
+    incrementProactivePrompts, 
+    getMinutesSinceLastActivity 
+  } = useSessionState(user?.id);
 
   // Load chat history when user is available
   useEffect(() => {
@@ -45,9 +44,9 @@ export const useChat = () => {
                 return prev;
               }
               return [...prev, newMessage];
-            });
-            setIsTyping(false);
-            setLastActivityTime(Date.now());
+              });
+              setIsTyping(false);
+              updateActivity();
           }
         )
         .subscribe();
@@ -58,31 +57,11 @@ export const useChat = () => {
     }
   }, [user]);
 
-  // Set up proactive engagement timer
-  useEffect(() => {
-    if (!user) return;
-
-    const checkProactiveEngagement = () => {
-      const minutesSinceLastActivity = (Date.now() - lastActivityTime) / 60000;
-      
-      // Trigger proactive engagement after 5 minutes of inactivity
-      if (minutesSinceLastActivity >= 5) {
-        console.log('Triggering proactive engagement check');
-        handleProactiveEngagement();
-      }
-    };
-
-    // Check every minute
-    const intervalId = setInterval(checkProactiveEngagement, 60000);
-
-    return () => clearInterval(intervalId);
-  }, [user, lastActivityTime]);
-
-  const handleProactiveEngagement = async () => {
+  const handleProactiveEngagement = useCallback(async () => {
     if (!user) return;
 
     try {
-      // Call orchestrator without content to trigger proactive engagement
+      incrementProactivePrompts();
       const { error: orchestratorError } = await supabase.functions.invoke(
         'ai-deliberation-orchestrator',
         {
@@ -99,7 +78,14 @@ export const useChat = () => {
     } catch (error: any) {
       console.error('Error triggering proactive engagement:', error);
     }
-  };
+  }, [user, incrementProactivePrompts]);
+
+  // Set up proactive engagement
+  useProactiveEngagement({
+    user,
+    lastActivityTime: sessionState.lastActivityTime,
+    onTriggerEngagement: handleProactiveEngagement
+  });
 
   const loadChatHistory = async () => {
     if (!user) return;
@@ -145,6 +131,7 @@ export const useChat = () => {
 
       // Don't add to local state here - real-time subscription will handle it
       setIsTyping(true);
+      updateActivity(); // Track user activity
 
       // Trigger AI response via edge function
       const { error: orchestratorError } = await supabase.functions.invoke(
@@ -154,6 +141,7 @@ export const useChat = () => {
             message_id: userMessage.id,
             user_id: user.id,
             content: content.trim(),
+            session_state: sessionState,
           }
         }
       );

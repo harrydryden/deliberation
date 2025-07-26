@@ -1,11 +1,17 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { 
+  corsHeaders, 
+  createSupabaseClient, 
+  getRecentMessages, 
+  getAgentConfig, 
+  searchKnowledge, 
+  callAnthropicAPI, 
+  saveAgentMessage,
+  buildSystemPrompt,
+  type AgentContext
+} from '../shared/agent-utils.ts';
+import { buildBillAgentPrompt } from '../shared/prompt-builders.ts';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,62 +19,27 @@ serve(async (req) => {
   }
 
   try {
-    const { message_id, content, user_id, input_type, session_state } = await req.json();
+    const context: AgentContext = await req.json();
+    const { message_id, content, user_id, input_type, session_state } = context;
     
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
     if (!ANTHROPIC_API_KEY) {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createSupabaseClient();
 
-    // Get user's recent messages for context (no deliberation needed for single-user chat)
-    const { data: recentMessages } = await supabase
-      .from('messages')
-      .select('content, message_type, created_at')
-      .eq('user_id', user_id)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    // Get default agent configuration
-    const { data: agentConfig } = await supabase
-      .from('agent_configurations')
-      .select('*')
-      .eq('agent_type', 'bill_agent')
-      .eq('is_default', true)
-      .eq('is_active', true)
-      .single();
+    // Get agent configuration and context
+    const [agentConfig, conversationContext] = await Promise.all([
+      getAgentConfig(supabase, 'bill_agent'),
+      getRecentMessages(supabase, user_id, 10)
+    ]);
 
     // Search for relevant knowledge
-    let knowledgeContext = '';
-    if (agentConfig?.id) {
-      try {
-        const { data: knowledgeResults } = await supabase.functions.invoke('search-knowledge', {
-          body: {
-            query: content,
-            agentId: agentConfig.id,
-            limit: 3
-          }
-        });
+    const knowledgeContext = await searchKnowledge(supabase, agentConfig?.id, content);
 
-        if (knowledgeResults?.results && knowledgeResults.results.length > 0) {
-          knowledgeContext = `\n\nRELEVANT KNOWLEDGE:\n${knowledgeResults.results.map((item: any, index: number) => 
-            `[${index + 1}] ${item.title}: ${item.content.substring(0, 500)}...`
-          ).join('\n\n')}\n\n`;
-        }
-      } catch (error) {
-        console.log('Knowledge search failed, continuing without:', error);
-      }
-    }
-
-    const context = recentMessages?.reverse().map(m => 
-      `[${m.message_type}]: ${m.content}`
-    ).join('\n') || '';
-
-    // Build dynamic prompt based on input type and enhanced logic
-    let systemPrompt = agentConfig?.system_prompt || `You are the Bill Agent, a specialized AI facilitator for democratic deliberation using the IBIS (Issue-Based Information System) framework.
+    // Build system prompt with enhancements
+    const defaultSystemPrompt = `You are the Bill Agent, a specialized AI facilitator for democratic deliberation using the IBIS (Issue-Based Information System) framework.
 
 YOUR ROLE:
 - Synthesize user input into clear IBIS Issues (core problems/questions)
@@ -78,119 +49,26 @@ YOUR ROLE:
 - Help users explore and develop their ideas through thoughtful questions
 - Use relevant knowledge from documents and sources to provide context and insights`;
 
-    // Enhance system prompt based on input type
-    if (input_type === 'QUESTION') {
-      systemPrompt += `
+    const systemPrompt = buildSystemPrompt(agentConfig, defaultSystemPrompt, input_type, session_state);
 
-QUESTION HANDLING:
-- Provide factual, balanced information
-- Acknowledge multiple perspectives when relevant
-- Base responses on verified information from knowledge base
-- Keep responses informative but concise (2-3 paragraphs)
-- End with confidence and relevance scores`;
-    } else if (input_type === 'STATEMENT') {
-      systemPrompt += `
-
-STATEMENT HANDLING:
-- Analyze the stance and underlying arguments
-- Provide a ${session_state?.statementCount % 2 === 0 ? 'supportive' : 'counter'} perspective
-- Reference relevant knowledge from the knowledge base
-- Maintain respectful and constructive tone
-- Focus on substance and evidence`;
-    }
-
-    const goals = agentConfig?.goals?.length ? 
-      `GOALS:\n${agentConfig.goals.map(goal => `- ${goal}`).join('\n')}\n\n` : '';
-
-    const responseStyle = agentConfig?.response_style ? 
-      `RESPONSE STYLE:\n${agentConfig.response_style}\n\n` : 
-      `RESPONSE STYLE:\n- Professional yet conversational\n- Focus on the structural aspects of the argument\n- Encourage deeper thinking\n- Keep responses concise (2-3 paragraphs max)\n- Reference relevant knowledge when helpful\n\n`;
-
-    let billAgentPrompt;
-    
-    if (input_type === 'QUESTION') {
-      billAgentPrompt = `${systemPrompt}
-
-${goals}CONVERSATION CONTEXT:
-${context}
-${knowledgeContext}
-USER QUESTION: "${content}"
-
-${responseStyle}${knowledgeContext ? 'Use the relevant knowledge above to inform your response when appropriate. ' : ''}
-
-Provide an informative response to this question. End with:
-CONFIDENCE: [0-1 score indicating how confident you are in this response]
-RELEVANCE: [0-1 score indicating how relevant this response is to the question]
-
-Respond as the Bill Agent:`;
-    } else if (input_type === 'STATEMENT') {
-      const responseType = session_state?.statementCount % 2 === 0 ? 'supportive' : 'counter';
-      billAgentPrompt = `${systemPrompt}
-
-${goals}CONVERSATION CONTEXT:
-${context}
-${knowledgeContext}
-USER STATEMENT: "${content}"
-
-${responseStyle}${knowledgeContext ? 'Use the relevant knowledge above to inform your response when appropriate. ' : ''}
-
-Provide a ${responseType} response to this statement. ${responseType === 'supportive' ? 'Build upon their perspective with additional evidence or reasoning.' : 'Present alternative viewpoints or evidence that challenges this perspective.'} Keep the tone respectful and constructive.
-
-Respond as the Bill Agent:`;
-    } else {
-      billAgentPrompt = `${systemPrompt}
-
-${goals}CONVERSATION CONTEXT:
-${context}
-${knowledgeContext}
-NEW USER MESSAGE: "${content}"
-
-${responseStyle}${knowledgeContext ? 'Use the relevant knowledge above to inform your response when appropriate. ' : ''}Respond as the Bill Agent:`;
-    }
+    // Build the complete prompt
+    const billAgentPrompt = buildBillAgentPrompt({
+      systemPrompt,
+      goals: agentConfig?.goals,
+      responseStyle: agentConfig?.response_style,
+      conversationContext,
+      knowledgeContext,
+      content,
+      inputType: input_type,
+      sessionState: session_state,
+      agentType: 'bill_agent'
+    });
 
     console.log('Calling Anthropic API...');
     
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1000,
-        messages: [
-          {
-            role: 'user',
-            content: billAgentPrompt
-          }
-        ]
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Anthropic API error:', errorText);
-      throw new Error(`Anthropic API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const agentResponse = data.content[0].text;
-
-    // Store the agent's response in the database
-    const { error: insertError } = await supabase
-      .from('messages')
-      .insert({
-        content: agentResponse,
-        user_id: user_id,
-        message_type: 'bill_agent'
-      });
-
-    if (insertError) {
-      console.error('Database insert error:', insertError);
-      throw insertError;
-    }
+    // Call Anthropic API and save response
+    const agentResponse = await callAnthropicAPI(ANTHROPIC_API_KEY, billAgentPrompt);
+    await saveAgentMessage(supabase, agentResponse, user_id, 'bill_agent');
 
     return new Response(
       JSON.stringify({ 
