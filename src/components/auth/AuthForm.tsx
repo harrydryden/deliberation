@@ -7,13 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+
 export const AuthForm = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [accessCode, setAccessCode] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const { signIn, signUp } = useBackendAuth();
+  const { authenticate } = useBackendAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -22,25 +21,17 @@ export const AuthForm = () => {
     setIsLoading(true);
     
     try {
-      if (isSignUp) {
-        await signUp(email, password, displayName);
-        toast({
-          title: "Account created!",
-          description: "Welcome to Democratic Deliberation!"
-        });
-      } else {
-        await signIn(email, password);
-        toast({
-          title: "Welcome back!",
-          description: "Successfully signed in"
-        });
-      }
+      await authenticate(accessCode, displayName || undefined);
+      toast({
+        title: "Welcome!",
+        description: "Successfully authenticated"
+      });
       navigate("/chat");
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: isSignUp ? "Sign Up Failed" : "Sign In Failed",
-        description: error.message || "An error occurred"
+        title: "Authentication Failed",
+        description: error.message || "Invalid access code"
       });
     } finally {
       setIsLoading(false);
@@ -51,73 +42,48 @@ export const AuthForm = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-democratic-blue">
-            {isSignUp ? "Join Deliberation" : "Welcome Back"}
+            Enter Access Code
           </CardTitle>
           <CardDescription>
-            {isSignUp ? "Create your account to join the conversation" : "Sign in to continue deliberating"}
+            Enter your 10-digit access code to join the deliberation
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="accessCode">Access Code</Label>
               <Input 
-                id="email" 
-                type="email" 
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="accessCode" 
+                type="text" 
+                placeholder="1234567890"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                maxLength={10}
+                pattern="\d{10}"
                 required 
+                className="text-center text-lg tracking-widest"
               />
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="displayName">Display Name (Optional)</Label>
               <Input 
-                id="password" 
-                type="password" 
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
+                id="displayName" 
+                type="text" 
+                placeholder="How should we address you?"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
               />
             </div>
-            
-            {isSignUp && (
-              <div className="space-y-2">
-                <Label htmlFor="displayName">Display Name (Optional)</Label>
-                <Input 
-                  id="displayName" 
-                  type="text" 
-                  placeholder="How should we address you?"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                />
-              </div>
-            )}
             
             <Button 
               type="submit" 
               className="w-full bg-democratic-blue hover:bg-democratic-blue/90" 
-              disabled={isLoading}
+              disabled={isLoading || accessCode.length !== 10}
             >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSignUp ? "Create Account" : "Sign In"}
+              Join Deliberation
             </Button>
-            
-            <div className="text-center">
-              <Button
-                type="button"
-                variant="link"
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-sm"
-              >
-                {isSignUp 
-                  ? "Already have an account? Sign in" 
-                  : "Need an account? Sign up"
-                }
-              </Button>
-            </div>
           </form>
         </CardContent>
       </Card>

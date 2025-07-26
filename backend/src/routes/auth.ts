@@ -3,15 +3,9 @@ import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 
-const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
+const authSchema = z.object({
+  accessCode: z.string().regex(/^\d{10}$/, "Access code must be exactly 10 digits"),
   displayName: z.string().optional(),
-});
-
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
 });
 
 const updateProfileSchema = z.object({
@@ -21,110 +15,79 @@ const updateProfileSchema = z.object({
 });
 
 export async function authRoutes(fastify: FastifyInstance) {
-  // Register new user
-  fastify.post('/register', {
+  // Authenticate with 10-digit access code
+  fastify.post('/auth', {
     schema: {
-      body: registerSchema,
+      body: authSchema,
     },
   }, async (request: FastifyRequest<{ 
-    Body: z.infer<typeof registerSchema> 
+    Body: z.infer<typeof authSchema> 
   }>, reply: FastifyReply) => {
-    const { email, password, displayName } = request.body;
+    const { accessCode, displayName } = request.body;
 
     try {
-      // Check if user already exists
-      const existingUser = await fastify.prisma.user.findUnique({
-        where: { email },
+      // Check if access code is valid
+      const codeRecord = await fastify.prisma.accessCode.findFirst({
+        where: {
+          code: accessCode,
+          isUsed: false,
+        },
       });
 
-      if (existingUser) {
-        reply.status(400).send({ error: 'User already exists' });
+      if (!codeRecord) {
+        reply.status(401).send({ error: 'Invalid access code' });
         return;
       }
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 12);
-      const userId = uuidv4();
-
-      // Create user and profile in transaction
-      const result = await fastify.prisma.$transaction(async (tx) => {
-        const user = await tx.user.create({
-          data: {
-            id: userId,
-            email,
-            // Note: In a real app, you'd have a password field
-            // For this migration, we're assuming password handling is done elsewhere
-          },
-        });
-
-        const profile = await tx.profile.create({
-          data: {
-            userId,
-            displayName: displayName || email.split('@')[0],
-          },
-        });
-
-        return { user, profile };
-      });
-
-      // Generate JWT token
-      const token = fastify.jwt.sign(
-        { sub: userId, email },
-        { expiresIn: '24h' }
-      );
-
-      reply.status(201).send({
-        user: {
-          id: result.user.id,
-          email: result.user.email,
-          profile: {
-            displayName: result.profile.displayName,
-            bio: result.profile.bio,
-          },
-        },
-        token,
-      });
-    } catch (error) {
-      fastify.log.error({ error, email }, 'Registration error');
-      reply.status(500).send({ error: 'Registration failed' });
-    }
-  });
-
-  // Login user
-  fastify.post('/login', {
-    schema: {
-      body: loginSchema,
-    },
-  }, async (request: FastifyRequest<{ 
-    Body: z.infer<typeof loginSchema> 
-  }>, reply: FastifyReply) => {
-    const { email, password } = request.body;
-
-    try {
-      // Find user with profile
-      const user = await fastify.prisma.user.findUnique({
-        where: { email },
+      // Check if user already exists with this access code
+      let user = await fastify.prisma.user.findFirst({
+        where: { accessCode },
         include: { profile: true },
       });
 
-      if (!user) {
-        reply.status(401).send({ error: 'Invalid credentials' });
-        return;
-      }
+      const userId = user?.id || uuidv4();
 
-      // In a real implementation, you'd verify the password hash here
-      // For this migration, we'll assume password verification is handled elsewhere
+      if (!user) {
+        // Create new user and profile
+        const result = await fastify.prisma.$transaction(async (tx) => {
+          const newUser = await tx.user.create({
+            data: {
+              id: userId,
+              email: `${accessCode}@temp.local`, // Temporary email for compatibility
+              accessCode,
+            },
+          });
+
+          const newProfile = await tx.profile.create({
+            data: {
+              userId,
+              displayName: displayName || `User ${accessCode}`,
+            },
+          });
+
+          return { user: newUser, profile: newProfile };
+        });
+        
+        user = { ...result.user, profile: result.profile };
+      } else if (displayName && user.profile?.displayName !== displayName) {
+        // Update display name if provided and different
+        await fastify.prisma.profile.update({
+          where: { userId },
+          data: { displayName },
+        });
+        user.profile.displayName = displayName;
+      }
 
       // Generate JWT token
       const token = fastify.jwt.sign(
-        { sub: user.id, email: user.email },
+        { sub: userId, accessCode },
         { expiresIn: '24h' }
       );
 
       reply.send({
         user: {
           id: user.id,
-          email: user.email,
+          accessCode: user.accessCode,
           profile: user.profile ? {
             displayName: user.profile.displayName,
             bio: user.profile.bio,
@@ -134,8 +97,8 @@ export async function authRoutes(fastify: FastifyInstance) {
         token,
       });
     } catch (error) {
-      fastify.log.error({ error, email }, 'Login error');
-      reply.status(500).send({ error: 'Login failed' });
+      fastify.log.error({ error, accessCode }, 'Authentication error');
+      reply.status(500).send({ error: 'Authentication failed' });
     }
   });
 
@@ -159,7 +122,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       reply.send({
         user: {
           id: user.id,
-          email: user.email,
+          accessCode: user.accessCode,
           profile: user.profile ? {
             displayName: user.profile.displayName,
             avatarUrl: user.profile.avatarUrl,
@@ -224,9 +187,14 @@ export async function authRoutes(fastify: FastifyInstance) {
     const email = request.user.email;
 
     try {
+      // Get user to include accessCode in token
+      const user = await fastify.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
       // Generate new JWT token
       const token = fastify.jwt.sign(
-        { sub: userId, email },
+        { sub: userId, accessCode: user?.accessCode },
         { expiresIn: '24h' }
       );
 

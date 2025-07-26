@@ -44,7 +44,7 @@ export const Header = () => {
                 </AvatarFallback>
               </Avatar>
               <span className="text-sm font-medium">
-                {(user as any).displayName || user.email}
+                {(user as any).displayName || `User ${user.accessCode}`}
               </span>
             </div>
             <Button

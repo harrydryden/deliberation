@@ -50,23 +50,16 @@ class ApiClient {
   }
 
   // Authentication endpoints
-  async signIn(email: string, password: string) {
-    return this.request<{ token: string; user: any }>('/auth/signin', {
+  async authenticate(accessCode: string, displayName?: string) {
+    return this.request<{ token: string; user: any }>('/auth/auth', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-  }
-
-  async signUp(email: string, password: string, displayName?: string) {
-    return this.request<{ token: string; user: any }>('/auth/signup', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, displayName }),
+      body: JSON.stringify({ accessCode, displayName }),
     });
   }
 
   async signOut() {
     try {
-      await this.request('/auth/signout', { method: 'POST' });
+      await this.request('/auth/logout', { method: 'POST' });
     } finally {
       this.setToken(null);
     }

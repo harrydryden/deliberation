@@ -3,15 +3,14 @@ import { apiClient } from "@/lib/api-client";
 
 interface User {
   id: string;
-  email: string;
+  accessCode: string;
   displayName?: string;
 }
 
 interface BackendAuthContextType {
   user: User | null;
   isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName?: string) => Promise<void>;
+  authenticate: (accessCode: string, displayName?: string) => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -29,33 +28,19 @@ export const BackendAuthProvider = ({ children }: { children: React.ReactNode })
       apiClient.setToken(token);
       // In a real app, you'd validate the token with the backend
       // For now, we'll assume it's valid if it exists
-      setUser({ id: 'user-id', email: 'user@example.com' }); // Placeholder
+      setUser({ id: 'user-id', accessCode: '1234567890' }); // Placeholder
     }
     setIsLoading(false);
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const authenticate = async (accessCode: string, displayName?: string) => {
     setIsLoading(true);
     try {
-      const response = await apiClient.signIn(email, password);
+      const response = await apiClient.authenticate(accessCode, displayName);
       apiClient.setToken(response.token);
       setUser(response.user);
     } catch (error) {
-      console.error('Sign in error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const signUp = async (email: string, password: string, displayName?: string) => {
-    setIsLoading(true);
-    try {
-      const response = await apiClient.signUp(email, password, displayName);
-      apiClient.setToken(response.token);
-      setUser(response.user);
-    } catch (error) {
-      console.error('Sign up error:', error);
+      console.error('Authentication error:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -77,8 +62,7 @@ export const BackendAuthProvider = ({ children }: { children: React.ReactNode })
   const value = {
     user,
     isLoading,
-    signIn,
-    signUp,
+    authenticate,
     signOut,
     isAuthenticated: !!user,
   };
