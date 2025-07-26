@@ -6,7 +6,7 @@ import type { ChatMessage } from "@/types/chat";
 import { convertApiMessagesToChatMessages } from "@/utils/chat";
 import { getErrorMessage } from "@/utils/errors";
 
-export const useBackendChat = () => {
+export const useBackendChat = (deliberationId?: string) => {
   const { user, isAuthenticated } = useBackendAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);

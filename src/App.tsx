@@ -10,6 +10,8 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Chat from "./pages/Chat";
 import Admin from "./pages/Admin";
+import Deliberations from "./pages/Deliberations";
+import DeliberationChat from "./pages/DeliberationChat";
 
 const App = () => (
   <ErrorBoundary>
@@ -24,7 +26,8 @@ const App = () => (
             <Route path="/chat" element={<Chat />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/backend" element={<BackendSelector />} />
-            <Route path="/deliberations" element={<Chat />} />
+            <Route path="/deliberations" element={<Deliberations />} />
+            <Route path="/deliberations/:deliberationId" element={<DeliberationChat />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

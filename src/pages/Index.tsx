@@ -14,7 +14,7 @@ const Index = () => {
     if (!user) {
       navigate("/auth");
     } else {
-      navigate("/chat");
+      navigate("/deliberations");
     }
   }, [user, navigate]);
 
