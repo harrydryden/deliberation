@@ -18,6 +18,8 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   async authenticate(accessCode: string): Promise<{ user: User; token: string }> {
+    console.log('🔐 Starting authentication with access code:', accessCode);
+    
     // Check if access code is valid
     const { data: accessCodeData, error: accessCodeError } = await supabase
       .from('access_codes')
@@ -26,11 +28,17 @@ export class SupabaseAuthService implements IAuthService {
       .eq('is_used', false)
       .single();
 
+    console.log('📋 Access code check result:', { accessCodeData, accessCodeError });
+
     if (accessCodeError || !accessCodeData) {
+      console.error('❌ Access code validation failed:', accessCodeError);
       throw new AuthenticationError('Invalid or already used access code');
     }
 
+    console.log('✅ Access code is valid, proceeding with auth...');
+
     // Sign up/in with access code as password
+    console.log('🔑 Attempting sign up...');
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: `${accessCode}@temp.local`,
       password: accessCode,
@@ -41,21 +49,28 @@ export class SupabaseAuthService implements IAuthService {
       }
     });
 
+    console.log('📝 Sign up result:', { authData, authError });
+
     if (authError) {
+      console.log('🔄 Sign up failed, trying sign in...', authError.message);
       // Try sign in if user already exists
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: `${accessCode}@temp.local`,
         password: accessCode,
       });
 
+      console.log('🔓 Sign in result:', { signInData, signInError });
       if (signInError) {
+        console.error('❌ Sign in failed:', signInError);
         throw new AuthenticationError(signInError.message);
       }
 
       if (!signInData.user || !signInData.session) {
+        console.error('❌ Sign in succeeded but missing user/session');
         throw new AuthenticationError('Authentication failed');
       }
 
+      console.log('✅ Sign in successful!');
       this.token = signInData.session.access_token;
       return {
         user: this.mapSupabaseUser(signInData.user, accessCode),
@@ -64,8 +79,11 @@ export class SupabaseAuthService implements IAuthService {
     }
 
     if (!authData.user || !authData.session) {
+      console.error('❌ Sign up succeeded but missing user/session');
       throw new AuthenticationError('Authentication failed');
     }
+
+    console.log('✅ Sign up successful!');
 
     // Mark access code as used
     await supabase

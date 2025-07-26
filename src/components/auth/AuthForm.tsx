@@ -29,15 +29,18 @@ export const AuthForm = () => {
     }
     
     setIsLoading(true);
+    console.log('🚀 Starting authentication process with code:', accessCode);
     
     try {
       await authenticate(accessCode);
+      console.log('✅ Authentication successful, navigating to chat...');
       toast({
         title: "Welcome!",
         description: "Successfully authenticated"
       });
       navigate("/chat");
     } catch (error: any) {
+      console.error('❌ Authentication failed:', error);
       toast({
         variant: "destructive",
         title: "Authentication Failed",
