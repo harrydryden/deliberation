@@ -1,4 +1,4 @@
-import { useAuth } from "@/hooks/useAuth";
+import { useBackendAuth } from "@/hooks/useBackendAuth";
 import { Header } from "./Header";
 import { Loader2 } from "lucide-react";
 
@@ -7,7 +7,7 @@ interface LayoutProps {
 }
 
 export const Layout = ({ children }: LayoutProps) => {
-  const { isLoading } = useAuth();
+  const { isLoading } = useBackendAuth();
 
   if (isLoading) {
     return (

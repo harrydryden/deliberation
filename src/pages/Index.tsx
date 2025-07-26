@@ -1,4 +1,4 @@
-import { useAuth } from "@/hooks/useAuth";
+import { useBackendAuth } from "@/hooks/useBackendAuth";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 
 const Index = () => {
-  const { user } = useAuth();
+  const { user } = useBackendAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

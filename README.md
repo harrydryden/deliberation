@@ -1,26 +1,16 @@
 # Democratic Deliberation Platform
 
-A full-stack application for facilitating democratic deliberation with AI assistance, built with React frontend and dual backend support (Supabase + Node.js).
+A modern web application for facilitating democratic deliberations and structured conversations using AI agents.
 
 ## Architecture
 
-### Frontend (React + TypeScript)
-- **Framework**: React 18 with TypeScript  
-- **Styling**: Tailwind CSS with custom design system
-- **State Management**: React Query + Context API
-- **UI Components**: Radix UI with custom styling
-- **Authentication**: Dual support for Supabase Auth and JWT-based backend auth
+This application uses a **Node.js backend** architecture with:
+- **Frontend**: React + TypeScript + Tailwind CSS
+- **Backend**: Node.js + Fastify + PostgreSQL + Redis
+- **Authentication**: JWT-based authentication system
+- **Real-time**: Server-Sent Events (SSE) and WebSocket support
 
-### Backend Options
-
-#### Option 1: Supabase (Current Default)
-- **Database**: PostgreSQL with Row Level Security
-- **Authentication**: Supabase Auth
-- **Real-time**: Supabase Realtime subscriptions
-- **Edge Functions**: TypeScript serverless functions
-- **AI Integration**: Anthropic Claude via edge functions
-
-#### Option 2: Node.js Backend (New)
+### Backend Services (Node.js)
 - **Framework**: Fastify with TypeScript
 - **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: JWT-based with bcrypt
@@ -42,7 +32,6 @@ A full-stack application for facilitating democratic deliberation with AI assist
 - **Admin Dashboard**: Agent configuration and system monitoring
 
 ### Technical Features
-- **Dual Backend Support**: Seamlessly toggle between Supabase and Node.js
 - **Real-time Updates**: WebSocket and Server-Sent Events for live updates
 - **Performance Optimization**: Intelligent caching, rate limiting, connection pooling
 - **Security**: Multi-layer content safety, authentication, and authorization
@@ -54,12 +43,6 @@ A full-stack application for facilitating democratic deliberation with AI assist
 **Lovable Project**: https://lovable.dev/projects/95847591-350e-48fd-8530-0c2bb5de6650
 
 ## Quick Start
-
-### Development with Supabase (Current Default)
-```bash
-npm install
-npm run dev
-```
 
 ### Development with Node.js Backend
 ```bash
@@ -86,12 +69,12 @@ JWT_SECRET=your-secure-jwt-secret-here
 ANTHROPIC_API_KEY=your-anthropic-api-key-here
 ```
 
-## Backend Selection
+## Backend Architecture
 
-The application supports both backends simultaneously. Toggle between them using the switch in the header:
-
-- **Supabase Mode**: Uses Supabase Auth, Realtime, and Edge Functions (current default)
-- **Node.js Mode**: Uses JWT auth, WebSocket/SSE, and direct AI integration (new option)
+The application uses a Node.js backend with:
+- **JWT-based Authentication**: Secure user authentication and session management
+- **Real-time Communication**: WebSocket and Server-Sent Events for live updates
+- **AI Integration**: Direct Anthropic SDK integration for chat functionality
 
 ## How to Edit This Code
 
@@ -107,10 +90,7 @@ cd <YOUR_PROJECT_NAME>
 # Install dependencies
 npm install
 
-# Start development (Supabase mode)
-npm run dev
-
-# Or start with Node.js backend
+# Start development with Node.js backend
 docker-compose -f docker-compose.dev.yml up
 ```
 
@@ -122,7 +102,6 @@ docker-compose -f docker-compose.dev.yml up
 - **React 18** - UI framework with hooks and context
 - **Tailwind CSS** - Utility-first styling with custom design system
 - **Radix UI** - Accessible UI primitives (shadcn-ui)
-- **React Query** - Server state management
 - **React Router** - Client-side routing
 
 ### Backend (Node.js Option)
@@ -139,7 +118,6 @@ docker-compose -f docker-compose.dev.yml up
 - **PostgreSQL** - Primary database with pgvector for semantic search
 - **Redis** - High-performance caching layer
 - **Docker** - Containerization for development and deployment
-- **Supabase** - Backend-as-a-Service (optional mode)
 
 ## How can I deploy this project?
 

@@ -1,10 +1,9 @@
 import { useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Bot, User, Users, Workflow, FileText, Send, CheckCircle } from "lucide-react";
+import { Bot, User, Users, Workflow, FileText } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useIbisSubmission } from "@/hooks/useIbisSubmission";
+
 import type { ChatMessage } from "@/types/chat";
 
 interface MessageListProps {
@@ -48,7 +47,6 @@ const getAgentInfo = (messageType: string) => {
 
 export const MessageList = ({ messages, isLoading, isTyping }: MessageListProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { submitToIbis, isSubmitting } = useIbisSubmission();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -126,27 +124,6 @@ export const MessageList = ({ messages, isLoading, isTyping }: MessageListProps)
                     </div>
                   )}
                   
-                  {isUser && (
-                    <div className="mt-3 pt-3 border-t border-white/20">
-                      {message.submitted_to_ibis ? (
-                        <div className="flex items-center gap-2 text-xs opacity-80">
-                          <CheckCircle className="h-3 w-3" />
-                          <span>Sent to IBIS</span>
-                        </div>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => submitToIbis({ messageId: message.id })}
-                          disabled={isSubmitting === message.id}
-                          className="text-white hover:bg-white/10 text-xs px-2 py-1 h-auto"
-                        >
-                          <Send className="h-3 w-3 mr-1" />
-                          {isSubmitting === message.id ? 'Submitting...' : 'Submit to IBIS'}
-                        </Button>
-                      )}
-                    </div>
-                  )}
                 </Card>
               </div>
             </div>

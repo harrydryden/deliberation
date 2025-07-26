@@ -1,30 +1,37 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useBackendAuth } from "@/hooks/useBackendAuth";
 import { Layout } from "@/components/layout/Layout";
-import { AdminInterface } from "@/components/admin/AdminInterface";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Admin = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading } = useBackendAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!isLoading && !user) {
       navigate("/auth");
     }
-    // Check if user has admin role
-    if (!isLoading && user && user.user_metadata?.user_role !== 'admin') {
-      navigate("/");
-    }
   }, [user, isLoading, navigate]);
 
   if (isLoading) return null;
   if (!user) return null;
-  if (user.user_metadata?.user_role !== 'admin') return null;
 
   return (
     <Layout>
-      <AdminInterface />
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Admin Dashboard</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Admin functionality is currently being migrated to the Node.js backend.
+              Check back soon for full admin capabilities.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </Layout>
   );
 };
