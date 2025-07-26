@@ -8,9 +8,11 @@ import { ChatInterface } from "@/components/chat/ChatInterface";
 const Chat = () => {
   const { useNodeBackend } = useBackend();
   const supabaseAuth = useAuth();
-  const backendAuth = useBackendAuth();
   const navigate = useNavigate();
-
+  
+  // Only use backend auth when Node backend is selected
+  const backendAuth = useNodeBackend ? useBackendAuth() : { user: null, isLoading: false };
+  
   // Use the appropriate auth based on backend selection
   const { user, isLoading } = useNodeBackend ? backendAuth : supabaseAuth;
 
