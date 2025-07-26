@@ -9,7 +9,8 @@ const Auth = () => {
 
   useEffect(() => {
     if (!isLoading && user) {
-      navigate("/chat");
+      console.log('✅ User authenticated, redirecting to deliberations:', user);
+      navigate("/deliberations");
     }
   }, [user, isLoading, navigate]);
 

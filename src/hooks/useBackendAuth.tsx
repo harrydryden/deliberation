@@ -80,10 +80,12 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
             setIsLoading(false);
           } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
             try {
+              console.log('🔐 Auth event:', event, 'Session:', session);
               const currentUser = await authService.getCurrentUser();
+              console.log('👤 Current user retrieved:', currentUser);
               setUser(currentUser);
             } catch (error) {
-              console.error('Failed to get current user:', error);
+              console.error('❌ Failed to get current user:', error);
               setUser(null);
             }
             setIsLoading(false);
