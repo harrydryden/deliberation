@@ -439,6 +439,10 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      get_access_code_type: {
+        Args: { access_code: string }
+        Returns: string
+      }
       halfvec_avg: {
         Args: { "": number[] }
         Returns: unknown
@@ -494,10 +498,6 @@ export type Database = {
       l2_normalize: {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: string
-      }
-      mark_access_code_used: {
-        Args: { access_code: string; user_uuid: string }
-        Returns: boolean
       }
       match_agent_knowledge: {
         Args: {

@@ -24,11 +24,10 @@ export async function authRoutes(fastify: FastifyInstance) {
     const { accessCode } = request.body;
 
     try {
-      // Check if access code is valid
+      // Check if access code is valid (no longer checking isUsed since codes are reusable)
       const codeRecord = await fastify.prisma.accessCode.findFirst({
         where: {
           code: accessCode,
-          isUsed: false,
         },
       });
 
@@ -221,7 +220,6 @@ export async function authRoutes(fastify: FastifyInstance) {
       const accessCode = await fastify.prisma.accessCode.findFirst({
         where: {
           code,
-          isUsed: false,
         },
       });
 
@@ -240,7 +238,7 @@ export async function authRoutes(fastify: FastifyInstance) {
     }
   });
 
-  // Use access code (mark as used)
+  // Check access code validity (codes are now reusable)
   fastify.post('/use-access-code', {
     preHandler: [fastify.authenticate],
     schema: {
@@ -252,38 +250,26 @@ export async function authRoutes(fastify: FastifyInstance) {
     Body: { code: string } 
   }>, reply: FastifyReply) => {
     const { code } = request.body;
-    const userId = request.user.id;
 
     try {
       const accessCode = await fastify.prisma.accessCode.findFirst({
         where: {
           code,
-          isUsed: false,
         },
       });
 
       if (!accessCode) {
-        reply.status(404).send({ error: 'Invalid or expired access code' });
+        reply.status(404).send({ error: 'Invalid access code' });
         return;
       }
 
-      // Mark code as used
-      await fastify.prisma.accessCode.update({
-        where: { id: accessCode.id },
-        data: {
-          isUsed: true,
-          usedBy: userId,
-          usedAt: new Date(),
-        },
-      });
-
       reply.send({
-        message: 'Access code used successfully',
+        message: 'Access code verified successfully',
         codeType: accessCode.codeType,
       });
     } catch (error) {
-      fastify.log.error({ error, code, userId }, 'Error using access code');
-      reply.status(500).send({ error: 'Failed to use access code' });
+      fastify.log.error({ error, code }, 'Error verifying access code');
+      reply.status(500).send({ error: 'Failed to verify access code' });
     }
   });
 }

@@ -20,19 +20,18 @@ export class SupabaseAuthService implements IAuthService {
   async authenticate(accessCode: string): Promise<{ user: User; token: string }> {
     console.log('🔐 Starting authentication with access code:', accessCode);
     
-    // Check if access code is valid
+    // Check if access code is valid (no longer checking is_used since codes are reusable)
     const { data: accessCodeData, error: accessCodeError } = await supabase
       .from('access_codes')
       .select('*')
       .eq('code', accessCode)
-      .eq('is_used', false)
       .single();
 
     console.log('📋 Access code check result:', { accessCodeData, accessCodeError });
 
     if (accessCodeError || !accessCodeData) {
       console.error('❌ Access code validation failed:', accessCodeError);
-      throw new AuthenticationError('Invalid or already used access code');
+      throw new AuthenticationError('Invalid access code');
     }
 
     console.log('✅ Access code is valid, proceeding with auth...');
@@ -84,16 +83,6 @@ export class SupabaseAuthService implements IAuthService {
     }
 
     console.log('✅ Sign up successful!');
-
-    // Mark access code as used
-    await supabase
-      .from('access_codes')
-      .update({
-        is_used: true,
-        used_by: authData.user.id,
-        used_at: new Date().toISOString(),
-      })
-      .eq('code', accessCode);
 
     this.token = authData.session.access_token;
     return {
