@@ -105,6 +105,12 @@ const Index = () => {
             >
               Join Existing Discussion
             </Button>
+            <Button 
+              variant="ghost"
+              onClick={() => navigate("/backend")}
+            >
+              Backend Config
+            </Button>
           </div>
         </div>
       </div>

@@ -1,102 +1,120 @@
-import { useState, useEffect, createContext, useContext } from "react";
-import { apiClient } from "@/lib/api-client";
-import { User } from "@/types/api";
-import { AuthContextType } from "@/types/auth";
-import { authService } from "@/services/auth.service";
-import { getErrorMessage, AuthenticationError } from "@/utils/errors";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { User } from '@/types/api';
+import { AuthContextType } from '@/types/auth';
+import { backendServiceFactory } from '@/services/backend/factory';
+import { BACKEND_CONFIG } from '@/config/backend';
 
-const BackendAuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const BackendAuthProvider = ({ children }: { children: React.ReactNode }) => {
+interface BackendAuthProviderProps {
+  children: ReactNode;
+}
+
+export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    initializeAuth();
-  }, []);
+  const authService = backendServiceFactory.getAuthService();
 
-  const initializeAuth = async () => {
-    setIsLoading(true);
+  const initializeAuth = useCallback(async () => {
     try {
-      // Check if we have a valid token
       if (authService.hasValidToken()) {
-        // Try to get current user from backend
-        try {
-          const currentUser = await apiClient.getCurrentUser();
-          setUser(currentUser);
-        } catch (error) {
-          // Token might be invalid or expired
-          console.warn('Failed to get current user:', getErrorMessage(error));
-          authService.clearAuth();
-          throw new AuthenticationError('Invalid or expired token');
-        }
+        const currentUser = await authService.getCurrentUser();
+        setUser(currentUser);
       }
     } catch (error) {
-      console.error('Auth initialization error:', getErrorMessage(error));
+      console.error('Failed to initialize auth:', error);
+      authService.setToken(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [authService]);
 
-  const authenticate = async (accessCode: string): Promise<void> => {
+  const authenticate = useCallback(async (accessCode: string) => {
     setIsLoading(true);
     try {
-      const response = await apiClient.authenticate(accessCode);
-      authService.setToken(response.token);
-      setUser(response.user);
-    } catch (error) {
-      console.error('Authentication error:', getErrorMessage(error));
-      throw error;
+      const { user: authenticatedUser, token } = await authService.authenticate(accessCode);
+      authService.setToken(token);
+      setUser(authenticatedUser);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [authService]);
 
-  const signOut = async (): Promise<void> => {
+  const signOut = useCallback(async () => {
     setIsLoading(true);
     try {
-      await apiClient.signOut();
-    } catch (error) {
-      console.error('Sign out error:', getErrorMessage(error));
-    } finally {
+      await authService.signOut();
       setUser(null);
+    } finally {
       setIsLoading(false);
     }
-  };
+  }, [authService]);
 
-  const refreshToken = async (): Promise<void> => {
+  const refreshToken = useCallback(async () => {
     try {
-      const response = await apiClient.refreshToken();
-      authService.setToken(response.token);
+      const { user: refreshedUser, token } = await authService.refreshToken();
+      authService.setToken(token);
+      setUser(refreshedUser);
     } catch (error) {
-      console.error('Token refresh error:', getErrorMessage(error));
-      // If refresh fails, clear auth and redirect to login
-      authService.clearAuth();
-      setUser(null);
+      console.error('Token refresh failed:', error);
+      await signOut();
       throw error;
     }
-  };
+  }, [authService, signOut]);
+
+  // Initialize auth on mount
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
+  // Set up Supabase auth state listener if using Supabase
+  useEffect(() => {
+    if (BACKEND_CONFIG.type === 'supabase') {
+      const { supabase } = require('@/integrations/supabase/client');
+      
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event: string, session: any) => {
+          if (event === 'SIGNED_OUT' || !session) {
+            setUser(null);
+            setIsLoading(false);
+          } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            try {
+              const currentUser = await authService.getCurrentUser();
+              setUser(currentUser);
+            } catch (error) {
+              console.error('Failed to get current user:', error);
+              setUser(null);
+            }
+            setIsLoading(false);
+          }
+        }
+      );
+
+      return () => subscription.unsubscribe();
+    }
+  }, [authService]);
 
   const value: AuthContextType = {
     user,
     isLoading,
     authenticate,
     signOut,
-    refreshToken,
     isAuthenticated: !!user,
+    refreshToken,
   };
 
   return (
-    <BackendAuthContext.Provider value={value}>
+    <AuthContext.Provider value={value}>
       {children}
-    </BackendAuthContext.Provider>
+    </AuthContext.Provider>
   );
 };
 
-export const useBackendAuth = () => {
-  const context = useContext(BackendAuthContext);
+export const useBackendAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error("useBackendAuth must be used within a BackendAuthProvider");
+    throw new Error('useBackendAuth must be used within a BackendAuthProvider');
   }
   return context;
 };
