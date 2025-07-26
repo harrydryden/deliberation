@@ -10,6 +10,7 @@ interface ChatMessage {
   created_at: string;
   user_id?: string;
   agent_context?: any;
+  submitted_to_ibis?: boolean;
 }
 
 export const useChat = () => {
@@ -62,7 +63,7 @@ export const useChat = () => {
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select('*')
+        .select('id, content, message_type, created_at, user_id, agent_context, submitted_to_ibis')
         .eq('user_id', user.id)
         .order('created_at', { ascending: true });
 

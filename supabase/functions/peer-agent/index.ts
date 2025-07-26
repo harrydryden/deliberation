@@ -32,6 +32,20 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(10);
 
+    // Get IBIS knowledge base for this user's context
+    const { data: ibisNodes } = await supabase
+      .from('ibis_nodes')
+      .select(`
+        title,
+        description,
+        node_type,
+        created_at,
+        messages!inner(user_id)
+      `)
+      .eq('messages.user_id', user_id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
     // Get default agent configuration
     const { data: agentConfig } = await supabase
       .from('agent_configurations')
@@ -41,9 +55,16 @@ serve(async (req) => {
       .eq('is_active', true)
       .single();
 
-    const context = recentMessages?.reverse().map(m => 
+    const conversationContext = recentMessages?.reverse().map(m => 
       `[${m.message_type}]: ${m.content}`
     ).join('\n') || '';
+
+    // Build IBIS knowledge context
+    const ibisContext = ibisNodes?.length ? 
+      `PREVIOUS STATEMENTS AND ARGUMENTS FROM IBIS KNOWLEDGE BASE:
+${ibisNodes.map(node => `[${node.node_type.toUpperCase()}] ${node.title}: ${node.description}`).join('\n\n')}
+
+` : '';
 
     // Build dynamic prompt from configuration
     const systemPrompt = agentConfig?.system_prompt || `You are the Peer Agent, representing diverse perspectives and alternative viewpoints in democratic deliberation.
@@ -64,12 +85,14 @@ YOUR ROLE:
 
     const peerAgentPrompt = `${systemPrompt}
 
-${goals}CONVERSATION CONTEXT:
-${context}
+${goals}${ibisContext}RECENT CONVERSATION CONTEXT:
+${conversationContext}
 
 NEW USER MESSAGE: "${content}"
 
-${responseStyle}Respond as the Peer Agent:`;
+${responseStyle}Use the IBIS knowledge base to provide informed responses that build upon previous statements and arguments. Reference specific points when relevant and offer thoughtful counterpoints or alternative perspectives.
+
+Respond as the Peer Agent:`;
 
     console.log('Calling Anthropic API for Peer Agent...');
     

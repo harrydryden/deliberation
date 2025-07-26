@@ -317,6 +317,7 @@ export type Database = {
           id: string
           message_type: Database["public"]["Enums"]["message_type"] | null
           parent_message_id: string | null
+          submitted_to_ibis: boolean | null
           updated_at: string | null
           user_id: string | null
         }
@@ -328,6 +329,7 @@ export type Database = {
           id?: string
           message_type?: Database["public"]["Enums"]["message_type"] | null
           parent_message_id?: string | null
+          submitted_to_ibis?: boolean | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -339,6 +341,7 @@ export type Database = {
           id?: string
           message_type?: Database["public"]["Enums"]["message_type"] | null
           parent_message_id?: string | null
+          submitted_to_ibis?: boolean | null
           updated_at?: string | null
           user_id?: string | null
         }

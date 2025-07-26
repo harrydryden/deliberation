@@ -1,5 +1,8 @@
 project_id = "iowsxuxkgvpgrvvklwyt"
 
+[functions.submit-to-ibis]
+verify_jwt = true
+
 [functions.bill-agent]
 verify_jwt = false
 
