@@ -3,6 +3,7 @@ import { User } from '@/types/api';
 import { AuthContextType } from '@/types/auth';
 import { backendServiceFactory } from '@/services/backend/factory';
 import { BACKEND_CONFIG } from '@/config/backend';
+import { supabase } from '@/integrations/supabase/client';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -71,7 +72,6 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
   // Set up Supabase auth state listener if using Supabase
   useEffect(() => {
     if (BACKEND_CONFIG.type === 'supabase') {
-      const { supabase } = require('@/integrations/supabase/client');
       
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         async (event: string, session: any) => {
