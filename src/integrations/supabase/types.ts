@@ -406,6 +406,7 @@ export type Database = {
           expertise_areas: string[] | null
           id: string
           updated_at: string | null
+          user_role: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -415,6 +416,7 @@ export type Database = {
           expertise_areas?: string[] | null
           id: string
           updated_at?: string | null
+          user_role?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -424,6 +426,7 @@ export type Database = {
           expertise_areas?: string[] | null
           id?: string
           updated_at?: string | null
+          user_role?: string | null
         }
         Relationships: []
       }
@@ -467,6 +470,10 @@ export type Database = {
       hnswhandler: {
         Args: { "": unknown }
         Returns: unknown
+      }
+      is_admin_user: {
+        Args: { user_id: string }
+        Returns: boolean
       }
       ivfflat_bit_support: {
         Args: { "": unknown }
