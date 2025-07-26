@@ -11,7 +11,6 @@ import { Loader2 } from "lucide-react";
 export const AuthForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [accessCode, setAccessCode] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const { authenticate } = useBackendAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -21,7 +20,7 @@ export const AuthForm = () => {
     setIsLoading(true);
     
     try {
-      await authenticate(accessCode, displayName || undefined);
+      await authenticate(accessCode);
       toast({
         title: "Welcome!",
         description: "Successfully authenticated"
@@ -62,17 +61,6 @@ export const AuthForm = () => {
                 pattern="\d{10}"
                 required 
                 className="text-center text-lg tracking-widest"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="displayName">Display Name (Optional)</Label>
-              <Input 
-                id="displayName" 
-                type="text" 
-                placeholder="How should we address you?"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
               />
             </div>
             

@@ -50,10 +50,10 @@ class ApiClient {
   }
 
   // Authentication endpoints
-  async authenticate(accessCode: string, displayName?: string) {
+  async authenticate(accessCode: string) {
     return this.request<{ token: string; user: any }>('/auth/auth', {
       method: 'POST',
-      body: JSON.stringify({ accessCode, displayName }),
+      body: JSON.stringify({ accessCode }),
     });
   }
 

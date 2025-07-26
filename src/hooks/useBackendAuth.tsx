@@ -10,7 +10,7 @@ interface User {
 interface BackendAuthContextType {
   user: User | null;
   isLoading: boolean;
-  authenticate: (accessCode: string, displayName?: string) => Promise<void>;
+  authenticate: (accessCode: string) => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -33,10 +33,10 @@ export const BackendAuthProvider = ({ children }: { children: React.ReactNode })
     setIsLoading(false);
   }, []);
 
-  const authenticate = async (accessCode: string, displayName?: string) => {
+  const authenticate = async (accessCode: string) => {
     setIsLoading(true);
     try {
-      const response = await apiClient.authenticate(accessCode, displayName);
+      const response = await apiClient.authenticate(accessCode);
       apiClient.setToken(response.token);
       setUser(response.user);
     } catch (error) {

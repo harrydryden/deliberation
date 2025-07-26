@@ -5,7 +5,6 @@ import { v4 as uuidv4 } from 'uuid';
 
 const authSchema = z.object({
   accessCode: z.string().regex(/^\d{10}$/, "Access code must be exactly 10 digits"),
-  displayName: z.string().optional(),
 });
 
 const updateProfileSchema = z.object({
@@ -23,7 +22,7 @@ export async function authRoutes(fastify: FastifyInstance) {
   }, async (request: FastifyRequest<{ 
     Body: z.infer<typeof authSchema> 
   }>, reply: FastifyReply) => {
-    const { accessCode, displayName } = request.body;
+    const { accessCode } = request.body;
 
     try {
       // Check if access code is valid
@@ -61,7 +60,7 @@ export async function authRoutes(fastify: FastifyInstance) {
           const newProfile = await tx.profile.create({
             data: {
               userId,
-              displayName: displayName || `User ${accessCode}`,
+              displayName: `User ${accessCode}`,
             },
           });
 
@@ -69,13 +68,6 @@ export async function authRoutes(fastify: FastifyInstance) {
         });
         
         user = { ...result.user, profile: result.profile };
-      } else if (displayName && user.profile?.displayName !== displayName) {
-        // Update display name if provided and different
-        await fastify.prisma.profile.update({
-          where: { userId },
-          data: { displayName },
-        });
-        user.profile.displayName = displayName;
       }
 
       // Generate JWT token
