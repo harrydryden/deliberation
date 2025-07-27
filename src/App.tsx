@@ -16,8 +16,8 @@ import DeliberationChat from "./pages/DeliberationChat";
 
 const App = () => (
   <ErrorBoundary>
-    <AuthLoadingBoundary>
-      <BackendAuthProvider>
+    <BackendAuthProvider>
+      <AuthLoadingBoundary>
         <TooltipProvider>
           <Toaster />
           <Sonner />
@@ -34,8 +34,8 @@ const App = () => (
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
-      </BackendAuthProvider>
-    </AuthLoadingBoundary>
+      </AuthLoadingBoundary>
+    </BackendAuthProvider>
   </ErrorBoundary>
 );
 
