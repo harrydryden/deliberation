@@ -479,6 +479,14 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      is_facilitator_of_deliberation: {
+        Args: { deliberation_id: string; user_id: string }
+        Returns: boolean
+      }
+      is_participant_in_deliberation: {
+        Args: { deliberation_id: string; user_id: string }
+        Returns: boolean
+      }
       ivfflat_bit_support: {
         Args: { "": unknown }
         Returns: unknown
