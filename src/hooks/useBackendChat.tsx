@@ -52,7 +52,7 @@ export const useBackendChat = (deliberationId?: string) => {
         });
         
         // Only stop typing indicator when an agent message comes in
-        if (message.messageType === 'agent') {
+        if (message.messageType.includes('agent') || message.messageType === 'peer_agent' || message.messageType === 'bill_agent' || message.messageType === 'flow_agent') {
           setIsTyping(false);
         }
       });
