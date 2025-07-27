@@ -11,11 +11,14 @@ const Admin = () => {
   useEffect(() => {
     if (!isLoading && !user) {
       navigate("/auth");
+    } else if (!isLoading && user && user.role !== 'admin') {
+      navigate("/");
     }
   }, [user, isLoading, navigate]);
 
   if (isLoading) return null;
   if (!user) return null;
+  if (user.role !== 'admin') return null;
 
   return (
     <Layout>

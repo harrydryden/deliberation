@@ -74,8 +74,16 @@ export class SupabaseAuthService implements IAuthService {
 
       console.log('✅ Sign in successful!');
       this.token = signInData.session.access_token;
+      
+      // Get user profile including role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_role, display_name, expertise_areas')
+        .eq('id', signInData.user.id)
+        .single();
+      
       return {
-        user: this.mapSupabaseUser(signInData.user, accessCode, accessCodeData.code_type),
+        user: this.mapSupabaseUser(signInData.user, accessCode, accessCodeData.code_type, profile),
         token: signInData.session.access_token,
       };
     }
@@ -88,8 +96,16 @@ export class SupabaseAuthService implements IAuthService {
     console.log('✅ Sign up successful!');
 
     this.token = authData.session.access_token;
+    
+    // Get user profile including role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('user_role, display_name, expertise_areas')
+      .eq('id', authData.user.id)
+      .single();
+    
     return {
-      user: this.mapSupabaseUser(authData.user, accessCode, accessCodeData.code_type),
+      user: this.mapSupabaseUser(authData.user, accessCode, accessCodeData.code_type, profile),
       token: authData.session.access_token,
     };
   }
@@ -104,9 +120,16 @@ export class SupabaseAuthService implements IAuthService {
       throw new AuthenticationError('No authenticated user');
     }
 
+    // Get user profile including role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('user_role, display_name, expertise_areas')
+      .eq('id', user.id)
+      .single();
+
     const accessCode = user.user_metadata?.access_code || 'unknown';
     const codeType = user.user_metadata?.code_type || 'user';
-    const mappedUser = this.mapSupabaseUser(user, accessCode, codeType);
+    const mappedUser = this.mapSupabaseUser(user, accessCode, codeType, profile);
     console.log('✅ User mapped successfully:', mappedUser);
     return mappedUser;
   }
@@ -121,8 +144,15 @@ export class SupabaseAuthService implements IAuthService {
     const accessCode = data.user.user_metadata?.access_code || 'unknown';
     const codeType = data.user.user_metadata?.code_type || 'user';
     
+    // Get user profile including role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('user_role, display_name, expertise_areas')
+      .eq('id', data.user.id)
+      .single();
+    
     return {
-      user: this.mapSupabaseUser(data.user, accessCode, codeType),
+      user: this.mapSupabaseUser(data.user, accessCode, codeType, profile),
       token: data.session.access_token,
     };
   }
@@ -144,13 +174,14 @@ export class SupabaseAuthService implements IAuthService {
     return !!this.token;
   }
 
-  private mapSupabaseUser(supabaseUser: any, accessCode: string, codeType: string): User {
+  private mapSupabaseUser(supabaseUser: any, accessCode: string, codeType: string, profile?: any): User {
     return {
       id: supabaseUser.id,
       accessCode,
+      role: profile?.user_role || 'user',
       profile: {
-        displayName: `User ${accessCode}`,
-        expertiseAreas: [],
+        displayName: profile?.display_name || `User ${accessCode}`,
+        expertiseAreas: profile?.expertise_areas || [],
         avatarUrl: undefined,
         bio: undefined
       },

@@ -28,15 +28,17 @@ export const Header = () => {
               <MessageSquare className="h-4 w-4" />
               <span>Chat</span>
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/admin')}
-              className="flex items-center space-x-1"
-            >
-              <Settings className="h-4 w-4" />
-              <span>Admin</span>
-            </Button>
+            {user.role === 'admin' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/admin')}
+                className="flex items-center space-x-1"
+              >
+                <Settings className="h-4 w-4" />
+                <span>Admin</span>
+              </Button>
+            )}
             <div className="flex items-center space-x-2">
               <Avatar className="h-8 w-8">
                 <AvatarFallback>

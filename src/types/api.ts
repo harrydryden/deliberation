@@ -13,6 +13,7 @@ export interface User {
   id: string;
   accessCode: string;
   profile: UserProfile | null;
+  role?: string;
 }
 
 export interface UserProfile {
