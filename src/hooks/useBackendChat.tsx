@@ -50,7 +50,11 @@ export const useBackendChat = (deliberationId?: string) => {
           }
           return [...prev, chatMessage];
         });
-        setIsTyping(false);
+        
+        // Only stop typing indicator when an agent message comes in
+        if (message.messageType === 'agent') {
+          setIsTyping(false);
+        }
       });
 
       unsubscribeRef.current = unsubscribe;
