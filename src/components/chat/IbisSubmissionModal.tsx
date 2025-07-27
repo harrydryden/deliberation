@@ -80,6 +80,12 @@ export const IbisSubmissionModal = ({
 
     try {
       // Create IBIS node
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       const { error: nodeError } = await supabase
         .from('ibis_nodes')
         .insert({
@@ -89,6 +95,7 @@ export const IbisSubmissionModal = ({
           parent_node_id: formData.parentNodeId || null,
           deliberation_id: deliberationId,
           message_id: messageId,
+          created_by: user.id, // This was missing!
           position_x: Math.random() * 800 + 100, // Random initial position
           position_y: Math.random() * 600 + 100
         });
