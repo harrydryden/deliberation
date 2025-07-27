@@ -16,7 +16,7 @@ export class SupabaseMessageService implements IMessageService {
     return data?.map(this.mapSupabaseMessage) || [];
   }
 
-  async sendMessage(content: string, messageType: string = 'user'): Promise<Message> {
+  async sendMessage(content: string, messageType: string = 'user', deliberationId?: string): Promise<Message> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('User not authenticated');
@@ -28,6 +28,7 @@ export class SupabaseMessageService implements IMessageService {
         content,
         message_type: messageType as any,
         user_id: user.id,
+        deliberation_id: deliberationId,
       })
       .select()
       .single();
@@ -36,7 +37,33 @@ export class SupabaseMessageService implements IMessageService {
       throw new Error(`Failed to send message: ${error.message}`);
     }
 
-    return this.mapSupabaseMessage(data);
+    const message = this.mapSupabaseMessage(data);
+
+    // Trigger agent responses for user messages in deliberations
+    if (messageType === 'user' && deliberationId) {
+      this.triggerAgentResponses(message.id, deliberationId);
+    }
+
+    return message;
+  }
+
+  private async triggerAgentResponses(messageId: string, deliberationId: string) {
+    try {
+      console.log('🤖 Triggering agent responses for message:', messageId);
+      
+      // Call the agent-response edge function
+      const { error } = await supabase.functions.invoke('agent-response', {
+        body: { messageId, deliberationId }
+      });
+
+      if (error) {
+        console.error('Failed to trigger agent responses:', error);
+      } else {
+        console.log('✅ Agent responses triggered successfully');
+      }
+    } catch (error) {
+      console.error('Error triggering agent responses:', error);
+    }
   }
 
   private mapSupabaseMessage(supabaseMessage: any): Message {

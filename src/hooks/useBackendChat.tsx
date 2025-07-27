@@ -86,7 +86,7 @@ export const useBackendChat = (deliberationId?: string) => {
       setIsTyping(true);
       
       const messageService = backendServiceFactory.getMessageService();
-      await messageService.sendMessage(content.trim());
+      await messageService.sendMessage(content.trim(), 'user', deliberationId);
       
       // The real-time update will handle adding the message to the UI
     } catch (error: any) {

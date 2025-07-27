@@ -25,7 +25,7 @@ export class NodeJSMessageService implements IMessageService {
     return data.data || [];
   }
 
-  async sendMessage(content: string, messageType: string = 'user'): Promise<Message> {
+  async sendMessage(content: string, messageType: string = 'user', deliberationId?: string): Promise<Message> {
     const token = this.getAuthToken();
     if (!token) {
       throw new Error('No authentication token');
@@ -37,9 +37,10 @@ export class NodeJSMessageService implements IMessageService {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        content,
+      body: JSON.stringify({ 
+        content, 
         messageType,
+        deliberationId 
       }),
     });
 
