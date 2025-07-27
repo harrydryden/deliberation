@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,8 +27,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Initialize Hugging Face for embeddings
-    const hf = new HfInference(Deno.env.get('HUGGING_FACE_ACCESS_TOKEN'))
+    // Get OpenAI API key
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
 
     // Process text content (assuming PDF text has been extracted)
     const text = fileContent
@@ -47,14 +46,25 @@ serve(async (req) => {
         // Generate title/summary using Anthropic
         const summary = await generateChunkSummary(chunk)
         
-        // Generate embeddings using Hugging Face
-        const embedding = await hf.featureExtraction({
-          model: 'sentence-transformers/all-MiniLM-L6-v2',
-          inputs: chunk
+        // Generate embeddings using OpenAI
+        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-3-small',
+            input: chunk
+          })
         })
 
-        // Convert embedding to proper format for PostgreSQL vector
-        const embeddingVector = Array.isArray(embedding) ? embedding : Array.from(embedding)
+        if (!embeddingResponse.ok) {
+          throw new Error(`OpenAI API error: ${embeddingResponse.statusText}`)
+        }
+
+        const embeddingData = await embeddingResponse.json()
+        const embeddingVector = embeddingData.data[0].embedding
 
         processedChunks.push({
           agent_id: agentId,

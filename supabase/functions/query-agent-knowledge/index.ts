@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
-import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,16 +27,32 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Initialize Hugging Face for embeddings
-    const hf = new HfInference(Deno.env.get('HUGGING_FACE_ACCESS_TOKEN'))
+    // Get OpenAI API key
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
+    
+    if (!openAIApiKey) {
+      throw new Error('OpenAI API key not configured')
+    }
 
-    // Generate embedding for the query
-    const queryEmbedding = await hf.featureExtraction({
-      model: 'sentence-transformers/all-MiniLM-L6-v2',
-      inputs: query
+    // Generate embedding for the query using OpenAI
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: query
+      })
     })
 
-    const embeddingVector = Array.isArray(queryEmbedding) ? queryEmbedding : Array.from(queryEmbedding)
+    if (!embeddingResponse.ok) {
+      throw new Error(`OpenAI API error: ${embeddingResponse.statusText}`)
+    }
+
+    const embeddingData = await embeddingResponse.json()
+    const embeddingVector = embeddingData.data[0].embedding
 
     // Use the existing match_agent_knowledge function
     const { data: matchResults, error } = await supabase
