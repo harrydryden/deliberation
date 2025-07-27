@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bot, User, Users, Workflow, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Bot, User, Users, Workflow, FileText, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import type { ChatMessage } from "@/types/chat";
@@ -10,6 +11,7 @@ interface MessageListProps {
   messages: ChatMessage[];
   isLoading: boolean;
   isTyping: boolean;
+  onAddToIbis?: (messageId: string, content: string) => void;
 }
 
 const getAgentInfo = (messageType: string) => {
@@ -45,7 +47,7 @@ const getAgentInfo = (messageType: string) => {
   }
 };
 
-export const MessageList = ({ messages, isLoading, isTyping }: MessageListProps) => {
+export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis }: MessageListProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -120,6 +122,31 @@ export const MessageList = ({ messages, isLoading, isTyping }: MessageListProps)
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Workflow className="h-3 w-3" />
                         <span>Proactive facilitation</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* IBIS submission button */}
+                  {onAddToIbis && !message.submitted_to_ibis && (
+                    <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onAddToIbis(message.id, message.content)}
+                        className={`h-6 px-2 text-xs ${isUser ? 'text-white hover:bg-white/20' : ''}`}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add to IBIS
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* IBIS submitted indicator */}
+                  {message.submitted_to_ibis && (
+                    <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <FileText className="h-3 w-3" />
+                        <span>Added to IBIS</span>
                       </div>
                     </div>
                   )}

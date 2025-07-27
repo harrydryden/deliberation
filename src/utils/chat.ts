@@ -8,6 +8,7 @@ export function convertApiMessageToChatMessage(apiMessage: Message): ChatMessage
     message_type: apiMessage.messageType as ChatMessage['message_type'],
     created_at: apiMessage.createdAt,
     user_id: apiMessage.userId,
+    submitted_to_ibis: (apiMessage as any).submitted_to_ibis || false,
   };
 }
 

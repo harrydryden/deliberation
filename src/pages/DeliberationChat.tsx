@@ -5,6 +5,7 @@ import { useTokenRefresh } from "@/hooks/useTokenRefresh";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 import { Layout } from "@/components/layout/Layout";
 import { MessageList } from "@/components/chat/MessageList";
+import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +34,15 @@ const DeliberationChat = () => {
   
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [ibisModal, setIbisModal] = useState<{
+    isOpen: boolean;
+    messageId: string;
+    messageContent: string;
+  }>({
+    isOpen: false,
+    messageId: '',
+    messageContent: ''
+  });
   
   // Enable token refresh for authenticated users
   useTokenRefresh();
@@ -42,7 +52,29 @@ const DeliberationChat = () => {
     isLoading: chatLoading,
     isTyping,
     sendMessage,
+    loadChatHistory,
   } = useBackendChat(deliberationId);
+
+  const handleAddToIbis = (messageId: string, messageContent: string) => {
+    setIbisModal({
+      isOpen: true,
+      messageId,
+      messageContent
+    });
+  };
+
+  const handleIbisModalClose = () => {
+    setIbisModal({
+      isOpen: false,
+      messageId: '',
+      messageContent: ''
+    });
+  };
+
+  const handleIbisSuccess = () => {
+    // Reload chat messages to reflect the updated submitted_to_ibis status
+    loadChatHistory();
+  };
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -158,12 +190,25 @@ const DeliberationChat = () => {
           messages={messages} 
           isLoading={chatLoading} 
           isTyping={isTyping}
+          onAddToIbis={handleAddToIbis}
         />
         
         <MessageInput 
           onSendMessage={sendMessage} 
           disabled={isTyping || deliberation.status === 'completed'}
         />
+        
+        {/* IBIS Submission Modal */}
+        {deliberation && (
+          <IbisSubmissionModal
+            isOpen={ibisModal.isOpen}
+            onClose={handleIbisModalClose}
+            messageId={ibisModal.messageId}
+            messageContent={ibisModal.messageContent}
+            deliberationId={deliberation.id}
+            onSuccess={handleIbisSuccess}
+          />
+        )}
       </div>
     </Layout>
   );
