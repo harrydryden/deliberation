@@ -56,21 +56,28 @@ const DeliberationChat = () => {
   }, [user, isLoading, deliberationId, navigate]);
 
   const loadDeliberation = async () => {
-    if (!deliberationId) return;
-    
+    if (!deliberationId) {
+      console.log('❌ No deliberationId provided');
+      return;
+    }
+
     try {
+      console.log('🔍 Loading deliberation details:', deliberationId);
       setLoading(true);
       const data = await deliberationService.getDeliberation(deliberationId);
+      console.log('✅ Deliberation details loaded successfully:', data);
       setDeliberation(data);
     } catch (error) {
+      console.error('❌ Failed to load deliberation details:', error);
       toast({
         title: "Error",
-        description: "Failed to load deliberation",
+        description: "Failed to load deliberation details",
         variant: "destructive"
       });
-      navigate("/deliberations");
+      // Don't automatically redirect - let user see the error and try again
     } finally {
       setLoading(false);
+      console.log('🏁 Deliberation details loading completed');
     }
   };
 

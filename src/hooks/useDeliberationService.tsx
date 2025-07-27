@@ -144,6 +144,8 @@ class SupabaseDeliberationService implements DeliberationService {
   }
 
   async getDeliberation(deliberationId: string): Promise<any> {
+    console.log(`🔍 Getting deliberation details for ID: ${deliberationId}`);
+    
     const { data, error } = await supabase
       .from('deliberations')
       .select(`
@@ -158,8 +160,18 @@ class SupabaseDeliberationService implements DeliberationService {
       .eq('id', deliberationId)
       .maybeSingle();
 
-    if (error) throw error;
-    if (!data) throw new Error('Deliberation not found');
+    console.log('📊 Get deliberation result:', { data, error });
+
+    if (error) {
+      console.error('❌ Error getting deliberation:', error);
+      throw error;
+    }
+    if (!data) {
+      console.error('❌ Deliberation not found');
+      throw new Error('Deliberation not found');
+    }
+    
+    console.log('✅ Deliberation details retrieved successfully');
     return data;
   }
 
