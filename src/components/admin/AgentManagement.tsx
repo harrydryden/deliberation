@@ -187,11 +187,11 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
                             <Edit className="h-4 w-4" />
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
                           <DialogHeader>
                             <DialogTitle>Edit Agent Configuration</DialogTitle>
                           </DialogHeader>
-                          <div className="space-y-4">
+                          <div className="space-y-4 overflow-y-auto flex-1 px-1">
                             <div>
                               <Label htmlFor="agent-name">Name</Label>
                               <Input
@@ -222,12 +222,13 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
                               </Select>
                             </div>
                             <div>
-                              <Label htmlFor="system-prompt">System Prompt</Label>
+                              <Label htmlFor="system-prompt">System Prompt (Agent Instructions)</Label>
                               <Textarea
                                 id="system-prompt"
                                 value={editForm.system_prompt}
                                 onChange={(e) => setEditForm(prev => ({ ...prev, system_prompt: e.target.value }))}
                                 rows={4}
+                                placeholder="Enter the system prompt that defines how this agent should behave..."
                               />
                             </div>
                             <div>
@@ -237,6 +238,7 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
                                 value={editForm.response_style}
                                 onChange={(e) => setEditForm(prev => ({ ...prev, response_style: e.target.value }))}
                                 rows={2}
+                                placeholder="Describe the tone and style of responses..."
                               />
                             </div>
                             <div>
@@ -284,14 +286,14 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
                               />
                               <Label>Default Agent</Label>
                             </div>
-                            <div className="flex justify-end gap-2">
-                              <Button variant="outline" onClick={() => setEditingAgent(null)}>
-                                Cancel
-                              </Button>
-                              <Button onClick={handleSaveEdit} disabled={updating === editingAgent?.id}>
-                                {updating === editingAgent?.id ? 'Saving...' : 'Save Changes'}
-                              </Button>
-                            </div>
+                          </div>
+                          <div className="flex justify-end gap-2 pt-4 border-t">
+                            <Button variant="outline" onClick={() => setEditingAgent(null)}>
+                              Cancel
+                            </Button>
+                            <Button onClick={handleSaveEdit} disabled={updating === editingAgent?.id}>
+                              {updating === editingAgent?.id ? 'Saving...' : 'Save Changes'}
+                            </Button>
                           </div>
                         </DialogContent>
                       </Dialog>
