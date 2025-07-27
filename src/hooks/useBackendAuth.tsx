@@ -88,7 +88,66 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
     initializeAuth();
   }, [initializeAuth]);
 
-  // No longer need Supabase auth state listener since we're using custom session management
+  // Set up Supabase auth state listener if using Supabase
+  useEffect(() => {
+    if (BACKEND_CONFIG.type === 'supabase') {
+      
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event: string, session: any) => {
+          console.log('🔄 Auth state change:', event, session ? 'with session' : 'no session');
+          
+          // Prevent processing if already in progress to avoid race conditions
+          if (authInProgress && event !== 'SIGNED_OUT') {
+            console.log('🚫 Auth in progress, skipping event:', event);
+            return;
+          }
+
+          // Handle sign out events
+          if (event === 'SIGNED_OUT' || !session) {
+            console.log('🚪 Signing out user');
+            setUser(null);
+            setIsLoading(false);
+            setIsInitialized(true);
+            return;
+          }
+
+          // Handle sign in and token refresh events
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            console.log('🔐 Processing auth event:', event);
+            setAuthInProgress(true);
+            
+            // Add timeout protection
+            const timeoutId = setTimeout(() => {
+              console.error('⏰ Auth timeout - forcing loading to false');
+              setIsLoading(false);
+              setAuthInProgress(false);
+            }, 10000); // 10 second timeout
+
+            Promise.resolve().then(async () => {
+              try {
+                console.log('🔐 Auth event:', event, 'Session:', session);
+                const currentUser = await authService.getCurrentUser();
+                console.log('👤 Current user retrieved:', currentUser);
+                setUser(currentUser);
+                console.log('✅ Auth state updated successfully');
+              } catch (error) {
+                console.error('❌ Failed to get current user:', error);
+                setUser(null);
+              } finally {
+                clearTimeout(timeoutId);
+                setIsLoading(false);
+                setIsInitialized(true);
+                setAuthInProgress(false);
+                console.log('🎯 Auth state change completed');
+              }
+            });
+          }
+        }
+      );
+
+      return () => subscription.unsubscribe();
+    }
+  }, [authService]);
 
   const value: AuthContextType = {
     user,

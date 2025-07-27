@@ -3,42 +3,24 @@ import { IAuthService } from '../base.service';
 import { User } from '@/types/api';
 import { AuthenticationError } from '@/utils/errors';
 
-interface SessionData {
-  user_id: string;
-  access_code: string;
-  expires_at: number;
-}
-
 export class SupabaseAuthService implements IAuthService {
   private token: string | null = null;
-  private sessionKey = 'deliberation_session';
 
   constructor() {
     this.initializeAuth();
   }
 
   private async initializeAuth() {
-    // Load session from localStorage instead of Supabase auth
-    const storedSession = localStorage.getItem(this.sessionKey);
-    if (storedSession) {
-      try {
-        const session: SessionData = JSON.parse(storedSession);
-        if (session.expires_at > Date.now()) {
-          this.token = session.user_id; // Use user_id as token
-        } else {
-          localStorage.removeItem(this.sessionKey);
-        }
-      } catch (error) {
-        console.error('Failed to parse stored session:', error);
-        localStorage.removeItem(this.sessionKey);
-      }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      this.token = session.access_token;
     }
   }
 
   async authenticate(accessCode: string): Promise<{ user: User; token: string }> {
     console.log('🔐 Starting authentication with access code:', accessCode);
     
-    // Validate access code exists
+    // Check if access code is valid
     const { data: accessCodeData, error: accessCodeError } = await supabase
       .from('access_codes')
       .select('*')
@@ -52,115 +34,100 @@ export class SupabaseAuthService implements IAuthService {
       throw new AuthenticationError('Invalid access code');
     }
 
-    console.log('✅ Access code is valid, creating session...');
+    console.log('✅ Access code is valid, proceeding with auth...');
 
-    // Generate a unique user ID for this session
-    const userId = `user_${accessCode}_${Date.now()}`;
-    
-    // Create session data
-    const sessionData: SessionData = {
-      user_id: userId,
-      access_code: accessCode,
-      expires_at: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
-    };
-
-    // Store session
-    localStorage.setItem(this.sessionKey, JSON.stringify(sessionData));
-    this.token = userId;
-
-    // Get or create user profile
-    let profile = null;
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (!existingProfile) {
-      // Create a profile for this session
-      const { data: newProfile, error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          display_name: `User ${accessCode}`,
-          user_role: accessCodeData.code_type === 'admin' ? 'admin' : 'user'
-        })
-        .select()
-        .single();
-
-      if (!profileError) {
-        profile = newProfile;
+    // Use access code as both email (hidden from user) and password  
+    const email = `${accessCode}@deliberation.local`;
+    console.log('🔑 Attempting sign up...');
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password: accessCode,
+      options: {
+        data: {
+          access_code: accessCode,
+          code_type: accessCodeData.code_type
+        }
       }
-    } else {
-      profile = existingProfile;
+    });
+
+    console.log('📝 Sign up result:', { authData, authError });
+
+    if (authError) {
+      console.log('🔄 Sign up failed, trying sign in...', authError.message);
+      // Try sign in if user already exists
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: accessCode,
+      });
+
+      console.log('🔓 Sign in result:', { signInData, signInError });
+      if (signInError) {
+        console.error('❌ Sign in failed:', signInError);
+        throw new AuthenticationError(signInError.message);
+      }
+
+      if (!signInData.user || !signInData.session) {
+        console.error('❌ Sign in succeeded but missing user/session');
+        throw new AuthenticationError('Authentication failed');
+      }
+
+      console.log('✅ Sign in successful!');
+      this.token = signInData.session.access_token;
+      return {
+        user: this.mapSupabaseUser(signInData.user, accessCode, accessCodeData.code_type),
+        token: signInData.session.access_token,
+      };
     }
 
-    console.log('✅ Authentication successful!');
+    if (!authData.user || !authData.session) {
+      console.error('❌ Sign up succeeded but missing user/session');
+      throw new AuthenticationError('Authentication failed');
+    }
 
-    const user: User = {
-      id: userId,
-      accessCode,
-      profile
+    console.log('✅ Sign up successful!');
+
+    this.token = authData.session.access_token;
+    return {
+      user: this.mapSupabaseUser(authData.user, accessCode, accessCodeData.code_type),
+      token: authData.session.access_token,
     };
-
-    return { user, token: userId };
   }
 
   async getCurrentUser(): Promise<User> {
     console.log('🔍 Getting current user...');
+    const { data: { user }, error } = await supabase.auth.getUser();
+    console.log('🔍 Supabase getUser result:', { user, error });
     
-    const storedSession = localStorage.getItem(this.sessionKey);
-    if (!storedSession) {
-      throw new AuthenticationError('No active session');
+    if (error || !user) {
+      console.error('❌ getCurrentUser failed:', error);
+      throw new AuthenticationError('No authenticated user');
     }
 
-    let session: SessionData;
-    try {
-      session = JSON.parse(storedSession);
-    } catch (error) {
-      throw new AuthenticationError('Invalid session data');
-    }
-
-    if (session.expires_at <= Date.now()) {
-      localStorage.removeItem(this.sessionKey);
-      throw new AuthenticationError('Session expired');
-    }
-
-    // Get user profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user_id)
-      .single();
-
-    const user: User = {
-      id: session.user_id,
-      accessCode: session.access_code,
-      profile
-    };
-
-    console.log('✅ User retrieved successfully:', user);
-    return user;
+    const accessCode = user.user_metadata?.access_code || 'unknown';
+    const codeType = user.user_metadata?.code_type || 'user';
+    const mappedUser = this.mapSupabaseUser(user, accessCode, codeType);
+    console.log('✅ User mapped successfully:', mappedUser);
+    return mappedUser;
   }
 
   async refreshToken(): Promise<{ user: User; token: string }> {
-    // For this simple system, just validate current session and extend it
-    const user = await this.getCurrentUser();
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error || !data.session || !data.user) {
+      throw new AuthenticationError('Failed to refresh token');
+    }
+
+    this.token = data.session.access_token;
+    const accessCode = data.user.user_metadata?.access_code || 'unknown';
+    const codeType = data.user.user_metadata?.code_type || 'user';
     
-    // Extend session
-    const sessionData: SessionData = {
-      user_id: user.id,
-      access_code: user.accessCode,
-      expires_at: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+    return {
+      user: this.mapSupabaseUser(data.user, accessCode, codeType),
+      token: data.session.access_token,
     };
-    
-    localStorage.setItem(this.sessionKey, JSON.stringify(sessionData));
-    
-    return { user, token: user.id };
   }
 
   async signOut(): Promise<void> {
-    localStorage.removeItem(this.sessionKey);
+    await supabase.auth.signOut();
     this.token = null;
   }
 
@@ -173,16 +140,19 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   hasValidToken(): boolean {
-    if (!this.token) return false;
-    
-    const storedSession = localStorage.getItem(this.sessionKey);
-    if (!storedSession) return false;
-    
-    try {
-      const session: SessionData = JSON.parse(storedSession);
-      return session.expires_at > Date.now();
-    } catch {
-      return false;
-    }
+    return !!this.token;
+  }
+
+  private mapSupabaseUser(supabaseUser: any, accessCode: string, codeType: string): User {
+    return {
+      id: supabaseUser.id,
+      accessCode,
+      profile: {
+        displayName: `User ${accessCode}`,
+        expertiseAreas: [],
+        avatarUrl: undefined,
+        bio: undefined
+      },
+    };
   }
 }
