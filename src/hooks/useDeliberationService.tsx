@@ -153,8 +153,7 @@ class SupabaseDeliberationService implements DeliberationService {
         participants(
           user_id,
           role,
-          joined_at,
-          profiles!inner(display_name, avatar_url)
+          joined_at
         )
       `)
       .eq('id', deliberationId)
