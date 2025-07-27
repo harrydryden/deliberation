@@ -49,20 +49,23 @@ export class SupabaseMessageService implements IMessageService {
 
   private async triggerAgentResponses(messageId: string, deliberationId: string) {
     try {
-      console.log('🤖 Triggering agent responses for message:', messageId);
+      console.log('🤖 Triggering agent responses for message:', messageId, 'in deliberation:', deliberationId);
       
       // Call the agent-response edge function
-      const { error } = await supabase.functions.invoke('agent-response', {
+      console.log('📞 Calling agent-response function...');
+      const { data, error } = await supabase.functions.invoke('agent-response', {
         body: { messageId, deliberationId }
       });
 
+      console.log('📊 Function response:', { data, error });
+
       if (error) {
-        console.error('Failed to trigger agent responses:', error);
+        console.error('❌ Failed to trigger agent responses:', error);
       } else {
-        console.log('✅ Agent responses triggered successfully');
+        console.log('✅ Agent responses triggered successfully:', data);
       }
     } catch (error) {
-      console.error('Error triggering agent responses:', error);
+      console.error('💥 Error triggering agent responses:', error);
     }
   }
 
