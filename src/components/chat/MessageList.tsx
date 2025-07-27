@@ -126,27 +126,27 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis }: Mess
                     </div>
                   )}
                   
-                  {/* IBIS submission button */}
-                  {onAddToIbis && !message.submitted_to_ibis && (
+                  {/* IBIS submission button - only for user messages */}
+                  {onAddToIbis && isUser && !message.submitted_to_ibis && (
                     <div className="mt-2 pt-2 border-t border-muted-foreground/20">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => onAddToIbis(message.id, message.content)}
-                        className={`h-6 px-2 text-xs ${isUser ? 'text-white hover:bg-white/20' : ''}`}
+                        className="h-6 px-2 text-xs text-white hover:bg-white/20"
                       >
                         <Plus className="h-3 w-3 mr-1" />
-                        Add to IBIS
+                        Submit
                       </Button>
                     </div>
                   )}
                   
-                  {/* IBIS submitted indicator */}
-                  {message.submitted_to_ibis && (
+                  {/* IBIS submitted indicator - only for user messages */}
+                  {isUser && message.submitted_to_ibis && (
                     <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2 text-xs text-white/80">
                         <FileText className="h-3 w-3" />
-                        <span>Added to IBIS</span>
+                        <span>Submitted to IBIS</span>
                       </div>
                     </div>
                   )}

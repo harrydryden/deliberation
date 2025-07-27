@@ -105,7 +105,7 @@ export const IbisSubmissionModal = ({
 
       toast({
         title: "Success",
-        description: "Message successfully added to IBIS",
+        description: "Message successfully submitted to IBIS",
       });
 
       onSuccess?.();
@@ -124,7 +124,7 @@ export const IbisSubmissionModal = ({
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to add message to IBIS",
+        description: error.message || "Failed to submit message to IBIS",
       });
     } finally {
       setIsSubmitting(false);
@@ -148,7 +148,7 @@ export const IbisSubmissionModal = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Message to IBIS</DialogTitle>
+          <DialogTitle>Submit Message to IBIS</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -244,7 +244,7 @@ export const IbisSubmissionModal = ({
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Adding...' : 'Add to IBIS'}
+              {isSubmitting ? 'Submitting...' : 'Submit to IBIS'}
             </Button>
           </DialogFooter>
         </form>
