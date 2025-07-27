@@ -11,23 +11,32 @@ interface DeliberationService {
 
 class SupabaseDeliberationService implements DeliberationService {
   async getDeliberations(): Promise<any[]> {
-    const { data, error } = await supabase
+    // First get deliberations
+    const { data: deliberations, error: deliberationsError } = await supabase
       .from('deliberations')
-      .select(`
-        *,
-        participants!inner(user_id),
-        participants(count)
-      `)
+      .select('*')
       .eq('is_public', true)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    
-    // Add participant count to each deliberation
-    return data.map(deliberation => ({
-      ...deliberation,
-      participant_count: deliberation.participants?.length || 0
-    }));
+    if (deliberationsError) throw deliberationsError;
+    if (!deliberations) return [];
+
+    // Then get participant counts for each deliberation
+    const deliberationsWithCounts = await Promise.all(
+      deliberations.map(async (deliberation) => {
+        const { count } = await supabase
+          .from('participants')
+          .select('*', { count: 'exact', head: true })
+          .eq('deliberation_id', deliberation.id);
+
+        return {
+          ...deliberation,
+          participant_count: count || 0
+        };
+      })
+    );
+
+    return deliberationsWithCounts;
   }
 
   async createDeliberation(deliberationData: any): Promise<any> {
