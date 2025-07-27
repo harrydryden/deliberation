@@ -78,12 +78,14 @@ class SupabaseDeliberationService implements DeliberationService {
     if (!user) throw new Error('User not authenticated');
 
     // Check if already a participant
-    const { data: existing } = await supabase
+    const { data: existing, error: checkError } = await supabase
       .from('participants')
       .select('id')
       .eq('deliberation_id', deliberationId)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
+
+    if (checkError) throw checkError;
 
     if (existing) {
       return; // Already a participant
@@ -114,9 +116,10 @@ class SupabaseDeliberationService implements DeliberationService {
         )
       `)
       .eq('id', deliberationId)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!data) throw new Error('Deliberation not found');
     return data;
   }
 
