@@ -10,6 +10,7 @@ import { AccessCodeManagement } from './AccessCodeManagement';
 import { AgentManagement } from './AgentManagement';
 import { DeliberationOverview } from './DeliberationOverview';
 import { DeliberationCreation } from './DeliberationCreation';
+import { KnowledgeManagement } from './KnowledgeManagement';
 import { SystemStats } from './SystemStats';
 import { useAdminService } from '@/hooks/useAdminService';
 
@@ -71,10 +72,11 @@ export const AdminDashboard = () => {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="access-codes">Access Codes</TabsTrigger>
           <TabsTrigger value="agents">Agents</TabsTrigger>
+          <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="deliberations">Deliberations</TabsTrigger>
         </TabsList>
 
@@ -104,6 +106,14 @@ export const AdminDashboard = () => {
             loading={adminService.loadingAgents}
             onLoad={adminService.fetchAgents}
             onUpdate={adminService.updateAgent}
+          />
+        </TabsContent>
+
+        <TabsContent value="knowledge" className="space-y-4">
+          <KnowledgeManagement
+            agents={adminService.agents}
+            loading={adminService.loadingAgents}
+            onLoad={adminService.fetchAgents}
           />
         </TabsContent>
 

@@ -1,0 +1,62 @@
+project_id = "iowsxuxkgvpgrvvklwyt"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+enabled = true
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+ip_version = "ipv6"
+port = 54323
+max_header_length = 4096
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1:54321"
+openai_api_key = "env(OPENAI_API_KEY)"
+
+[inbucket]
+enabled = true
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+upload_file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+external_email_enabled = true
+external_phone_enabled = true
+external_sms_test_otp = "123456"
+
+[edge_runtime]
+enabled = true
+ip_version = "ipv4"
+port = 54322
+inspector_port = 8083
+
+[functions.process-agent-knowledge]
+verify_jwt = false
+
+[functions.query-agent-knowledge] 
+verify_jwt = false

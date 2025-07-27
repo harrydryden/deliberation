@@ -128,6 +128,39 @@ YOUR ROLE:
     if (!agentId) return '';
 
     try {
+      // Try to use Supabase function for semantic search first
+      try {
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        
+        if (supabaseUrl && supabaseKey) {
+          const response = await fetch(`${supabaseUrl}/functions/v1/query-agent-knowledge`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseKey}`,
+            },
+            body: JSON.stringify({
+              query,
+              agentId,
+              maxResults: 3
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.relevantKnowledge?.length > 0) {
+              return `\n\nRELEVANT KNOWLEDGE:\n${data.relevantKnowledge.map((item: any, index: number) => 
+                `[${index + 1}] ${item.title}: ${item.content.substring(0, 500)}...`
+              ).join('\n\n')}\n\n`;
+            }
+          }
+        }
+      } catch (error) {
+        logger.error({ error, traceId }, 'Supabase knowledge search failed, falling back to Prisma');
+      }
+
+      // Fallback to Prisma-based search
       const knowledgeItems = await this.prisma.agentKnowledge.findMany({
         where: { agentId },
         select: { title: true, content: true },
@@ -136,23 +169,26 @@ YOUR ROLE:
 
       if (knowledgeItems.length === 0) return '';
 
-      // Calculate relevance for each knowledge item
-      const relevantItems = await Promise.all(
-        knowledgeItems.map(async (item) => {
-          const relevance = await this.aiService.calculateRelevance(query, item.content, traceId);
+      // Simple keyword-based relevance for fallback
+      const relevantItems = knowledgeItems
+        .map((item) => {
+          const queryLower = query.toLowerCase();
+          const contentLower = item.content.toLowerCase();
+          const titleLower = item.title.toLowerCase();
+          
+          const titleScore = titleLower.includes(queryLower) ? 1 : 0;
+          const contentScore = contentLower.split(queryLower).length - 1;
+          const relevance = (titleScore * 0.5) + (contentScore * 0.1);
+          
           return { ...item, relevance };
         })
-      );
-
-      // Filter and sort by relevance
-      const filteredItems = relevantItems
-        .filter(item => item.relevance > 0.6)
+        .filter(item => item.relevance > 0)
         .sort((a, b) => b.relevance - a.relevance)
         .slice(0, 3);
 
-      if (filteredItems.length === 0) return '';
+      if (relevantItems.length === 0) return '';
 
-      return `\n\nRELEVANT KNOWLEDGE:\n${filteredItems.map((item, index) => 
+      return `\n\nRELEVANT KNOWLEDGE:\n${relevantItems.map((item, index) => 
         `[${index + 1}] ${item.title}: ${item.content.substring(0, 500)}...`
       ).join('\n\n')}\n\n`;
     } catch (error) {
