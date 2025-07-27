@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { RefreshCw, Plus, Trash2, Key, Copy } from 'lucide-react';
+import { formatToUKDate } from '@/utils/timeUtils';
 import { AccessCode } from '@/services/backend/base.service';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { toast } from 'sonner';
@@ -164,7 +165,7 @@ export const AccessCodeManagement = ({ accessCodes, loading, onLoad, onCreate, o
                       )}
                     </TableCell>
                     <TableCell>
-                      {new Date(accessCode.created_at).toLocaleDateString()}
+                      {formatToUKDate(accessCode.created_at)}
                     </TableCell>
                     <TableCell>
                       <AlertDialog>

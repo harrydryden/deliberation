@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Upload, FileText, Brain, Trash2, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { formatToUKDate } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -373,7 +374,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
                         {item.chunk_index + 1}
                       </TableCell>
                       <TableCell>
-                        {new Date(item.created_at).toLocaleDateString()}
+                        {formatToUKDate(item.created_at)}
                       </TableCell>
                       <TableCell>
                         <Button

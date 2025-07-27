@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw, Settings, Edit, Plus, X } from 'lucide-react';
+import { formatToUKDate } from '@/utils/timeUtils';
 import { Agent } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
@@ -171,7 +172,7 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
                       </div>
                     </TableCell>
                     <TableCell>
-                      {new Date(agent.createdAt).toLocaleDateString()}
+                      {formatToUKDate(agent.createdAt)}
                     </TableCell>
                     <TableCell>
                       <Dialog>

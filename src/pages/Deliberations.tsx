@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Users, Clock, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatToUKDate } from "@/utils/timeUtils";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 
 interface Deliberation {
@@ -161,7 +162,7 @@ const Deliberations = () => {
                     </div>
                     <div className="flex items-center space-x-1">
                       <Clock className="h-4 w-4" />
-                      <span>{new Date(deliberation.created_at).toLocaleDateString()}</span>
+                      <span>{formatToUKDate(deliberation.created_at)}</span>
                     </div>
                   </div>
                   

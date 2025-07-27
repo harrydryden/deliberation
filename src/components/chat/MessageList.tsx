@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Bot, User, Users, Workflow, FileText, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatToUKTime } from "@/utils/timeUtils";
 
 import type { ChatMessage } from "@/types/chat";
 
@@ -107,7 +108,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis }: Mess
                     </span>
                   )}
                   <span className="text-xs text-muted-foreground">
-                    {new Date(message.created_at).toLocaleTimeString()}
+                    {formatToUKTime(message.created_at)}
                   </span>
                 </div>
                 

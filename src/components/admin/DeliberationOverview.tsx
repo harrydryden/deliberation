@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw, MessageSquare, Eye } from 'lucide-react';
+import { formatToUKDateTime } from '@/utils/timeUtils';
 import { Deliberation } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useNavigate } from 'react-router-dom';
@@ -46,13 +47,7 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatToUKDateTime(dateString, 'dd MMM yyyy HH:mm');
   };
 
   return (

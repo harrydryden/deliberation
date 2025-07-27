@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ThumbsUp, ThumbsDown, Share, BookOpen } from "lucide-react";
+import { formatToUKTime } from "@/utils/timeUtils";
 import { getAgentInfo } from "@/utils/agentHelpers";
 import type { ChatMessage, AgentType } from "@/types/chat";
 import { cn } from "@/lib/utils";
@@ -49,7 +50,7 @@ export const ResponseCard = ({ message, onFeedback, onShare }: ResponseCardProps
             {message.content}
           </div>
           <div className="mt-2 text-xs opacity-80">
-            {new Date(message.created_at).toLocaleTimeString()}
+            {formatToUKTime(message.created_at)}
           </div>
         </Card>
       </div>
@@ -71,7 +72,7 @@ export const ResponseCard = ({ message, onFeedback, onShare }: ResponseCardProps
             {agentInfo?.description}
           </Badge>
           <span className="text-xs text-muted-foreground">
-            {new Date(message.created_at).toLocaleTimeString()}
+            {formatToUKTime(message.created_at)}
           </span>
         </div>
         
