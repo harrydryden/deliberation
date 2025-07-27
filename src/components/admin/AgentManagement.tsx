@@ -46,11 +46,11 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
       name: agent.name,
       description: agent.description,
       isActive: agent.isActive,
-      system_prompt: agent.configuration?.system_prompt || '',
-      response_style: agent.configuration?.response_style || '',
-      goals: agent.configuration?.goals || [],
-      agent_type: agent.configuration?.agent_type || '',
-      is_default: agent.configuration?.is_default || false
+      system_prompt: agent.system_prompt || '',
+      response_style: agent.response_style || '',
+      goals: agent.goals || [],
+      agent_type: agent.agent_type || '',
+      is_default: agent.is_default || false
     });
   };
 
@@ -72,14 +72,11 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
         name: editForm.name,
         description: editForm.description,
         isActive: editForm.isActive,
-        configuration: {
-          ...editingAgent.configuration,
-          system_prompt: editForm.system_prompt,
-          response_style: editForm.response_style,
-          goals: editForm.goals,
-          agent_type: editForm.agent_type,
-          is_default: editForm.is_default
-        }
+        system_prompt: editForm.system_prompt,
+        response_style: editForm.response_style,
+        goals: editForm.goals,
+        agent_type: editForm.agent_type,
+        is_default: editForm.is_default
       });
       setEditingAgent(null);
     } finally {
@@ -156,7 +153,7 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
                       {agent.name}
                     </TableCell>
                     <TableCell>
-                      {getAgentTypeBadge(agent.configuration?.agent_type || 'unknown')}
+                      {getAgentTypeBadge(agent.agent_type || 'unknown')}
                     </TableCell>
                     <TableCell className="max-w-xs truncate">
                       {agent.description || 'No description'}

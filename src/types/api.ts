@@ -35,7 +35,11 @@ export interface Agent {
   id: string;
   name: string;
   description: string;
-  configuration: Record<string, any>;
+  system_prompt: string;
+  response_style?: string;
+  goals?: string[];
+  agent_type: string;
+  is_default: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

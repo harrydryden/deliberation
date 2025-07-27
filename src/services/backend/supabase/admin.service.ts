@@ -88,12 +88,11 @@ export class SupabaseAdminService implements IAdminService {
       id: config.id,
       name: config.name,
       description: config.description || '',
-      configuration: {
-        agent_type: config.agent_type,
-        system_prompt: config.system_prompt,
-        goals: config.goals,
-        response_style: config.response_style
-      },
+      system_prompt: config.system_prompt || '',
+      response_style: config.response_style,
+      goals: config.goals || [],
+      agent_type: config.agent_type,
+      is_default: config.is_default || false,
       isActive: config.is_active,
       createdAt: config.created_at,
       updatedAt: config.updated_at
@@ -106,12 +105,11 @@ export class SupabaseAdminService implements IAdminService {
     if (config.name) updateData.name = config.name;
     if (config.description) updateData.description = config.description;
     if (config.isActive !== undefined) updateData.is_active = config.isActive;
-    if (config.configuration) {
-      updateData.agent_type = config.configuration.agent_type;
-      updateData.system_prompt = config.configuration.system_prompt;
-      updateData.goals = config.configuration.goals;
-      updateData.response_style = config.configuration.response_style;
-    }
+    if (config.agent_type) updateData.agent_type = config.agent_type;
+    if (config.system_prompt) updateData.system_prompt = config.system_prompt;
+    if (config.goals) updateData.goals = config.goals;
+    if (config.response_style) updateData.response_style = config.response_style;
+    if (config.is_default !== undefined) updateData.is_default = config.is_default;
 
     const { data, error } = await supabase
       .from('agent_configurations')
@@ -126,12 +124,11 @@ export class SupabaseAdminService implements IAdminService {
       id: data.id,
       name: data.name,
       description: data.description || '',
-      configuration: {
-        agent_type: data.agent_type,
-        system_prompt: data.system_prompt,
-        goals: data.goals,
-        response_style: data.response_style
-      },
+      system_prompt: data.system_prompt || '',
+      response_style: data.response_style,
+      goals: data.goals || [],
+      agent_type: data.agent_type,
+      is_default: data.is_default || false,
       isActive: data.is_active,
       createdAt: data.created_at,
       updatedAt: data.updated_at
