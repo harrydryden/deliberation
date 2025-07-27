@@ -22,7 +22,7 @@ export const Header = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/deliberations')}
               className="flex items-center space-x-1"
             >
               <MessageSquare className="h-4 w-4" />
