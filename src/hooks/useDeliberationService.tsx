@@ -11,6 +11,8 @@ interface DeliberationService {
 
 class SupabaseDeliberationService implements DeliberationService {
   async getDeliberations(): Promise<any[]> {
+    console.log('🔍 Starting getDeliberations...');
+    
     // First get deliberations
     const { data: deliberations, error: deliberationsError } = await supabase
       .from('deliberations')
@@ -18,16 +20,33 @@ class SupabaseDeliberationService implements DeliberationService {
       .eq('is_public', true)
       .order('created_at', { ascending: false });
 
-    if (deliberationsError) throw deliberationsError;
-    if (!deliberations) return [];
+    console.log('📊 Deliberations query result:', { deliberations, deliberationsError });
+
+    if (deliberationsError) {
+      console.error('❌ Error fetching deliberations:', deliberationsError);
+      throw deliberationsError;
+    }
+    if (!deliberations) {
+      console.log('📭 No deliberations found');
+      return [];
+    }
+
+    console.log(`📋 Found ${deliberations.length} deliberations`);
 
     // Then get participant counts for each deliberation
     const deliberationsWithCounts = await Promise.all(
       deliberations.map(async (deliberation) => {
-        const { count } = await supabase
+        console.log(`🔢 Getting participant count for deliberation ${deliberation.id}`);
+        const { count, error: countError } = await supabase
           .from('participants')
           .select('*', { count: 'exact', head: true })
           .eq('deliberation_id', deliberation.id);
+
+        if (countError) {
+          console.error(`❌ Error getting participant count for ${deliberation.id}:`, countError);
+        }
+
+        console.log(`👥 Participant count for ${deliberation.id}: ${count}`);
 
         return {
           ...deliberation,
@@ -36,6 +55,7 @@ class SupabaseDeliberationService implements DeliberationService {
       })
     );
 
+    console.log('✅ Final deliberations with counts:', deliberationsWithCounts);
     return deliberationsWithCounts;
   }
 
@@ -74,10 +94,18 @@ class SupabaseDeliberationService implements DeliberationService {
   }
 
   async joinDeliberation(deliberationId: string): Promise<void> {
+    console.log(`🚀 Starting joinDeliberation for ID: ${deliberationId}`);
+    
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    if (!user) {
+      console.error('❌ User not authenticated');
+      throw new Error('User not authenticated');
+    }
+
+    console.log(`👤 User authenticated: ${user.id}`);
 
     // Check if already a participant
+    console.log('🔍 Checking if user is already a participant...');
     const { data: existing, error: checkError } = await supabase
       .from('participants')
       .select('id')
@@ -85,13 +113,20 @@ class SupabaseDeliberationService implements DeliberationService {
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (checkError) throw checkError;
+    console.log('📊 Existing participant check result:', { existing, checkError });
+
+    if (checkError) {
+      console.error('❌ Error checking existing participant:', checkError);
+      throw checkError;
+    }
 
     if (existing) {
+      console.log('✅ User is already a participant, skipping join');
       return; // Already a participant
     }
 
     // Add as participant
+    console.log('➕ Adding user as participant...');
     const { error } = await supabase
       .from('participants')
       .insert({
@@ -100,7 +135,12 @@ class SupabaseDeliberationService implements DeliberationService {
         role: 'participant'
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error adding participant:', error);
+      throw error;
+    }
+
+    console.log('✅ Successfully joined deliberation');
   }
 
   async getDeliberation(deliberationId: string): Promise<any> {

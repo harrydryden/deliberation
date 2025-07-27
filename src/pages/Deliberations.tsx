@@ -46,10 +46,13 @@ const Deliberations = () => {
 
   const loadDeliberations = async () => {
     try {
+      console.log('🔄 Loading deliberations...');
       setLoading(true);
       const data = await deliberationService.getDeliberations();
+      console.log('📋 Deliberations loaded successfully:', data);
       setDeliberations(data);
     } catch (error) {
+      console.error('❌ Failed to load deliberations:', error);
       toast({
         title: "Error",
         description: "Failed to load deliberations",
@@ -57,19 +60,24 @@ const Deliberations = () => {
       });
     } finally {
       setLoading(false);
+      console.log('🏁 Loading deliberations completed');
     }
   };
 
 
   const handleJoinDeliberation = async (deliberationId: string) => {
     try {
+      console.log(`🎯 Attempting to join deliberation: ${deliberationId}`);
       await deliberationService.joinDeliberation(deliberationId);
+      console.log('✅ Join deliberation successful');
       toast({
         title: "Success",
         description: "Joined deliberation successfully"
       });
+      console.log(`🚀 Navigating to deliberation: ${deliberationId}`);
       navigate(`/deliberations/${deliberationId}`);
     } catch (error) {
+      console.error('❌ Failed to join deliberation:', error);
       toast({
         title: "Error",
         description: "Failed to join deliberation",
