@@ -45,7 +45,8 @@ export class SupabaseAuthService implements IAuthService {
       options: {
         data: {
           access_code: accessCode,
-          code_type: accessCodeData.code_type
+          code_type: accessCodeData.code_type,
+          user_role: accessCodeData.code_type === 'admin' ? 'admin' : 'user'
         }
       }
     });
