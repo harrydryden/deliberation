@@ -4,19 +4,41 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Users, Vote, Brain } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useDeliberationService } from "@/hooks/useDeliberationService";
 
 const Index = () => {
   const { user } = useBackendAuth();
   const navigate = useNavigate();
+  const deliberationService = useDeliberationService();
+  const [deliberations, setDeliberations] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) {
       navigate("/auth");
     } else {
-      navigate("/deliberations");
+      loadDeliberations();
     }
   }, [user, navigate]);
+
+  const loadDeliberations = async () => {
+    try {
+      const data = await deliberationService.getDeliberations();
+      setDeliberations(data);
+      
+      if (data.length > 0) {
+        // Find most recent active deliberation, or fallback to most recent
+        const mostRecentDeliberation = data.find(d => d.status === 'active') || data[0];
+        navigate(`/deliberations/${mostRecentDeliberation.id}`);
+      } else {
+        // No deliberations available, stay on Index page to show info
+        setDeliberations([]);
+      }
+    } catch (error) {
+      console.error('Failed to load deliberations:', error);
+      // Stay on index page if there's an error
+    }
+  };
 
   if (!user) {
     return null;
@@ -93,18 +115,18 @@ const Index = () => {
             Ready to start deliberating?
           </h2>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button 
-              className="bg-democratic-blue hover:bg-democratic-blue/90"
-              onClick={() => navigate("/deliberations")}
-            >
-              Create New Deliberation
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={() => navigate("/deliberations")}
-            >
-              Join Existing Discussion
-            </Button>
+            {deliberations.length > 0 ? (
+              <Button 
+                className="bg-democratic-blue hover:bg-democratic-blue/90"
+                onClick={() => navigate("/deliberations")}
+              >
+                View Available Deliberations
+              </Button>
+            ) : (
+              <p className="text-muted-foreground text-center">
+                No deliberations are currently available. Please contact an administrator to set up new discussions.
+              </p>
+            )}
             <Button 
               variant="ghost"
               onClick={() => navigate("/backend")}

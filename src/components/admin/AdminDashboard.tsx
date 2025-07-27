@@ -9,6 +9,7 @@ import { UserManagement } from './UserManagement';
 import { AccessCodeManagement } from './AccessCodeManagement';
 import { AgentManagement } from './AgentManagement';
 import { DeliberationOverview } from './DeliberationOverview';
+import { DeliberationCreation } from './DeliberationCreation';
 import { SystemStats } from './SystemStats';
 import { useAdminService } from '@/hooks/useAdminService';
 
@@ -107,6 +108,9 @@ export const AdminDashboard = () => {
         </TabsContent>
 
         <TabsContent value="deliberations" className="space-y-4">
+          <DeliberationCreation 
+            onDeliberationCreated={adminService.fetchDeliberations}
+          />
           <DeliberationOverview
             deliberations={adminService.deliberations}
             loading={adminService.loadingDeliberations}

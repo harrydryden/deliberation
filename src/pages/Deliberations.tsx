@@ -5,12 +5,7 @@ import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Plus, Users, Clock, MessageSquare } from "lucide-react";
+import { Users, Clock, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 
@@ -36,13 +31,6 @@ const Deliberations = () => {
   
   const [deliberations, setDeliberations] = useState<Deliberation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    is_public: true,
-    max_participants: 50
-  });
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -54,6 +42,14 @@ const Deliberations = () => {
       loadDeliberations();
     }
   }, [user, isLoading, navigate]);
+
+  // Auto-redirect to most recent deliberation
+  useEffect(() => {
+    if (deliberations.length > 0) {
+      const mostRecentDeliberation = deliberations.find(d => d.status === 'active') || deliberations[0];
+      navigate(`/deliberations/${mostRecentDeliberation.id}`);
+    }
+  }, [deliberations, navigate]);
 
   const loadDeliberations = async () => {
     try {
@@ -71,24 +67,6 @@ const Deliberations = () => {
     }
   };
 
-  const handleCreateDeliberation = async () => {
-    try {
-      const deliberation = await deliberationService.createDeliberation(formData);
-      toast({
-        title: "Success",
-        description: "Deliberation created successfully"
-      });
-      setCreateOpen(false);
-      setFormData({ title: '', description: '', is_public: true, max_participants: 50 });
-      navigate(`/deliberations/${deliberation.id}`);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to create deliberation",
-        variant: "destructive"
-      });
-    }
-  };
 
   const handleJoinDeliberation = async (deliberationId: string) => {
     try {
@@ -140,78 +118,9 @@ const Deliberations = () => {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-democratic-blue">Deliberations</h1>
-            <p className="text-muted-foreground">Join ongoing discussions or create new ones</p>
+            <h1 className="text-3xl font-bold text-democratic-blue">Available Deliberations</h1>
+            <p className="text-muted-foreground">Join active discussions created by administrators</p>
           </div>
-          
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-democratic-blue hover:bg-democratic-blue/90">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Deliberation
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Deliberation</DialogTitle>
-                <DialogDescription>
-                  Set up a new deliberation for structured discussion
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="title">Title</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="Enter deliberation title"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Describe what this deliberation is about"
-                    rows={3}
-                  />
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="is_public"
-                    checked={formData.is_public}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_public: checked }))}
-                  />
-                  <Label htmlFor="is_public">Public deliberation</Label>
-                </div>
-                
-                <div>
-                  <Label htmlFor="max_participants">Maximum Participants</Label>
-                  <Input
-                    id="max_participants"
-                    type="number"
-                    value={formData.max_participants}
-                    onChange={(e) => setFormData(prev => ({ ...prev, max_participants: parseInt(e.target.value) || 50 }))}
-                    min={2}
-                    max={200}
-                  />
-                </div>
-                
-                <Button 
-                  onClick={handleCreateDeliberation}
-                  className="w-full bg-democratic-blue hover:bg-democratic-blue/90"
-                  disabled={!formData.title.trim()}
-                >
-                  Create Deliberation
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
 
         {/* Deliberations Grid */}
@@ -219,16 +128,10 @@ const Deliberations = () => {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No deliberations found</h3>
+              <h3 className="text-lg font-semibold mb-2">No deliberations available</h3>
               <p className="text-muted-foreground text-center mb-4">
-                Be the first to create a deliberation and start a meaningful discussion
+                No deliberations have been created yet. Please contact an administrator to set up new discussions.
               </p>
-              <Button 
-                onClick={() => setCreateOpen(true)}
-                className="bg-democratic-blue hover:bg-democratic-blue/90"
-              >
-                Create First Deliberation
-              </Button>
             </CardContent>
           </Card>
         ) : (

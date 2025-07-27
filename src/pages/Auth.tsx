@@ -1,18 +1,43 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useBackendAuth } from "@/hooks/useBackendAuth";
 import { AuthForm } from "@/components/auth/AuthForm";
+import { useDeliberationService } from "@/hooks/useDeliberationService";
 
 const Auth = () => {
   const { user, isLoading } = useBackendAuth();
   const navigate = useNavigate();
+  const deliberationService = useDeliberationService();
+  const [deliberations, setDeliberations] = useState<any[]>([]);
 
   useEffect(() => {
     if (!isLoading && user) {
-      console.log('✅ User authenticated, redirecting to deliberations:', user);
+      console.log('✅ User authenticated, loading deliberations:', user);
+      loadDeliberations();
+    }
+  }, [user, isLoading]);
+
+  const loadDeliberations = async () => {
+    try {
+      const data = await deliberationService.getDeliberations();
+      setDeliberations(data);
+      
+      if (data.length > 0) {
+        // Find most recent active deliberation, or fallback to most recent
+        const mostRecentDeliberation = data.find(d => d.status === 'active') || data[0];
+        console.log('✅ Redirecting to most recent deliberation:', mostRecentDeliberation.id);
+        navigate(`/deliberations/${mostRecentDeliberation.id}`);
+      } else {
+        // No deliberations available, redirect to deliberations page
+        console.log('✅ No deliberations found, redirecting to deliberations page');
+        navigate("/deliberations");
+      }
+    } catch (error) {
+      console.error('Failed to load deliberations:', error);
+      // Fallback to deliberations page
       navigate("/deliberations");
     }
-  }, [user, isLoading, navigate]);
+  };
 
   if (isLoading) {
     return (
