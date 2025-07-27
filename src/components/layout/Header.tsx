@@ -22,11 +22,11 @@ export const Header = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/chat')}
+              onClick={() => navigate('/')}
               className="flex items-center space-x-1"
             >
               <MessageSquare className="h-4 w-4" />
-              <span>Chat</span>
+              <span>Deliberations</span>
             </Button>
             {user.role === 'admin' && (
               <Button

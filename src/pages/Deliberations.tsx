@@ -43,13 +43,6 @@ const Deliberations = () => {
     }
   }, [user, isLoading, navigate]);
 
-  // Auto-redirect to most recent deliberation
-  useEffect(() => {
-    if (deliberations.length > 0) {
-      const mostRecentDeliberation = deliberations.find(d => d.status === 'active') || deliberations[0];
-      navigate(`/deliberations/${mostRecentDeliberation.id}`);
-    }
-  }, [deliberations, navigate]);
 
   const loadDeliberations = async () => {
     try {
