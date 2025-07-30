@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -29,12 +31,20 @@ export const IbisSubmissionModal = ({
 }: IbisSubmissionModalProps) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isClassifying, setIsClassifying] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: messageContent,
     nodeType: '' as NodeType | '',
     parentNodeId: ''
   });
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    title: string;
+    keywords: string[];
+    nodeType: NodeType;
+    description: string;
+    confidence: number;
+  } | null>(null);
 
   const [existingNodes, setExistingNodes] = useState<Array<{
     id: string;
@@ -42,12 +52,13 @@ export const IbisSubmissionModal = ({
     node_type: string;
   }>>([]);
 
-  // Load existing nodes when modal opens
+  // Load existing nodes and classify message when modal opens
   useEffect(() => {
     if (isOpen) {
       loadExistingNodes();
+      classifyMessage();
     }
-  }, [isOpen, deliberationId]);
+  }, [isOpen, deliberationId, messageContent]);
 
   const loadExistingNodes = async () => {
     try {
@@ -62,6 +73,53 @@ export const IbisSubmissionModal = ({
     } catch (error) {
       console.error('Error loading existing nodes:', error);
     }
+  };
+
+  const classifyMessage = async () => {
+    if (!messageContent.trim()) return;
+    
+    setIsClassifying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('classify-message', {
+        body: {
+          content: messageContent,
+          deliberationId: deliberationId
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success && data.classification) {
+        const classification = data.classification;
+        setAiSuggestions({
+          title: classification.title,
+          keywords: classification.keywords,
+          nodeType: classification.nodeType,
+          description: classification.description,
+          confidence: classification.confidence
+        });
+
+        // Pre-populate form with AI suggestions
+        setFormData(prev => ({
+          ...prev,
+          title: classification.title,
+          nodeType: classification.nodeType
+        }));
+      }
+    } catch (error: any) {
+      console.error('Error classifying message:', error);
+      toast({
+        title: "AI Classification Failed",
+        description: "Unable to get AI suggestions. You can still fill the form manually.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsClassifying(false);
+    }
+  };
+
+  const applyAiSuggestion = (field: string, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,13 +176,14 @@ export const IbisSubmissionModal = ({
       onSuccess?.();
       onClose();
       
-      // Reset form
+      // Reset form and AI suggestions
       setFormData({
         title: '',
         description: messageContent,
         nodeType: '',
         parentNodeId: ''
       });
+      setAiSuggestions(null);
 
     } catch (error: any) {
       console.error('Error submitting to IBIS:', error);
@@ -157,6 +216,39 @@ export const IbisSubmissionModal = ({
         <DialogHeader>
           <DialogTitle>Submit Message to IBIS</DialogTitle>
         </DialogHeader>
+
+        {/* AI Classification Status */}
+        {isClassifying && (
+          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+            <LoadingSpinner className="h-4 w-4" />
+            <span className="text-sm text-muted-foreground">AI is analyzing your message...</span>
+          </div>
+        )}
+
+        {/* AI Suggestions */}
+        {aiSuggestions && !isClassifying && (
+          <div className="p-3 bg-muted rounded-lg space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">AI Suggestions</span>
+              <Badge variant="secondary" className="text-xs">
+                {Math.round(aiSuggestions.confidence * 100)}% confidence
+              </Badge>
+            </div>
+            
+            {aiSuggestions.keywords.length > 0 && (
+              <div>
+                <span className="text-xs text-muted-foreground">Keywords: </span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {aiSuggestions.keywords.map((keyword, index) => (
+                    <Badge key={index} variant="outline" className="text-xs">
+                      {keyword}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
