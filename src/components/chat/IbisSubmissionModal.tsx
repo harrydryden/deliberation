@@ -92,7 +92,7 @@ export const IbisSubmissionModal = ({
           title: formData.title.trim(),
           description: formData.description.trim() || null,
           node_type: formData.nodeType,
-          parent_node_id: formData.parentNodeId || null,
+          parent_node_id: formData.parentNodeId && formData.parentNodeId !== 'none' ? formData.parentNodeId : null,
           deliberation_id: deliberationId,
           message_id: messageId,
           created_by: user.id, // This was missing!
@@ -230,7 +230,7 @@ export const IbisSubmissionModal = ({
                   <SelectValue placeholder="Select a parent node to link to" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No parent (root node)</SelectItem>
+                  <SelectItem value="none">No parent (root node)</SelectItem>
                   {existingNodes.map((node) => (
                     <SelectItem key={node.id} value={node.id}>
                       <div>
