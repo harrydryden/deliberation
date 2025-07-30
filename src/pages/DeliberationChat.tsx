@@ -34,6 +34,8 @@ const DeliberationChat = () => {
   
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isParticipant, setIsParticipant] = useState(false);
+  const [joiningDeliberation, setJoiningDeliberation] = useState(false);
   const [ibisModal, setIbisModal] = useState<{
     isOpen: boolean;
     messageId: string;
@@ -99,6 +101,10 @@ const DeliberationChat = () => {
       const data = await deliberationService.getDeliberation(deliberationId);
       console.log('✅ Deliberation details loaded successfully:', data);
       setDeliberation(data);
+      
+      // Check if current user is a participant
+      const isUserParticipant = data.participants?.some((p: any) => p.user_id === user?.id);
+      setIsParticipant(isUserParticipant || false);
     } catch (error) {
       console.error('❌ Failed to load deliberation details:', error);
       toast({
@@ -110,6 +116,31 @@ const DeliberationChat = () => {
     } finally {
       setLoading(false);
       console.log('🏁 Deliberation details loading completed');
+    }
+  };
+
+  const handleJoinDeliberation = async () => {
+    if (!deliberationId || !user) return;
+    
+    setJoiningDeliberation(true);
+    try {
+      await deliberationService.joinDeliberation(deliberationId);
+      setIsParticipant(true);
+      toast({
+        title: "Success",
+        description: "You have joined the deliberation",
+      });
+      // Reload deliberation to get updated participant list
+      loadDeliberation();
+    } catch (error) {
+      console.error('Failed to join deliberation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to join deliberation",
+        variant: "destructive"
+      });
+    } finally {
+      setJoiningDeliberation(false);
     }
   };
 
@@ -163,6 +194,17 @@ const DeliberationChat = () => {
                 <Users className="h-4 w-4" />
                 <span>{deliberation.participants?.length || 0}/{deliberation.max_participants}</span>
               </div>
+              
+              {!isParticipant && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleJoinDeliberation}
+                  disabled={joiningDeliberation}
+                >
+                  {joiningDeliberation ? 'Joining...' : 'Join Deliberation'}
+                </Button>
+              )}
               
               <Button
                 variant="outline"
