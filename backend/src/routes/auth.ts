@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
 const authSchema = z.object({
-  accessCode: z.string().regex(/^\d{10}$/, "Access code must be exactly 10 digits"),
+  accessCode: z.string()
+    .min(8, "Access code must be at least 8 characters")
+    .max(15, "Access code must not exceed 15 characters")
+    .regex(/^[A-Z0-9]+$/, "Access code must contain only uppercase letters and numbers"),
 });
 
 const updateProfileSchema = z.object({
