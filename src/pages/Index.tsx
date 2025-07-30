@@ -1,10 +1,10 @@
+import React, { useEffect, useState } from "react";
 import { useBackendAuth } from "@/hooks/useBackendAuth";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Users, Vote, Brain, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 
 const Index = () => {

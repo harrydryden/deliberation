@@ -6,7 +6,17 @@ import { BACKEND_CONFIG } from '@/config/backend';
 import { supabase } from '@/integrations/supabase/client';
 import { userCache } from '@/utils/validation';
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Create context with a default value to prevent undefined errors
+const defaultAuthContext: AuthContextType = {
+  user: null,
+  isLoading: true,
+  authenticate: async () => { throw new Error('Auth not initialized'); },
+  signOut: async () => { throw new Error('Auth not initialized'); },
+  isAuthenticated: false,
+  refreshToken: async () => { throw new Error('Auth not initialized'); },
+};
+
+const AuthContext = createContext<AuthContextType>(defaultAuthContext);
 
 interface BackendAuthProviderProps {
   children: ReactNode;
@@ -18,11 +28,19 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [authInProgress, setAuthInProgress] = useState(false);
 
-  const authService = backendServiceFactory.getAuthService();
+  // Get auth service safely
+  const authService = React.useMemo(() => {
+    try {
+      return backendServiceFactory.getAuthService();
+    } catch (error) {
+      console.error('Failed to get auth service:', error);
+      return null;
+    }
+  }, []);
 
   const initializeAuth = useCallback(async () => {
-    if (isInitialized || authInProgress) {
-      console.log('🔄 Auth already initialized or in progress, skipping');
+    if (isInitialized || authInProgress || !authService) {
+      console.log('🔄 Auth already initialized or in progress, or no auth service, skipping');
       return;
     }
 
@@ -41,7 +59,9 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
       }
     } catch (error) {
       console.error('❌ Failed to initialize auth:', error);
-      authService.setToken(null);
+      if (authService) {
+        authService.setToken(null);
+      }
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -52,6 +72,9 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
   }, [authService, isInitialized, authInProgress]);
 
   const authenticate = useCallback(async (accessCode: string) => {
+    if (!authService) {
+      throw new Error('Auth service not available');
+    }
     setIsLoading(true);
     try {
       const { user: authenticatedUser, token } = await authService.authenticate(accessCode);
@@ -65,7 +88,9 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
   const signOut = useCallback(async () => {
     setIsLoading(true);
     try {
-      await authService.signOut();
+      if (authService) {
+        await authService.signOut();
+      }
       // Clear all cached user data for performance
       userCache.clear();
       setUser(null);
@@ -75,6 +100,9 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
   }, [authService]);
 
   const refreshToken = useCallback(async () => {
+    if (!authService) {
+      throw new Error('Auth service not available');
+    }
     try {
       const { user: refreshedUser, token } = await authService.refreshToken();
       authService.setToken(token);
@@ -93,12 +121,12 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
 
   // Set up Supabase auth state listener if using Supabase
   useEffect(() => {
-    if (BACKEND_CONFIG.type === 'supabase') {
+    if (BACKEND_CONFIG.type === 'supabase' && authService) {
       
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         (event: string, session: any) => {
           console.log('🔄 Auth state change:', event, session ? 'with session' : 'no session');
-          
+           
           // Prevent processing if already in progress to avoid race conditions
           if (authInProgress && event !== 'SIGNED_OUT') {
             console.log('🚫 Auth in progress, skipping event:', event);
@@ -129,10 +157,12 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
             Promise.resolve().then(async () => {
               try {
                 console.log('🔐 Auth event:', event, 'Session:', session);
-                const currentUser = await authService.getCurrentUser();
-                console.log('👤 Current user retrieved:', currentUser);
-                setUser(currentUser);
-                console.log('✅ Auth state updated successfully');
+                if (authService) {
+                  const currentUser = await authService.getCurrentUser();
+                  console.log('👤 Current user retrieved:', currentUser);
+                  setUser(currentUser);
+                  console.log('✅ Auth state updated successfully');
+                }
               } catch (error) {
                 console.error('❌ Failed to get current user:', error);
                 setUser(null);
@@ -150,17 +180,18 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
 
       return () => subscription.unsubscribe();
     }
-  }, [authService]);
+  }, [authService, authInProgress]);
 
   const value: AuthContextType = {
     user,
-    isLoading,
+    isLoading: authService ? isLoading : false, // If no auth service, don't show loading
     authenticate,
     signOut,
     isAuthenticated: !!user,
     refreshToken,
   };
 
+  // Always provide context, even if auth service fails
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -170,8 +201,6 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
 
 export const useBackendAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useBackendAuth must be used within a BackendAuthProvider');
-  }
+  // Context now always has a value due to default, so no need to check for undefined
   return context;
 };
