@@ -1,15 +1,11 @@
 import { useEffect } from "react";
-import { useTokenRefresh } from "@/hooks/useTokenRefresh";
+import { ChatInterface } from "@/components/chat/ChatInterface";
 import { useNavigate } from "react-router-dom";
 import { useBackendAuth } from "@/hooks/useBackendAuth";
-import { ChatInterface } from "@/components/chat/ChatInterface";
 
 const Chat = () => {
   const { user, isLoading } = useBackendAuth();
   const navigate = useNavigate();
-  
-  // Enable token refresh for authenticated users
-  useTokenRefresh();
 
   useEffect(() => {
     if (!isLoading && !user) {

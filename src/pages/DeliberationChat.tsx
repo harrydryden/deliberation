@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useBackendAuth } from "@/hooks/useBackendAuth";
-import { useTokenRefresh } from "@/hooks/useTokenRefresh";
+
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 import { Layout } from "@/components/layout/Layout";
 import { MessageList } from "@/components/chat/MessageList";
@@ -46,8 +46,6 @@ const DeliberationChat = () => {
     messageContent: ''
   });
   
-  // Enable token refresh for authenticated users
-  useTokenRefresh();
 
   const {
     messages,

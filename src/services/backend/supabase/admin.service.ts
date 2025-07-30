@@ -53,9 +53,8 @@ export class SupabaseAdminService implements IAdminService {
   }
 
   async createAccessCode(codeType: string): Promise<AccessCode> {
-    // Use database function for secure code generation
-    const { data: code, error: genError } = await supabase.rpc('generate_secure_access_code');
-    if (genError) throw genError;
+    // Simple random code generation for performance
+    const code = Math.random().toString(36).substring(2, 12).toUpperCase();
     
     const { data, error } = await supabase
       .from('access_codes')

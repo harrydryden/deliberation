@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { IAuthService } from '../base.service';
 import { User } from '@/types/api';
 import { AuthenticationError } from '@/utils/errors';
+import { userCache } from '@/utils/validation';
 
 export class SupabaseAuthService implements IAuthService {
   private token: string | null = null;
@@ -120,16 +121,27 @@ export class SupabaseAuthService implements IAuthService {
       throw new AuthenticationError('No authenticated user');
     }
 
-    // Get user profile including role
+    // Check cache first for performance
+    const cachedUser = userCache.get(user.id);
+    if (cachedUser) {
+      console.log('🚀 Retrieved user from cache');
+      return cachedUser;
+    }
+
+    // Batch query for better performance - get user profile in single request
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('user_role, display_name, expertise_areas')
+      .from('user_cache')  // Use optimized view
+      .select('*')
       .eq('id', user.id)
       .single();
 
     const accessCode = user.user_metadata?.access_code || 'unknown';
     const codeType = user.user_metadata?.code_type || 'user';
     const mappedUser = this.mapSupabaseUser(user, accessCode, codeType, profile);
+    
+    // Cache for future requests (5 minute TTL)
+    userCache.set(user.id, mappedUser);
+    
     console.log('✅ User mapped successfully:', mappedUser);
     return mappedUser;
   }

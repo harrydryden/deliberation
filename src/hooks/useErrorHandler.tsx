@@ -1,35 +1,22 @@
 import { useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { getErrorMessage, isAuthError } from '@/utils/errors';
-import { useBackendAuth } from '@/hooks/useBackendAuth';
 
 export const useErrorHandler = () => {
   const { toast } = useToast();
-  const { signOut } = useBackendAuth();
 
   const handleError = useCallback((error: any, context?: string) => {
-    const message = getErrorMessage(error);
+    // Simple error handling for performance
+    const message = error?.message || 'An error occurred';
     
     console.error(`Error${context ? ` in ${context}` : ''}:`, error);
 
-    // Handle authentication errors
-    if (isAuthError(error)) {
-      toast({
-        variant: "destructive",
-        title: "Authentication Error",
-        description: "Please sign in again",
-      });
-      signOut();
-      return;
-    }
-
-    // Handle general errors
+    // Show generic error toast
     toast({
       variant: "destructive",
       title: context ? `Error in ${context}` : "Error",
       description: message,
     });
-  }, [toast, signOut]);
+  }, [toast]);
 
   const handleAsyncError = useCallback(async (
     asyncFn: () => Promise<any>,

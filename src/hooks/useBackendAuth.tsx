@@ -4,6 +4,7 @@ import { AuthContextType } from '@/types/auth';
 import { backendServiceFactory } from '@/services/backend/factory';
 import { BACKEND_CONFIG } from '@/config/backend';
 import { supabase } from '@/integrations/supabase/client';
+import { userCache } from '@/utils/validation';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -65,6 +66,8 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
     setIsLoading(true);
     try {
       await authService.signOut();
+      // Clear all cached user data for performance
+      userCache.clear();
       setUser(null);
     } finally {
       setIsLoading(false);
