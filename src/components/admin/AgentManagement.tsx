@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw, Settings, Edit, Plus, X } from 'lucide-react';
 import { formatToUKDate } from '@/utils/timeUtils';
-import { Agent } from '@/types/api';
+import { Agent, FacilitatorConfig, FacilitatorQuestion } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 interface AgentManagementProps {
@@ -32,7 +32,13 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
     response_style: '',
     goals: [] as string[],
     agent_type: '',
-    is_default: false
+    is_default: false,
+    facilitator_config: {
+      prompting_enabled: false,
+      prompting_interval_minutes: 3,
+      max_prompts_per_session: 5,
+      prompting_questions: [] as FacilitatorQuestion[]
+    } as FacilitatorConfig
   });
 
   useEffect(() => {
@@ -51,7 +57,13 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
       response_style: agent.response_style || '',
       goals: agent.goals || [],
       agent_type: agent.agent_type || '',
-      is_default: agent.is_default || false
+      is_default: agent.is_default || false,
+      facilitator_config: agent.facilitator_config || {
+        prompting_enabled: false,
+        prompting_interval_minutes: 3,
+        max_prompts_per_session: 5,
+        prompting_questions: []
+      }
     });
   };
 
@@ -77,7 +89,8 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
         response_style: editForm.response_style,
         goals: editForm.goals,
         agent_type: editForm.agent_type,
-        is_default: editForm.is_default
+        is_default: editForm.is_default,
+        facilitator_config: editForm.facilitator_config
       });
       setEditingAgent(null);
     } finally {
@@ -100,6 +113,55 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
     setEditForm(prev => ({
       ...prev,
       goals: prev.goals.map((goal, i) => i === index ? value : goal)
+    }));
+  };
+
+  // Facilitator question management
+  const addFacilitatorQuestion = () => {
+    const newQuestion: FacilitatorQuestion = {
+      id: `question_${Date.now()}`,
+      text: '',
+      category: 'exploration',
+      weight: 1.0
+    };
+    setEditForm(prev => ({
+      ...prev,
+      facilitator_config: {
+        ...prev.facilitator_config,
+        prompting_questions: [...prev.facilitator_config.prompting_questions, newQuestion]
+      }
+    }));
+  };
+
+  const removeFacilitatorQuestion = (index: number) => {
+    setEditForm(prev => ({
+      ...prev,
+      facilitator_config: {
+        ...prev.facilitator_config,
+        prompting_questions: prev.facilitator_config.prompting_questions.filter((_, i) => i !== index)
+      }
+    }));
+  };
+
+  const updateFacilitatorQuestion = (index: number, field: keyof FacilitatorQuestion, value: any) => {
+    setEditForm(prev => ({
+      ...prev,
+      facilitator_config: {
+        ...prev.facilitator_config,
+        prompting_questions: prev.facilitator_config.prompting_questions.map((q, i) => 
+          i === index ? { ...q, [field]: value } : q
+        )
+      }
+    }));
+  };
+
+  const updateFacilitatorConfig = (field: keyof FacilitatorConfig, value: any) => {
+    setEditForm(prev => ({
+      ...prev,
+      facilitator_config: {
+        ...prev.facilitator_config,
+        [field]: value
+      }
     }));
   };
 
@@ -270,6 +332,124 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
                                 )}
                               </div>
                             </div>
+                            
+                            {/* Facilitator Configuration for Flow Agent */}
+                            {editForm.agent_type === 'flow_agent' && (
+                              <div className="border-t pt-4">
+                                <Label className="text-base font-semibold">Facilitator Configuration</Label>
+                                <div className="space-y-4 mt-4">
+                                  <div className="flex items-center space-x-2">
+                                    <Switch
+                                      checked={editForm.facilitator_config.prompting_enabled}
+                                      onCheckedChange={(checked) => updateFacilitatorConfig('prompting_enabled', checked)}
+                                    />
+                                    <Label>Enable Facilitator Prompting</Label>
+                                  </div>
+                                  
+                                  {editForm.facilitator_config.prompting_enabled && (
+                                    <>
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                          <Label htmlFor="prompt-interval">Prompting Interval (minutes)</Label>
+                                          <Input
+                                            id="prompt-interval"
+                                            type="number"
+                                            value={editForm.facilitator_config.prompting_interval_minutes}
+                                            onChange={(e) => updateFacilitatorConfig('prompting_interval_minutes', parseInt(e.target.value) || 3)}
+                                            min="1"
+                                            max="60"
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label htmlFor="max-prompts">Max Prompts per Session</Label>
+                                          <Input
+                                            id="max-prompts"
+                                            type="number"
+                                            value={editForm.facilitator_config.max_prompts_per_session}
+                                            onChange={(e) => updateFacilitatorConfig('max_prompts_per_session', parseInt(e.target.value) || 5)}
+                                            min="1"
+                                            max="20"
+                                          />
+                                        </div>
+                                      </div>
+                                      
+                                      <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                          <Label>Facilitator Questions</Label>
+                                          <Button type="button" variant="outline" size="sm" onClick={addFacilitatorQuestion}>
+                                            <Plus className="h-4 w-4 mr-1" />
+                                            Add Question
+                                          </Button>
+                                        </div>
+                                        <div className="space-y-3 max-h-48 overflow-y-auto">
+                                          {editForm.facilitator_config.prompting_questions.map((question, index) => (
+                                            <div key={question.id} className="border rounded-lg p-3 space-y-2">
+                                              <div className="flex gap-2">
+                                                <div className="flex-1">
+                                                  <Label htmlFor={`question-text-${index}`}>Question Text</Label>
+                                                  <Textarea
+                                                    id={`question-text-${index}`}
+                                                    value={question.text}
+                                                    onChange={(e) => updateFacilitatorQuestion(index, 'text', e.target.value)}
+                                                    placeholder="Enter facilitator question..."
+                                                    rows={2}
+                                                  />
+                                                </div>
+                                                <Button
+                                                  type="button"
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() => removeFacilitatorQuestion(index)}
+                                                  className="mt-auto"
+                                                >
+                                                  <X className="h-4 w-4" />
+                                                </Button>
+                                              </div>
+                                              <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                  <Label htmlFor={`question-category-${index}`}>Category</Label>
+                                                  <Select 
+                                                    value={question.category} 
+                                                    onValueChange={(value) => updateFacilitatorQuestion(index, 'category', value)}
+                                                  >
+                                                    <SelectTrigger>
+                                                      <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      <SelectItem value="exploration">Exploration</SelectItem>
+                                                      <SelectItem value="perspective">Perspective</SelectItem>
+                                                      <SelectItem value="clarification">Clarification</SelectItem>
+                                                      <SelectItem value="synthesis">Synthesis</SelectItem>
+                                                      <SelectItem value="action">Action</SelectItem>
+                                                    </SelectContent>
+                                                  </Select>
+                                                </div>
+                                                <div>
+                                                  <Label htmlFor={`question-weight-${index}`}>Weight</Label>
+                                                  <Input
+                                                    id={`question-weight-${index}`}
+                                                    type="number"
+                                                    value={question.weight}
+                                                    onChange={(e) => updateFacilitatorQuestion(index, 'weight', parseFloat(e.target.value) || 1.0)}
+                                                    min="0.1"
+                                                    max="2.0"
+                                                    step="0.1"
+                                                  />
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                          {editForm.facilitator_config.prompting_questions.length === 0 && (
+                                            <p className="text-sm text-muted-foreground">No facilitator questions configured</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
                             <div className="flex items-center space-x-2">
                               <Switch
                                 checked={editForm.isActive}

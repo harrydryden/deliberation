@@ -40,10 +40,25 @@ export interface Agent {
   response_style?: string;
   goals?: string[];
   agent_type: string;
+  facilitator_config?: FacilitatorConfig;
   is_default: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface FacilitatorConfig {
+  prompting_enabled: boolean;
+  prompting_interval_minutes: number;
+  max_prompts_per_session: number;
+  prompting_questions: FacilitatorQuestion[];
+}
+
+export interface FacilitatorQuestion {
+  id: string;
+  text: string;
+  category: 'exploration' | 'perspective' | 'clarification' | 'synthesis' | 'action';
+  weight: number;
 }
 
 export interface Deliberation {

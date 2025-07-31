@@ -62,24 +62,26 @@ model Message {
 }
 
 model AgentConfiguration {
-  id              String    @id @default(uuid())
-  agentType       String    @map("agent_type")
-  name            String
-  systemPrompt    String    @map("system_prompt")
-  description     String?
-  goals           String[]
-  responseStyle   String?   @map("response_style")
-  presetQuestions Json      @default("[]") @map("preset_questions")
-  isActive        Boolean   @default(false) @map("is_active")
-  isDefault       Boolean   @default(false) @map("is_default")
-  createdBy       String?   @map("created_by")
-  deliberationId  String?   @map("deliberation_id")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  id                String    @id @default(uuid())
+  agentType         String    @map("agent_type")
+  name              String
+  systemPrompt      String    @map("system_prompt")
+  description       String?
+  goals             String[]
+  responseStyle     String?   @map("response_style")
+  presetQuestions   Json      @default("[]") @map("preset_questions")
+  facilitatorConfig Json      @default("{}") @map("facilitator_config")
+  isActive          Boolean   @default(false) @map("is_active")
+  isDefault         Boolean   @default(false) @map("is_default")
+  createdBy         String?   @map("created_by")
+  deliberationId    String?   @map("deliberation_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  deliberation Deliberation?   @relation(fields: [deliberationId], references: [id])
-  knowledge    AgentKnowledge[]
+  deliberation       Deliberation?       @relation(fields: [deliberationId], references: [id])
+  knowledge          AgentKnowledge[]
+  facilitatorSessions FacilitatorSession[]
 
   @@map("agent_configurations")
 }
@@ -193,6 +195,24 @@ model AccessCode {
   createdAt DateTime  @default(now()) @map("created_at")
 
   @@map("access_codes")
+}
+
+model FacilitatorSession {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  deliberationId    String?   @map("deliberation_id")
+  agentConfigId     String    @map("agent_config_id")
+  lastPromptTime    DateTime? @map("last_prompt_time")
+  promptsSentCount  Int       @default(0) @map("prompts_sent_count")
+  lastActivityTime  DateTime  @default(now()) @map("last_activity_time")
+  sessionState      Json      @default("{}") @map("session_state")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  agentConfig AgentConfiguration @relation(fields: [agentConfigId], references: [id])
+
+  @@map("facilitator_sessions")
 }
 
 // Enums

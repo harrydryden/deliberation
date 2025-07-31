@@ -252,23 +252,110 @@ export class AIOrchestrationService {
       }
     }
 
-    // Flow Agent provides conversation management and transitions
-    const flowPrompt = `You are the Flow Agent, managing conversation flow and transitions in democratic deliberation.
+    // Get flow agent configuration with facilitator settings
+    const flowAgentConfig = await this.prisma.agentConfiguration.findFirst({
+      where: { 
+        agentType: 'flow_agent',
+        isActive: true,
+        isDefault: true
+      },
+    });
+
+    // Get or create facilitator session to track prompting state
+    let facilitatorSession = await this.prisma.facilitatorSession.findFirst({
+      where: {
+        userId,
+        deliberationId,
+        agentConfigId: flowAgentConfig?.id,
+      },
+    });
+
+    if (!facilitatorSession && flowAgentConfig) {
+      facilitatorSession = await this.prisma.facilitatorSession.create({
+        data: {
+          userId,
+          deliberationId,
+          agentConfigId: flowAgentConfig.id,
+          lastActivityTime: new Date(),
+        },
+      });
+    }
+
+    // Check if we should send a facilitator prompt based on configuration
+    const facilitatorConfig = flowAgentConfig?.facilitatorConfig as any;
+    const shouldSendPrompt = await this.shouldSendFacilitatorPrompt(
+      facilitatorSession,
+      facilitatorConfig,
+      sessionState
+    );
+
+    let flowPrompt: string;
+    
+    if (shouldSendPrompt) {
+      // Select an appropriate prompting question
+      const selectedQuestion = this.selectFacilitatorQuestion(
+        facilitatorConfig?.prompting_questions || [],
+        sessionState,
+        facilitatorSession?.sessionState as any
+      );
+      
+      if (selectedQuestion) {
+        flowPrompt = `You are the Flow Agent acting as a facilitator in democratic deliberation.
 ${deliberationContext}
-CURRENT CONTEXT:
+FACILITATION CONTEXT:
 - User input type: ${inputType}
 - Session message count: ${sessionState?.messageCount || 0}
 - Recent statement count: ${sessionState?.statementCount || 0}
 
 USER MESSAGE: "${content}"
 
-Provide a brief transitional response that:
-- Acknowledges the user's contribution
-- Suggests next steps or deeper exploration
-- Encourages continued engagement
-- Keeps the conversation flowing naturally
+Your role is to facilitate engagement. Use this prompting question to encourage participation:
+"${selectedQuestion.text}"
 
-Keep response under 2 sentences and focus on facilitation, not content.`;
+Provide a response that:
+- Briefly acknowledges their contribution
+- Naturally incorporates the prompting question
+- Encourages deeper engagement
+- Maintains conversational flow
+
+Keep response conversational and under 3 sentences.`;
+
+        // Update facilitator session
+        if (facilitatorSession) {
+          await this.prisma.facilitatorSession.update({
+            where: { id: facilitatorSession.id },
+            data: {
+              lastPromptTime: new Date(),
+              promptsSentCount: (facilitatorSession.promptsSentCount || 0) + 1,
+              lastActivityTime: new Date(),
+              sessionState: {
+                ...facilitatorSession.sessionState as any,
+                usedQuestionIds: [
+                  ...((facilitatorSession.sessionState as any)?.usedQuestionIds || []),
+                  selectedQuestion.id
+                ]
+              }
+            },
+          });
+        }
+      } else {
+        // Default flow agent response
+        flowPrompt = this.getDefaultFlowPrompt(deliberationContext, inputType, sessionState, content);
+      }
+    } else {
+      // Default flow agent response
+      flowPrompt = this.getDefaultFlowPrompt(deliberationContext, inputType, sessionState, content);
+      
+      // Update last activity time
+      if (facilitatorSession) {
+        await this.prisma.facilitatorSession.update({
+          where: { id: facilitatorSession.id },
+          data: {
+            lastActivityTime: new Date(),
+          },
+        });
+      }
+    }
 
     const response = await this.aiService.generateResponse(flowPrompt, undefined, { traceId });
 
@@ -409,5 +496,143 @@ Keep response under 2 sentences and focus on facilitation, not content.`;
     }
 
     return Math.min(1, score);
+  }
+
+  private async shouldSendFacilitatorPrompt(
+    facilitatorSession: any,
+    facilitatorConfig: any,
+    sessionState?: SessionState
+  ): Promise<boolean> {
+    if (!facilitatorConfig?.prompting_enabled || !facilitatorSession) {
+      return false;
+    }
+
+    const intervalMinutes = facilitatorConfig.prompting_interval_minutes || 3;
+    const maxPromptsPerSession = facilitatorConfig.max_prompts_per_session || 5;
+    
+    // Check if we've exceeded max prompts for this session
+    if ((facilitatorSession.promptsSentCount || 0) >= maxPromptsPerSession) {
+      return false;
+    }
+
+    // Check if enough time has passed since last prompt
+    if (facilitatorSession.lastPromptTime) {
+      const timeSinceLastPrompt = Date.now() - new Date(facilitatorSession.lastPromptTime).getTime();
+      const intervalMs = intervalMinutes * 60 * 1000;
+      
+      if (timeSinceLastPrompt < intervalMs) {
+        return false;
+      }
+    }
+
+    // Check if enough time has passed since last activity
+    if (facilitatorSession.lastActivityTime) {
+      const timeSinceLastActivity = Date.now() - new Date(facilitatorSession.lastActivityTime).getTime();
+      const intervalMs = intervalMinutes * 60 * 1000;
+      
+      // Only prompt if user has been inactive for the interval duration
+      return timeSinceLastActivity >= intervalMs;
+    }
+
+    return true;
+  }
+
+  private selectFacilitatorQuestion(
+    questions: any[],
+    sessionState?: SessionState,
+    facilitatorSessionState?: any
+  ): any | null {
+    if (!questions || questions.length === 0) {
+      return null;
+    }
+
+    // Filter out already used questions
+    const usedQuestionIds = facilitatorSessionState?.usedQuestionIds || [];
+    const availableQuestions = questions.filter(
+      q => !usedQuestionIds.includes(q.id)
+    );
+
+    if (availableQuestions.length === 0) {
+      return null; // All questions used
+    }
+
+    // Select question based on category weighting and relevance
+    const weightedQuestions = availableQuestions.map(q => ({
+      ...q,
+      relevanceScore: this.calculateFacilitatorQuestionRelevance(q, sessionState)
+    }));
+
+    // Sort by relevance score and weight
+    weightedQuestions.sort((a, b) => 
+      (b.relevanceScore * (b.weight || 1.0)) - (a.relevanceScore * (a.weight || 1.0))
+    );
+
+    return weightedQuestions[0] || null;
+  }
+
+  private calculateFacilitatorQuestionRelevance(
+    question: any,
+    sessionState?: SessionState
+  ): number {
+    let score = 0.5; // Base score
+
+    if (!sessionState) {
+      return score;
+    }
+
+    // Category-specific scoring
+    switch (question.category) {
+      case 'exploration':
+        if (sessionState.messageCount >= 2 && sessionState.statementCount === 0) {
+          score += 0.4;
+        }
+        break;
+      case 'perspective':
+        if (sessionState.statementCount > 0 && sessionState.messageCount >= 3) {
+          score += 0.3;
+        }
+        break;
+      case 'clarification':
+        if (sessionState.questionCount === 0 && sessionState.messageCount >= 2) {
+          score += 0.3;
+        }
+        break;
+      case 'synthesis':
+        if (sessionState.messageCount >= 5 && sessionState.statementCount >= 2) {
+          score += 0.4;
+        }
+        break;
+      case 'action':
+        if (sessionState.messageCount >= 7) {
+          score += 0.3;
+        }
+        break;
+    }
+
+    return Math.min(1, score);
+  }
+
+  private getDefaultFlowPrompt(
+    deliberationContext: string,
+    inputType: string,
+    sessionState?: SessionState,
+    content?: string
+  ): string {
+    return `You are the Flow Agent, managing conversation flow and transitions in democratic deliberation.
+${deliberationContext}
+CURRENT CONTEXT:
+- User input type: ${inputType}
+- Session message count: ${sessionState?.messageCount || 0}
+- Recent statement count: ${sessionState?.statementCount || 0}
+
+USER MESSAGE: "${content}"
+
+Provide a brief transitional response that:
+- Acknowledges the user's contribution
+- Suggests next steps or deeper exploration
+- Encourages continued engagement
+- Keeps the conversation flowing naturally
+
+Keep response under 2 sentences and focus on facilitation, not content.`;
   }
 }
