@@ -1,20 +1,34 @@
+import { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
+import { ChatModeSelector, ChatMode } from "./ChatModeSelector";
 import { useBackendChat } from "@/hooks/useBackendChat";
 
 export const ChatInterface = () => {
+  const [chatMode, setChatMode] = useState<ChatMode>('chat');
   const {
     messages,
     isLoading,
     isTyping,
-    sendMessage
+    sendMessage: originalSendMessage
   } = useBackendChat();
+
+  const sendMessage = async (content: string) => {
+    await originalSendMessage(content, chatMode);
+  };
   return <Layout>
       <div className="h-[calc(100vh-120px)] flex flex-col bg-background rounded-lg border">
         <div className="border-b p-4 bg-card">
-          <h1 className="text-xl font-semibold text-democratic-blue">Assisted Dying</h1>
-          <p className="text-sm text-muted-foreground">Join the conversation, learn and share.</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-semibold text-democratic-blue">Assisted Dying</h1>
+              <p className="text-sm text-muted-foreground">Join the conversation, learn and share.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <ChatModeSelector mode={chatMode} onModeChange={setChatMode} />
+            </div>
+          </div>
         </div>
         
         <MessageList messages={messages} isLoading={isLoading} isTyping={isTyping} />

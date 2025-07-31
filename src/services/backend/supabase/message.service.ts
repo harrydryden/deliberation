@@ -16,7 +16,7 @@ export class SupabaseMessageService implements IMessageService {
     return data?.map(this.mapSupabaseMessage) || [];
   }
 
-  async sendMessage(content: string, messageType: string = 'user', deliberationId?: string): Promise<Message> {
+  async sendMessage(content: string, messageType: string = 'user', deliberationId?: string, mode: 'chat' | 'learn' = 'chat'): Promise<Message> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('User not authenticated');
@@ -41,20 +41,20 @@ export class SupabaseMessageService implements IMessageService {
 
     // Trigger agent responses for user messages in deliberations
     if (messageType === 'user' && deliberationId) {
-      this.triggerAgentResponses(message.id, deliberationId);
+      this.triggerAgentResponses(message.id, deliberationId, mode);
     }
 
     return message;
   }
 
-  private async triggerAgentResponses(messageId: string, deliberationId: string) {
+  private async triggerAgentResponses(messageId: string, deliberationId: string, mode: 'chat' | 'learn' = 'chat') {
     try {
       console.log('🤖 Triggering agent responses for message:', messageId, 'in deliberation:', deliberationId);
       
       // Call the agent-response edge function
       console.log('📞 Calling agent-response function...');
       const { data, error } = await supabase.functions.invoke('agent-response', {
-        body: { messageId, deliberationId }
+        body: { messageId, deliberationId, mode }
       });
 
       console.log('📊 Function response:', { data, error });

@@ -25,7 +25,7 @@ export class NodeJSMessageService implements IMessageService {
     return data.data || [];
   }
 
-  async sendMessage(content: string, messageType: string = 'user', deliberationId?: string): Promise<Message> {
+  async sendMessage(content: string, messageType: string = 'user', deliberationId?: string, mode: 'chat' | 'learn' = 'chat'): Promise<Message> {
     const token = this.getAuthToken();
     if (!token) {
       throw new Error('No authentication token');
@@ -40,7 +40,8 @@ export class NodeJSMessageService implements IMessageService {
       body: JSON.stringify({ 
         content, 
         messageType,
-        deliberationId 
+        deliberationId,
+        mode
       }),
     });
 

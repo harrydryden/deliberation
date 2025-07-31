@@ -19,8 +19,8 @@ serve(async (req) => {
     const body = await req.json();
     console.log('📊 Request body:', body);
     
-    const { messageId, deliberationId } = body;
-    console.log('🔍 Processing agent response for message:', messageId, 'in deliberation:', deliberationId);
+    const { messageId, deliberationId, mode = 'chat' } = body;
+    console.log('🔍 Processing agent response for message:', messageId, 'in deliberation:', deliberationId, 'mode:', mode);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -84,19 +84,26 @@ serve(async (req) => {
       }
     }
 
-    // Get active agents
-    console.log('🤖 Fetching active agents...');
-    const { data: agents, error: agentsError } = await supabase
+    // Get active agents - filter by mode
+    console.log(`🤖 Fetching active agents for ${mode} mode...`);
+    let agentQuery = supabase
       .from('agent_configurations')
       .select('*')
       .eq('is_active', true);
+
+    // In learn mode, only get the bill agent
+    if (mode === 'learn') {
+      agentQuery = agentQuery.eq('agent_type', 'bill_agent');
+    }
+
+    const { data: agents, error: agentsError } = await agentQuery;
 
     if (agentsError) {
       console.error('❌ Agents error:', agentsError);
       throw new Error(`Failed to get agents: ${agentsError.message}`);
     }
 
-    console.log(`🎯 Found ${agents?.length || 0} active agents`);
+    console.log(`🎯 Found ${agents?.length || 0} active agents for ${mode} mode`);
 
     if (!agents || agents.length === 0) {
       console.log('⚠️ No active agents found');

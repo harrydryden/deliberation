@@ -12,7 +12,7 @@ export interface IAuthService {
 
 export interface IMessageService {
   getMessages(): Promise<Message[]>;
-  sendMessage(content: string, messageType?: string, deliberationId?: string): Promise<Message>;
+  sendMessage(content: string, messageType?: string, deliberationId?: string, mode?: 'chat' | 'learn'): Promise<Message>;
 }
 
 export interface IAgentService {
