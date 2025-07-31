@@ -110,7 +110,7 @@ export async function messageRoutes(fastify: FastifyInstance) {
       });
 
       // Get or initialize session state
-      const sessionState = await this.getSessionState(userId);
+      const sessionState = await getSessionState(userId);
 
       // Process message through orchestration service asynchronously
       orchestrationService.processMessage({
@@ -119,6 +119,7 @@ export async function messageRoutes(fastify: FastifyInstance) {
         content: content.trim(),
         sessionState,
         traceId,
+        deliberationId,
       }).catch(error => {
         fastify.log.error({ error, userId, messageId: userMessage.id }, 'Async message processing failed');
       });

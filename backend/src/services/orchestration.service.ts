@@ -22,6 +22,7 @@ interface OrchestrationContext {
   content?: string;
   sessionState?: SessionState;
   traceId: string;
+  deliberationId?: string;
 }
 
 // Facilitation questions for proactive engagement
@@ -62,7 +63,7 @@ export class AIOrchestrationService {
   }
 
   async processMessage(context: OrchestrationContext): Promise<void> {
-    const { messageId, userId, content, sessionState, traceId } = context;
+    const { messageId, userId, content, sessionState, traceId, deliberationId } = context;
 
     try {
       if (!content) {
@@ -114,6 +115,7 @@ export class AIOrchestrationService {
           inputType,
           sessionState,
           traceId,
+          deliberationId,
         });
       });
 
@@ -176,6 +178,7 @@ export class AIOrchestrationService {
       inputType: string;
       sessionState?: SessionState;
       traceId: string;
+      deliberationId?: string;
     }
   ): Promise<void> {
     const { userId, traceId } = context;

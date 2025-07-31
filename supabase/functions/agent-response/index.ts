@@ -57,6 +57,33 @@ serve(async (req) => {
 
     console.log('✅ Message found:', message.content);
 
+    // Get deliberation context if deliberationId is provided
+    let deliberationContext = '';
+    if (deliberationId) {
+      console.log('📋 Fetching deliberation context...');
+      const { data: deliberation, error: deliberationError } = await supabase
+        .from('deliberations')
+        .select('title, description, notion')
+        .eq('id', deliberationId)
+        .single();
+
+      if (deliberation && !deliberationError) {
+        const context = [];
+        context.push(`DELIBERATION TITLE: ${deliberation.title}`);
+        
+        if (deliberation.notion) {
+          context.push(`DELIBERATION NOTION: ${deliberation.notion}`);
+        }
+        
+        if (deliberation.description) {
+          context.push(`DELIBERATION DESCRIPTION: ${deliberation.description}`);
+        }
+
+        deliberationContext = context.length > 1 ? `\n\nDELIBERATION CONTEXT:\n${context.join('\n')}\n\n` : '';
+        console.log('✅ Deliberation context loaded');
+      }
+    }
+
     // Get active agents
     console.log('🤖 Fetching active agents...');
     const { data: agents, error: agentsError } = await supabase
@@ -93,7 +120,7 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: agent.system_prompt || `You are ${agent.name}, a deliberation agent.`
+            content: `${agent.system_prompt || `You are ${agent.name}, a deliberation agent.`}${deliberationContext}`
           },
           { 
             role: 'user', 

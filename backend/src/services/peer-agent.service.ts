@@ -9,6 +9,7 @@ interface AgentContext {
   inputType?: 'QUESTION' | 'STATEMENT' | 'OTHER';
   sessionState?: any;
   traceId?: string;
+  deliberationId?: string;
 }
 
 interface AgentResponse {
@@ -28,9 +29,12 @@ export class PeerAgentService {
 
   async generateResponse(context: AgentContext): Promise<AgentResponse> {
     const startTime = Date.now();
-    const { content, userId, inputType, sessionState, traceId } = context;
+    const { content, userId, inputType, sessionState, traceId, deliberationId } = context;
 
     try {
+      // Get deliberation context
+      const deliberationContext = await this.getDeliberationContext(deliberationId);
+
       // Get agent configuration
       const agentConfig = await this.prisma.agentConfiguration.findFirst({
         where: {
@@ -85,6 +89,7 @@ YOUR ROLE:
         responseStyle: agentConfig?.responseStyle,
         conversationContext,
         knowledgeContext: ibisContext + peerContext,
+        deliberationContext,
         content,
         inputType,
         sessionState,
@@ -230,12 +235,42 @@ STATEMENT HANDLING:
     return systemPrompt;
   }
 
+  private async getDeliberationContext(deliberationId?: string): Promise<string> {
+    if (!deliberationId) return '';
+
+    try {
+      const deliberation = await this.prisma.deliberation.findUnique({
+        where: { id: deliberationId },
+        select: { title: true, description: true, notion: true },
+      });
+
+      if (!deliberation) return '';
+
+      const context = [];
+      context.push(`DELIBERATION TITLE: ${deliberation.title}`);
+      
+      if (deliberation.notion) {
+        context.push(`DELIBERATION NOTION: ${deliberation.notion}`);
+      }
+      
+      if (deliberation.description) {
+        context.push(`DELIBERATION DESCRIPTION: ${deliberation.description}`);
+      }
+
+      return context.length > 1 ? `\n\nDELIBERATION CONTEXT:\n${context.join('\n')}\n\n` : '';
+    } catch (error) {
+      logger.error({ error, deliberationId }, 'Failed to fetch deliberation context');
+      return '';
+    }
+  }
+
   private buildPrompt(params: {
     systemPrompt: string;
     goals?: string[];
     responseStyle?: string;
     conversationContext: string;
     knowledgeContext: string;
+    deliberationContext: string;
     content: string;
     inputType?: string;
     sessionState?: any;
@@ -246,6 +281,7 @@ STATEMENT HANDLING:
       responseStyle,
       conversationContext,
       knowledgeContext,
+      deliberationContext,
       content,
       inputType,
       sessionState,
@@ -262,7 +298,7 @@ STATEMENT HANDLING:
     if (inputType === 'QUESTION') {
       return `${systemPrompt}
 
-${goalsSection}${knowledgeContext}RECENT CONVERSATION CONTEXT:
+${goalsSection}${deliberationContext}${knowledgeContext}RECENT CONVERSATION CONTEXT:
 ${conversationContext}
 
 USER QUESTION: "${content}"
@@ -274,7 +310,7 @@ Respond as the Peer Agent:`;
       const responseType = sessionState?.statementCount % 2 === 1 ? 'supportive' : 'counter';
       return `${systemPrompt}
 
-${goalsSection}${knowledgeContext}RECENT CONVERSATION CONTEXT:
+${goalsSection}${deliberationContext}${knowledgeContext}RECENT CONVERSATION CONTEXT:
 ${conversationContext}
 
 USER STATEMENT: "${content}"
@@ -289,7 +325,7 @@ Respond as the Peer Agent:`;
     } else {
       return `${systemPrompt}
 
-${goalsSection}${knowledgeContext}RECENT CONVERSATION CONTEXT:
+${goalsSection}${deliberationContext}${knowledgeContext}RECENT CONVERSATION CONTEXT:
 ${conversationContext}
 
 NEW USER MESSAGE: "${content}"
@@ -305,9 +341,12 @@ Respond as the Peer Agent:`;
     content: string;
     done: boolean;
   }, void, unknown> {
-    const { content, userId, inputType, sessionState, traceId } = context;
+    const { content, userId, inputType, sessionState, traceId, deliberationId } = context;
 
     try {
+      // Get deliberation context
+      const deliberationContext = await this.getDeliberationContext(deliberationId);
+
       const agentConfig = await this.prisma.agentConfiguration.findFirst({
         where: {
           agentType: 'peer_agent',
@@ -346,6 +385,7 @@ Respond as the Peer Agent:`;
         responseStyle: agentConfig?.responseStyle,
         conversationContext,
         knowledgeContext: ibisContext + peerContext,
+        deliberationContext,
         content,
         inputType,
         sessionState,
