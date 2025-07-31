@@ -17,12 +17,15 @@ interface LocalAgentManagementProps {
 
 export const LocalAgentManagement = ({ localAgents, loading, onLoad, onUpdate }: LocalAgentManagementProps) => {
   const [updating, setUpdating] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
-    if (localAgents.length === 0 && !loading) {
+    if (!hasLoaded && !loading) {
+      console.log('🔍 Loading local agents for the first time');
       onLoad();
+      setHasLoaded(true);
     }
-  }, [localAgents.length, loading, onLoad]);
+  }, [hasLoaded, loading, onLoad]);
 
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
     setUpdating(id);
@@ -31,6 +34,11 @@ export const LocalAgentManagement = ({ localAgents, loading, onLoad, onUpdate }:
     } finally {
       setUpdating(null);
     }
+  };
+
+  const handleRefresh = () => {
+    console.log('🔍 Manual refresh of local agents');
+    onLoad();
   };
 
   const getAgentTypeBadge = (type: string) => {
@@ -72,7 +80,7 @@ export const LocalAgentManagement = ({ localAgents, loading, onLoad, onUpdate }:
           <Bot className="h-5 w-5" />
           Local Agent Management
         </CardTitle>
-        <Button variant="outline" size="sm" onClick={onLoad} disabled={loading}>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
