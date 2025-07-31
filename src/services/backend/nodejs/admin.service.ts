@@ -1,6 +1,6 @@
 import { apiClient } from '@/lib/api-client';
 import { IAdminService, AccessCode, AdminStats } from '../base.service';
-import { User, Agent, Deliberation } from '@/types/api';
+import { User, Agent, Deliberation, LocalAgentCreate } from '@/types/api';
 
 export class NodeJSAdminService implements IAdminService {
   constructor(private getToken: () => string | null) {}
@@ -43,6 +43,10 @@ export class NodeJSAdminService implements IAdminService {
   async createAgentConfiguration(config: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>): Promise<Agent> {
     // For now, simulate creation - in real implementation this would call the backend
     throw new Error('Agent creation not implemented for NodeJS backend yet');
+  }
+
+  async createLocalAgentConfiguration(config: LocalAgentCreate): Promise<Agent> {
+    return await apiClient.adminCreateLocalAgentConfiguration(config);
   }
 
   async updateAgentConfiguration(id: string, config: Partial<Agent>): Promise<Agent> {

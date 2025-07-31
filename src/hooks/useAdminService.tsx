@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { backendServiceFactory } from '@/services/backend/factory';
 import { IAdminService, AccessCode, AdminStats } from '@/services/backend/base.service';
-import { User, Agent, Deliberation } from '@/types/api';
+import { User, Agent, Deliberation, LocalAgentCreate } from '@/types/api';
 import { toast } from 'sonner';
 
 export const useAdminService = () => {
@@ -152,6 +152,16 @@ export const useAdminService = () => {
     }
   };
 
+  const createLocalAgent = async (config: LocalAgentCreate) => {
+    try {
+      await adminService.createLocalAgentConfiguration(config);
+      toast.success('Local agent created successfully');
+      await fetchLocalAgents(); // Refresh the list
+    } catch (error) {
+      handleError(error, 'create local agent');
+    }
+  };
+
   // Deliberation operations
   const fetchDeliberations = async () => {
     setLoadingDeliberations(true);
@@ -215,6 +225,7 @@ export const useAdminService = () => {
     fetchAgents,
     fetchLocalAgents,
     createAgent,
+    createLocalAgent,
     updateAgent,
     fetchDeliberations,
     updateDeliberationStatus,

@@ -1,4 +1,4 @@
-import { User, ApiResponse, Message, Agent, Deliberation } from '@/types/api';
+import { User, ApiResponse, Message, Agent, Deliberation, LocalAgentCreate } from '@/types/api';
 
 export interface IAuthService {
   authenticate(accessCode: string): Promise<{ user: User; token: string }>;
@@ -68,6 +68,7 @@ export interface IAdminService {
   getAgentConfigurations(): Promise<Agent[]>;
   getLocalAgentConfigurations(): Promise<Agent[]>;
   createAgentConfiguration(config: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>): Promise<Agent>;
+  createLocalAgentConfiguration(config: LocalAgentCreate): Promise<Agent>;
   updateAgentConfiguration(id: string, config: Partial<Agent>): Promise<Agent>;
   
   // Deliberations

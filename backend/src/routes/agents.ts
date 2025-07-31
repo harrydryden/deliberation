@@ -141,6 +141,48 @@ export async function agentRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // Create new local agent configuration (deliberation-specific)
+  fastify.post('/local-configurations', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      body: createAgentConfigSchema.extend({
+        deliberationId: z.string().uuid(),
+      }),
+    },
+  }, async (request: FastifyRequest<{ 
+    Body: z.infer<typeof createAgentConfigSchema> & { deliberationId: string }
+  }>, reply: FastifyReply) => {
+    const userId = request.user.id;
+    const configData = request.body;
+
+    try {
+      // Verify deliberation exists
+      const deliberation = await fastify.prisma.deliberation.findUnique({
+        where: { id: configData.deliberationId },
+      });
+
+      if (!deliberation) {
+        reply.status(404).send({ error: 'Deliberation not found' });
+        return;
+      }
+
+      const configuration = await fastify.prisma.agentConfiguration.create({
+        data: {
+          ...configData,
+          deliberationId: configData.deliberationId,
+          createdBy: userId,
+          isActive: true,
+          isDefault: false, // Local agents are never default
+        },
+      });
+
+      reply.status(201).send({ configuration });
+    } catch (error) {
+      fastify.log.error({ error, userId }, 'Error creating local agent configuration');
+      reply.status(500).send({ error: 'Failed to create local configuration' });
+    }
+  });
+
   // Update agent configuration
   fastify.put('/configurations/:configId', {
     preHandler: [fastify.authenticate],

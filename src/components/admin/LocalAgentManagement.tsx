@@ -5,17 +5,20 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RefreshCw, Bot, ExternalLink } from 'lucide-react';
 import { formatToUKDateTime } from '@/utils/timeUtils';
-import { Agent } from '@/types/api';
+import { Agent, Deliberation, LocalAgentCreate } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { LocalAgentCreationModal } from './LocalAgentCreationModal';
 
 interface LocalAgentManagementProps {
   localAgents: Agent[];
+  deliberations: Deliberation[];
   loading: boolean;
   onLoad: () => void;
   onUpdate: (id: string, config: Partial<Agent>) => void;
+  onCreate: (config: LocalAgentCreate) => void;
 }
 
-export const LocalAgentManagement = ({ localAgents, loading, onLoad, onUpdate }: LocalAgentManagementProps) => {
+export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLoad, onUpdate, onCreate }: LocalAgentManagementProps) => {
   const [updating, setUpdating] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
 
@@ -80,10 +83,17 @@ export const LocalAgentManagement = ({ localAgents, loading, onLoad, onUpdate }:
           <Bot className="h-5 w-5" />
           Local Agent Management
         </CardTitle>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
+        <div className="flex gap-2">
+          <LocalAgentCreationModal
+            deliberations={deliberations}
+            onCreateAgent={onCreate}
+            loading={loading}
+          />
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
-        </Button>
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {loading && localAgents.length === 0 ? (

@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { IAdminService, AccessCode, AdminStats } from '../base.service';
-import { User, Agent, Deliberation } from '@/types/api';
+import { User, Agent, Deliberation, LocalAgentCreate } from '@/types/api';
 
 export class SupabaseAdminService implements IAdminService {
   // Users
@@ -200,6 +200,60 @@ export class SupabaseAdminService implements IAdminService {
       isActive: data.is_active,
       createdAt: data.created_at,
       updatedAt: data.updated_at
+    };
+  }
+
+  async createLocalAgentConfiguration(config: LocalAgentCreate): Promise<Agent> {
+    // Verify deliberation exists first
+    const { data: deliberation, error: deliberationError } = await supabase
+      .from('deliberations')
+      .select('id, title, status')
+      .eq('id', config.deliberationId)
+      .single();
+
+    if (deliberationError || !deliberation) {
+      throw new Error('Deliberation not found');
+    }
+
+    const insertData = {
+      name: config.name,
+      description: config.description || '',
+      system_prompt: config.system_prompt || '',
+      response_style: config.response_style || '',
+      goals: config.goals || [],
+      agent_type: config.agent_type || '',
+      facilitator_config: config.facilitator_config || {},
+      deliberation_id: config.deliberationId,
+      is_default: false, // Local agents are never default
+      is_active: true
+    };
+
+    const { data, error } = await supabase
+      .from('agent_configurations')
+      .insert(insertData)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      system_prompt: data.system_prompt || '',
+      response_style: data.response_style,
+      goals: data.goals || [],
+      agent_type: data.agent_type,
+      facilitator_config: data.facilitator_config || {},
+      is_default: data.is_default || false,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      deliberation: {
+        id: deliberation.id,
+        title: deliberation.title,
+        status: deliberation.status,
+      }
     };
   }
 

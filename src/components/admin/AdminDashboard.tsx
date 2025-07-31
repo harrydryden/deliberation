@@ -118,9 +118,11 @@ export const AdminDashboard = () => {
               <h3 className="text-lg font-semibold mb-4">Local Agents (Deliberation-Specific)</h3>
               <LocalAgentManagement
                 localAgents={adminService.localAgents}
+                deliberations={adminService.deliberations}
                 loading={adminService.loadingLocalAgents}
                 onLoad={adminService.fetchLocalAgents}
                 onUpdate={adminService.updateAgent}
+                onCreate={adminService.createLocalAgent}
               />
             </div>
           </div>
