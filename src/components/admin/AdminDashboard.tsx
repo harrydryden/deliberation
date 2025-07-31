@@ -22,6 +22,7 @@ export const AdminDashboard = () => {
   useEffect(() => {
     // Load initial data
     adminService.fetchStats();
+    adminService.fetchDeliberations();
   }, []);
 
   const handleBackendToggle = (checked: boolean) => {
