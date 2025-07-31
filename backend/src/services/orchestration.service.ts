@@ -4,6 +4,7 @@ import { PeerAgentService } from './peer-agent.service';
 import { AIService } from './ai.service';
 import { logger } from '../utils/logger';
 import { sendSSEMessage } from '../routes/sse';
+import { DeliberationAgentManager } from './deliberation-agent-manager.service';
 
 interface SessionState {
   lastActivityTime: number;
@@ -51,15 +52,13 @@ const FACILITATION_QUESTIONS = [
 
 export class AIOrchestrationService {
   private prisma: PrismaClient;
-  private billAgent: BillAgentService;
-  private peerAgent: PeerAgentService;
-  private aiService: AIService;
+  private deliberationAgentManager: DeliberationAgentManager;
+  private globalAiService: AIService; // For safety checks and non-deliberation operations
 
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
-    this.billAgent = new BillAgentService(prisma);
-    this.peerAgent = new PeerAgentService(prisma);
-    this.aiService = new AIService();
+    this.deliberationAgentManager = new DeliberationAgentManager(prisma);
+    this.globalAiService = new AIService();
   }
 
   async processMessage(context: OrchestrationContext): Promise<void> {
@@ -73,7 +72,7 @@ export class AIOrchestrationService {
       }
 
       // Check content safety first
-      const safetyCheck = await this.aiService.checkContentSafety(content, traceId);
+      const safetyCheck = await this.globalAiService.checkContentSafety(content, traceId);
       if (!safetyCheck.safe) {
         logger.warn({ userId, content, reason: safetyCheck.reason, traceId }, 'Content blocked by safety check');
         
@@ -99,7 +98,7 @@ export class AIOrchestrationService {
       }
 
       // Classify input type
-      const inputType = await this.aiService.classifyInput(content, traceId);
+      const inputType = await this.globalAiService.classifyInput(content, traceId);
       
       logger.info({ userId, inputType, messageLength: content.length, traceId }, 'Input classified');
 
@@ -181,12 +180,19 @@ export class AIOrchestrationService {
       deliberationId?: string;
     }
   ): Promise<void> {
-    const { userId, traceId } = context;
+    const { userId, traceId, deliberationId } = context;
 
     try {
       if (agentType === 'bill_agent') {
+        // Get deliberation-scoped agents
+        const agents = deliberationId 
+          ? await this.deliberationAgentManager.getAgentsForDeliberation(deliberationId)
+          : null;
+
+        const billAgent = agents ? agents.billAgent : new BillAgentService(this.prisma);
+        
         // Stream Bill Agent response
-        const responseStream = this.billAgent.streamResponse(context);
+        const responseStream = billAgent.streamResponse(context);
         
         for await (const chunk of responseStream) {
           sendSSEMessage(userId, 'agent_response', {
@@ -198,8 +204,15 @@ export class AIOrchestrationService {
           });
         }
       } else if (agentType === 'peer_agent') {
+        // Get deliberation-scoped agents
+        const agents = deliberationId 
+          ? await this.deliberationAgentManager.getAgentsForDeliberation(deliberationId)
+          : null;
+
+        const peerAgent = agents ? agents.peerAgent : new PeerAgentService(this.prisma);
+        
         // Stream Peer Agent response
-        const responseStream = this.peerAgent.streamResponse(context);
+        const responseStream = peerAgent.streamResponse(context);
         
         for await (const chunk of responseStream) {
           sendSSEMessage(userId, 'agent_response', {
@@ -357,7 +370,7 @@ Keep response conversational and under 3 sentences.`;
       }
     }
 
-    const response = await this.aiService.generateResponse(flowPrompt, undefined, { traceId });
+    const response = await this.globalAiService.generateResponse(flowPrompt, undefined, { traceId });
 
     await this.prisma.message.create({
       data: {
@@ -634,5 +647,22 @@ Provide a brief transitional response that:
 - Keeps the conversation flowing naturally
 
 Keep response under 2 sentences and focus on facilitation, not content.`;
+  }
+
+  // Cleanup methods for resource management
+  async cleanupDeliberationAgents(deliberationId: string): Promise<void> {
+    await this.deliberationAgentManager.cleanupAgentsForDeliberation(deliberationId);
+  }
+
+  async cleanupAllAgents(): Promise<void> {
+    await this.deliberationAgentManager.cleanupAllAgents();
+  }
+
+  getActiveDeliberations(): string[] {
+    return this.deliberationAgentManager.getActiveDeliberations();
+  }
+
+  getAgentCount(): number {
+    return this.deliberationAgentManager.getAgentCount();
   }
 }

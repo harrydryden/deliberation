@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { AIService } from './ai.service';
 import { logger } from '../utils/logger';
+import { DeliberationContext } from './agent-factory.service';
 
 interface AgentContext {
   messageId?: string;
@@ -18,13 +19,35 @@ interface AgentResponse {
   sources?: string[];
 }
 
+interface PeerAgentOptions {
+  deliberationContext: DeliberationContext;
+  configuration?: any;
+  aiService: AIService;
+}
+
 export class PeerAgentService {
   private prisma: PrismaClient;
   private aiService: AIService;
+  private deliberationContext: DeliberationContext;
+  private configuration: any;
 
-  constructor(prisma: PrismaClient) {
+  constructor(prisma: PrismaClient, options?: PeerAgentOptions) {
     this.prisma = prisma;
-    this.aiService = new AIService();
+    
+    if (options) {
+      // New deliberation-scoped instance
+      this.aiService = options.aiService;
+      this.deliberationContext = options.deliberationContext;
+      this.configuration = options.configuration;
+    } else {
+      // Legacy global instance for backward compatibility
+      this.aiService = new AIService();
+      this.deliberationContext = {
+        id: 'global',
+        title: 'Global Context',
+      };
+      this.configuration = null;
+    }
   }
 
   async generateResponse(context: AgentContext): Promise<AgentResponse> {
@@ -32,17 +55,21 @@ export class PeerAgentService {
     const { content, userId, inputType, sessionState, traceId, deliberationId } = context;
 
     try {
-      // Get deliberation context
-      const deliberationContext = await this.getDeliberationContext(deliberationId);
+      // Use instance deliberation context
+      const deliberationContext = this.getInstanceDeliberationContext();
 
-      // Get agent configuration
-      const agentConfig = await this.prisma.agentConfiguration.findFirst({
-        where: {
-          agentType: 'peer_agent',
-          isDefault: true,
-          isActive: true,
-        },
-      });
+      // Use instance configuration if available, otherwise fetch from database
+      let agentConfig = this.configuration;
+      
+      if (!agentConfig) {
+        agentConfig = await this.prisma.agentConfiguration.findFirst({
+          where: {
+            agentType: 'peer_agent',
+            isDefault: true,
+            isActive: true,
+          },
+        });
+      }
 
       // Get recent conversation context
       const recentMessages = await this.prisma.message.findMany({
@@ -260,9 +287,18 @@ STATEMENT HANDLING:
       return context.length > 1 ? `\n\nDELIBERATION CONTEXT:\n${context.join('\n')}\n\n` : '';
     } catch (error) {
       logger.error({ error, deliberationId }, 'Failed to fetch deliberation context');
-      return '';
-    }
+    return '';
   }
+
+  private getInstanceDeliberationContext(): string {
+    if (!this.deliberationContext || this.deliberationContext.id === 'global') return '';
+    
+    const context = [];
+    context.push(`DELIBERATION: ${this.deliberationContext.title}`);
+    if (this.deliberationContext.notion) context.push(`NOTION: ${this.deliberationContext.notion}`);
+    return context.length > 1 ? `\n${context.join(' | ')}\n` : '';
+  }
+}
 
   private buildPrompt(params: {
     systemPrompt: string;
@@ -344,16 +380,21 @@ Respond as the Peer Agent:`;
     const { content, userId, inputType, sessionState, traceId, deliberationId } = context;
 
     try {
-      // Get deliberation context
-      const deliberationContext = await this.getDeliberationContext(deliberationId);
+      // Use instance deliberation context
+      const deliberationContext = this.getInstanceDeliberationContext();
 
-      const agentConfig = await this.prisma.agentConfiguration.findFirst({
-        where: {
-          agentType: 'peer_agent',
-          isDefault: true,
-          isActive: true,
-        },
-      });
+      // Use instance configuration if available, otherwise fetch from database
+      let agentConfig = this.configuration;
+      
+      if (!agentConfig) {
+        agentConfig = await this.prisma.agentConfiguration.findFirst({
+          where: {
+            agentType: 'peer_agent',
+            isDefault: true,
+            isActive: true,
+          },
+        });
+      }
 
       const recentMessages = await this.prisma.message.findMany({
         where: { userId },
