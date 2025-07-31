@@ -7,8 +7,7 @@ export const sanitizeInput = (input: string): string => {
 
 // Basic access code validation (performance focused)
 export const accessCodeSchema = z.string()
-  .min(1, "Access code is required")
-  .max(20, "Access code too long");
+  .regex(/^\d{10}$/, "Access code must be exactly 10 digits");
 
 // Simplified profile validation
 export const displayNameSchema = z.string()

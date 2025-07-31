@@ -78,10 +78,12 @@ export const AuthForm = () => {
               <Input 
                 id="accessCode" 
                 type="text" 
-                placeholder="Enter access code"
+                placeholder="Enter 10-digit access code"
                 value={accessCode}
+                maxLength={10}
                 onChange={(e) => {
-                  setAccessCode(e.target.value);
+                  const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+                  setAccessCode(value);
                   if (validationError) setValidationError("");
                 }}
                 required 
