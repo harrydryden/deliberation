@@ -106,6 +106,7 @@ export const AdminDashboard = () => {
             loading={adminService.loadingAgents}
             onLoad={adminService.fetchAgents}
             onUpdate={adminService.updateAgent}
+            onCreate={adminService.createAgent}
           />
         </TabsContent>
 

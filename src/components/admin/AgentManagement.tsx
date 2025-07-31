@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, Settings, Edit, Plus, X } from 'lucide-react';
+import { RefreshCw, Settings, Edit, Plus, X, UserPlus } from 'lucide-react';
 import { formatToUKDate } from '@/utils/timeUtils';
 import { Agent, FacilitatorConfig, FacilitatorQuestion } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -19,11 +19,13 @@ interface AgentManagementProps {
   loading: boolean;
   onLoad: () => void;
   onUpdate: (id: string, config: Partial<Agent>) => void;
+  onCreate?: (config: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>) => void;
 }
 
-export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentManagementProps) => {
+export const AgentManagement = ({ agents, loading, onLoad, onUpdate, onCreate }: AgentManagementProps) => {
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
     description: '',
@@ -93,6 +95,48 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
         facilitator_config: editForm.facilitator_config
       });
       setEditingAgent(null);
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleCreateAgent = () => {
+    setCreating(true);
+    setEditForm({
+      name: '',
+      description: '',
+      isActive: true,
+      system_prompt: '',
+      response_style: '',
+      goals: [],
+      agent_type: 'bill_agent',
+      is_default: true, // New agents are global templates by default
+      facilitator_config: {
+        prompting_enabled: false,
+        prompting_interval_minutes: 3,
+        max_prompts_per_session: 5,
+        prompting_questions: []
+      }
+    });
+  };
+
+  const handleSaveNewAgent = async () => {
+    if (!onCreate) return;
+    
+    setUpdating('creating');
+    try {
+      await onCreate({
+        name: editForm.name,
+        description: editForm.description,
+        isActive: editForm.isActive,
+        system_prompt: editForm.system_prompt,
+        response_style: editForm.response_style,
+        goals: editForm.goals,
+        agent_type: editForm.agent_type,
+        is_default: editForm.is_default,
+        facilitator_config: editForm.facilitator_config
+      } as Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>);
+      setCreating(false);
     } finally {
       setUpdating(null);
     }
@@ -181,10 +225,89 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate }: AgentMana
           <Settings className="h-5 w-5" />
           Agent Management
         </CardTitle>
-        <Button variant="outline" size="sm" onClick={onLoad} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          {onCreate && (
+            <Dialog open={creating} onOpenChange={setCreating}>
+              <DialogTrigger asChild>
+                <Button variant="default" size="sm" onClick={handleCreateAgent}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Create Agent
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                  <DialogTitle>Create New Agent Template</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 overflow-y-auto flex-1 px-1">
+                  {/* Same form fields as edit, but we'll create a reusable component later */}
+                  <div>
+                    <Label htmlFor="new-agent-name">Name</Label>
+                    <Input
+                      id="new-agent-name"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Enter agent name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new-agent-description">Description</Label>
+                    <Textarea
+                      id="new-agent-description"
+                      value={editForm.description}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Describe what this agent does"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new-agent-type">Agent Type</Label>
+                    <Select value={editForm.agent_type} onValueChange={(value) => setEditForm(prev => ({ ...prev, agent_type: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select agent type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bill_agent">Bill Agent</SelectItem>
+                        <SelectItem value="peer_agent">Peer Agent</SelectItem>
+                        <SelectItem value="flow_agent">Flow Agent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="new-system-prompt">System Prompt</Label>
+                    <Textarea
+                      id="new-system-prompt"
+                      value={editForm.system_prompt}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, system_prompt: e.target.value }))}
+                      rows={4}
+                      placeholder="Define how this agent should behave..."
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={editForm.is_default}
+                      onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, is_default: checked }))}
+                    />
+                    <Label>Make this a global template (recommended)</Label>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setCreating(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleSaveNewAgent} 
+                    disabled={updating === 'creating' || !editForm.name || !editForm.agent_type}
+                  >
+                    {updating === 'creating' ? 'Creating...' : 'Create Agent'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+          <Button variant="outline" size="sm" onClick={onLoad} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {loading && agents.length === 0 ? (

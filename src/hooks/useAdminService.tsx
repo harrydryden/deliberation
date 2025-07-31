@@ -125,6 +125,16 @@ export const useAdminService = () => {
     }
   };
 
+  const createAgent = async (config: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      await adminService.createAgentConfiguration(config);
+      toast.success('Agent configuration created successfully');
+      await fetchAgents(); // Refresh the list
+    } catch (error) {
+      handleError(error, 'create agent configuration');
+    }
+  };
+
   // Deliberation operations
   const fetchDeliberations = async () => {
     setLoadingDeliberations(true);
@@ -184,6 +194,7 @@ export const useAdminService = () => {
     createAccessCode,
     deleteAccessCode,
     fetchAgents,
+    createAgent,
     updateAgent,
     fetchDeliberations,
     updateDeliberationStatus,

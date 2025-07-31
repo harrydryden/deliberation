@@ -99,6 +99,43 @@ export class SupabaseAdminService implements IAdminService {
     })) || [];
   }
 
+  async createAgentConfiguration(config: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>): Promise<Agent> {
+    const insertData = {
+      name: config.name,
+      description: config.description || '',
+      system_prompt: config.system_prompt || '',
+      response_style: config.response_style || '',
+      goals: config.goals || [],
+      agent_type: config.agent_type || '',
+      facilitator_config: config.facilitator_config || {},
+      is_default: config.is_default || false,
+      is_active: config.isActive || false
+    };
+
+    const { data, error } = await supabase
+      .from('agent_configurations')
+      .insert(insertData)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      system_prompt: data.system_prompt || '',
+      response_style: data.response_style,
+      goals: data.goals || [],
+      agent_type: data.agent_type,
+      facilitator_config: data.facilitator_config || {},
+      is_default: data.is_default || false,
+      isActive: data.is_active,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
+  }
+
   async updateAgentConfiguration(id: string, config: Partial<Agent>): Promise<Agent> {
     const updateData: any = {};
     
