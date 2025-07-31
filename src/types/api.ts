@@ -84,11 +84,11 @@ export interface ApiError {
 
 export interface LocalAgentCreate {
   name: string;
+  agent_type: string;
+  deliberationId: string;
   description?: string;
-  system_prompt: string;
+  system_prompt?: string;
   response_style?: string;
   goals?: string[];
-  agent_type: string;
   facilitator_config?: FacilitatorConfig;
-  deliberationId: string;
 }

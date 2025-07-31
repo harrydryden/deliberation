@@ -215,14 +215,28 @@ export class SupabaseAdminService implements IAdminService {
       throw new Error('Deliberation not found');
     }
 
+    // Find the global template for this agent type
+    const { data: globalTemplate, error: templateError } = await supabase
+      .from('agent_configurations')
+      .select('*')
+      .eq('agent_type', config.agent_type)
+      .eq('is_default', true)
+      .is('deliberation_id', null)
+      .single();
+
+    if (templateError || !globalTemplate) {
+      throw new Error(`No global template found for agent type: ${config.agent_type}`);
+    }
+
+    // Inherit from global template, but allow overrides from config
     const insertData = {
       name: config.name,
-      description: config.description || '',
-      system_prompt: config.system_prompt || '',
-      response_style: config.response_style || '',
-      goals: config.goals || [],
-      agent_type: config.agent_type || '',
-      facilitator_config: config.facilitator_config || {},
+      description: config.description || globalTemplate.description || '',
+      system_prompt: config.system_prompt || globalTemplate.system_prompt || '',
+      response_style: config.response_style || globalTemplate.response_style || '',
+      goals: config.goals || globalTemplate.goals || [],
+      agent_type: config.agent_type,
+      facilitator_config: config.facilitator_config || globalTemplate.facilitator_config || {},
       deliberation_id: config.deliberationId,
       is_default: false, // Local agents are never default
       is_active: true
