@@ -3,11 +3,18 @@ import { IMessageService } from '../base.service';
 import { Message } from '@/types/api';
 
 export class SupabaseMessageService implements IMessageService {
-  async getMessages(): Promise<Message[]> {
-    const { data, error } = await supabase
+  async getMessages(deliberationId?: string): Promise<Message[]> {
+    let query = supabase
       .from('messages')
       .select('*')
       .order('created_at', { ascending: true });
+
+    // Filter by deliberation_id if provided
+    if (deliberationId) {
+      query = query.eq('deliberation_id', deliberationId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(`Failed to fetch messages: ${error.message}`);

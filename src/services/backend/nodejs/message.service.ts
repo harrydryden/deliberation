@@ -5,13 +5,18 @@ import { BACKEND_CONFIG } from '@/config/backend';
 export class NodeJSMessageService implements IMessageService {
   constructor(private getAuthToken: () => string | null) {}
 
-  async getMessages(): Promise<Message[]> {
+  async getMessages(deliberationId?: string): Promise<Message[]> {
     const token = this.getAuthToken();
     if (!token) {
       throw new Error('No authentication token');
     }
 
-    const response = await fetch(`${BACKEND_CONFIG.apiUrl}/api/v1/messages`, {
+    let url = `${BACKEND_CONFIG.apiUrl}/api/v1/messages`;
+    if (deliberationId) {
+      url += `?deliberationId=${encodeURIComponent(deliberationId)}`;
+    }
+
+    const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },

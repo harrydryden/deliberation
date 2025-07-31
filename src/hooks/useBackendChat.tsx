@@ -14,7 +14,7 @@ export const useBackendChat = (deliberationId?: string) => {
   const [isTyping, setIsTyping] = useState(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  // Load chat history when user is authenticated
+  // Load chat history when user is authenticated or deliberationId changes
   useEffect(() => {
     if (isAuthenticated) {
       loadChatHistory();
@@ -26,7 +26,7 @@ export const useBackendChat = (deliberationId?: string) => {
         unsubscribeRef.current();
       }
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, deliberationId]);
 
   const setupRealTimeUpdates = () => {
     if (!isAuthenticated) return;
@@ -43,6 +43,9 @@ export const useBackendChat = (deliberationId?: string) => {
           user_id: message.userId,
         };
 
+        // Only add messages that belong to this deliberation (or all if no deliberationId)
+        // Note: For real-time, we need to get deliberation_id from the message
+        // For now, we'll add all messages and let the initial load filter them
         setMessages(prev => {
           // Avoid duplicates
           if (prev.some(msg => msg.id === chatMessage.id)) {
@@ -69,7 +72,7 @@ export const useBackendChat = (deliberationId?: string) => {
     setIsLoading(true);
     try {
       const messageService = backendServiceFactory.getMessageService();
-      const data = await messageService.getMessages();
+      const data = await messageService.getMessages(deliberationId);
       setMessages(convertApiMessagesToChatMessages(data || []));
     } catch (error: any) {
       console.error('Error loading chat history:', getErrorMessage(error));
