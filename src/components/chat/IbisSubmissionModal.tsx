@@ -44,6 +44,7 @@ export const IbisSubmissionModal = ({
     nodeType: NodeType;
     description: string;
     confidence: number;
+    stanceScore?: number;
   } | null>(null);
 
   const [existingNodes, setExistingNodes] = useState<Array<{
@@ -96,7 +97,8 @@ export const IbisSubmissionModal = ({
           keywords: classification.keywords,
           nodeType: classification.nodeType,
           description: classification.description,
-          confidence: classification.confidence
+          confidence: classification.confidence,
+          stanceScore: classification.stanceScore
         });
 
         // Pre-populate form with AI suggestions
@@ -245,6 +247,24 @@ export const IbisSubmissionModal = ({
                     </Badge>
                   ))}
                 </div>
+              </div>
+            )}
+            
+            {aiSuggestions.stanceScore !== undefined && (
+              <div>
+                <span className="text-xs text-muted-foreground">Stance: </span>
+                <Badge 
+                  variant={
+                    aiSuggestions.stanceScore > 0.3 ? "default" : 
+                    aiSuggestions.stanceScore < -0.3 ? "destructive" : 
+                    "secondary"
+                  }
+                  className="text-xs"
+                >
+                  {aiSuggestions.stanceScore > 0.3 ? "Supporting" :
+                   aiSuggestions.stanceScore < -0.3 ? "Opposing" :
+                   "Neutral"} ({(aiSuggestions.stanceScore >= 0 ? '+' : '') + aiSuggestions.stanceScore.toFixed(2)})
+                </Badge>
               </div>
             )}
           </div>

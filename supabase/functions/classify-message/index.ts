@@ -24,10 +24,31 @@ serve(async (req) => {
       throw new Error('ANTHROPIC_API_KEY is not set')
     }
 
-    // Create classification prompt
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Fetch deliberation context if deliberationId is provided
+    let deliberationContext = ''
+    if (deliberationId) {
+      const { data: deliberation } = await supabase
+        .from('deliberations')
+        .select('title, description')
+        .eq('id', deliberationId)
+        .single()
+      
+      if (deliberation) {
+        deliberationContext = `\n\nDeliberation Context:
+Title: "${deliberation.title}"
+Description: "${deliberation.description || 'No description provided'}"`
+      }
+    }
+
+    // Create classification prompt with stance analysis
     const prompt = `Analyze this message from a democratic deliberation and extract the following information:
 
-Message: "${content}"
+Message: "${content}"${deliberationContext}
 
 Please respond with a JSON object containing:
 1. "title": A concise, descriptive title (max 60 characters)
@@ -35,11 +56,18 @@ Please respond with a JSON object containing:
 3. "nodeType": One of "issue", "position", or "argument" based on IBIS methodology
 4. "confidence": A number between 0 and 1 indicating confidence in the classification
 5. "description": A brief description explaining the classification
+6. "stanceScore": A number between -1 and 1 indicating the stance relative to the deliberation topic (-1 = strongly against, 0 = neutral, 1 = strongly in favor)
 
 IBIS Guidelines:
 - "issue": Questions, problems, or topics to be discussed
 - "position": Potential solutions, options, or answers to issues
 - "argument": Supporting or opposing evidence for positions
+
+Stance Analysis:
+- Analyze the message's position relative to the main deliberation topic
+- Consider the emotional tone, supporting/opposing language, and explicit positions taken
+- Return a score between -1 (strongly opposing) and 1 (strongly supporting) with 0 being neutral
+- Base the stance on the overall deliberation topic, not sub-issues
 
 Respond only with valid JSON.`
 
@@ -86,10 +114,11 @@ Respond only with valid JSON.`
       throw new Error('Incomplete classification response')
     }
 
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    // Validate stance score if present
+    if (classification.stanceScore !== undefined && (classification.stanceScore < -1 || classification.stanceScore > 1)) {
+      console.warn('Stance score out of range, clamping to [-1, 1]')
+      classification.stanceScore = Math.max(-1, Math.min(1, classification.stanceScore))
+    }
 
     // Store or update keywords in the database
     const keywordIds = []
