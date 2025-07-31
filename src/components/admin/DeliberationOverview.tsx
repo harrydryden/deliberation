@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, MessageSquare, Eye } from 'lucide-react';
+import { RefreshCw, MessageSquare, Eye, GitBranch } from 'lucide-react';
 import { formatToUKDateTime } from '@/utils/timeUtils';
 import { Deliberation } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useNavigate } from 'react-router-dom';
+import { IbisNodeManagement } from './IbisNodeManagement';
 
 interface DeliberationOverviewProps {
   deliberations: Deliberation[];
@@ -19,6 +20,7 @@ interface DeliberationOverviewProps {
 
 export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateStatus }: DeliberationOverviewProps) => {
   const [updating, setUpdating] = useState<string | null>(null);
+  const [selectedDeliberation, setSelectedDeliberation] = useState<Deliberation | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,6 +51,24 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
   const formatDate = (dateString: string) => {
     return formatToUKDateTime(dateString, 'dd MMM yyyy HH:mm');
   };
+
+  const handleEditNodes = (deliberation: Deliberation) => {
+    setSelectedDeliberation(deliberation);
+  };
+
+  const handleBackFromNodes = () => {
+    setSelectedDeliberation(null);
+  };
+
+  if (selectedDeliberation) {
+    return (
+      <IbisNodeManagement
+        deliberationId={selectedDeliberation.id}
+        deliberationTitle={selectedDeliberation.title}
+        onBack={handleBackFromNodes}
+      />
+    );
+  }
 
   return (
     <Card>
@@ -144,14 +164,24 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
                       {formatDate(deliberation.updatedAt)}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(`/deliberations/${deliberation.id}`)}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => navigate(`/deliberations/${deliberation.id}`)}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditNodes(deliberation)}
+                        >
+                          <GitBranch className="h-4 w-4 mr-2" />
+                          Edit Nodes
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
