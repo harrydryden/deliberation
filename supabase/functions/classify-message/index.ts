@@ -32,12 +32,23 @@ serve(async (req) => {
     // Fetch deliberation context if deliberationId is provided
     let deliberationContext = ''
     let deliberationNotion = ''
+    let hasExistingNodes = true
+    
     if (deliberationId) {
       const { data: deliberation } = await supabase
         .from('deliberations')
         .select('title, description, notion')
         .eq('id', deliberationId)
         .single()
+      
+      // Check if there are existing IBIS nodes
+      const { data: existingNodes } = await supabase
+        .from('ibis_nodes')
+        .select('id')
+        .eq('deliberation_id', deliberationId)
+        .limit(1)
+      
+      hasExistingNodes = existingNodes && existingNodes.length > 0
       
       if (deliberation) {
         deliberationNotion = deliberation.notion || ''
@@ -166,13 +177,23 @@ Respond only with valid JSON.`
       }
     }
 
+    // If no IBIS nodes exist yet, suggest generating root issues
+    let rootSuggestion = null
+    if (!hasExistingNodes) {
+      rootSuggestion = {
+        message: "This deliberation has no IBIS nodes yet. Consider generating initial root issues to structure the discussion.",
+        action: "generateRootIssues"
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         classification: {
           ...classification,
           keywordIds
-        }
+        },
+        rootSuggestion
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

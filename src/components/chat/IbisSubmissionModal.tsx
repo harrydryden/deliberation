@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Lightbulb } from "lucide-react";
 
 interface IbisSubmissionModalProps {
   isOpen: boolean;
@@ -52,6 +53,11 @@ export const IbisSubmissionModal = ({
     title: string;
     node_type: string;
   }>>([]);
+  const [isGeneratingRoots, setIsGeneratingRoots] = useState(false);
+  const [rootSuggestion, setRootSuggestion] = useState<{
+    message: string;
+    action: string;
+  } | null>(null);
 
   // Load existing nodes and classify message when modal opens
   useEffect(() => {
@@ -107,6 +113,11 @@ export const IbisSubmissionModal = ({
           title: classification.title,
           nodeType: classification.nodeType
         }));
+      }
+
+      // Handle root suggestion if provided
+      if (data.rootSuggestion) {
+        setRootSuggestion(data.rootSuggestion);
       }
     } catch (error: any) {
       console.error('Error classifying message:', error);
@@ -199,6 +210,49 @@ export const IbisSubmissionModal = ({
     }
   };
 
+  const handleGenerateRootIssues = async () => {
+    setIsGeneratingRoots(true);
+    try {
+      // Get deliberation details
+      const { data: deliberation, error: deliberationError } = await supabase
+        .from('deliberations')
+        .select('title, description, notion')
+        .eq('id', deliberationId)
+        .single();
+
+      if (deliberationError) throw deliberationError;
+
+      const { data: rootsData, error: rootsError } = await supabase.functions.invoke('generate-ibis-roots', {
+        body: {
+          deliberationId,
+          deliberationTitle: deliberation.title,
+          deliberationDescription: deliberation.description,
+          notion: deliberation.notion
+        }
+      });
+
+      if (rootsError) throw rootsError;
+
+      if (rootsData?.success) {
+        toast({
+          title: "Success",
+          description: `Generated ${rootsData.count} root issues for this deliberation`
+        });
+        // Reload existing nodes to show the new ones
+        await loadExistingNodes();
+      }
+    } catch (error: any) {
+      console.error('Error generating root issues:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate root issues. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingRoots(false);
+    }
+  };
+
   const getNodeTypeDescription = (nodeType: string) => {
     switch (nodeType) {
       case 'issue':
@@ -224,6 +278,39 @@ export const IbisSubmissionModal = ({
           <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
             <LoadingSpinner className="h-4 w-4" />
             <span className="text-sm text-muted-foreground">AI is analyzing your message...</span>
+          </div>
+        )}
+
+        {/* No existing nodes - suggest root issues */}
+        {existingNodes.length === 0 && !isClassifying && (
+          <div className="p-3 bg-muted rounded-lg space-y-3">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">No IBIS nodes exist yet</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Start this deliberation by generating AI-suggested root issues, or create your own manually.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateRootIssues}
+              disabled={isGeneratingRoots}
+              className="flex items-center gap-2"
+            >
+              {isGeneratingRoots ? (
+                <>
+                  <LoadingSpinner className="h-3 w-3" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Lightbulb className="h-3 w-3" />
+                  Suggest Root Issues
+                </>
+              )}
+            </Button>
           </div>
         )}
 

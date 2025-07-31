@@ -6,9 +6,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus } from 'lucide-react';
+import { Plus, Lightbulb } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useDeliberationService } from '@/hooks/useDeliberationService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DeliberationCreationProps {
   onDeliberationCreated: () => void;
@@ -22,7 +23,8 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
     description: '',
     notion: '',
     is_public: true,
-    max_participants: 50
+    max_participants: 50,
+    generate_ibis_roots: true
   });
   
   const { toast } = useToast();
@@ -49,13 +51,50 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
 
     setCreating(true);
     try {
-      await deliberationService.createDeliberation(formData);
-      toast({
-        title: "Success",
-        description: "Deliberation created successfully"
-      });
+      const deliberation = await deliberationService.createDeliberation(formData);
+      
+      // If generate_ibis_roots is enabled, create initial IBIS nodes
+      if (formData.generate_ibis_roots && deliberation?.id) {
+        try {
+          const { data: rootsData, error: rootsError } = await supabase.functions.invoke('generate-ibis-roots', {
+            body: {
+              deliberationId: deliberation.id,
+              deliberationTitle: formData.title,
+              deliberationDescription: formData.description,
+              notion: formData.notion
+            }
+          });
+
+          if (rootsError) {
+            console.error('Error generating IBIS roots:', rootsError);
+            toast({
+              title: "Partial Success",
+              description: "Deliberation created but failed to generate initial IBIS nodes. You can add them manually.",
+              variant: "destructive"
+            });
+          } else if (rootsData?.success) {
+            toast({
+              title: "Success",
+              description: `Deliberation created with ${rootsData.count} AI-generated root issues`
+            });
+          }
+        } catch (rootsError) {
+          console.error('Error generating IBIS roots:', rootsError);
+          toast({
+            title: "Partial Success",
+            description: "Deliberation created but failed to generate initial IBIS nodes",
+            variant: "destructive"
+          });
+        }
+      } else {
+        toast({
+          title: "Success",
+          description: "Deliberation created successfully"
+        });
+      }
+      
       setCreateOpen(false);
-      setFormData({ title: '', description: '', notion: '', is_public: true, max_participants: 50 });
+      setFormData({ title: '', description: '', notion: '', is_public: true, max_participants: 50, generate_ibis_roots: true });
       onDeliberationCreated();
     } catch (error) {
       console.error('Failed to create deliberation:', error);
@@ -140,6 +179,18 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
                   onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_public: checked }))}
                 />
                 <Label htmlFor="is_public">Public deliberation</Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="generate_ibis_roots"
+                  checked={formData.generate_ibis_roots}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, generate_ibis_roots: checked }))}
+                />
+                <Label htmlFor="generate_ibis_roots" className="flex items-center gap-2">
+                  <Lightbulb className="h-4 w-4" />
+                  Generate initial IBIS root issues with AI
+                </Label>
               </div>
               
               <div>
