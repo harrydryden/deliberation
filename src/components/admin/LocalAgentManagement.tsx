@@ -8,6 +8,7 @@ import { formatToUKDateTime } from '@/utils/timeUtils';
 import { Agent, Deliberation, LocalAgentCreate } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { LocalAgentCreationModal } from './LocalAgentCreationModal';
+import { LocalAgentEditModal } from './LocalAgentEditModal';
 
 interface LocalAgentManagementProps {
   localAgents: Agent[];
@@ -187,18 +188,25 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
                       {formatDate(agent.createdAt)}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleToggleActive(agent.id, agent.isActive)}
-                        disabled={updating === agent.id}
-                      >
-                        {updating === agent.id ? (
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                        ) : (
-                          agent.isActive ? 'Deactivate' : 'Activate'
-                        )}
-                      </Button>
+                      <div className="flex gap-2">
+                        <LocalAgentEditModal
+                          agent={agent}
+                          onUpdateAgent={onUpdate}
+                          loading={updating === agent.id}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleToggleActive(agent.id, agent.isActive)}
+                          disabled={updating === agent.id}
+                        >
+                          {updating === agent.id ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            agent.isActive ? 'Deactivate' : 'Activate'
+                          )}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
