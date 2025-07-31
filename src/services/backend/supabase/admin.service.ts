@@ -102,6 +102,8 @@ export class SupabaseAdminService implements IAdminService {
   }
 
   async getLocalAgentConfigurations(): Promise<Agent[]> {
+    console.log('🔍 Fetching local agent configurations...');
+    
     // First get the agent configurations
     const { data: agentConfigs, error: agentError } = await supabase
       .from('agent_configurations')
@@ -109,14 +111,23 @@ export class SupabaseAdminService implements IAdminService {
       .not('deliberation_id', 'is', null)
       .order('created_at', { ascending: false });
 
-    if (agentError) throw agentError;
+    console.log('🔍 Agent configs query result:', { agentConfigs, agentError });
+
+    if (agentError) {
+      console.error('🚨 Error fetching agent configs:', agentError);
+      throw agentError;
+    }
+
+    console.log('🔍 Found agent configs:', agentConfigs?.length || 0);
 
     if (!agentConfigs || agentConfigs.length === 0) {
+      console.log('🔍 No local agent configurations found');
       return [];
     }
 
     // Get unique deliberation IDs
     const deliberationIds = [...new Set(agentConfigs.map(config => config.deliberation_id).filter(Boolean))];
+    console.log('🔍 Deliberation IDs to fetch:', deliberationIds);
     
     // Fetch deliberation details
     const { data: deliberations, error: deliberationError } = await supabase
@@ -124,12 +135,18 @@ export class SupabaseAdminService implements IAdminService {
       .select('id, title, status')
       .in('id', deliberationIds);
 
-    if (deliberationError) throw deliberationError;
+    console.log('🔍 Deliberations query result:', { deliberations, deliberationError });
+
+    if (deliberationError) {
+      console.error('🚨 Error fetching deliberations:', deliberationError);
+      throw deliberationError;
+    }
 
     // Create a map for quick lookup
     const deliberationMap = new Map(deliberations?.map(d => [d.id, d]) || []);
+    console.log('🔍 Deliberation map:', Object.fromEntries(deliberationMap));
 
-    return agentConfigs.map(config => ({
+    const result = agentConfigs.map(config => ({
       id: config.id,
       name: config.name,
       description: config.description || '',
@@ -144,6 +161,9 @@ export class SupabaseAdminService implements IAdminService {
       updatedAt: config.updated_at,
       deliberation: config.deliberation_id ? deliberationMap.get(config.deliberation_id) : undefined,
     }));
+
+    console.log('🔍 Final result:', result);
+    return result;
   }
 
   async createAgentConfiguration(config: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>): Promise<Agent> {
