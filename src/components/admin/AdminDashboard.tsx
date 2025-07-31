@@ -130,9 +130,9 @@ export const AdminDashboard = () => {
 
         <TabsContent value="knowledge" className="space-y-4">
           <KnowledgeManagement
-            agents={adminService.agents}
-            loading={adminService.loadingAgents}
-            onLoad={adminService.fetchAgents}
+            agents={adminService.localAgents}
+            loading={adminService.loadingLocalAgents}
+            onLoad={adminService.fetchLocalAgents}
           />
         </TabsContent>
 

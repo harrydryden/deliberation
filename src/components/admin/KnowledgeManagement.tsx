@@ -212,13 +212,13 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5" />
-            Agent Knowledge Management
+            Local Agent Knowledge Management
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="agent-select">Select Agent</Label>
+              <Label htmlFor="agent-select">Select Local Agent</Label>
               <Select 
                 value={selectedAgent} 
                 onValueChange={(value) => {
@@ -227,19 +227,24 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose an agent to manage knowledge" />
+                  <SelectValue placeholder="Choose a local agent to manage knowledge" />
                 </SelectTrigger>
                 <SelectContent>
-                  {agents.map((agent) => (
+                  {agents.filter(agent => agent.deliberation).map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name}
+                      <div className="flex items-center gap-2">
+                        <span>{agent.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {agent.deliberation?.title}
+                        </Badge>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {selectedAgent && (
+            {selectedAgent && agents.filter(agent => agent.deliberation).length > 0 && (
               <div className="flex gap-4">
                 <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
                   <DialogTrigger asChild>
