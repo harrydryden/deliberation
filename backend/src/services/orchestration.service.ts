@@ -229,12 +229,32 @@ export class AIOrchestrationService {
     inputType: string;
     sessionState?: SessionState;
     traceId: string;
+    deliberationId?: string;
   }): Promise<void> {
-    const { content, userId, inputType, sessionState, traceId } = context;
+    const { content, userId, inputType, sessionState, traceId, deliberationId } = context;
+
+    // Get deliberation context
+    let deliberationContext = '';
+    if (deliberationId) {
+      try {
+        const deliberation = await this.prisma.deliberation.findUnique({
+          where: { id: deliberationId },
+          select: { title: true, description: true, notion: true },
+        });
+        if (deliberation) {
+          const context = [];
+          context.push(`DELIBERATION: ${deliberation.title}`);
+          if (deliberation.notion) context.push(`NOTION: ${deliberation.notion}`);
+          deliberationContext = context.length > 1 ? `\n${context.join(' | ')}\n` : '';
+        }
+      } catch (error) {
+        logger.error({ error, deliberationId }, 'Failed to fetch deliberation context for flow agent');
+      }
+    }
 
     // Flow Agent provides conversation management and transitions
     const flowPrompt = `You are the Flow Agent, managing conversation flow and transitions in democratic deliberation.
-
+${deliberationContext}
 CURRENT CONTEXT:
 - User input type: ${inputType}
 - Session message count: ${sessionState?.messageCount || 0}
