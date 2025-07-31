@@ -7,6 +7,7 @@ import { Layout } from "@/components/layout/Layout";
 import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput } from "@/components/chat/MessageInput";
+import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,7 @@ const DeliberationChat = () => {
   const [loading, setLoading] = useState(true);
   const [isParticipant, setIsParticipant] = useState(false);
   const [joiningDeliberation, setJoiningDeliberation] = useState(false);
+  const [chatMode, setChatMode] = useState<ChatMode>('chat');
   const [ibisModal, setIbisModal] = useState<{
     isOpen: boolean;
     messageId: string;
@@ -51,9 +53,13 @@ const DeliberationChat = () => {
     messages,
     isLoading: chatLoading,
     isTyping,
-    sendMessage,
+    sendMessage: originalSendMessage,
     loadChatHistory,
   } = useBackendChat(deliberationId);
+
+  const sendMessage = async (content: string) => {
+    await originalSendMessage(content, chatMode);
+  };
 
   const handleAddToIbis = (messageId: string, messageContent: string) => {
     setIbisModal({
@@ -188,6 +194,8 @@ const DeliberationChat = () => {
             </div>
             
             <div className="flex items-center space-x-2">
+              <ChatModeSelector mode={chatMode} onModeChange={setChatMode} />
+              
               <div className="flex items-center space-x-1 text-sm text-muted-foreground">
                 <Users className="h-4 w-4" />
                 <span>{deliberation.participants?.length || 0}/{deliberation.max_participants}</span>
