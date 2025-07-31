@@ -103,10 +103,17 @@ Respond only with valid JSON.`
 
       if (existingKeyword) {
         keywordIds.push(existingKeyword.id)
-        // Increment usage count
+        // Get current usage count and increment it
+        const { data: currentKeyword } = await supabase
+          .from('keywords')
+          .select('usage_count')
+          .eq('id', existingKeyword.id)
+          .single()
+        
+        const newUsageCount = (currentKeyword?.usage_count || 0) + 1
         await supabase
           .from('keywords')
-          .update({ usage_count: supabase.raw('usage_count + 1') })
+          .update({ usage_count: newUsageCount })
           .eq('id', existingKeyword.id)
       } else {
         // Create new keyword
