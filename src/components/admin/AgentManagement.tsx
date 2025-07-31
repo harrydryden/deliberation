@@ -223,7 +223,7 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate, onCreate }:
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <Settings className="h-5 w-5" />
-          Agent Management
+          Global Agent Management
         </CardTitle>
         <div className="flex gap-2">
           {onCreate && (
