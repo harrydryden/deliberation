@@ -31,17 +31,20 @@ serve(async (req) => {
 
     // Fetch deliberation context if deliberationId is provided
     let deliberationContext = ''
+    let deliberationNotion = ''
     if (deliberationId) {
       const { data: deliberation } = await supabase
         .from('deliberations')
-        .select('title, description')
+        .select('title, description, notion')
         .eq('id', deliberationId)
         .single()
       
       if (deliberation) {
+        deliberationNotion = deliberation.notion || ''
         deliberationContext = `\n\nDeliberation Context:
 Title: "${deliberation.title}"
-Description: "${deliberation.description || 'No description provided'}"`
+Description: "${deliberation.description || 'No description provided'}"
+Notion: "${deliberationNotion}"`
       }
     }
 
@@ -64,10 +67,11 @@ IBIS Guidelines:
 - "argument": Supporting or opposing evidence for positions
 
 Stance Analysis:
-- Analyze the message's position relative to the main deliberation topic
+- Analyze the message's position relative to the deliberation's NOTION: "${deliberationNotion}"
 - Consider the emotional tone, supporting/opposing language, and explicit positions taken
 - Return a score between -1 (strongly opposing) and 1 (strongly supporting) with 0 being neutral
-- Base the stance on the overall deliberation topic, not sub-issues
+- Base the stance specifically on the deliberation's notion, not the general topic or sub-issues
+- If no notion is provided, base it on the overall deliberation topic
 
 Respond only with valid JSON.`
 

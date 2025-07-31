@@ -274,6 +274,7 @@ export type Database = {
           id: string
           is_public: boolean | null
           max_participants: number | null
+          notion: string | null
           start_time: string | null
           status: Database["public"]["Enums"]["deliberation_status"] | null
           title: string
@@ -287,6 +288,7 @@ export type Database = {
           id?: string
           is_public?: boolean | null
           max_participants?: number | null
+          notion?: string | null
           start_time?: string | null
           status?: Database["public"]["Enums"]["deliberation_status"] | null
           title: string
@@ -300,6 +302,7 @@ export type Database = {
           id?: string
           is_public?: boolean | null
           max_participants?: number | null
+          notion?: string | null
           start_time?: string | null
           status?: Database["public"]["Enums"]["deliberation_status"] | null
           title?: string

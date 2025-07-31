@@ -20,6 +20,7 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    notion: '',
     is_public: true,
     max_participants: 50
   });
@@ -37,6 +38,15 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
       return;
     }
 
+    if (!formData.notion.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a notion for stance scoring",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setCreating(true);
     try {
       await deliberationService.createDeliberation(formData);
@@ -45,7 +55,7 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
         description: "Deliberation created successfully"
       });
       setCreateOpen(false);
-      setFormData({ title: '', description: '', is_public: true, max_participants: 50 });
+      setFormData({ title: '', description: '', notion: '', is_public: true, max_participants: 50 });
       onDeliberationCreated();
     } catch (error) {
       console.error('Failed to create deliberation:', error);
@@ -109,6 +119,20 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
                 />
               </div>
               
+              <div>
+                <Label htmlFor="notion">Notion *</Label>
+                <Input
+                  id="notion"
+                  value={formData.notion}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notion: e.target.value.slice(0, 100) }))}
+                  placeholder="Enter the core notion for stance scoring (max 100 chars)"
+                  maxLength={100}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.notion.length}/100 characters - This notion will be used to determine if messages are supportive or opposing
+                </p>
+              </div>
+              
               <div className="flex items-center space-x-2">
                 <Switch
                   id="is_public"
@@ -133,7 +157,7 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
               <Button 
                 onClick={handleCreateDeliberation}
                 className="w-full bg-democratic-blue hover:bg-democratic-blue/90"
-                disabled={!formData.title.trim() || creating}
+                disabled={!formData.title.trim() || !formData.notion.trim() || creating}
               >
                 {creating ? 'Creating...' : 'Create Deliberation'}
               </Button>
