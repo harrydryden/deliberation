@@ -1,0 +1,194 @@
+import { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { RefreshCw, Bot, ExternalLink } from 'lucide-react';
+import { formatToUKDateTime } from '@/utils/timeUtils';
+import { Agent } from '@/types/api';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+
+interface LocalAgentManagementProps {
+  localAgents: Agent[];
+  loading: boolean;
+  onLoad: () => void;
+  onUpdate: (id: string, config: Partial<Agent>) => void;
+}
+
+export const LocalAgentManagement = ({ localAgents, loading, onLoad, onUpdate }: LocalAgentManagementProps) => {
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (localAgents.length === 0 && !loading) {
+      onLoad();
+    }
+  }, [localAgents.length, loading, onLoad]);
+
+  const handleToggleActive = async (id: string, currentStatus: boolean) => {
+    setUpdating(id);
+    try {
+      await onUpdate(id, { isActive: !currentStatus });
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const getAgentTypeBadge = (type: string) => {
+    const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
+      'bill_agent': 'default',
+      'peer_agent': 'secondary',
+      'flow_agent': 'destructive',
+    };
+    return <Badge variant={variants[type] || 'secondary'}>{type.replace('_', ' ')}</Badge>;
+  };
+
+  const getStatusBadge = (isActive: boolean) => {
+    return (
+      <Badge variant={isActive ? 'default' : 'secondary'}>
+        {isActive ? 'Active' : 'Inactive'}
+      </Badge>
+    );
+  };
+
+  const getDeliberationStatusBadge = (status?: string) => {
+    if (!status) return null;
+    const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
+      'draft': 'secondary',
+      'active': 'default',
+      'completed': 'destructive',
+      'archived': 'secondary'
+    };
+    return <Badge variant={variants[status] || 'secondary'}>{status}</Badge>;
+  };
+
+  const formatDate = (dateString: string) => {
+    return formatToUKDateTime(dateString, 'dd MMM yyyy HH:mm');
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2">
+          <Bot className="h-5 w-5" />
+          Local Agent Management
+        </CardTitle>
+        <Button variant="outline" size="sm" onClick={onLoad} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {loading && localAgents.length === 0 ? (
+          <LoadingSpinner />
+        ) : localAgents.length === 0 ? (
+          <div className="text-center py-8">
+            <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">No local agents found</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Local agents are created automatically when deliberations begin
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold">{localAgents.length}</div>
+                <div className="text-sm text-muted-foreground">Total Local</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {localAgents.filter(a => a.isActive).length}
+                </div>
+                <div className="text-sm text-muted-foreground">Active</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {localAgents.filter(a => a.deliberation?.status === 'active').length}
+                </div>
+                <div className="text-sm text-muted-foreground">In Active Deliberations</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-600">
+                  {new Set(localAgents.map(a => a.deliberation?.id)).size}
+                </div>
+                <div className="text-sm text-muted-foreground">Deliberations</div>
+              </div>
+            </div>
+            
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Deliberation</TableHead>
+                  <TableHead>Deliberation Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {localAgents.map((agent) => (
+                  <TableRow key={agent.id}>
+                    <TableCell className="font-medium">
+                      <div>
+                        <div className="font-semibold">{agent.name}</div>
+                        {agent.description && (
+                          <div className="text-sm text-muted-foreground truncate max-w-xs">
+                            {agent.description}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {getAgentTypeBadge(agent.agent_type)}
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(agent.isActive)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{agent.deliberation?.title || 'Unknown'}</span>
+                        {agent.deliberation && (
+                          <Button variant="ghost" size="sm" asChild>
+                            <a 
+                              href={`/deliberations/${agent.deliberation.id}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {getDeliberationStatusBadge(agent.deliberation?.status)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(agent.createdAt)}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleActive(agent.id, agent.isActive)}
+                        disabled={updating === agent.id}
+                      >
+                        {updating === agent.id ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          agent.isActive ? 'Deactivate' : 'Activate'
+                        )}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};

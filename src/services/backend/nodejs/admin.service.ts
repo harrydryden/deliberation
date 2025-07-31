@@ -36,6 +36,10 @@ export class NodeJSAdminService implements IAdminService {
     return await apiClient.adminGetAgentConfigurations();
   }
 
+  async getLocalAgentConfigurations(): Promise<Agent[]> {
+    return await apiClient.adminGetLocalAgentConfigurations();
+  }
+
   async createAgentConfiguration(config: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>): Promise<Agent> {
     // For now, simulate creation - in real implementation this would call the backend
     throw new Error('Agent creation not implemented for NodeJS backend yet');

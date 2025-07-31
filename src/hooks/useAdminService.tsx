@@ -21,6 +21,10 @@ export const useAdminService = () => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loadingAgents, setLoadingAgents] = useState(false);
 
+  // Local Agents
+  const [localAgents, setLocalAgents] = useState<Agent[]>([]);
+  const [loadingLocalAgents, setLoadingLocalAgents] = useState(false);
+
   // Deliberations
   const [deliberations, setDeliberations] = useState<Deliberation[]>([]);
   const [loadingDeliberations, setLoadingDeliberations] = useState(false);
@@ -135,6 +139,19 @@ export const useAdminService = () => {
     }
   };
 
+  // Local Agent operations
+  const fetchLocalAgents = async () => {
+    setLoadingLocalAgents(true);
+    try {
+      const data = await adminService.getLocalAgentConfigurations();
+      setLocalAgents(data);
+    } catch (error) {
+      handleError(error, 'fetch local agents');
+    } finally {
+      setLoadingLocalAgents(false);
+    }
+  };
+
   // Deliberation operations
   const fetchDeliberations = async () => {
     setLoadingDeliberations(true);
@@ -176,12 +193,14 @@ export const useAdminService = () => {
     users,
     accessCodes,
     agents,
+    localAgents,
     deliberations,
     stats,
     loading,
     loadingUsers,
     loadingAccessCodes,
     loadingAgents,
+    loadingLocalAgents,
     loadingDeliberations,
     loadingStats,
     error,
@@ -194,6 +213,7 @@ export const useAdminService = () => {
     createAccessCode,
     deleteAccessCode,
     fetchAgents,
+    fetchLocalAgents,
     createAgent,
     updateAgent,
     fetchDeliberations,

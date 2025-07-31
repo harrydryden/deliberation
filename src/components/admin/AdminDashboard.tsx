@@ -8,6 +8,7 @@ import { BACKEND_CONFIG } from '@/config/backend';
 import { UserManagement } from './UserManagement';
 import { AccessCodeManagement } from './AccessCodeManagement';
 import { AgentManagement } from './AgentManagement';
+import { LocalAgentManagement } from './LocalAgentManagement';
 import { DeliberationOverview } from './DeliberationOverview';
 import { DeliberationCreation } from './DeliberationCreation';
 import { KnowledgeManagement } from './KnowledgeManagement';
@@ -101,13 +102,28 @@ export const AdminDashboard = () => {
         </TabsContent>
 
         <TabsContent value="agents" className="space-y-4">
-          <AgentManagement
-            agents={adminService.agents}
-            loading={adminService.loadingAgents}
-            onLoad={adminService.fetchAgents}
-            onUpdate={adminService.updateAgent}
-            onCreate={adminService.createAgent}
-          />
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Global Agent Templates</h3>
+              <AgentManagement
+                agents={adminService.agents}
+                loading={adminService.loadingAgents}
+                onLoad={adminService.fetchAgents}
+                onUpdate={adminService.updateAgent}
+                onCreate={adminService.createAgent}
+              />
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Local Agents (Deliberation-Specific)</h3>
+              <LocalAgentManagement
+                localAgents={adminService.localAgents}
+                loading={adminService.loadingLocalAgents}
+                onLoad={adminService.fetchLocalAgents}
+                onUpdate={adminService.updateAgent}
+              />
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="knowledge" className="space-y-4">

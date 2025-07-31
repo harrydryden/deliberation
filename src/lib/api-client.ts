@@ -196,6 +196,10 @@ class ApiClient {
     return this.request<any[]>('/admin/agents');
   }
 
+  async adminGetLocalAgentConfigurations(): Promise<any[]> {
+    return this.request<any[]>('/agents/local-configurations');
+  }
+
   async adminUpdateAgentConfiguration(id: string, config: any): Promise<any> {
     return this.request<any>(`/admin/agents/${id}`, {
       method: 'PUT',

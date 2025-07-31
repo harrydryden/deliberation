@@ -80,6 +80,7 @@ export class SupabaseAdminService implements IAdminService {
     const { data, error } = await supabase
       .from('agent_configurations')
       .select('*')
+      .is('deliberation_id', null)  // Only global agents
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -92,10 +93,48 @@ export class SupabaseAdminService implements IAdminService {
       response_style: config.response_style,
       goals: config.goals || [],
       agent_type: config.agent_type,
+      facilitator_config: config.facilitator_config || undefined,
       is_default: config.is_default || false,
       isActive: config.is_active,
       createdAt: config.created_at,
       updatedAt: config.updated_at
+    })) || [];
+  }
+
+  async getLocalAgentConfigurations(): Promise<Agent[]> {
+    const { data, error } = await supabase
+      .from('agent_configurations')
+      .select(`
+        *,
+        deliberations:deliberation_id (
+          id,
+          title,
+          status
+        )
+      `)
+      .not('deliberation_id', 'is', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return data?.map(config => ({
+      id: config.id,
+      name: config.name,
+      description: config.description || '',
+      system_prompt: config.system_prompt || '',
+      response_style: config.response_style,
+      goals: config.goals || [],
+      agent_type: config.agent_type,
+      facilitator_config: config.facilitator_config || undefined,
+      is_default: config.is_default || false,
+      isActive: config.is_active,
+      createdAt: config.created_at,
+      updatedAt: config.updated_at,
+      deliberation: config.deliberations ? {
+        id: config.deliberations.id,
+        title: config.deliberations.title,
+        status: config.deliberations.status,
+      } : undefined,
     })) || [];
   }
 

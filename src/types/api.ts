@@ -45,6 +45,11 @@ export interface Agent {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  deliberation?: {
+    id: string;
+    title: string;
+    status: string;
+  };
 }
 
 export interface FacilitatorConfig {

@@ -333,6 +333,39 @@ export async function agentRoutes(fastify: FastifyInstance) {
     }
   });
 
+  // Get deliberation-specific agent configurations (local agents)
+  fastify.get('/local-configurations', {
+    preHandler: [fastify.authenticate],
+  }, async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      // Get all deliberation-specific agent configurations
+      const configurations = await fastify.prisma.agentConfiguration.findMany({
+        where: { 
+          deliberationId: { not: null },
+          isActive: true 
+        },
+        include: {
+          deliberation: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+            }
+          }
+        },
+        orderBy: [
+          { agentType: 'asc' },
+          { createdAt: 'desc' },
+        ],
+      });
+
+      reply.send({ configurations });
+    } catch (error) {
+      fastify.log.error({ error }, 'Error fetching local agent configurations');
+      reply.status(500).send({ error: 'Failed to fetch local configurations' });
+    }
+  });
+
   // Delete knowledge item
   fastify.delete('/knowledge/:knowledgeId', {
     preHandler: [fastify.authenticate],

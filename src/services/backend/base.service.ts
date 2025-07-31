@@ -66,6 +66,7 @@ export interface IAdminService {
   
   // Agents
   getAgentConfigurations(): Promise<Agent[]>;
+  getLocalAgentConfigurations(): Promise<Agent[]>;
   createAgentConfiguration(config: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>): Promise<Agent>;
   updateAgentConfiguration(id: string, config: Partial<Agent>): Promise<Agent>;
   
