@@ -51,6 +51,7 @@ export type Database = {
           created_by: string | null
           deliberation_id: string | null
           description: string | null
+          facilitator_config: Json | null
           goals: string[] | null
           id: string
           is_active: boolean
@@ -67,6 +68,7 @@ export type Database = {
           created_by?: string | null
           deliberation_id?: string | null
           description?: string | null
+          facilitator_config?: Json | null
           goals?: string[] | null
           id?: string
           is_active?: boolean
@@ -83,6 +85,7 @@ export type Database = {
           created_by?: string | null
           deliberation_id?: string | null
           description?: string | null
+          facilitator_config?: Json | null
           goals?: string[] | null
           id?: string
           is_active?: boolean
@@ -309,6 +312,53 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      facilitator_sessions: {
+        Row: {
+          agent_config_id: string
+          created_at: string | null
+          deliberation_id: string | null
+          id: string
+          last_activity_time: string | null
+          last_prompt_time: string | null
+          prompts_sent_count: number | null
+          session_state: Json | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          agent_config_id: string
+          created_at?: string | null
+          deliberation_id?: string | null
+          id?: string
+          last_activity_time?: string | null
+          last_prompt_time?: string | null
+          prompts_sent_count?: number | null
+          session_state?: Json | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          agent_config_id?: string
+          created_at?: string | null
+          deliberation_id?: string | null
+          id?: string
+          last_activity_time?: string | null
+          last_prompt_time?: string | null
+          prompts_sent_count?: number | null
+          session_state?: Json | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facilitator_sessions_agent_config_id_fkey"
+            columns: ["agent_config_id"]
+            isOneToOne: false
+            referencedRelation: "agent_configurations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ibis_nodes: {
         Row: {
