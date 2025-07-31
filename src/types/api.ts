@@ -50,6 +50,7 @@ export interface Deliberation {
   id: string;
   title: string;
   description: string;
+  notion?: string;
   status: string;
   createdAt: string;
   updatedAt: string;

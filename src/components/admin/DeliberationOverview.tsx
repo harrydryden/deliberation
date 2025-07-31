@@ -99,6 +99,7 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
                 <TableRow>
                   <TableHead>Title</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Notion</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Updated</TableHead>
@@ -127,6 +128,11 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
                           <SelectItem value="archived">Archived</SelectItem>
                         </SelectContent>
                       </Select>
+                    </TableCell>
+                    <TableCell className="max-w-xs">
+                      <div className="text-sm font-medium text-primary">
+                        {deliberation.notion || 'No notion set'}
+                      </div>
                     </TableCell>
                     <TableCell className="max-w-xs truncate">
                       {deliberation.description || 'No description'}
