@@ -102,22 +102,34 @@ export class SupabaseAdminService implements IAdminService {
   }
 
   async getLocalAgentConfigurations(): Promise<Agent[]> {
-    const { data, error } = await supabase
+    // First get the agent configurations
+    const { data: agentConfigs, error: agentError } = await supabase
       .from('agent_configurations')
-      .select(`
-        *,
-        deliberations:deliberation_id (
-          id,
-          title,
-          status
-        )
-      `)
+      .select('*')
       .not('deliberation_id', 'is', null)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (agentError) throw agentError;
 
-    return data?.map(config => ({
+    if (!agentConfigs || agentConfigs.length === 0) {
+      return [];
+    }
+
+    // Get unique deliberation IDs
+    const deliberationIds = [...new Set(agentConfigs.map(config => config.deliberation_id).filter(Boolean))];
+    
+    // Fetch deliberation details
+    const { data: deliberations, error: deliberationError } = await supabase
+      .from('deliberations')
+      .select('id, title, status')
+      .in('id', deliberationIds);
+
+    if (deliberationError) throw deliberationError;
+
+    // Create a map for quick lookup
+    const deliberationMap = new Map(deliberations?.map(d => [d.id, d]) || []);
+
+    return agentConfigs.map(config => ({
       id: config.id,
       name: config.name,
       description: config.description || '',
@@ -130,12 +142,8 @@ export class SupabaseAdminService implements IAdminService {
       isActive: config.is_active,
       createdAt: config.created_at,
       updatedAt: config.updated_at,
-      deliberation: config.deliberations ? {
-        id: config.deliberations.id,
-        title: config.deliberations.title,
-        status: config.deliberations.status,
-      } : undefined,
-    })) || [];
+      deliberation: config.deliberation_id ? deliberationMap.get(config.deliberation_id) : undefined,
+    }));
   }
 
   async createAgentConfiguration(config: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>): Promise<Agent> {
