@@ -38,7 +38,7 @@ serve(async (req) => {
       throw new Error('File content and agent ID are required')
     }
 
-    console.log(`Processing knowledge for agent ${agentId}, file: ${fileName}`)
+    console.log(`Processing knowledge for agent ${agentId}, file: ${fileName}, type: ${contentType}`)
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -69,8 +69,14 @@ serve(async (req) => {
       throw new Error('Service configuration error')
     }
 
-    // Process text content (assuming PDF text has been extracted)
-    const text = fileContent
+    // Extract text based on content type
+    let text = ''
+    if (contentType === 'application/pdf') {
+      console.log('Extracting text from PDF...')
+      text = await extractTextFromPDF(fileContent)
+    } else {
+      text = fileContent
+    }
 
     // Split text into chunks (roughly 500 words each)
     const chunks = splitTextIntoChunks(text, 500)
@@ -183,6 +189,55 @@ function splitTextIntoChunks(text: string, maxWords: number): string[] {
   }
   
   return chunks
+}
+
+async function extractTextFromPDF(base64Data: string): Promise<string> {
+  try {
+    // Convert base64 to Uint8Array
+    const binaryString = atob(base64Data)
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+
+    // Use pdfjs-dist for text extraction
+    const pdfjsLib = await import('https://esm.sh/pdfjs-dist@3.11.174/build/pdf.min.mjs')
+    
+    // Load the PDF document
+    const loadingTask = pdfjsLib.getDocument({ data: bytes })
+    const pdf = await loadingTask.promise
+    
+    let fullText = ''
+    
+    // Extract text from each page
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      try {
+        const page = await pdf.getPage(pageNum)
+        const textContent = await page.getTextContent()
+        
+        // Combine text items
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ')
+        
+        fullText += pageText + '\n'
+        console.log(`Extracted text from page ${pageNum}`)
+      } catch (pageError) {
+        console.error(`Error extracting text from page ${pageNum}:`, pageError)
+      }
+    }
+    
+    if (!fullText.trim()) {
+      throw new Error('No text could be extracted from the PDF')
+    }
+    
+    console.log(`Successfully extracted ${fullText.length} characters from PDF`)
+    return fullText.trim()
+    
+  } catch (error) {
+    console.error('PDF text extraction error:', error)
+    throw new Error(`Failed to extract text from PDF: ${error.message}`)
+  }
 }
 
 async function generateChunkSummary(chunk: string): Promise<string> {

@@ -90,14 +90,10 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       if (file.type.startsWith('text/')) {
         fileContent = await file.text();
       } else if (file.type === 'application/pdf') {
-        // For PDF files, we'll need to extract text first
-        // For now, show an error asking for text extraction
-        toast({
-          title: "PDF Processing",
-          description: "PDF text extraction not implemented yet. Please convert to text first.",
-          variant: "destructive"
-        });
-        return;
+        // Convert PDF to base64 for processing in the edge function
+        const arrayBuffer = await file.arrayBuffer();
+        const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        fileContent = base64String;
       }
 
       // Process the knowledge
