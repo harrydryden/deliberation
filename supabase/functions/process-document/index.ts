@@ -95,32 +95,51 @@ serve(async (req) => {
     console.log('Extracting text content...')
     let textContent = ''
 
-    if (contentType === 'application/pdf') {
-      // For PDFs, we'll use a simple text extraction approach
-      // In production, you'd want to use a proper PDF parsing library
+    if (contentType === 'pdf') {
+      // For large PDFs, we'll use a more memory-efficient approach
       try {
         const arrayBuffer = await fileData.arrayBuffer()
+        const fileSize = arrayBuffer.byteLength
+        console.log(`PDF file size: ${fileSize} bytes`)
+        
+        // For large files, limit processing to avoid memory issues
+        if (fileSize > 25 * 1024 * 1024) { // 25MB limit
+          throw new Error('PDF file too large. Please upload files smaller than 25MB or convert to text format.')
+        }
+        
         const bytes = new Uint8Array(arrayBuffer)
         
-        // Convert to string and look for text patterns
-        const pdfString = new TextDecoder('latin1').decode(bytes)
+        // More efficient text extraction with streaming
+        const decoder = new TextDecoder('latin1', { fatal: false })
+        const pdfString = decoder.decode(bytes)
         
-        // Extract text between parentheses (common PDF text encoding)
-        const textMatches = pdfString.match(/\(([^)]+)\)/g) || []
-        const extractedTexts = textMatches
-          .map(match => match.slice(1, -1))
-          .filter(text => text.length > 2 && /[a-zA-Z]/.test(text))
-          .join(' ')
+        // Extract text more efficiently
+        const textMatches = []
+        const regex = /\(([^)]+)\)/g
+        let match
+        let totalMatches = 0
         
-        if (extractedTexts.length > 100) {
-          textContent = extractedTexts
-        } else {
-          // Fallback: use stream content if no proper extraction
-          textContent = `PDF Document: ${fileName}. Content extraction may be limited. Please consider uploading as text format for better processing.`
+        while ((match = regex.exec(pdfString)) !== null && totalMatches < 10000) {
+          const text = match[1]
+          if (text.length > 2 && /[a-zA-Z]/.test(text)) {
+            textMatches.push(text)
+          }
+          totalMatches++
+        }
+        
+        textContent = textMatches.join(' ')
+        
+        // If extraction was minimal, provide a meaningful fallback
+        if (textContent.length < 100) {
+          textContent = `PDF Document: ${fileName}. 
+This appears to be a complex PDF that requires specialized processing. 
+Key content may include structured data, forms, or images that cannot be easily extracted as plain text.
+File size: ${Math.round(fileSize / 1024)} KB.
+For better text extraction, consider converting this PDF to a plain text format before uploading.`
         }
       } catch (error) {
         console.error('PDF processing error:', error)
-        textContent = `PDF Document: ${fileName}. Text extraction failed: ${error.message}`
+        throw new Error(`PDF processing failed: ${error.message}`)
       }
     } else {
       // For text files
@@ -128,7 +147,7 @@ serve(async (req) => {
     }
 
     if (!textContent || textContent.trim().length < 10) {
-      throw new Error('No meaningful text content extracted')
+      throw new Error('No meaningful text content extracted from the document')
     }
 
     console.log(`Extracted text length: ${textContent.length}`)
@@ -183,7 +202,7 @@ serve(async (req) => {
           agent_id: agentId,
           title: `${fileName} - Part ${i + 1}`,
           content: sanitizedChunk,
-          content_type: contentType,
+          content_type: contentType, // This will now be 'pdf' or 'text'
           file_name: fileName,
           chunk_index: i,
           file_size: textContent.length,
