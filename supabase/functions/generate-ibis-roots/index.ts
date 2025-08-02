@@ -22,10 +22,10 @@ serve(async (req) => {
       );
     }
 
-    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!anthropicApiKey) {
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
       return new Response(
-        JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }),
+        JSON.stringify({ error: 'OPENAI_API_KEY not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -61,17 +61,17 @@ Respond with a JSON array in this exact format:
   }
 ]`;
 
-    // Call Anthropic API
-    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+    // Call OpenAI API
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': anthropicApiKey,
-        'anthropic-version': '2023-06-01'
+        'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'gpt-4.1-2025-04-14',
         max_tokens: 1000,
+        temperature: 0.7,
         messages: [
           {
             role: 'user',
@@ -81,12 +81,12 @@ Respond with a JSON array in this exact format:
       })
     });
 
-    if (!anthropicResponse.ok) {
-      throw new Error(`Anthropic API error: ${anthropicResponse.statusText}`);
+    if (!openaiResponse.ok) {
+      throw new Error(`OpenAI API error: ${openaiResponse.statusText}`);
     }
 
-    const anthropicData = await anthropicResponse.json();
-    const aiResponse = anthropicData.content[0].text;
+    const openaiData = await openaiResponse.json();
+    const aiResponse = openaiData.choices[0].message.content;
 
     // Parse AI response
     let suggestedIssues;

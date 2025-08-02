@@ -1,5 +1,6 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,9 +20,9 @@ serve(async (req) => {
       throw new Error('Message content is required')
     }
 
-    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY')
-    if (!anthropicApiKey) {
-      throw new Error('ANTHROPIC_API_KEY is not set')
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiApiKey) {
+      throw new Error('OPENAI_API_KEY is not set')
     }
 
     // Create Supabase client
@@ -86,17 +87,17 @@ Stance Analysis:
 
 Respond only with valid JSON.`
 
-    // Call Anthropic API
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Call OpenAI API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': anthropicApiKey,
-        'anthropic-version': '2023-06-01'
+        'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'gpt-4.1-2025-04-14',
         max_tokens: 1000,
+        temperature: 0.7,
         messages: [{
           role: 'user',
           content: prompt
@@ -106,12 +107,12 @@ Respond only with valid JSON.`
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Anthropic API error:', errorText)
-      throw new Error(`Anthropic API error: ${response.status}`)
+      console.error('OpenAI API error:', errorText)
+      throw new Error(`OpenAI API error: ${response.status}`)
     }
 
-    const anthropicData = await response.json()
-    const aiResponse = anthropicData.content[0].text
+    const openaiData = await response.json()
+    const aiResponse = openaiData.choices[0].message.content
 
     console.log('AI Response:', aiResponse)
 

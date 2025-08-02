@@ -1,10 +1,10 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { config } from '../config';
 import { logger, logTokenUsage } from '../utils/logger';
 import { CacheManager } from '../utils/redis';
 
-const anthropic = new Anthropic({
-  apiKey: config.anthropicApiKey,
+const openai = new OpenAI({
+  apiKey: config.openaiApiKey,
 });
 
 const cache = new CacheManager();
@@ -32,7 +32,7 @@ export class AIService {
   private temperature: number;
 
   constructor(params: AIServiceParams = {}) {
-    this.model = params.model || 'claude-3-5-sonnet-20241022';
+    this.model = params.model || 'gpt-4.1-2025-04-14';
     this.maxTokens = params.maxTokens || 1000;
     this.temperature = params.temperature || 0.7;
   }
@@ -46,32 +46,38 @@ export class AIService {
     const traceId = params.traceId || `ai-${Date.now()}`;
 
     try {
-      const messages: Anthropic.MessageParam[] = [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ];
+      const messages: OpenAI.ChatCompletionMessageParam[] = [];
+      
+      if (systemPrompt) {
+        messages.push({
+          role: 'system',
+          content: systemPrompt
+        });
+      }
+      
+      messages.push({
+        role: 'user',
+        content: prompt
+      });
 
-      const response = await anthropic.messages.create({
+      const response = await openai.chat.completions.create({
         model: params.model || this.model,
         max_tokens: params.maxTokens || this.maxTokens,
         temperature: params.temperature || this.temperature,
-        system: systemPrompt,
         messages,
       });
 
       const latency = Date.now() - startTime;
       const usage = {
-        promptTokens: response.usage.input_tokens,
-        completionTokens: response.usage.output_tokens,
-        totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+        promptTokens: response.usage?.prompt_tokens || 0,
+        completionTokens: response.usage?.completion_tokens || 0,
+        totalTokens: response.usage?.total_tokens || 0,
       };
 
       // Log token usage for monitoring
       logTokenUsage({
         traceId,
-        service: 'anthropic',
+        service: 'openai',
         model: params.model || this.model,
         promptTokens: usage.promptTokens,
         completionTokens: usage.completionTokens,
@@ -79,9 +85,7 @@ export class AIService {
         latency,
       });
 
-      const content = response.content[0]?.type === 'text' 
-        ? response.content[0].text 
-        : '';
+      const content = response.choices[0]?.message?.content || '';
 
       return {
         content,
@@ -213,21 +217,35 @@ Respond with only a decimal number.`;
     const traceId = params.traceId || `ai-stream-${Date.now()}`;
     
     try {
-      const stream = await anthropic.messages.create({
+      const messages: OpenAI.ChatCompletionMessageParam[] = [];
+      
+      if (systemPrompt) {
+        messages.push({
+          role: 'system',
+          content: systemPrompt
+        });
+      }
+      
+      messages.push({
+        role: 'user',
+        content: prompt
+      });
+
+      const stream = await openai.chat.completions.create({
         model: params.model || this.model,
         max_tokens: params.maxTokens || this.maxTokens,
         temperature: params.temperature || this.temperature,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: prompt }],
+        messages,
         stream: true,
       });
 
       let fullContent = '';
       
       for await (const chunk of stream) {
-        if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-          fullContent += chunk.delta.text;
-          yield { content: chunk.delta.text, done: false };
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          fullContent += content;
+          yield { content, done: false };
         }
       }
       

@@ -16,7 +16,7 @@ const configSchema = z.object({
   jwtExpiresIn: z.string().default('24h'),
   
   // AI Services
-  anthropicApiKey: z.string(),
+  openaiApiKey: z.string(),
   
   // Rate limiting
   rateLimitMax: z.coerce.number().default(100),
@@ -52,7 +52,7 @@ function loadConfig() {
     redisUrl: process.env.REDIS_URL,
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN,
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    openaiApiKey: process.env.OPENAI_API_KEY,
     rateLimitMax: process.env.RATE_LIMIT_MAX,
     rateLimitWindow: process.env.RATE_LIMIT_WINDOW,
     logLevel: process.env.LOG_LEVEL,

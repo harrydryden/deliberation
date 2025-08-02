@@ -1,5 +1,6 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -131,12 +132,12 @@ serve(async (req) => {
     const knowledgeContext = formatKnowledgeForAnalysis(matchResults, queryAnalysis)
 
     console.log('Generating AI response...')
-    const anthropicResponse = await generateResponseWithKnowledge(query, knowledgeContext, queryAnalysis)
+    const openaiResponse = await generateResponseWithKnowledge(query, knowledgeContext, queryAnalysis)
 
     return new Response(
       JSON.stringify({ 
         success: true,
-        response: anthropicResponse,
+        response: openaiResponse,
         knowledgeChunks: matchResults?.length || 0,
         relevantKnowledge: matchResults || []
       }),
@@ -314,21 +315,21 @@ Generate your analytical response:`
 
 async function generateResponseWithKnowledge(query: string, knowledgeContext: string, queryAnalysis: any): Promise<string> {
   try {
-    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
-    if (!anthropicKey) {
+    const openaiKey = Deno.env.get('OPENAI_API_KEY')
+    if (!openaiKey) {
       return `Based on available knowledge: ${knowledgeContext.substring(0, 500)}...`
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01'
+        'Authorization': `Bearer ${openaiKey}`
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'gpt-4.1-2025-04-14',
         max_tokens: 1000,
+        temperature: 0.7,
         messages: [{
           role: 'user',
           content: buildAnalyticalPrompt(query, knowledgeContext, queryAnalysis)
@@ -338,10 +339,10 @@ async function generateResponseWithKnowledge(query: string, knowledgeContext: st
 
     if (response.ok) {
       const data = await response.json()
-      return data.content[0].text
+      return data.choices[0].message.content
     } else {
       const errorData = await response.text()
-      console.error('Anthropic API error:', errorData)
+      console.error('OpenAI API error:', errorData)
       return `I found relevant information but encountered an error generating the response. Here's the raw knowledge: ${knowledgeContext.substring(0, 1000)}...`
     }
   } catch (error) {
