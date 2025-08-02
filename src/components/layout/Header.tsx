@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useBackendAuth } from "@/hooks/useBackendAuth";
-import { LogOut, User, MessageSquare, Settings } from "lucide-react";
+import { LogOut, User, MessageSquare, Settings, Brain } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 
@@ -27,6 +27,15 @@ export const Header = () => {
             >
               <MessageSquare className="h-4 w-4" />
               <span>Deliberations</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/knowledge')}
+              className="flex items-center space-x-1"
+            >
+              <Brain className="h-4 w-4" />
+              <span>Knowledge</span>
             </Button>
             {user.role === 'admin' && (
               <Button

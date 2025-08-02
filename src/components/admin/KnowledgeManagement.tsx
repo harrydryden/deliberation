@@ -13,7 +13,11 @@ import { useToast } from '@/hooks/use-toast';
 import { formatToUKDate } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
+import * as pdfjsLib from 'pdfjs-dist';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js`;
 
 interface KnowledgeItem {
   id: string;
@@ -90,21 +94,32 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       if (file.type.startsWith('text/')) {
         fileContent = await file.text();
       } else if (file.type === 'application/pdf') {
-        // Convert PDF to base64 for processing in the edge function
-        const arrayBuffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
-        
-        // Process in chunks to avoid call stack overflow
-        let binaryString = '';
-        const chunkSize = 8192; // Process 8KB at a time
-        
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-          const chunk = bytes.slice(i, i + chunkSize);
-          binaryString += String.fromCharCode(...chunk);
+        // Extract text from PDF using PDF.js
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          
+          let extractedText = '';
+          
+          // Extract text from each page
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items
+              .map((item: any) => item.str)
+              .join(' ');
+            extractedText += pageText + '\n\n';
+          }
+          
+          if (extractedText.trim().length < 10) {
+            throw new Error('No readable text found in PDF');
+          }
+          
+          fileContent = extractedText.trim();
+        } catch (pdfError) {
+          console.error('PDF text extraction failed:', pdfError);
+          throw new Error(`Failed to extract text from PDF: ${pdfError.message}`);
         }
-        
-        const base64String = btoa(binaryString);
-        fileContent = base64String;
       }
 
       // Process the knowledge

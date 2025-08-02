@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// Note: PDF.js doesn't work reliably in Deno, so we'll use a different approach
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -71,17 +72,8 @@ serve(async (req) => {
     // Extract text content based on file type
     let textContent = ''
     
-    if (contentType === 'application/pdf') {
-      // For PDF files, assume the frontend has already extracted the text content
-      // The fileContent should be the base64 encoded PDF or extracted text
-      if (typeof fileContent === 'string' && !fileContent.startsWith('data:')) {
-        // If it's not a data URL, treat it as extracted text
-        textContent = fileContent
-      } else {
-        // For now, we'll handle PDFs by asking the frontend to send extracted text
-        throw new Error('PDF processing requires text extraction on the frontend')
-      }
-    } else if (contentType === 'text/plain' || contentType === 'text/markdown') {
+    if (contentType === 'application/pdf' || contentType.startsWith('text/')) {
+      // Frontend should send extracted text content for both PDFs and text files
       textContent = fileContent
     } else {
       throw new Error(`Unsupported content type: ${contentType}`)

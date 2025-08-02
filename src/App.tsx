@@ -13,6 +13,7 @@ import Chat from "./pages/Chat";
 import Admin from "./pages/Admin";
 import Deliberations from "./pages/Deliberations";
 import DeliberationChat from "./pages/DeliberationChat";
+import { KnowledgeBase } from "./pages/KnowledgeBase";
 
 const App = () => (
   <ErrorBoundary>
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/backend" element={<BackendSelector />} />
               <Route path="/deliberations" element={<Deliberations />} />
               <Route path="/deliberations/:deliberationId" element={<DeliberationChat />} />
+              <Route path="/knowledge" element={<KnowledgeBase />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
