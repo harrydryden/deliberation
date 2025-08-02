@@ -61,6 +61,25 @@ serve(async (req) => {
       throw new Error('Service configuration error')
     }
 
+    // Validate that the agent is a local agent (not a global template)
+    console.log('Validating agent type...')
+    const { data: agentData, error: agentError } = await supabase
+      .from('agent_configurations')
+      .select('id, deliberation_id')
+      .eq('id', agentId)
+      .single()
+
+    if (agentError) {
+      console.error('Agent validation error:', agentError)
+      throw new Error('Invalid agent ID')
+    }
+
+    if (!agentData.deliberation_id) {
+      console.error('Attempted to upload knowledge to global agent:', agentId)
+      throw new Error('Knowledge can only be uploaded to local agents (specific to deliberations), not global template agents')
+    }
+
+    console.log('Agent validation passed - local agent confirmed')
     console.log('Downloading file from storage...')
     
     // Download the file from storage

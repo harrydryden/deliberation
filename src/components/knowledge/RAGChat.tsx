@@ -112,12 +112,12 @@ export function RAGChat({ agents }: RAGChatProps) {
           Knowledge Assistant
         </CardTitle>
         
-        {agents && (
+        {agents && agents.length > 0 ? (
           <div className="space-y-2">
-            <Label htmlFor="chat-agent-select">Select Agent</Label>
+            <Label htmlFor="chat-agent-select">Select Local Agent</Label>
             <Select value={selectedAgent} onValueChange={setSelectedAgent}>
               <SelectTrigger>
-                <SelectValue placeholder="Choose an agent to chat with..." />
+                <SelectValue placeholder="Choose a local agent to chat with..." />
               </SelectTrigger>
               <SelectContent>
                 {agents.map((agent) => (
@@ -127,6 +127,14 @@ export function RAGChat({ agents }: RAGChatProps) {
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              Chat with local agents that have knowledge specific to deliberations.
+            </p>
+          </div>
+        ) : (
+          <div className="text-center py-2 text-muted-foreground">
+            <p className="text-sm">No local agents available.</p>
+            <p className="text-xs">Local agents are created for specific deliberations and can have custom knowledge.</p>
           </div>
         )}
       </CardHeader>

@@ -6,18 +6,18 @@ import { useAdminService } from '@/hooks/useAdminService';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 export function KnowledgeBase() {
-  const { agents, loading, fetchAgents } = useAdminService();
+  const { localAgents, loadingLocalAgents, fetchLocalAgents } = useAdminService();
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    fetchAgents();
-  }, [fetchAgents, refreshKey]);
+    fetchLocalAgents();
+  }, [fetchLocalAgents, refreshKey]);
 
   const handleUploadSuccess = () => {
     setRefreshKey(prev => prev + 1);
   };
 
-  if (loading) {
+  if (loadingLocalAgents) {
     return <LoadingSpinner />;
   }
 
@@ -32,11 +32,11 @@ export function KnowledgeBase() {
         </TabsList>
         
         <TabsContent value="chat">
-          <RAGChat agents={agents} />
+          <RAGChat agents={localAgents} />
         </TabsContent>
         
         <TabsContent value="upload">
-          <DocumentUpload agents={agents} onUploadSuccess={handleUploadSuccess} />
+          <DocumentUpload agents={localAgents} onUploadSuccess={handleUploadSuccess} />
         </TabsContent>
       </Tabs>
     </div>

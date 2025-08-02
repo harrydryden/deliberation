@@ -125,12 +125,12 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {agents && (
+        {agents && agents.length > 0 ? (
           <div className="space-y-2">
-            <Label htmlFor="agent-select">Select Agent</Label>
+            <Label htmlFor="agent-select">Select Local Agent</Label>
             <Select value={selectedAgent} onValueChange={setSelectedAgent}>
               <SelectTrigger>
-                <SelectValue placeholder="Choose an agent..." />
+                <SelectValue placeholder="Choose a local agent..." />
               </SelectTrigger>
               <SelectContent>
                 {agents.map((agent) => (
@@ -140,6 +140,15 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-sm text-muted-foreground">
+              Only local agents (specific to deliberations) can receive knowledge uploads.
+            </p>
+          </div>
+        ) : (
+          <div className="text-center py-4 text-muted-foreground">
+            <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>No local agents available.</p>
+            <p className="text-sm">Knowledge can only be uploaded to local agents created for specific deliberations.</p>
           </div>
         )}
 
@@ -151,7 +160,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             type="file"
             accept=".txt,.md,.pdf"
             onChange={handleFileUpload}
-            disabled={uploading || !selectedAgent}
+            disabled={uploading || !selectedAgent || !agents || agents.length === 0}
           />
           <p className="text-sm text-muted-foreground">
             Supported formats: PDF, TXT, MD (with server-side processing)

@@ -55,6 +55,26 @@ serve(async (req) => {
       }
     })
 
+    // Validate that the agent is a local agent (not a global template)
+    console.log('Validating agent type...')
+    const { data: agentData, error: agentError } = await supabase
+      .from('agent_configurations')
+      .select('id, deliberation_id')
+      .eq('id', agentId)
+      .single()
+
+    if (agentError) {
+      console.error('Agent validation error:', agentError)
+      throw new Error('Invalid agent ID')
+    }
+
+    if (!agentData.deliberation_id) {
+      console.error('Attempted to query knowledge from global agent:', agentId)
+      throw new Error('Knowledge queries are only available for local agents (specific to deliberations), not global template agents')
+    }
+
+    console.log('Agent validation passed - local agent confirmed')
+
     // Get OpenAI API key
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
     
