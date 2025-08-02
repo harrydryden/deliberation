@@ -64,8 +64,7 @@ export const AccessCodeManagement = ({ accessCodes, loading, onLoad, onCreate, o
   const getTypeBadge = (type: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
       'standard': 'default',
-      'admin': 'destructive',
-      'moderator': 'secondary'
+      'admin': 'destructive'
     };
     return <Badge variant={variants[type] || 'default'}>{type}</Badge>;
   };
@@ -98,7 +97,6 @@ export const AccessCodeManagement = ({ accessCodes, loading, onLoad, onCreate, o
                 <SelectContent>
                   <SelectItem value="standard">Standard</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="moderator">Moderator</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -93,7 +93,6 @@ export const UserManagement = ({ users, loading, onLoad, onUpdateRole, onDelete 
                         <SelectContent>
                           <SelectItem value="user">User</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="moderator">Moderator</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
