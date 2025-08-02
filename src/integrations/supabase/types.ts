@@ -177,6 +177,9 @@ export type Database = {
           file_size: number | null
           id: string
           metadata: Json | null
+          original_file_size: number | null
+          processing_status: string | null
+          storage_path: string | null
           title: string
           updated_at: string
         }
@@ -192,6 +195,9 @@ export type Database = {
           file_size?: number | null
           id?: string
           metadata?: Json | null
+          original_file_size?: number | null
+          processing_status?: string | null
+          storage_path?: string | null
           title: string
           updated_at?: string
         }
@@ -207,6 +213,9 @@ export type Database = {
           file_size?: number | null
           id?: string
           metadata?: Json | null
+          original_file_size?: number | null
+          processing_status?: string | null
+          storage_path?: string | null
           title?: string
           updated_at?: string
         }

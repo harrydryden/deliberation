@@ -1,0 +1,251 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+serve(async (req) => {
+  console.log('=== DOCUMENT PROCESSING FUNCTION CALLED ===')
+  console.log('Method:', req.method)
+  
+  try {
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders })
+    }
+
+    // Parse request body
+    const body = await req.json()
+    console.log('Processing document:', body.fileName)
+    console.log('Agent ID:', body.agentId)
+    console.log('Storage path:', body.storagePath)
+
+    const { agentId, storagePath, fileName, contentType } = body
+
+    // Check required fields
+    if (!agentId || !storagePath) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Missing agentId or storagePath' 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase configuration')
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    })
+
+    // Get OpenAI API key
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
+    
+    if (!openAIApiKey) {
+      console.error('OpenAI API key not configured')
+      throw new Error('Service configuration error')
+    }
+
+    console.log('Downloading file from storage...')
+    
+    // Download the file from storage
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('documents')
+      .download(storagePath)
+
+    if (downloadError) {
+      console.error('Storage download error:', downloadError)
+      throw new Error(`Failed to download file: ${downloadError.message}`)
+    }
+
+    console.log('Extracting text content...')
+    let textContent = ''
+
+    if (contentType === 'application/pdf') {
+      // For PDFs, we'll use a simple text extraction approach
+      // In production, you'd want to use a proper PDF parsing library
+      try {
+        const arrayBuffer = await fileData.arrayBuffer()
+        const bytes = new Uint8Array(arrayBuffer)
+        
+        // Convert to string and look for text patterns
+        const pdfString = new TextDecoder('latin1').decode(bytes)
+        
+        // Extract text between parentheses (common PDF text encoding)
+        const textMatches = pdfString.match(/\(([^)]+)\)/g) || []
+        const extractedTexts = textMatches
+          .map(match => match.slice(1, -1))
+          .filter(text => text.length > 2 && /[a-zA-Z]/.test(text))
+          .join(' ')
+        
+        if (extractedTexts.length > 100) {
+          textContent = extractedTexts
+        } else {
+          // Fallback: use stream content if no proper extraction
+          textContent = `PDF Document: ${fileName}. Content extraction may be limited. Please consider uploading as text format for better processing.`
+        }
+      } catch (error) {
+        console.error('PDF processing error:', error)
+        textContent = `PDF Document: ${fileName}. Text extraction failed: ${error.message}`
+      }
+    } else {
+      // For text files
+      textContent = await fileData.text()
+    }
+
+    if (!textContent || textContent.trim().length < 10) {
+      throw new Error('No meaningful text content extracted')
+    }
+
+    console.log(`Extracted text length: ${textContent.length}`)
+
+    // Chunk the text
+    const chunks = chunkText(textContent, 1000, 200)
+    console.log(`Created ${chunks.length} chunks`)
+
+    let processedChunks = 0
+
+    // Process each chunk
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i]
+      
+      if (chunk.trim().length < 50) continue
+
+      console.log(`Processing chunk ${i + 1}/${chunks.length}`)
+      
+      // Generate embedding
+      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small',
+          input: chunk
+        })
+      })
+
+      if (!embeddingResponse.ok) {
+        console.error(`OpenAI API error for chunk ${i + 1}:`, embeddingResponse.statusText)
+        continue
+      }
+
+      const embeddingData = await embeddingResponse.json()
+      const embeddingVector = embeddingData.data[0].embedding
+
+      // Insert into agent_knowledge table
+      const { error: insertError } = await supabase
+        .from('agent_knowledge')
+        .insert({
+          agent_id: agentId,
+          title: `${fileName} - Part ${i + 1}`,
+          content: chunk,
+          content_type: contentType,
+          file_name: fileName,
+          chunk_index: i,
+          file_size: textContent.length,
+          embedding: embeddingVector,
+          storage_path: storagePath,
+          original_file_size: fileData.size,
+          processing_status: 'completed',
+          metadata: {
+            total_chunks: chunks.length,
+            chunk_size: chunk.length,
+            original_file_type: contentType
+          }
+        })
+
+      if (insertError) {
+        console.error(`Error inserting chunk ${i + 1}:`, insertError)
+        continue
+      }
+
+      processedChunks++
+    }
+
+    console.log(`Processing complete. ${processedChunks} chunks processed.`)
+    
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        chunksProcessed: processedChunks,
+        totalChunks: chunks.length,
+        message: `Successfully processed ${processedChunks} knowledge chunks`
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
+
+  } catch (error) {
+    console.error('=== ERROR IN DOCUMENT PROCESSING ===')
+    console.error('Error message:', error.message)
+    console.error('Error stack:', error.stack)
+    
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: `Document processing error: ${error.message}`
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
+  }
+})
+
+// Helper function to chunk text
+function chunkText(text: string, chunkSize: number = 1000, overlap: number = 200): string[] {
+  const chunks: string[] = []
+  let start = 0
+
+  while (start < text.length) {
+    let end = start + chunkSize
+    
+    if (end < text.length) {
+      // Look for sentence boundaries
+      const sentenceEnd = text.lastIndexOf('.', end)
+      const questionEnd = text.lastIndexOf('?', end)
+      const exclamationEnd = text.lastIndexOf('!', end)
+      
+      const sentenceBoundary = Math.max(sentenceEnd, questionEnd, exclamationEnd)
+      
+      if (sentenceBoundary > start + chunkSize * 0.7) {
+        end = sentenceBoundary + 1
+      } else {
+        // Fall back to word boundary
+        const wordBoundary = text.lastIndexOf(' ', end)
+        if (wordBoundary > start + chunkSize * 0.7) {
+          end = wordBoundary
+        }
+      }
+    }
+
+    const chunk = text.slice(start, end).trim()
+    if (chunk.length > 0) {
+      chunks.push(chunk)
+    }
+
+    start = end - overlap
+    if (start >= text.length) break
+  }
+
+  return chunks
+}

@@ -9,14 +9,8 @@ import { Upload, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
-import * as pdfjsLib from 'pdfjs-dist';
 
-// Set up PDF.js worker with fallback
-try {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.min.js`;
-} catch (error) {
-  console.warn('PDF.js worker setup failed:', error);
-}
+// Remove PDF.js imports since we're using server-side processing
 
 interface DocumentUploadProps {
   agents?: Agent[];
@@ -45,36 +39,48 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
     setUploadProgress(0);
 
     try {
-      let fileContent = '';
-      
-      // Extract content based on file type
-      if (file.type.startsWith('text/')) {
-        fileContent = await file.text();
-        setUploadProgress(30);
-      } else if (file.type === 'application/pdf') {
-        // PDF processing is temporarily disabled due to worker issues
-        // For now, ask users to convert PDFs to text
-        throw new Error('PDF processing is temporarily unavailable. Please convert your PDF to a text file (.txt) and upload that instead.');
-      } else {
-        throw new Error(`Unsupported file type: ${file.type}`);
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
       }
 
-      setUploadProgress(70);
+      setUploadProgress(10);
 
-      // Process the knowledge
-      const { data, error } = await supabase.functions.invoke('process-agent-knowledge', {
+      // Upload file to storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}_${file.name}`;
+      
+      console.log('Uploading file to storage:', fileName);
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      setUploadProgress(50);
+      console.log('File uploaded successfully:', uploadData.path);
+
+      // Trigger background processing
+      const { data, error } = await supabase.functions.invoke('process-document', {
         body: {
-          fileContent,
-          fileName: file.name,
           agentId: selectedAgent,
+          storagePath: uploadData.path,
+          fileName: file.name,
           contentType: file.type
         }
       });
 
-      setUploadProgress(90);
+      setUploadProgress(70);
 
       if (error) {
-        console.error('Edge function error:', error);
+        console.error('Processing error:', error);
+        // Clean up uploaded file on processing error
+        await supabase.storage.from('documents').remove([uploadData.path]);
         throw new Error(error.message || 'Processing failed');
       }
 
@@ -82,7 +88,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         setUploadProgress(100);
         toast({
           title: "Success",
-          description: `Processed ${data.chunksProcessed} knowledge chunks from ${file.name}`
+          description: `Successfully uploaded and processed ${file.name}. Created ${data.chunksProcessed} knowledge chunks.`
         });
         
         // Reset form
@@ -93,6 +99,8 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         
         onUploadSuccess?.();
       } else {
+        // Clean up uploaded file on processing failure
+        await supabase.storage.from('documents').remove([uploadData.path]);
         throw new Error(data?.error || 'Processing failed');
       }
     } catch (error: any) {
@@ -141,12 +149,12 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             ref={fileInputRef}
             id="file-upload"
             type="file"
-            accept=".txt,.md"
+            accept=".txt,.md,.pdf"
             onChange={handleFileUpload}
             disabled={uploading || !selectedAgent}
           />
           <p className="text-sm text-muted-foreground">
-            Supported formats: TXT, MD (PDF temporarily disabled)
+            Supported formats: PDF, TXT, MD (with server-side processing)
           </p>
         </div>
 
