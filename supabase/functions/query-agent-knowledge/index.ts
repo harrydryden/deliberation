@@ -9,7 +9,6 @@ const corsHeaders = {
 serve(async (req) => {
   console.log('=== QUERY EDGE FUNCTION CALLED ===')
   console.log('Method:', req.method)
-  console.log('URL:', req.url)
   
   try {
     // Handle CORS preflight requests
@@ -22,12 +21,12 @@ serve(async (req) => {
     
     // Parse request body
     const body = await req.json()
-    console.log('Request body keys:', Object.keys(body))
     console.log('Query:', body.query)
     console.log('Agent ID:', body.agentId)
 
-    // Check required fields
-    if (!body.query || !body.agentId) {
+    const { query, agentId, maxResults = 5 } = body
+
+    if (!query || !agentId) {
       console.log('Missing required fields')
       return new Response(
         JSON.stringify({ 
@@ -41,14 +40,83 @@ serve(async (req) => {
       )
     }
 
-    // For now, just return a success response without actually processing
-    console.log('Returning success response')
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase configuration')
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    })
+
+    // Get OpenAI API key
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
+    
+    if (!openAIApiKey) {
+      console.error('OpenAI API key not configured')
+      throw new Error('Service configuration error')
+    }
+
+    console.log('Generating embedding for query...')
+    
+    // Generate embedding for the query using OpenAI
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: query
+      })
+    })
+
+    if (!embeddingResponse.ok) {
+      throw new Error(`OpenAI API error: ${embeddingResponse.statusText}`)
+    }
+
+    const embeddingData = await embeddingResponse.json()
+    const embeddingVector = embeddingData.data[0].embedding
+
+    console.log('Querying knowledge database...')
+
+    // Use the existing match_agent_knowledge function
+    const { data: matchResults, error } = await supabase
+      .rpc('match_agent_knowledge', {
+        input_agent_id: agentId,
+        query_embedding: embeddingVector,
+        match_threshold: 0.1,
+        match_count: maxResults
+      })
+
+    if (error) {
+      console.error('Knowledge matching error:', error)
+      throw new Error(`Failed to query knowledge: ${error.message}`)
+    }
+
+    console.log(`Found ${matchResults?.length || 0} relevant knowledge chunks`)
+
+    // Generate response using Anthropic with the retrieved knowledge
+    const knowledgeContext = matchResults
+      ?.map(item => `Title: ${item.title}\nContent: ${item.content}\nSimilarity: ${item.similarity.toFixed(3)}`)
+      .join('\n\n---\n\n') || 'No relevant knowledge found.'
+
+    console.log('Generating AI response...')
+    const anthropicResponse = await generateResponseWithKnowledge(query, knowledgeContext)
+
     return new Response(
       JSON.stringify({ 
-        success: true, 
-        response: 'Test query response - processing disabled for debugging',
-        knowledgeChunks: 1,
-        relevantKnowledge: [{ title: 'Test', content: 'Test content', similarity: 0.9 }]
+        success: true,
+        response: anthropicResponse,
+        knowledgeChunks: matchResults?.length || 0,
+        relevantKnowledge: matchResults || []
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -57,15 +125,13 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('=== ERROR IN QUERY EDGE FUNCTION ===')
-    console.error('Error type:', typeof error)
     console.error('Error message:', error.message)
     console.error('Error stack:', error.stack)
     
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: `Edge function error: ${error.message}`,
-        details: error.stack
+        error: `Edge function error: ${error.message}`
       }),
       { 
         status: 500,
