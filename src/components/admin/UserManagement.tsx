@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -71,10 +70,8 @@ export const UserManagement = ({ users, loading, onLoad, onUpdateRole, onDelete 
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User ID</TableHead>
-                  <TableHead>Display Name</TableHead>
+                  <TableHead>Access Code</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Expertise</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -82,10 +79,7 @@ export const UserManagement = ({ users, loading, onLoad, onUpdateRole, onDelete 
                 {users.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-mono text-sm">
-                      {user.id.slice(0, 8)}...
-                    </TableCell>
-                    <TableCell>
-                      {user.profile?.displayName || 'No name'}
+                      {user.accessCode}
                     </TableCell>
                     <TableCell>
                       <Select
@@ -102,15 +96,6 @@ export const UserManagement = ({ users, loading, onLoad, onUpdateRole, onDelete 
                           <SelectItem value="moderator">Moderator</SelectItem>
                         </SelectContent>
                       </Select>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {user.profile?.expertiseAreas?.map((area) => (
-                          <Badge key={area} variant="secondary" className="text-xs">
-                            {area}
-                          </Badge>
-                        )) || <span className="text-muted-foreground text-sm">None</span>}
-                      </div>
                     </TableCell>
                     <TableCell>
                       <AlertDialog>
