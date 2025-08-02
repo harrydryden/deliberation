@@ -110,12 +110,15 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       console.log('File uploaded successfully:', uploadData.path);
 
       // Trigger background processing using the correct edge function
+      // Convert MIME type to simple content type for database constraint
+      const contentType = file.type === 'application/pdf' ? 'pdf' : 'text';
+      
       const { data, error } = await supabase.functions.invoke('process-document', {
         body: {
           agentId: selectedAgent,
           storagePath: uploadData.path,
           fileName: file.name,
-          contentType: file.type
+          contentType: contentType
         }
       });
 
