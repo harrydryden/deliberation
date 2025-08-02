@@ -13,11 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatToUKDate } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
-import * as pdfjsLib from 'pdfjs-dist';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js`;
 
 interface KnowledgeItem {
   id: string;
@@ -76,12 +72,10 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !selectedAgent) return;
-
-    if (file.type !== 'application/pdf' && !file.type.startsWith('text/')) {
+    if (!file || !selectedAgent) {
       toast({
         title: "Error",
-        description: "Please upload a PDF or text file",
+        description: "Please select an agent and choose a file",
         variant: "destructive"
       });
       return;
@@ -89,68 +83,59 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
 
     setUploading(true);
     try {
-      let fileContent = '';
-      
-      if (file.type.startsWith('text/')) {
-        fileContent = await file.text();
-      } else if (file.type === 'application/pdf') {
-        // Extract text from PDF using PDF.js
-        try {
-          const arrayBuffer = await file.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-          
-          let extractedText = '';
-          
-          // Extract text from each page
-          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-            const page = await pdf.getPage(pageNum);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items
-              .map((item: any) => item.str)
-              .join(' ');
-            extractedText += pageText + '\n\n';
-          }
-          
-          if (extractedText.trim().length < 10) {
-            throw new Error('No readable text found in PDF');
-          }
-          
-          fileContent = extractedText.trim();
-        } catch (pdfError) {
-          console.error('PDF text extraction failed:', pdfError);
-          throw new Error(`Failed to extract text from PDF: ${pdfError.message}`);
-        }
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
       }
 
-      // Process the knowledge
-      const { data, error } = await supabase.functions.invoke('process-agent-knowledge', {
+      // Upload file to storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}_${file.name}`;
+      
+      console.log('Uploading file to storage:', fileName);
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      console.log('File uploaded successfully:', uploadData.path);
+
+      // Trigger background processing using the correct edge function
+      const { data, error } = await supabase.functions.invoke('process-document', {
         body: {
-          fileContent,
-          fileName: file.name,
           agentId: selectedAgent,
+          storagePath: uploadData.path,
+          fileName: file.name,
           contentType: file.type
         }
       });
 
-      console.log('Edge function response:', { data, error });
-
       if (error) {
-        console.error('Edge function error:', error);
-        throw new Error(error.message || 'Edge function returned an error');
+        console.error('Processing error:', error);
+        // Clean up uploaded file on processing error
+        await supabase.storage.from('documents').remove([uploadData.path]);
+        throw new Error(error.message || 'Processing failed');
       }
 
       if (data?.success) {
         toast({
           title: "Success",
-          description: `Processed ${data.chunksProcessed} knowledge chunks`
+          description: `Successfully uploaded and processed ${file.name}. Created ${data.chunksProcessed} knowledge chunks.`
         });
         setUploadOpen(false);
         loadKnowledgeForAgent(selectedAgent);
       } else {
-        console.error('Edge function returned non-success:', data);
+        // Clean up uploaded file on processing failure
+        await supabase.storage.from('documents').remove([uploadData.path]);
         throw new Error(data?.error || 'Processing failed');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
       toast({
         title: "Error",
@@ -244,35 +229,47 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="agent-select">Select Local Agent</Label>
-              <Select 
-                value={selectedAgent} 
-                onValueChange={(value) => {
-                  setSelectedAgent(value);
-                  loadKnowledgeForAgent(value);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a local agent to manage knowledge" />
-                </SelectTrigger>
-                <SelectContent>
-                  {agents.filter(agent => agent.deliberation).map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{agent.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {agent.deliberation?.title}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {agents.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <h3 className="text-lg font-semibold mb-2">No Local Agents Available</h3>
+              <p className="mb-4">
+                Local agents are deliberation-specific and can have custom knowledge uploaded to them.
+              </p>
+              <p className="text-sm">
+                Create local agents in the Agents tab to start managing knowledge.
+              </p>
             </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="agent-select">Select Local Agent</Label>
+                <Select 
+                  value={selectedAgent} 
+                  onValueChange={(value) => {
+                    setSelectedAgent(value);
+                    loadKnowledgeForAgent(value);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a local agent to manage knowledge" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agents.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{agent.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {agent.agent_type}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {selectedAgent && agents.filter(agent => agent.deliberation).length > 0 && (
+              {selectedAgent && agents.length > 0 && (
               <div className="flex gap-4">
                 <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
                   <DialogTrigger asChild>
@@ -356,8 +353,9 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
                   </DialogContent>
                 </Dialog>
               </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
