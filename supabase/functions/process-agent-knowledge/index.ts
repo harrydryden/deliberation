@@ -2,37 +2,45 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://iowsxuxkgvpgrvvklwyt.supabase.co',
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 }
 
 serve(async (req) => {
+  console.log('Edge function called with method:', req.method)
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling CORS preflight')
     return new Response(null, { headers: corsHeaders })
   }
 
   // Validate request method
   if (req.method !== 'POST') {
+    console.log('Invalid method:', req.method)
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
 
-  // Get and validate authorization header
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return new Response(JSON.stringify({ error: 'Missing or invalid authorization header' }), {
-      status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
-  }
-
   try {
+    console.log('Starting to process request...')
+    
+    // Get and validate authorization header
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('Missing or invalid authorization header')
+      return new Response(JSON.stringify({ error: 'Missing or invalid authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
     const { fileContent, fileName, agentId, contentType } = await req.json()
+    console.log('Request body parsed:', { fileName, agentId, contentType, contentLength: fileContent?.length })
 
     if (!fileContent || !agentId) {
       throw new Error('File content and agent ID are required')
@@ -45,6 +53,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
     if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase configuration')
       throw new Error('Missing Supabase configuration')
     }
     
@@ -60,22 +69,42 @@ serve(async (req) => {
     
     if (!openAIApiKey) {
       console.error('OpenAI API key not configured')
-      throw new Error('Service configuration error')
+      throw new Error('Service configuration error - OpenAI API key missing')
     }
     
     // Validate API key format
     if (!openAIApiKey.startsWith('sk-')) {
       console.error('Invalid OpenAI API key format')
-      throw new Error('Service configuration error')
+      throw new Error('Service configuration error - Invalid API key format')
     }
 
     // Extract text based on content type
     let text = ''
     if (contentType === 'application/pdf') {
       console.log('Extracting text from PDF...')
-      text = await extractTextFromPDF(fileContent)
+      try {
+        text = await extractTextFromPDF(fileContent)
+        console.log(`PDF text extraction successful, ${text.length} characters`)
+      } catch (pdfError) {
+        console.error('PDF extraction failed:', pdfError)
+        // For now, if PDF extraction fails, return a helpful error
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `PDF text extraction failed: ${pdfError.message}. Please try converting the PDF to a text file first.` 
+          }),
+          { 
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        )
+      }
     } else {
       text = fileContent
+    }
+
+    if (!text || text.trim().length === 0) {
+      throw new Error('No text content found to process')
     }
 
     // Split text into chunks (roughly 500 words each)
@@ -88,7 +117,9 @@ serve(async (req) => {
       const chunk = chunks[i]
       
       try {
-        // Generate title/summary using Anthropic
+        console.log(`Processing chunk ${i + 1}/${chunks.length}`)
+        
+        // Generate title/summary using Anthropic (with fallback)
         const summary = await generateChunkSummary(chunk)
         
         // Generate embeddings using OpenAI
@@ -105,6 +136,8 @@ serve(async (req) => {
         })
 
         if (!embeddingResponse.ok) {
+          const errorText = await embeddingResponse.text()
+          console.error('OpenAI API error:', errorText)
           throw new Error(`OpenAI API error: ${embeddingResponse.statusText}`)
         }
 
@@ -127,15 +160,17 @@ serve(async (req) => {
           }
         })
 
-        console.log(`Processed chunk ${i + 1}/${chunks.length}`)
+        console.log(`Successfully processed chunk ${i + 1}/${chunks.length}`)
       } catch (error) {
         console.error(`Error processing chunk ${i}:`, error)
-        // Continue with other chunks
+        // Continue with other chunks but log the error
       }
     }
 
     // Store all chunks in the database
     if (processedChunks.length > 0) {
+      console.log(`Storing ${processedChunks.length} processed chunks...`)
+      
       const { data, error } = await supabase
         .from('agent_knowledge')
         .insert(processedChunks)
@@ -192,97 +227,83 @@ function splitTextIntoChunks(text: string, maxWords: number): string[] {
 }
 
 async function extractTextFromPDF(base64Data: string): Promise<string> {
-  try {
-    console.log('Starting PDF text extraction...')
-    
-    // Convert base64 to Uint8Array
-    const binaryString = atob(base64Data)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-
-    console.log(`PDF file size: ${bytes.length} bytes`)
-
-    // Use a simple PDF text extraction approach that works in Deno
-    // For now, we'll use a basic text extraction that looks for text content
-    const pdfText = await extractSimplePDFText(bytes)
-    
-    if (!pdfText.trim()) {
-      throw new Error('No text could be extracted from the PDF. The PDF might be image-based or encrypted.')
-    }
-    
-    console.log(`Successfully extracted ${pdfText.length} characters from PDF`)
-    return pdfText.trim()
-    
-  } catch (error) {
-    console.error('PDF text extraction error:', error)
-    throw new Error(`Failed to extract text from PDF: ${error.message}`)
+  console.log('Starting PDF text extraction...')
+  
+  // Convert base64 to Uint8Array
+  const binaryString = atob(base64Data)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i)
   }
+
+  console.log(`PDF file size: ${bytes.length} bytes`)
+
+  // Use a simple PDF text extraction approach
+  const pdfText = await extractSimplePDFText(bytes)
+  
+  if (!pdfText.trim()) {
+    throw new Error('No text could be extracted from the PDF. The PDF might be image-based, encrypted, or in an unsupported format.')
+  }
+  
+  console.log(`Successfully extracted ${pdfText.length} characters from PDF`)
+  return pdfText.trim()
 }
 
 async function extractSimplePDFText(pdfBytes: Uint8Array): Promise<string> {
-  // Convert PDF bytes to string for basic text extraction
-  const pdfString = new TextDecoder('latin1').decode(pdfBytes)
-  
-  // Look for text objects in the PDF
-  const textMatches = []
-  
-  // Basic regex patterns to find text content in PDF
-  const patterns = [
-    /\(([^)]+)\)\s*Tj/g,  // Text showing operators
-    /\[([^\]]+)\]\s*TJ/g, // Text showing with individual glyph positioning
-    /BT\s+.*?ET/gs,       // Text objects
-  ]
-  
-  for (const pattern of patterns) {
-    let match
-    while ((match = pattern.exec(pdfString)) !== null) {
-      if (match[1]) {
-        // Clean up the extracted text
-        let text = match[1]
-          .replace(/\\n/g, '\n')
-          .replace(/\\r/g, '\r')
-          .replace(/\\t/g, '\t')
-          .replace(/\\(.)/g, '$1')
-        
-        // Filter out obvious non-text content
-        if (text.length > 2 && /[a-zA-Z\s]/.test(text)) {
-          textMatches.push(text)
+  try {
+    // Convert PDF bytes to string for basic text extraction
+    const pdfString = new TextDecoder('latin1').decode(pdfBytes)
+    
+    // Look for text objects in the PDF
+    const textMatches = []
+    
+    // Basic regex patterns to find text content in PDF
+    const patterns = [
+      /\(([^)]+)\)\s*Tj/g,  // Text showing operators
+      /\[([^\]]+)\]\s*TJ/g, // Text showing with individual glyph positioning
+    ]
+    
+    for (const pattern of patterns) {
+      let match
+      while ((match = pattern.exec(pdfString)) !== null) {
+        if (match[1]) {
+          // Clean up the extracted text
+          let text = match[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\r/g, '\r')
+            .replace(/\\t/g, '\t')
+            .replace(/\\(.)/g, '$1')
+          
+          // Filter out obvious non-text content
+          if (text.length > 2 && /[a-zA-Z\s]/.test(text)) {
+            textMatches.push(text)
+          }
         }
       }
     }
+    
+    // Combine and clean up text
+    const extractedText = textMatches
+      .filter(text => text.trim().length > 0)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    
+    console.log(`Extracted text segments: ${textMatches.length}`)
+    console.log(`Final text length: ${extractedText.length}`)
+    
+    return extractedText
+  } catch (error) {
+    console.error('Error in extractSimplePDFText:', error)
+    throw error
   }
-  
-  // Also try to find streams that might contain text
-  const streamRegex = /stream\s*(.*?)\s*endstream/gs
-  let match
-  while ((match = streamRegex.exec(pdfString)) !== null) {
-    const streamContent = match[1]
-    // Look for readable text in streams
-    const readableText = streamContent.match(/[A-Za-z][A-Za-z\s]{3,}/g)
-    if (readableText) {
-      textMatches.push(...readableText)
-    }
-  }
-  
-  // Combine and deduplicate text
-  const extractedText = textMatches
-    .filter(text => text.trim().length > 0)
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-  
-  console.log(`Extracted text segments: ${textMatches.length}`)
-  console.log(`Final text length: ${extractedText.length}`)
-  
-  return extractedText
 }
 
 async function generateChunkSummary(chunk: string): Promise<string> {
   try {
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
     if (!anthropicKey) {
+      console.log('Anthropic API key not found, using fallback title')
       return `Text chunk (${chunk.substring(0, 50)}...)`
     }
 
