@@ -12,15 +12,46 @@ export class SupabaseAdminService implements IAdminService {
 
     if (error) throw error;
 
-    return userProfiles?.map(profile => ({
+    if (!userProfiles) return [];
+
+    // Get deliberations for all users
+    const userIds = userProfiles.map(p => p.id).filter(Boolean);
+    const { data: participantsData, error: participantsError } = await supabase
+      .from('participants')
+      .select(`
+        user_id,
+        role,
+        deliberations(id, title)
+      `)
+      .in('user_id', userIds);
+
+    if (participantsError) throw participantsError;
+
+    // Group deliberations by user
+    const userDeliberations = (participantsData || []).reduce((acc: Record<string, any[]>, participant: any) => {
+      if (!acc[participant.user_id]) {
+        acc[participant.user_id] = [];
+      }
+      if (participant.deliberations) {
+        acc[participant.user_id].push({
+          id: participant.deliberations.id,
+          title: participant.deliberations.title,
+          role: participant.role
+        });
+      }
+      return acc;
+    }, {});
+
+    return userProfiles.map(profile => ({
       id: profile.id,
       accessCode: profile.access_code || '',
       profile: {
         displayName: profile.display_name || '',
         expertiseAreas: profile.expertise_areas || []
       },
-      role: profile.user_role
-    })) || [];
+      role: profile.user_role,
+      deliberations: userDeliberations[profile.id] || []
+    }));
   }
 
   async updateUserRole(userId: string, role: string): Promise<void> {

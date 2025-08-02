@@ -14,6 +14,13 @@ export interface User {
   accessCode: string;
   profile: UserProfile | null;
   role?: string;
+  deliberations?: UserDeliberation[];
+}
+
+export interface UserDeliberation {
+  id: string;
+  title: string;
+  role: string;
 }
 
 export interface UserProfile {

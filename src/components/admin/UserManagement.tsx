@@ -72,6 +72,7 @@ export const UserManagement = ({ users, loading, onLoad, onUpdateRole, onDelete 
                 <TableRow>
                   <TableHead>Access Code</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead>Deliberations</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -95,6 +96,20 @@ export const UserManagement = ({ users, loading, onLoad, onUpdateRole, onDelete 
                           <SelectItem value="admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        {user.deliberations && user.deliberations.length > 0 ? (
+                          user.deliberations.map((delib) => (
+                            <div key={delib.id} className="text-sm">
+                              <span className="font-medium">{delib.title}</span>
+                              <span className="text-muted-foreground ml-2">({delib.role})</span>
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground text-sm">No deliberations</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <AlertDialog>
