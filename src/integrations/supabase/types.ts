@@ -114,7 +114,15 @@ export type Database = {
           system_prompt?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "agent_configurations_deliberation_id_fkey"
+            columns: ["deliberation_id"]
+            isOneToOne: false
+            referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       agent_interactions: {
         Row: {
