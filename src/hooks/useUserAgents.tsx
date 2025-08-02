@@ -1,0 +1,98 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Agent } from '@/types/api';
+import { useToast } from '@/hooks/use-toast';
+
+export const useUserAgents = () => {
+  const [localAgents, setLocalAgents] = useState<Agent[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const fetchUserAccessibleLocalAgents = async () => {
+    setLoading(true);
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLocalAgents([]);
+        return;
+      }
+
+      // First, get deliberations the user participates in
+      const { data: participations, error: participationError } = await supabase
+        .from('participants')
+        .select('deliberation_id')
+        .eq('user_id', user.id);
+
+      if (participationError) {
+        console.error('Error fetching user participations:', participationError);
+        throw participationError;
+      }
+
+      if (!participations || participations.length === 0) {
+        console.log('User is not participating in any deliberations');
+        setLocalAgents([]);
+        return;
+      }
+
+      const deliberationIds = participations.map(p => p.deliberation_id);
+
+      // Now get local agents for those deliberations
+      const { data: agentConfigs, error: agentError } = await supabase
+        .from('agent_configurations')
+        .select(`
+          *,
+          deliberations:deliberation_id (
+            id,
+            title,
+            status
+          )
+        `)
+        .in('deliberation_id', deliberationIds)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (agentError) {
+        console.error('Error fetching local agents:', agentError);
+        throw agentError;
+      }
+
+      const formattedAgents: Agent[] = agentConfigs?.map(config => ({
+        id: config.id,
+        name: config.name,
+        description: config.description || '',
+        system_prompt: config.system_prompt || '',
+        response_style: config.response_style,
+        goals: config.goals || [],
+        agent_type: config.agent_type,
+        facilitator_config: config.facilitator_config || undefined,
+        is_default: config.is_default || false,
+        isActive: config.is_active,
+        createdAt: config.created_at,
+        updatedAt: config.updated_at,
+      })) || [];
+
+      setLocalAgents(formattedAgents);
+    } catch (error: any) {
+      console.error('Error fetching user accessible local agents:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load available agents",
+        variant: "destructive"
+      });
+      setLocalAgents([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserAccessibleLocalAgents();
+  }, []);
+
+  return {
+    localAgents,
+    loading,
+    refetch: fetchUserAccessibleLocalAgents
+  };
+};
