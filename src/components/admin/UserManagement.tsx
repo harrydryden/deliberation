@@ -83,7 +83,7 @@ export const UserManagement = ({ users, loading, onLoad, onUpdateRole, onDelete 
                     </TableCell>
                     <TableCell>
                       <Select
-                        value={(user as any).user_role || 'user'}
+                        value={user.role || 'user'}
                         onValueChange={(value) => handleRoleUpdate(user.id, value)}
                         disabled={updatingRole === user.id}
                       >
