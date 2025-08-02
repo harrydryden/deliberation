@@ -57,10 +57,35 @@ export async function authRoutes(fastify: FastifyInstance) {
 
       // Record the attempt for security monitoring
       recordAccessCodeAttempt(accessCode, clientIP);
-      // Check if access code is valid (no longer checking isUsed since codes are reusable)
+      // Check if access code is valid using enhanced validation
+      const validationResult = await fastify.prisma.$queryRaw<Array<{
+        valid: boolean;
+        code_type: string;
+        expired: boolean;
+        max_uses_reached: boolean;
+      }>>`SELECT * FROM validate_access_code(${accessCode})`;
+
+      const validation = validationResult[0];
+      
+      if (!validation || !validation.valid) {
+        recordFailure(rateLimitKey);
+        let errorMessage = 'Invalid access code';
+        
+        if (validation?.expired) {
+          errorMessage = 'Access code has expired';
+        } else if (validation?.max_uses_reached) {
+          errorMessage = 'Access code usage limit reached';
+        }
+        
+        reply.status(401).send({ error: errorMessage });
+        return;
+      }
+
+      // Get the actual access code record for further processing
       const codeRecord = await fastify.prisma.accessCode.findFirst({
         where: {
           code: accessCode,
+          isActive: true,
         },
       });
 
@@ -101,6 +126,9 @@ export async function authRoutes(fastify: FastifyInstance) {
         
         user = { ...result.user, profile: result.profile };
       }
+
+      // Increment access code usage
+      await fastify.prisma.$queryRaw`SELECT increment_access_code_usage(${accessCode})`;
 
       // Generate JWT token with shorter expiration for security
       const token = fastify.jwt.sign(
@@ -220,10 +248,10 @@ export async function authRoutes(fastify: FastifyInstance) {
         where: { id: userId },
       });
 
-      // Generate new JWT token
+      // Generate new JWT token with shorter expiration
       const token = fastify.jwt.sign(
         { sub: userId, accessCode: user?.accessCode },
-        { expiresIn: '24h' }
+        { expiresIn: '8h' } // Consistent with auth endpoint
       );
 
       reply.send({ token });
@@ -255,20 +283,32 @@ export async function authRoutes(fastify: FastifyInstance) {
     const { code } = request.body;
 
     try {
-      const accessCode = await fastify.prisma.accessCode.findFirst({
-        where: {
-          code,
-        },
-      });
+      // Use the enhanced validation function
+      const validationResult = await fastify.prisma.$queryRaw<Array<{
+        valid: boolean;
+        code_type: string;
+        expired: boolean;
+        max_uses_reached: boolean;
+      }>>`SELECT * FROM validate_access_code(${code})`;
 
-      if (!accessCode) {
-        reply.status(404).send({ error: 'Invalid or expired access code' });
+      const validation = validationResult[0];
+
+      if (!validation || !validation.valid) {
+        let errorMessage = 'Invalid or expired access code';
+        
+        if (validation?.expired) {
+          errorMessage = 'Access code has expired';
+        } else if (validation?.max_uses_reached) {
+          errorMessage = 'Access code usage limit reached';
+        }
+        
+        reply.status(404).send({ error: errorMessage });
         return;
       }
 
       reply.send({
         valid: true,
-        codeType: accessCode.codeType,
+        codeType: validation.code_type,
       });
     } catch (error) {
       fastify.log.error({ error, code }, 'Error checking access code');
@@ -290,20 +330,24 @@ export async function authRoutes(fastify: FastifyInstance) {
     const { code } = request.body;
 
     try {
-      const accessCode = await fastify.prisma.accessCode.findFirst({
-        where: {
-          code,
-        },
-      });
+      // Use the enhanced validation function
+      const validationResult = await fastify.prisma.$queryRaw<Array<{
+        valid: boolean;
+        code_type: string;
+        expired: boolean;
+        max_uses_reached: boolean;
+      }>>`SELECT * FROM validate_access_code(${code})`;
 
-      if (!accessCode) {
+      const validation = validationResult[0];
+
+      if (!validation || !validation.valid) {
         reply.status(404).send({ error: 'Invalid access code' });
         return;
       }
 
       reply.send({
         message: 'Access code verified successfully',
-        codeType: accessCode.codeType,
+        codeType: validation.code_type,
       });
     } catch (error) {
       fastify.log.error({ error, code }, 'Error verifying access code');
