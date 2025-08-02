@@ -193,6 +193,8 @@ function splitTextIntoChunks(text: string, maxWords: number): string[] {
 
 async function extractTextFromPDF(base64Data: string): Promise<string> {
   try {
+    console.log('Starting PDF text extraction...')
+    
     // Convert base64 to Uint8Array
     const binaryString = atob(base64Data)
     const bytes = new Uint8Array(binaryString.length)
@@ -200,44 +202,81 @@ async function extractTextFromPDF(base64Data: string): Promise<string> {
       bytes[i] = binaryString.charCodeAt(i)
     }
 
-    // Use pdfjs-dist for text extraction
-    const pdfjsLib = await import('https://esm.sh/pdfjs-dist@3.11.174/build/pdf.min.mjs')
+    console.log(`PDF file size: ${bytes.length} bytes`)
+
+    // Use a simple PDF text extraction approach that works in Deno
+    // For now, we'll use a basic text extraction that looks for text content
+    const pdfText = await extractSimplePDFText(bytes)
     
-    // Load the PDF document
-    const loadingTask = pdfjsLib.getDocument({ data: bytes })
-    const pdf = await loadingTask.promise
-    
-    let fullText = ''
-    
-    // Extract text from each page
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      try {
-        const page = await pdf.getPage(pageNum)
-        const textContent = await page.getTextContent()
-        
-        // Combine text items
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(' ')
-        
-        fullText += pageText + '\n'
-        console.log(`Extracted text from page ${pageNum}`)
-      } catch (pageError) {
-        console.error(`Error extracting text from page ${pageNum}:`, pageError)
-      }
+    if (!pdfText.trim()) {
+      throw new Error('No text could be extracted from the PDF. The PDF might be image-based or encrypted.')
     }
     
-    if (!fullText.trim()) {
-      throw new Error('No text could be extracted from the PDF')
-    }
-    
-    console.log(`Successfully extracted ${fullText.length} characters from PDF`)
-    return fullText.trim()
+    console.log(`Successfully extracted ${pdfText.length} characters from PDF`)
+    return pdfText.trim()
     
   } catch (error) {
     console.error('PDF text extraction error:', error)
     throw new Error(`Failed to extract text from PDF: ${error.message}`)
   }
+}
+
+async function extractSimplePDFText(pdfBytes: Uint8Array): Promise<string> {
+  // Convert PDF bytes to string for basic text extraction
+  const pdfString = new TextDecoder('latin1').decode(pdfBytes)
+  
+  // Look for text objects in the PDF
+  const textMatches = []
+  
+  // Basic regex patterns to find text content in PDF
+  const patterns = [
+    /\(([^)]+)\)\s*Tj/g,  // Text showing operators
+    /\[([^\]]+)\]\s*TJ/g, // Text showing with individual glyph positioning
+    /BT\s+.*?ET/gs,       // Text objects
+  ]
+  
+  for (const pattern of patterns) {
+    let match
+    while ((match = pattern.exec(pdfString)) !== null) {
+      if (match[1]) {
+        // Clean up the extracted text
+        let text = match[1]
+          .replace(/\\n/g, '\n')
+          .replace(/\\r/g, '\r')
+          .replace(/\\t/g, '\t')
+          .replace(/\\(.)/g, '$1')
+        
+        // Filter out obvious non-text content
+        if (text.length > 2 && /[a-zA-Z\s]/.test(text)) {
+          textMatches.push(text)
+        }
+      }
+    }
+  }
+  
+  // Also try to find streams that might contain text
+  const streamRegex = /stream\s*(.*?)\s*endstream/gs
+  let match
+  while ((match = streamRegex.exec(pdfString)) !== null) {
+    const streamContent = match[1]
+    // Look for readable text in streams
+    const readableText = streamContent.match(/[A-Za-z][A-Za-z\s]{3,}/g)
+    if (readableText) {
+      textMatches.push(...readableText)
+    }
+  }
+  
+  // Combine and deduplicate text
+  const extractedText = textMatches
+    .filter(text => text.trim().length > 0)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  
+  console.log(`Extracted text segments: ${textMatches.length}`)
+  console.log(`Final text length: ${extractedText.length}`)
+  
+  return extractedText
 }
 
 async function generateChunkSummary(chunk: string): Promise<string> {
