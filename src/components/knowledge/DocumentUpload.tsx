@@ -52,36 +52,9 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         fileContent = await file.text();
         setUploadProgress(30);
       } else if (file.type === 'application/pdf') {
-        // Extract text from PDF using PDF.js
-        try {
-          const arrayBuffer = await file.arrayBuffer();
-          setUploadProgress(20);
-          
-          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-          setUploadProgress(40);
-          
-          let extractedText = '';
-          
-          // Extract text from each page
-          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-            const page = await pdf.getPage(pageNum);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items
-              .map((item: any) => item.str)
-              .join(' ');
-            extractedText += pageText + '\n\n';
-            setUploadProgress(40 + (pageNum / pdf.numPages) * 30);
-          }
-          
-          if (extractedText.trim().length < 10) {
-            throw new Error('No readable text found in PDF');
-          }
-          
-          fileContent = extractedText.trim();
-        } catch (pdfError) {
-          console.error('PDF text extraction failed:', pdfError);
-          throw new Error(`Failed to extract text from PDF: ${pdfError.message}`);
-        }
+        // PDF processing is temporarily disabled due to worker issues
+        // For now, ask users to convert PDFs to text
+        throw new Error('PDF processing is temporarily unavailable. Please convert your PDF to a text file (.txt) and upload that instead.');
       } else {
         throw new Error(`Unsupported file type: ${file.type}`);
       }
@@ -168,12 +141,12 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             ref={fileInputRef}
             id="file-upload"
             type="file"
-            accept=".txt,.pdf,.md"
+            accept=".txt,.md"
             onChange={handleFileUpload}
             disabled={uploading || !selectedAgent}
           />
           <p className="text-sm text-muted-foreground">
-            Supported formats: PDF, TXT, MD
+            Supported formats: TXT, MD (PDF temporarily disabled)
           </p>
         </div>
 
