@@ -124,13 +124,14 @@ serve(async (req) => {
 
     console.log(`Found ${matchResults?.length || 0} relevant knowledge chunks`)
 
-    // Generate response using Anthropic with the retrieved knowledge
-    const knowledgeContext = matchResults
-      ?.map(item => `Title: ${item.title}\nContent: ${item.content}\nSimilarity: ${item.similarity.toFixed(3)}`)
-      .join('\n\n---\n\n') || 'No relevant knowledge found.'
+    // Analyze query complexity and type
+    const queryAnalysis = analyzeQuery(query)
+    
+    // Generate enhanced knowledge context with metadata
+    const knowledgeContext = formatKnowledgeForAnalysis(matchResults, queryAnalysis)
 
     console.log('Generating AI response...')
-    const anthropicResponse = await generateResponseWithKnowledge(query, knowledgeContext)
+    const anthropicResponse = await generateResponseWithKnowledge(query, knowledgeContext, queryAnalysis)
 
     return new Response(
       JSON.stringify({ 
@@ -162,7 +163,156 @@ serve(async (req) => {
   }
 })
 
-async function generateResponseWithKnowledge(query: string, knowledgeContext: string): Promise<string> {
+function analyzeQuery(query: string) {
+  const queryLower = query.toLowerCase()
+  const words = queryLower.split(/\s+/)
+  
+  // Detect question types
+  const isDefinitional = /^(what is|define|explain|describe)/.test(queryLower)
+  const isComparative = /(compare|versus|vs|difference|similar|different)/.test(queryLower)
+  const isAnalytical = /(why|how|impact|effect|consequence|implication|analysis|evaluate)/.test(queryLower)
+  const isSpecific = /(section|clause|article|paragraph|line|page)/.test(queryLower)
+  const isRelational = /(relate|connect|link|association|relationship)/.test(queryLower)
+  
+  // Detect complexity indicators
+  const hasMultipleConcepts = words.length > 8
+  const hasComplexTerms = /(implementation|stakeholder|framework|methodology|compliance)/.test(queryLower)
+  
+  return {
+    type: isDefinitional ? 'definitional' : 
+          isComparative ? 'comparative' :
+          isAnalytical ? 'analytical' :
+          isSpecific ? 'specific' :
+          isRelational ? 'relational' : 'general',
+    complexity: hasMultipleConcepts || hasComplexTerms ? 'high' : 
+                isAnalytical || isComparative ? 'medium' : 'low',
+    isDefinitional,
+    isComparative,
+    isAnalytical,
+    isSpecific,
+    isRelational
+  }
+}
+
+function formatKnowledgeForAnalysis(matchResults: any[], queryAnalysis: any): string {
+  if (!matchResults || matchResults.length === 0) {
+    return 'No relevant knowledge found in the uploaded documents.'
+  }
+
+  // Group similar content and provide richer context
+  const formattedChunks = matchResults.map((item, index) => {
+    const relevanceLevel = item.similarity > 0.8 ? 'HIGH' : 
+                          item.similarity > 0.6 ? 'MEDIUM' : 'LOW'
+    
+    return `KNOWLEDGE CHUNK ${index + 1} (Relevance: ${relevanceLevel} - ${item.similarity.toFixed(3)}):
+DOCUMENT: ${item.title || 'Untitled'}
+${item.file_name ? `SOURCE FILE: ${item.file_name}` : ''}
+${item.chunk_index ? `SECTION: Part ${item.chunk_index + 1}` : ''}
+
+CONTENT:
+${item.content}
+
+---`
+  })
+
+  // Add synthesis instruction based on query type
+  let synthesisPrompt = ''
+  if (queryAnalysis.complexity === 'high' && matchResults.length > 1) {
+    synthesisPrompt = '\n\nSYNTHESIS INSTRUCTION: Multiple relevant sections found. Please synthesize information across these sources to provide a comprehensive analysis.'
+  }
+
+  return formattedChunks.join('\n\n') + synthesisPrompt
+}
+
+function buildAnalyticalPrompt(query: string, knowledgeContext: string, queryAnalysis: any): string {
+  const baseContext = `You are an expert policy analyst specializing in legislative documents and policy interpretation. Your role is to provide insightful, contextual analysis rather than simple factual recitation.`
+  
+  let analysisInstructions = ''
+  
+  switch (queryAnalysis.type) {
+    case 'definitional':
+      analysisInstructions = `
+ANALYTICAL APPROACH: This is a definitional query. Beyond basic definition, provide:
+- Context about why this concept matters in the policy framework
+- Practical implications and applications
+- Related concepts and how they interconnect
+- Any nuances or complexities in interpretation`
+      break
+      
+    case 'comparative':
+      analysisInstructions = `
+ANALYTICAL APPROACH: This is a comparative query. Provide:
+- Clear comparison of the concepts/provisions
+- Analysis of implications of differences
+- Context about why these distinctions matter
+- Practical impact of each approach`
+      break
+      
+    case 'analytical':
+      analysisInstructions = `
+ANALYTICAL APPROACH: This requires deep analysis. Provide:
+- Multi-layered examination of causes, effects, and implications
+- Consider stakeholder perspectives and impacts
+- Identify potential unintended consequences
+- Connect to broader policy objectives and context`
+      break
+      
+    case 'relational':
+      analysisInstructions = `
+ANALYTICAL APPROACH: This asks about relationships. Provide:
+- Map the connections between concepts/provisions
+- Explain the nature and strength of relationships
+- Analyze how changes in one area might affect others
+- Consider systemic implications`
+      break
+      
+    case 'specific':
+      analysisInstructions = `
+ANALYTICAL APPROACH: This targets specific content. Provide:
+- The specific information requested
+- Context around why this provision exists
+- How it fits into the broader document structure
+- Practical application and interpretation guidance`
+      break
+      
+    default:
+      analysisInstructions = `
+ANALYTICAL APPROACH: Provide comprehensive analysis including:
+- Core information with contextual interpretation
+- Relevant implications and applications
+- Connections to related concepts
+- Practical significance`
+  }
+
+  const complexityInstructions = queryAnalysis.complexity === 'high' 
+    ? '\n\nCOMPLEXITY NOTE: This is a complex query requiring synthesis across multiple concepts. Ensure your response integrates information from multiple sources where available and addresses the multifaceted nature of the question.'
+    : queryAnalysis.complexity === 'medium'
+    ? '\n\nCOMPLEXITY NOTE: This requires moderate analysis. Balance comprehensive coverage with clear, focused insights.'
+    : '\n\nCOMPLEXITY NOTE: Provide clear, direct response while including relevant analytical context.'
+
+  return `${baseContext}
+
+${analysisInstructions}
+
+${complexityInstructions}
+
+KNOWLEDGE BASE:
+${knowledgeContext}
+
+USER QUESTION: ${query}
+
+RESPONSE REQUIREMENTS:
+1. Lead with direct insight, not just facts
+2. Synthesize information across sources when multiple chunks are provided
+3. Provide contextual interpretation that helps users understand significance
+4. Include practical implications where relevant
+5. If knowledge is insufficient, be specific about what's missing and suggest what additional information would be helpful
+6. Maintain authoritative but accessible tone
+
+Generate your analytical response:`
+}
+
+async function generateResponseWithKnowledge(query: string, knowledgeContext: string, queryAnalysis: any): Promise<string> {
   try {
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
     if (!anthropicKey) {
@@ -181,14 +331,7 @@ async function generateResponseWithKnowledge(query: string, knowledgeContext: st
         max_tokens: 1000,
         messages: [{
           role: 'user',
-          content: `You are a bill agent helping users understand policy documents. Use the following knowledge to answer the user's question. Be specific and reference the relevant information.
-
-KNOWLEDGE CONTEXT:
-${knowledgeContext}
-
-USER QUESTION: ${query}
-
-Please provide a comprehensive answer based on the knowledge above. If the knowledge doesn't contain relevant information, say so clearly.`
+          content: buildAnalyticalPrompt(query, knowledgeContext, queryAnalysis)
         }]
       })
     })
