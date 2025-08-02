@@ -96,7 +96,7 @@ serve(async (req) => {
     let textContent = ''
 
     if (contentType === 'pdf') {
-      // For large PDFs, we'll use a more memory-efficient approach
+      // For PDFs, we need to extract readable text
       try {
         const arrayBuffer = await fileData.arrayBuffer()
         const fileSize = arrayBuffer.byteLength
@@ -109,34 +109,62 @@ serve(async (req) => {
         
         const bytes = new Uint8Array(arrayBuffer)
         
-        // More efficient text extraction with streaming
-        const decoder = new TextDecoder('latin1', { fatal: false })
-        const pdfString = decoder.decode(bytes)
+        // Extract readable text from PDF
+        const decoder = new TextDecoder('utf-8', { fatal: false })
+        let pdfString = decoder.decode(bytes)
         
-        // Extract text more efficiently
-        const textMatches = []
-        const regex = /\(([^)]+)\)/g
-        let match
-        let totalMatches = 0
-        
-        while ((match = regex.exec(pdfString)) !== null && totalMatches < 10000) {
-          const text = match[1]
-          if (text.length > 2 && /[a-zA-Z]/.test(text)) {
-            textMatches.push(text)
-          }
-          totalMatches++
+        // If UTF-8 fails, try latin1
+        if (!pdfString || pdfString.includes('�')) {
+          const latin1Decoder = new TextDecoder('latin1', { fatal: false })
+          pdfString = latin1Decoder.decode(bytes)
         }
         
-        textContent = textMatches.join(' ')
+        // Extract text patterns from PDF
+        const textPatterns = []
+        
+        // Pattern 1: Text between parentheses (common PDF text encoding)
+        const parenMatches = pdfString.match(/\(([^)]+)\)/g) || []
+        textPatterns.push(...parenMatches.map(match => match.slice(1, -1)))
+        
+        // Pattern 2: Text between square brackets
+        const bracketMatches = pdfString.match(/\[([^\]]+)\]/g) || []
+        textPatterns.push(...bracketMatches.map(match => match.slice(1, -1)))
+        
+        // Pattern 3: Look for plain text sequences
+        const plainTextMatches = pdfString.match(/[A-Za-z][A-Za-z\s]{10,}/g) || []
+        textPatterns.push(...plainTextMatches)
+        
+        // Pattern 4: Extract from stream objects
+        const streamMatches = pdfString.match(/stream\s+(.*?)\s+endstream/gs) || []
+        streamMatches.forEach(stream => {
+          const streamContent = stream.replace(/^stream\s+|\s+endstream$/g, '')
+          const textInStream = streamContent.match(/[A-Za-z][A-Za-z\s]{5,}/g) || []
+          textPatterns.push(...textInStream)
+        })
+        
+        // Filter and clean extracted text
+        const cleanedText = textPatterns
+          .filter(text => {
+            // Filter out binary junk and keep meaningful text
+            return text && 
+                   text.length > 3 && 
+                   /[A-Za-z]/.test(text) &&
+                   !/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\xFF]/.test(text) &&
+                   text.split(' ').length > 1
+          })
+          .map(text => text.trim())
+          .filter(text => text.length > 0)
+        
+        textContent = cleanedText.join(' ')
         
         // If extraction was minimal, provide a meaningful fallback
         if (textContent.length < 100) {
           textContent = `PDF Document: ${fileName}. 
-This appears to be a complex PDF that requires specialized processing. 
-Key content may include structured data, forms, or images that cannot be easily extracted as plain text.
+This PDF contains primarily structured data, forms, or images that cannot be easily extracted as plain text.
 File size: ${Math.round(fileSize / 1024)} KB.
-For better text extraction, consider converting this PDF to a plain text format before uploading.`
+For better text extraction, please convert this PDF to a plain text format before uploading or ensure the PDF contains selectable text.`
         }
+        
       } catch (error) {
         console.error('PDF processing error:', error)
         throw new Error(`PDF processing failed: ${error.message}`)
