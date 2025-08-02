@@ -81,25 +81,20 @@ serve(async (req) => {
     // Extract text based on content type
     let text = ''
     if (contentType === 'application/pdf') {
-      console.log('Extracting text from PDF...')
-      try {
-        text = await extractTextFromPDF(fileContent)
-        console.log(`PDF text extraction successful, ${text.length} characters`)
-      } catch (pdfError) {
-        console.error('PDF extraction failed:', pdfError)
-        // For now, if PDF extraction fails, return a helpful error
-        return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: `PDF text extraction failed: ${pdfError.message}. Please try converting the PDF to a text file first.` 
-          }),
-          { 
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
-      }
+      console.log('Processing PDF file...')
+      // For now, let's skip PDF extraction and return a helpful message
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'PDF processing is temporarily disabled. Please convert your PDF to a text file (.txt) and upload that instead.' 
+        }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     } else {
+      console.log('Processing text file...')
       text = fileContent
     }
 

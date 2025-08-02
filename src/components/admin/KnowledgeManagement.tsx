@@ -117,9 +117,14 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         }
       });
 
-      if (error) throw error;
+      console.log('Edge function response:', { data, error });
 
-      if (data.success) {
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Edge function returned an error');
+      }
+
+      if (data?.success) {
         toast({
           title: "Success",
           description: `Processed ${data.chunksProcessed} knowledge chunks`
@@ -127,7 +132,8 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         setUploadOpen(false);
         loadKnowledgeForAgent(selectedAgent);
       } else {
-        throw new Error(data.error);
+        console.error('Edge function returned non-success:', data);
+        throw new Error(data?.error || 'Processing failed');
       }
     } catch (error) {
       console.error('Upload error:', error);
