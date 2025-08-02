@@ -16,7 +16,7 @@ This application uses a **Node.js backend** architecture with:
 - **Authentication**: JWT-based with bcrypt
 - **Real-time**: WebSocket + Server-Sent Events
 - **Caching**: Redis for performance optimization
-- **AI Integration**: Direct Anthropic SDK integration
+- **AI Integration**: Direct OpenAI SDK integration
 - **Rate Limiting**: Token bucket algorithm for API protection
 - **Security**: Helmet, CORS, comprehensive input validation
 
@@ -66,7 +66,7 @@ Create a `.env` file in the backend directory:
 DATABASE_URL=postgresql://postgres:password@localhost:5432/deliberation
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=your-secure-jwt-secret-here
-ANTHROPIC_API_KEY=your-anthropic-api-key-here
+OPENAI_API_KEY=your-openai-api-key-here
 ```
 
 ## Backend Architecture
@@ -74,7 +74,7 @@ ANTHROPIC_API_KEY=your-anthropic-api-key-here
 The application uses a Node.js backend with:
 - **JWT-based Authentication**: Secure user authentication and session management
 - **Real-time Communication**: WebSocket and Server-Sent Events for live updates
-- **AI Integration**: Direct Anthropic SDK integration for chat functionality
+- **AI Integration**: Direct OpenAI SDK integration for chat functionality
 
 ## How to Edit This Code
 
@@ -111,7 +111,7 @@ docker-compose -f docker-compose.dev.yml up
 - **PostgreSQL** - Primary database with vector extensions
 - **Redis** - Caching and session storage
 - **JWT** - Stateless authentication
-- **Anthropic SDK** - Direct AI integration
+- **OpenAI SDK** - Direct AI integration
 - **Socket.io** - Real-time WebSocket communication
 
 ### Database & Infrastructure
