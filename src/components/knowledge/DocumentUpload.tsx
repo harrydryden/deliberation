@@ -11,8 +11,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js`;
+// Set up PDF.js worker with fallback
+try {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.min.js`;
+} catch (error) {
+  console.warn('PDF.js worker setup failed:', error);
+}
 
 interface DocumentUploadProps {
   agents?: Agent[];
