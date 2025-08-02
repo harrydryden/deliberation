@@ -149,13 +149,21 @@ serve(async (req) => {
       const embeddingData = await embeddingResponse.json()
       const embeddingVector = embeddingData.data[0].embedding
 
+      // Sanitize chunk content to remove null bytes and other problematic characters
+      const sanitizedChunk = chunk
+        .replace(/\u0000/g, '') // Remove null bytes
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove other control characters
+        .trim()
+
+      if (sanitizedChunk.length < 50) continue
+
       // Insert into agent_knowledge table
       const { error: insertError } = await supabase
         .from('agent_knowledge')
         .insert({
           agent_id: agentId,
           title: `${fileName} - Part ${i + 1}`,
-          content: chunk,
+          content: sanitizedChunk,
           content_type: contentType,
           file_name: fileName,
           chunk_index: i,
