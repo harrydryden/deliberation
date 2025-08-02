@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, FileText, Brain, Trash2, Search } from 'lucide-react';
+import { Upload, FileText, Brain, Trash2, Search, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatToUKDate } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,9 +38,11 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
   
   const [uploadOpen, setUploadOpen] = useState(false);
   const [queryOpen, setQueryOpen] = useState(false);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [querying, setQuerying] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
   const [loadingKnowledge, setLoadingKnowledge] = useState(false);
   const [query, setQuery] = useState('');
@@ -219,6 +221,37 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
     }
   };
 
+  const deleteAllKnowledgeForAgent = async () => {
+    if (!selectedAgent) return;
+
+    setDeletingAll(true);
+    try {
+      const { error } = await supabase
+        .from('agent_knowledge')
+        .delete()
+        .eq('agent_id', selectedAgent);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "All knowledge items deleted for this agent"
+      });
+      
+      setDeleteAllOpen(false);
+      setKnowledgeItems([]);
+    } catch (error) {
+      console.error('Delete all error:', error);
+      toast({
+        title: "Error", 
+        description: "Failed to delete all knowledge items",
+        variant: "destructive"
+      });
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const getAgentName = (agentId: string) => {
     const agent = agents.find(a => a.id === agentId);
     return agent?.name || 'Unknown Agent';
@@ -358,6 +391,52 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
                     </div>
                   </DialogContent>
                 </Dialog>
+
+                {knowledgeItems.length > 0 && (
+                  <Dialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="destructive">
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        Delete All Knowledge
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Delete All Knowledge</DialogTitle>
+                        <DialogDescription>
+                          Are you sure you want to delete all knowledge items for {getAgentName(selectedAgent)}? 
+                          This action cannot be undone.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setDeleteAllOpen(false)}
+                          disabled={deletingAll}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          onClick={deleteAllKnowledgeForAgent}
+                          disabled={deletingAll}
+                        >
+                          {deletingAll ? (
+                            <>
+                              <LoadingSpinner className="mr-2" />
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete All ({knowledgeItems.length} items)
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
               )}
             </div>
