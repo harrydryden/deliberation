@@ -17,10 +17,10 @@ enabled = true
 port = 54324
 
 [functions.process-agent-knowledge]
-verify_jwt = false
+verify_jwt = true
 
 [functions.query-agent-knowledge]
-verify_jwt = false
+verify_jwt = true
 
 [functions.agent-response]
-verify_jwt = false
+verify_jwt = true

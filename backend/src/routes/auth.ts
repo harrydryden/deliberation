@@ -1,6 +1,12 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
+import { authRateLimiter, recordSuccess, recordFailure } from '../middleware/rateLimiter';
+import { 
+  recordAccessCodeAttempt, 
+  isSuspiciousIP, 
+  validateAccessCodeFormat 
+} from '../middleware/accessCodeSecurity';
 
 const authSchema = z.object({
   accessCode: z.string()
@@ -18,6 +24,7 @@ const updateProfileSchema = z.object({
 export async function authRoutes(fastify: FastifyInstance) {
   // Authenticate with 10-digit access code
   fastify.post('/auth', {
+    preHandler: [authRateLimiter(fastify)],
     schema: {
       body: authSchema,
     },
@@ -25,8 +32,31 @@ export async function authRoutes(fastify: FastifyInstance) {
     Body: z.infer<typeof authSchema> 
   }>, reply: FastifyReply) => {
     const { accessCode } = request.body;
+    const clientIP = request.ip || request.socket.remoteAddress || 'unknown';
+    const rateLimitKey = (request as any).rateLimitKey;
 
     try {
+      // Validate access code format
+      const formatValidation = validateAccessCodeFormat(accessCode);
+      if (!formatValidation.valid) {
+        recordAccessCodeAttempt(accessCode, clientIP);
+        recordFailure(rateLimitKey);
+        reply.status(400).send({ error: formatValidation.reason });
+        return;
+      }
+
+      // Check for suspicious IP
+      if (isSuspiciousIP(clientIP)) {
+        fastify.log.warn({ ip: clientIP, accessCode }, 'Suspicious IP attempting authentication');
+        recordFailure(rateLimitKey);
+        reply.status(429).send({ 
+          error: 'Too many invalid attempts. Please try again later.' 
+        });
+        return;
+      }
+
+      // Record the attempt for security monitoring
+      recordAccessCodeAttempt(accessCode, clientIP);
       // Check if access code is valid (no longer checking isUsed since codes are reusable)
       const codeRecord = await fastify.prisma.accessCode.findFirst({
         where: {
@@ -35,6 +65,7 @@ export async function authRoutes(fastify: FastifyInstance) {
       });
 
       if (!codeRecord) {
+        recordFailure(rateLimitKey);
         reply.status(401).send({ error: 'Invalid access code' });
         return;
       }
@@ -71,11 +102,14 @@ export async function authRoutes(fastify: FastifyInstance) {
         user = { ...result.user, profile: result.profile };
       }
 
-      // Generate JWT token
+      // Generate JWT token with shorter expiration for security
       const token = fastify.jwt.sign(
         { sub: userId, accessCode },
-        { expiresIn: '24h' }
+        { expiresIn: '8h' } // Reduced from 24h for better security
       );
+
+      // Record successful authentication
+      recordSuccess(rateLimitKey);
 
       reply.send({
         user: {
@@ -90,7 +124,8 @@ export async function authRoutes(fastify: FastifyInstance) {
         token,
       });
     } catch (error) {
-      fastify.log.error({ error, accessCode }, 'Authentication error');
+      recordFailure(rateLimitKey);
+      fastify.log.error({ error, accessCode, ip: clientIP }, 'Authentication error');
       reply.status(500).send({ error: 'Authentication failed' });
     }
   });

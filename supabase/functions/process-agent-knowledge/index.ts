@@ -2,14 +2,33 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://iowsxuxkgvpgrvvklwyt.supabase.co',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 }
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
+  }
+
+  // Validate request method
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Get and validate authorization header
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Missing or invalid authorization header' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
 
   try {
@@ -22,13 +41,33 @@ serve(async (req) => {
     console.log(`Processing knowledge for agent ${agentId}, file: ${fileName}`)
 
     // Initialize Supabase client
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase configuration')
+    }
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    })
 
-    // Get OpenAI API key
+    // Get OpenAI API key from Supabase secrets
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
+    
+    if (!openAIApiKey) {
+      console.error('OpenAI API key not configured')
+      throw new Error('Service configuration error')
+    }
+    
+    // Validate API key format
+    if (!openAIApiKey.startsWith('sk-')) {
+      console.error('Invalid OpenAI API key format')
+      throw new Error('Service configuration error')
+    }
 
     // Process text content (assuming PDF text has been extracted)
     const text = fileContent

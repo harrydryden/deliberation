@@ -3,8 +3,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://iowsxuxkgvpgrvvklwyt.supabase.co',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 };
 
 serve(async (req) => {
@@ -13,6 +15,23 @@ serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Validate request method
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Get and validate authorization header
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Missing or invalid authorization header' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
 
   try {
@@ -37,10 +56,22 @@ serve(async (req) => {
     }
 
     if (!openaiApiKey) {
-      throw new Error('OPENAI_API_KEY not configured');
+      console.error('OpenAI API key not configured')
+      throw new Error('Service configuration error')
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Validate API key format
+    if (!openaiApiKey.startsWith('sk-')) {
+      console.error('Invalid OpenAI API key format')
+      throw new Error('Service configuration error')
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      }
+    });
 
     // Get the user message
     console.log('📨 Fetching message...');
