@@ -19,8 +19,14 @@ export type Database = {
           code: string
           code_type: string
           created_at: string
+          created_by: string | null
+          current_uses: number | null
+          expires_at: string | null
           id: string
+          is_active: boolean | null
           is_used: boolean
+          last_used_at: string | null
+          max_uses: number | null
           used_at: string | null
           used_by: string | null
         }
@@ -28,8 +34,14 @@ export type Database = {
           code: string
           code_type: string
           created_at?: string
+          created_by?: string | null
+          current_uses?: number | null
+          expires_at?: string | null
           id?: string
+          is_active?: boolean | null
           is_used?: boolean
+          last_used_at?: string | null
+          max_uses?: number | null
           used_at?: string | null
           used_by?: string | null
         }
@@ -37,8 +49,14 @@ export type Database = {
           code?: string
           code_type?: string
           created_at?: string
+          created_by?: string | null
+          current_uses?: number | null
+          expires_at?: string | null
           id?: string
+          is_active?: boolean | null
           is_used?: boolean
+          last_used_at?: string | null
+          max_uses?: number | null
           used_at?: string | null
           used_by?: string | null
         }
@@ -887,6 +905,10 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      cleanup_expired_access_codes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       generate_secure_access_code: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -926,6 +948,10 @@ export type Database = {
       hnswhandler: {
         Args: { "": unknown }
         Returns: unknown
+      }
+      increment_access_code_usage: {
+        Args: { input_code: string }
+        Returns: boolean
       }
       is_admin_user: {
         Args: { user_id: string }
@@ -990,6 +1016,15 @@ export type Database = {
       sparsevec_typmod_in: {
         Args: { "": unknown[] }
         Returns: number
+      }
+      validate_access_code: {
+        Args: { input_code: string }
+        Returns: {
+          valid: boolean
+          code_type: string
+          expired: boolean
+          max_uses_reached: boolean
+        }[]
       }
       vector_avg: {
         Args: { "": number[] }
