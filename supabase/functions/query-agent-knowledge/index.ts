@@ -107,12 +107,13 @@ serve(async (req) => {
 
     console.log('Querying knowledge database...')
 
-    // Use the existing match_agent_knowledge function
+    // Use the existing match_agent_knowledge function with a more lenient threshold
+    console.log('Calling match_agent_knowledge with threshold 0.3...')
     const { data: matchResults, error } = await supabase
       .rpc('match_agent_knowledge', {
         input_agent_id: agentId,
         query_embedding: embeddingVector,
-        match_threshold: 0.1,
+        match_threshold: 0.3,
         match_count: maxResults
       })
 
