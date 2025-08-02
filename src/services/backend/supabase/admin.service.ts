@@ -5,20 +5,21 @@ import { User, Agent, Deliberation, LocalAgentCreate } from '@/types/api';
 export class SupabaseAdminService implements IAdminService {
   // Users
   async getUsers(): Promise<User[]> {
-    const { data: profiles, error } = await supabase
-      .from('profiles')
-      .select('id, display_name, user_role, expertise_areas, created_at, updated_at')
+    const { data: userProfiles, error } = await supabase
+      .from('user_profiles_with_codes')
+      .select('id, display_name, user_role, expertise_areas, access_code, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
-    return profiles?.map(profile => ({
+    return userProfiles?.map(profile => ({
       id: profile.id,
-      accessCode: '', // Not stored in profiles
+      accessCode: profile.access_code || '',
       profile: {
         displayName: profile.display_name || '',
         expertiseAreas: profile.expertise_areas || []
-      }
+      },
+      role: profile.user_role
     })) || [];
   }
 
