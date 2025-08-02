@@ -33,6 +33,9 @@ interface KnowledgeManagementProps {
 }
 
 export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManagementProps) => {
+  console.log('🔍 KnowledgeManagement received agents:', agents);
+  console.log('🔍 KnowledgeManagement loading state:', loading);
+  
   const [uploadOpen, setUploadOpen] = useState(false);
   const [queryOpen, setQueryOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string>('');
