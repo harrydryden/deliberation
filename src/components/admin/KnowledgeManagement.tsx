@@ -92,7 +92,18 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       } else if (file.type === 'application/pdf') {
         // Convert PDF to base64 for processing in the edge function
         const arrayBuffer = await file.arrayBuffer();
-        const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const bytes = new Uint8Array(arrayBuffer);
+        
+        // Process in chunks to avoid call stack overflow
+        let binaryString = '';
+        const chunkSize = 8192; // Process 8KB at a time
+        
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.slice(i, i + chunkSize);
+          binaryString += String.fromCharCode(...chunk);
+        }
+        
+        const base64String = btoa(binaryString);
         fileContent = base64String;
       }
 
