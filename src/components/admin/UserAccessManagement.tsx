@@ -205,6 +205,7 @@ export const UserAccessManagement = ({
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>User ID</TableHead>
                       <TableHead>Access Code</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Code Type</TableHead>
@@ -215,6 +216,11 @@ export const UserAccessManagement = ({
                   <TableBody>
                     {users.map((user) => (
                       <TableRow key={user.id}>
+                        <TableCell>
+                          <code className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                            {user.id}
+                          </code>
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <code className="font-mono bg-muted px-2 py-1 rounded text-sm">
