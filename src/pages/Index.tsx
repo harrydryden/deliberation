@@ -89,15 +89,16 @@ const Index = () => {
 
         {/* Call to Action */}
         <div className="text-center space-y-4">
-          <h2 className="text-2xl font-semibold text-foreground">
-            Ready to start deliberating?
-          </h2>
+          <h2 className="text-2xl font-semibold text-foreground">Get started here</h2>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {deliberations.length > 0 ? <Button className="bg-democratic-blue hover:bg-democratic-blue/90" onClick={() => navigate("/deliberations")}>
                 View Available Deliberations
               </Button> : <p className="text-muted-foreground text-center">
                 No deliberations are currently available. Please contact an administrator to set up new discussions.
               </p>}
+            <Button variant="ghost" onClick={() => navigate("/backend")}>
+              Backend Config
+            </Button>
           </div>
         </div>
       </div>
