@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { config } from '../config';
 import { logger, logTokenUsage } from '../utils/logger';
 import { CacheManager } from '../utils/redis';
+import { memoryService } from './memory.service';
 
 const openai = new OpenAI({
   apiKey: config.openaiApiKey,
@@ -40,7 +41,9 @@ export class AIService {
   async generateResponse(
     prompt: string,
     systemPrompt?: string,
-    params: AIServiceParams = {}
+    params: AIServiceParams = {},
+    userId?: string,
+    deliberationId?: string
   ): Promise<AIResponse> {
     const startTime = Date.now();
     const traceId = params.traceId || `ai-${Date.now()}`;
@@ -54,11 +57,28 @@ export class AIService {
           content: systemPrompt
         });
       }
-      
-      messages.push({
-        role: 'user',
-        content: prompt
-      });
+
+      // Add conversation history if userId is provided
+      if (userId) {
+        const memoryVars = await memoryService.getMemoryVariables(userId, deliberationId);
+        if (memoryVars.chat_history) {
+          const historyPrompt = `Previous conversation context:\n${memoryVars.chat_history}\n\nCurrent message:`;
+          messages.push({
+            role: 'user',
+            content: `${historyPrompt}\n${prompt}`
+          });
+        } else {
+          messages.push({
+            role: 'user',
+            content: prompt
+          });
+        }
+      } else {
+        messages.push({
+          role: 'user',
+          content: prompt
+        });
+      }
 
       const response = await openai.chat.completions.create({
         model: params.model || this.model,
@@ -86,6 +106,11 @@ export class AIService {
       });
 
       const content = response.choices[0]?.message?.content || '';
+
+      // Add to memory if userId is provided
+      if (userId && content) {
+        await memoryService.addToMemory(userId, prompt, content, deliberationId);
+      }
 
       return {
         content,

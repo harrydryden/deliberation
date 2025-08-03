@@ -370,7 +370,7 @@ Keep response conversational and under 3 sentences.`;
       }
     }
 
-    const response = await this.globalAiService.generateResponse(flowPrompt, undefined, { traceId });
+    const response = await this.globalAiService.generateResponse(flowPrompt, undefined, { traceId }, context.userId, context.deliberationId);
 
     await this.prisma.message.create({
       data: {

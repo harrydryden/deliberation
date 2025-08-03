@@ -56,20 +56,31 @@ export class SupabaseMessageService implements IMessageService {
 
   private async triggerAgentResponses(messageId: string, deliberationId: string, mode: 'chat' | 'learn' = 'chat') {
     try {
-      console.log('🤖 Triggering agent responses for message:', messageId, 'in deliberation:', deliberationId);
+      console.log('🤖 Triggering agent responses with memory for message:', messageId, 'in deliberation:', deliberationId);
       
-      // Call the agent-response edge function
-      console.log('📞 Calling agent-response function...');
-      const { data, error } = await supabase.functions.invoke('agent-response', {
+      // Call the memory-enhanced agent-response edge function
+      console.log('📞 Calling agent-response-with-memory function...');
+      const { data, error } = await supabase.functions.invoke('agent-response-with-memory', {
         body: { messageId, deliberationId, mode }
       });
 
-      console.log('📊 Function response:', { data, error });
+      console.log('📊 Memory function response:', { data, error });
 
       if (error) {
-        console.error('❌ Failed to trigger agent responses:', error);
+        console.error('❌ Failed to trigger agent responses with memory:', error);
+        // Fallback to original function
+        console.log('🔄 Falling back to original agent-response function...');
+        const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('agent-response', {
+          body: { messageId, deliberationId, mode }
+        });
+        
+        if (fallbackError) {
+          console.error('❌ Fallback agent response also failed:', fallbackError);
+        } else {
+          console.log('✅ Fallback agent responses triggered successfully:', fallbackData);
+        }
       } else {
-        console.log('✅ Agent responses triggered successfully:', data);
+        console.log('✅ Agent responses with memory triggered successfully:', data);
       }
     } catch (error) {
       console.error('💥 Error triggering agent responses:', error);
