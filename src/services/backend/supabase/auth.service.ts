@@ -121,12 +121,9 @@ export class SupabaseAuthService implements IAuthService {
       throw new AuthenticationError('No authenticated user');
     }
 
-    // Check cache first for performance
-    const cachedUser = userCache.get(user.id);
-    if (cachedUser) {
-      console.log('🚀 Retrieved user from cache');
-      return cachedUser;
-    }
+    // Clear cache to ensure fresh role data
+    userCache.clear(user.id);
+    console.log('🗑️ Cleared user cache to refresh role data');
 
     // Batch query for better performance - get user profile in single request
     const { data: profile } = await supabase
@@ -134,6 +131,8 @@ export class SupabaseAuthService implements IAuthService {
       .select('*')
       .eq('id', user.id)
       .single();
+
+    console.log('🔍 Profile data from user_cache:', profile);
 
     const accessCode = user.user_metadata?.access_code || 'unknown';
     const codeType = user.user_metadata?.code_type || 'user';
@@ -190,7 +189,7 @@ export class SupabaseAuthService implements IAuthService {
     return {
       id: supabaseUser.id,
       accessCode,
-      role: profile?.role || 'user',
+      role: profile?.user_role || profile?.role || 'user',
       profile: {
         displayName: profile?.display_name || `User ${accessCode}`,
         expertiseAreas: profile?.expertise_areas || [],
