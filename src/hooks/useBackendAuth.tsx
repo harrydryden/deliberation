@@ -113,7 +113,7 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
       authService.setToken(token);
       setUser(refreshedUser);
     } catch (error) {
-      console.error('Token refresh failed:', error);
+      logger.auth.failure('Token refresh failed', error);
       await signOut();
       throw error;
     }
@@ -130,17 +130,17 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
       
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         (event: string, session: any) => {
-          console.log('🔄 Auth state change:', event, session ? 'with session' : 'no session');
+          logger.auth.info('Auth state change', { event, hasSession: !!session });
            
           // Prevent processing if already in progress to avoid race conditions
           if (authInProgress && event !== 'SIGNED_OUT') {
-            console.log('🚫 Auth in progress, skipping event:', event);
+            logger.auth.warning('Auth in progress, skipping event', { event });
             return;
           }
 
           // Handle sign out events
           if (event === 'SIGNED_OUT' || !session) {
-            console.log('🚪 Signing out user');
+            logger.auth.info('Signing out user');
             setUser(null);
             setIsLoading(false);
             setIsInitialized(true);
@@ -149,34 +149,34 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
 
           // Handle sign in and token refresh events
           if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            console.log('🔐 Processing auth event:', event);
+            logger.auth.progress('Processing auth event', { event });
             setAuthInProgress(true);
             
             // Add timeout protection
             const timeoutId = setTimeout(() => {
-              console.error('⏰ Auth timeout - forcing loading to false');
+              logger.auth.timeout('Auth timeout - forcing loading to false');
               setIsLoading(false);
               setAuthInProgress(false);
             }, 10000); // 10 second timeout
 
             Promise.resolve().then(async () => {
               try {
-                console.log('🔐 Auth event:', event, 'Session:', session);
+                logger.auth.info('Processing auth event with session', { event, hasSession: !!session });
                 if (authService) {
                   const currentUser = await authService.getCurrentUser();
-                  console.log('👤 Current user retrieved:', currentUser);
+                  logger.auth.success('Current user retrieved', { userId: currentUser?.id });
                   setUser(currentUser);
-                  console.log('✅ Auth state updated successfully');
+                  logger.auth.success('Auth state updated successfully');
                 }
               } catch (error) {
-                console.error('❌ Failed to get current user:', error);
+                logger.auth.failure('Failed to get current user', error);
                 setUser(null);
               } finally {
                 clearTimeout(timeoutId);
                 setIsLoading(false);
                 setIsInitialized(true);
                 setAuthInProgress(false);
-                console.log('🎯 Auth state change completed');
+                logger.auth.complete('Auth state change completed');
               }
             });
           }

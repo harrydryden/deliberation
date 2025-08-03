@@ -9,6 +9,7 @@ import { Agent, Deliberation, LocalAgentCreate } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { LocalAgentCreationModal } from './LocalAgentCreationModal';
 import { LocalAgentEditModal } from './LocalAgentEditModal';
+import { logger } from '@/utils/logger';
 
 interface LocalAgentManagementProps {
   localAgents: Agent[];
@@ -25,7 +26,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
 
   useEffect(() => {
     if (!hasLoaded && !loading) {
-      console.log('🔍 Loading local agents for the first time');
+      logger.component.mount('LocalAgentManagement', { action: 'initialLoad' });
       onLoad();
       setHasLoaded(true);
     }
@@ -41,7 +42,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
   };
 
   const handleRefresh = () => {
-    console.log('🔍 Manual refresh of local agents');
+    logger.component.update('LocalAgentManagement', { action: 'manualRefresh' });
     onLoad();
   };
 

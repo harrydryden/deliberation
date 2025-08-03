@@ -4,6 +4,8 @@ import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { ChatModeSelector, ChatMode } from "./ChatModeSelector";
 import { useBackendChat } from "@/hooks/useBackendChat";
+import { useMemoryLeakDetection } from '@/utils/performanceUtils';
+import { logger } from '@/utils/logger';
 
 export const ChatInterface = () => {
   const [chatMode, setChatMode] = useState<ChatMode>('chat');
@@ -13,8 +15,11 @@ export const ChatInterface = () => {
     isTyping,
     sendMessage: originalSendMessage
   } = useBackendChat();
+  
+  useMemoryLeakDetection('ChatInterface');
 
   const sendMessage = async (content: string) => {
+    logger.component.update('ChatInterface', { mode: chatMode, contentLength: content.length });
     await originalSendMessage(content, chatMode);
   };
   return <Layout>

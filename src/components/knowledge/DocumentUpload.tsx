@@ -9,6 +9,7 @@ import { Upload, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
+import { logger } from '@/utils/logger';
 
 // Remove PDF.js imports since we're using server-side processing
 
@@ -61,7 +62,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}_${file.name}`;
       
-      console.log('Uploading file to storage:', fileName);
+      logger.component.update('DocumentUpload', { action: 'uploadStart', fileName });
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
@@ -74,7 +75,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
 
       setUploadProgress(30);
       setProcessingStatus('File uploaded, starting intelligent processing...');
-      console.log('File uploaded successfully:', uploadData.path);
+      logger.component.update('DocumentUpload', { action: 'uploadSuccess', path: uploadData.path });
 
       // Use optimized LangChain processing with progress monitoring
       setProcessingStatus('Processing with optimized batch operations...');
@@ -93,7 +94,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       const processingError = result.error;
       const processingTime = performance.now() - processingStartTime;
       
-      console.log('Optimized processing result:', { data: processingData, error: processingError });
+      logger.component.update('DocumentUpload', { action: 'processingResult', hasData: !!processingData, hasError: !!processingError });
       
       setUploadProgress(90);
       setProcessingStatus('Finalizing and saving results...');

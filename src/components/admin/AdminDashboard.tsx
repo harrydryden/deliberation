@@ -13,20 +13,36 @@ import { DeliberationCreation } from './DeliberationCreation';
 import { KnowledgeManagement } from './KnowledgeManagement';
 import { SystemStats } from './SystemStats';
 import { useAdminService } from '@/hooks/useAdminService';
+import { useMemoryLeakDetection } from '@/utils/performanceUtils';
+import { logger } from '@/utils/logger';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 export const AdminDashboard = () => {
   const [currentBackend, setCurrentBackend] = useState(BACKEND_CONFIG.type);
   const adminService = useAdminService();
+  const { handleAsyncError } = useErrorHandler();
+  
+  useMemoryLeakDetection('AdminDashboard');
 
   useEffect(() => {
-    // Load initial data
-    adminService.fetchStats();
-    adminService.fetchDeliberations();
-  }, []);
+    const initializeData = async () => {
+      await handleAsyncError(async () => {
+        await Promise.all([
+          adminService.fetchStats(),
+          adminService.fetchDeliberations()
+        ]);
+        logger.component.mount('AdminDashboard', { message: 'Admin dashboard initialized successfully' });
+      }, 'admin dashboard initialization');
+    };
+    
+    initializeData();
+  }, [handleAsyncError]);
 
   const handleBackendToggle = (checked: boolean) => {
     const newBackend = checked ? 'nodejs' : 'supabase';
     setCurrentBackend(newBackend);
+    
+    logger.component.update('AdminDashboard', { oldBackend: currentBackend, newBackend });
     
     // In a real implementation, you'd need to:
     // 1. Update environment variables

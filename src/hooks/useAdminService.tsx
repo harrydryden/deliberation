@@ -3,6 +3,9 @@ import { backendServiceFactory } from '@/services/backend/factory';
 import { IAdminService, AccessCode, AdminStats } from '@/services/backend/base.service';
 import { User, Agent, Deliberation, LocalAgentCreate } from '@/types/api';
 import { toast } from 'sonner';
+import { useErrorHandler } from './useErrorHandler';
+import { logger } from '@/utils/logger';
+import { performanceMonitor } from '@/utils/performanceUtils';
 
 export const useAdminService = () => {
   const [adminService] = useState<IAdminService>(() => backendServiceFactory.getAdminService());
@@ -33,11 +36,14 @@ export const useAdminService = () => {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
 
-  const handleError = (error: any, operation: string) => {
-    const message = error?.message || `Failed to ${operation}`;
+  const { handleError: handleTypedError } = useErrorHandler();
+
+  const handleError = (error: unknown, operation: string) => {
+    const message = (error as Error)?.message || `Failed to ${operation}`;
     setError(message);
     toast.error(message);
-    console.error(`Admin ${operation} error:`, error);
+    logger.error(`Admin ${operation} error`, error as Error);
+    handleTypedError(error, `admin ${operation}`);
   };
 
   // User operations

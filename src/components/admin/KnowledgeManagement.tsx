@@ -14,6 +14,7 @@ import { formatToUKDate } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { logger } from '@/utils/logger';
 
 interface KnowledgeItem {
   id: string;
@@ -33,8 +34,7 @@ interface KnowledgeManagementProps {
 }
 
 export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManagementProps) => {
-  console.log('🔍 KnowledgeManagement received agents:', agents);
-  console.log('🔍 KnowledgeManagement loading state:', loading);
+  logger.component.mount('KnowledgeManagement', { agentCount: agents.length, loading });
   
   const [uploadOpen, setUploadOpen] = useState(false);
   const [queryOpen, setQueryOpen] = useState(false);
@@ -98,7 +98,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}_${file.name}`;
       
-      console.log('Uploading file to storage:', fileName);
+      logger.component.update('KnowledgeManagement', { action: 'uploadStart', fileName });
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
@@ -109,7 +109,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      console.log('File uploaded successfully:', uploadData.path);
+      logger.component.update('KnowledgeManagement', { action: 'uploadSuccess', path: uploadData.path });
 
       // Trigger background processing using the correct edge function
       // Convert MIME type to simple content type for database constraint

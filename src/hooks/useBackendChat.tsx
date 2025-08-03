@@ -1,18 +1,24 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useBackendAuth } from "./useBackendAuth";
 import { backendServiceFactory } from '@/services/backend/factory';
-import { useToast } from "@/hooks/use-toast";
 import type { ChatMessage } from "@/types/chat";
 import { convertApiMessagesToChatMessages } from "@/utils/chat";
 import { getErrorMessage } from "@/utils/errors";
+import { useErrorHandler } from './useErrorHandler';
+import { useOptimizedArray } from './useOptimizedState';
+import { logger } from '@/utils/logger';
+import { performanceMonitor } from '@/utils/performanceUtils';
+import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 
 export const useBackendChat = (deliberationId?: string) => {
   const { user, isAuthenticated } = useBackendAuth();
-  const { toast } = useToast();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const { handleError, handleAsyncError } = useErrorHandler();
+  const [messages, setMessages] = useOptimizedArray<ChatMessage>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  
+  useMemoryLeakDetection('useBackendChat');
 
   // Load chat history when user is authenticated or deliberationId changes
   useEffect(() => {
@@ -62,50 +68,39 @@ export const useBackendChat = (deliberationId?: string) => {
 
       unsubscribeRef.current = unsubscribe;
     } catch (error) {
-      console.error('Failed to setup real-time updates:', error);
+      handleError(error, 'real-time setup');
     }
   };
 
-  const loadChatHistory = async () => {
+  const loadChatHistory = useCallback(async () => {
     if (!isAuthenticated) return;
 
     setIsLoading(true);
-    try {
+    await handleAsyncError(async () => {
+      const timer = performanceMonitor.startTimer('loadChatHistory');
       const messageService = backendServiceFactory.getMessageService();
       const data = await messageService.getMessages(deliberationId);
       setMessages(convertApiMessagesToChatMessages(data || []));
-    } catch (error: any) {
-      console.error('Error loading chat history:', getErrorMessage(error));
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to load chat history",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      timer();
+      logger.api.response('GET', '/messages', 200, { deliberationId, messageCount: data?.length || 0 });
+    }, 'loading chat history');
+    setIsLoading(false);
+  }, [isAuthenticated, deliberationId, handleAsyncError, setMessages]);
 
-  const sendMessage = async (content: string, mode: 'chat' | 'learn' = 'chat') => {
+  const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!isAuthenticated || !content.trim()) return;
 
-    try {
-      setIsTyping(true);
-      
+    setIsTyping(true);
+    await handleAsyncError(async () => {
+      const timer = performanceMonitor.startTimer('sendMessage');
       const messageService = backendServiceFactory.getMessageService();
       await messageService.sendMessage(content.trim(), 'user', deliberationId, mode);
-      
-      // The real-time update will handle adding the message to the UI
-    } catch (error: any) {
-      console.error('Error sending message:', getErrorMessage(error));
-      setIsTyping(false);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to send message",
-      });
-    }
-  };
+      timer();
+      logger.api.response('POST', '/messages', 200, { deliberationId, mode, contentLength: content.length });
+    }, 'sending message');
+    
+    // Keep typing indicator on - real-time update will turn it off when response arrives
+  }, [isAuthenticated, deliberationId, handleAsyncError]);
 
   return {
     messages,

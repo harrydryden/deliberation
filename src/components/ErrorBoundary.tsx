@@ -2,6 +2,9 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
+import { errorReporter } from '@/utils/errorHandling';
+import { logger } from '@/utils/logger';
+import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 
 interface Props {
   children: ReactNode;
@@ -23,7 +26,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Error boundary caught an error:', error, errorInfo);
+    logger.component.error('ErrorBoundary', error, { errorInfo, componentStack: errorInfo.componentStack });
+    errorReporter.report(error, {
+      context: 'ErrorBoundary',
+      errorInfo,
+      componentStack: errorInfo.componentStack
+    });
   }
 
   private handleRetry = () => {

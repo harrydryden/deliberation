@@ -11,6 +11,7 @@ import { getErrorMessage, ValidationError } from "@/utils/errors";
 import { accessCodeSchema, sanitizeInput, validateAndSanitize } from "@/utils/validation";
 import { authRateLimit, logSecurityEvent } from "@/utils/security";
 import { validateInput, criticalOpRateLimit } from "@/utils/securityValidation";
+import { logger } from '@/utils/logger';
 
 export const AuthForm = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -93,11 +94,11 @@ export const AuthForm = () => {
     setValidationError("");
     
     setIsLoading(true);
-    console.log('🚀 Starting authentication process with code:', validation.data);
+    logger.auth.start('Starting authentication process', { accessCode: validation.data });
     
     try {
       await authenticate(validation.data);
-      console.log('✅ Authentication successful, letting Auth page handle redirect...');
+      logger.auth.success('Authentication successful, letting Auth page handle redirect');
       authRateLimit.reset(clientId); // Reset on success
       criticalOpRateLimit.reset(clientId); // Reset critical rate limit too
       logSecurityEvent('auth_success', { 
@@ -112,7 +113,7 @@ export const AuthForm = () => {
       });
       // Remove manual navigation - let Auth page handle redirect
     } catch (error: any) {
-      console.error('❌ Authentication failed:', error);
+      logger.auth.failure('Authentication failed', error);
       logSecurityEvent('auth_failed', { 
         error: error.message, 
         timestamp: Date.now(),
