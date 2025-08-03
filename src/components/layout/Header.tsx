@@ -28,7 +28,7 @@ export const Header = () => {
               <MessageSquare className="h-4 w-4" />
               <span>Deliberations</span>
             </Button>
-            {(console.log('🔍 Current user role in Header:', user.role), user.role === 'admin') && (
+            {user.role === 'admin' && (
               <Button
                 variant="ghost"
                 size="sm"

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 export const useUserAgents = () => {
   const [localAgents, setLocalAgents] = useState<Agent[]>([]);
@@ -30,7 +31,7 @@ export const useUserAgents = () => {
       }
 
       if (!participations || participations.length === 0) {
-        console.log('User is not participating in any deliberations');
+        logger.component.update('useUserAgents', { action: 'noDeliberations' });
         setLocalAgents([]);
         return;
       }

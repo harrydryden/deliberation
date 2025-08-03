@@ -10,6 +10,7 @@ import { Brain, Send, Loader2, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
+import { logger } from '@/utils/logger';
 
 interface Message {
   id: string;
@@ -60,7 +61,7 @@ export function RAGChat({ agents }: RAGChatProps) {
 
       // If LangChain function fails, try the original function
       if (error || !data?.success) {
-        console.log('LangChain function failed, trying original function...');
+        logger.component.update('RAGChat', { action: 'fallbackToOriginal', agentId: selectedAgent });
         
         const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('query-agent-knowledge', {
           body: {
@@ -103,7 +104,7 @@ export function RAGChat({ agents }: RAGChatProps) {
         });
       }
     } catch (error: any) {
-      console.error('Chat error:', error);
+      logger.component.error('RAGChat', error);
       toast({
         title: "Error",
         description: `Failed to get response: ${error.message}`,
