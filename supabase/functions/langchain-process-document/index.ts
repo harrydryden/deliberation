@@ -3,8 +3,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 import { OpenAIEmbeddings } from 'https://esm.sh/@langchain/openai@0.6.3';
 import { RecursiveCharacterTextSplitter } from 'https://esm.sh/langchain@0.3.30/text_splitter';
-import { SupabaseVectorStore } from 'https://esm.sh/@langchain/community@0.3.60/vectorstores/supabase';
-import { Document } from 'https://esm.sh/@langchain/core@0.3.60/documents';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
