@@ -7,15 +7,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface SessionState {
-  lastActivityTime: number;
+interface ConversationState {
   messageCount: number;
-  statementCount: number;
-  questionCount: number;
-  topicsEngaged: string[];
+  topicDepth: number;
+  userEngagement: number;
+  lastAgentUsed: string;
+  topicKeywords: string[];
+  ibisElements: {
+    issues: string[];
+    positions: string[];
+    arguments: string[];
+  };
+  lastActivityTime: number;
   usedQuestionIds: string[];
   proactivePromptsCount: number;
   optedOutOfPrompts: boolean;
+}
+
+interface SemanticAnalysis {
+  intent: string;
+  complexity: number; // 0-1
+  topicRelevance: number; // 0-1
+  questionType: 'basic' | 'detailed' | 'argumentative' | 'collaborative';
+  entities: string[];
+  sentiment: number; // -1 to 1
+  requiresExpertise: boolean;
+  discussionPotential: number; // 0-1
 }
 
 interface OrchestrationContext {
@@ -23,7 +40,7 @@ interface OrchestrationContext {
   deliberationId: string;
   userId: string;
   content: string;
-  sessionState: SessionState;
+  conversationState: ConversationState;
   mode: 'chat' | 'learn';
 }
 
@@ -125,43 +142,39 @@ serve(async (req) => {
       deliberationId: deliberationId || message.deliberation_id,
       userId: message.user_id,
       content: message.content,
-      sessionState: await getSessionState(supabase, message.user_id),
+      conversationState: await getConversationState(supabase, message.user_id, deliberationId),
       mode
     };
 
     console.log('🧠 Processing orchestration context for user:', context.userId);
 
-    // Classify input type
-    const inputType = await classifyInput(context.content);
-    console.log('🏷️ Input classified as:', inputType);
+    // Perform semantic analysis
+    const analysis = await analyzeMessage(context.content, context.conversationState, openAIApiKey);
+    console.log('🔬 Semantic analysis:', analysis);
 
-    // Determine which agents should respond
-    const agentTypes = await determineAgentResponses(inputType, context.sessionState, mode);
-    console.log('🤖 Selected agents:', agentTypes);
+    // Select appropriate agent using sophisticated algorithm
+    const selectedAgent = selectAgent(analysis, context.conversationState, mode);
+    console.log('🤖 Selected agent:', selectedAgent);
 
-    // Execute agent responses in parallel
-    const responses = await Promise.allSettled(
-      agentTypes.map(agentType => executeAgentResponse(agentType, context, supabase, openAIApiKey))
-    );
+    // Update conversation state
+    updateConversationState(context.conversationState, analysis, selectedAgent);
 
-    console.log('✅ Agent responses completed');
+    // Execute selected agent response
+    const agentResponse = await executeAgentResponse(selectedAgent, context, supabase, openAIApiKey, analysis);
 
-    // Handle any failures
-    const failures = responses.filter(r => r.status === 'rejected');
-    if (failures.length > 0) {
-      console.warn('⚠️ Some agent responses failed:', failures);
-    }
+    console.log('✅ Agent response completed');
 
     // Handle proactive engagement for Flow Agent
-    if (agentTypes.includes('flow_agent')) {
+    if (selectedAgent === 'flow_agent') {
       await handleProactiveEngagement(context, supabase, openAIApiKey);
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        agentsTriggered: agentTypes,
-        failures: failures.length 
+        selectedAgent,
+        confidence: calculateConfidence(selectedAgent, analysis, context.conversationState),
+        agentResponse: agentResponse ? agentResponse.substring(0, 100) + '...' : 'No response'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -180,129 +193,341 @@ serve(async (req) => {
   }
 });
 
-async function getSessionState(supabase: any, userId: string): Promise<SessionState> {
-  console.log('📊 Getting session state for user:', userId);
+// Semantic analysis using OpenAI GPT-4
+async function analyzeMessage(content: string, state: ConversationState, openAIApiKey: string): Promise<SemanticAnalysis> {
+  const prompt = `
+Analyze this message in the context of an ongoing conversation about a specific topic.
+Current conversation depth: ${state.messageCount} messages
+Topic depth: ${state.topicDepth}
+Previous keywords: ${state.topicKeywords.join(', ')}
+User engagement level: ${state.userEngagement}
 
-  // Fetch recent messages from the user
-  const { data: recentMessages } = await supabase
+Message: "${content}"
+
+Provide analysis in the following JSON format:
+{
+  "intent": "user's primary intent (brief description)",
+  "complexity": 0.0-1.0,
+  "topicRelevance": 0.0-1.0,
+  "questionType": "basic|detailed|argumentative|collaborative",
+  "entities": ["key entities, topics, or concepts mentioned"],
+  "sentiment": -1.0 to 1.0,
+  "requiresExpertise": true|false,
+  "discussionPotential": 0.0-1.0
+}`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are a semantic analyzer for a multi-agent deliberation system. Analyze the message and respond with ONLY valid JSON.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 200
+      })
+    });
+
+    const data = await response.json();
+    const analysisText = data.choices[0].message.content;
+    
+    try {
+      return JSON.parse(analysisText);
+    } catch (parseError) {
+      console.warn('⚠️ Failed to parse semantic analysis JSON, using fallback');
+      return getFallbackAnalysis(content);
+    }
+  } catch (error) {
+    console.error('❌ Semantic analysis error:', error);
+    return getFallbackAnalysis(content);
+  }
+}
+
+// Agent selection algorithm with sophisticated scoring
+function selectAgent(analysis: SemanticAnalysis, state: ConversationState, mode: string): string {
+  // Calculate agent scores
+  const scores = {
+    flow_agent: calculateFlowScore(analysis, state, mode),
+    bill_agent: calculateBillScore(analysis, state, mode),
+    peer_agent: calculatePeerScore(analysis, state, mode)
+  };
+
+  console.log('🎯 Agent scores:', scores);
+
+  // Select agent with highest score
+  return Object.entries(scores).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+}
+
+// Flow Agent scoring (default for basic questions)
+function calculateFlowScore(analysis: SemanticAnalysis, state: ConversationState, mode: string): number {
+  let score = 0.5; // Base score as default agent
+
+  // Boost for basic questions at conversation start
+  if (state.messageCount < 3) score += 0.3;
+  if (analysis.questionType === 'basic') score += 0.4;
+  if (analysis.complexity < 0.3) score += 0.3;
+  
+  // Reduce score for complex or detailed queries
+  if (analysis.requiresExpertise) score -= 0.4;
+  if (analysis.complexity > 0.7) score -= 0.3;
+  
+  // Reduce score as conversation progresses
+  score -= Math.min(state.messageCount * 0.015, 0.3);
+
+  // Mode-specific adjustments
+  if (mode === 'learn') score -= 0.2;
+
+  return Math.max(0, Math.min(1, score));
+}
+
+// Bill Agent scoring (expert knowledge)
+function calculateBillScore(analysis: SemanticAnalysis, state: ConversationState, mode: string): number {
+  let score = 0.25; // Base score
+
+  // Boost for detailed/expert questions
+  if (analysis.questionType === 'detailed') score += 0.5;
+  if (analysis.requiresExpertise) score += 0.4;
+  if (analysis.complexity > 0.6) score += 0.3;
+  if (analysis.topicRelevance > 0.8) score += 0.2;
+  
+  // Consider conversation depth
+  if (state.topicDepth > 2) score += 0.2;
+  
+  // Reduce if too collaborative
+  if (analysis.discussionPotential > 0.7) score -= 0.2;
+
+  // Mode-specific adjustments
+  if (mode === 'learn') score += 0.3;
+
+  return Math.max(0, Math.min(1, score));
+}
+
+// Peer Agent scoring (discussion facilitation)
+function calculatePeerScore(analysis: SemanticAnalysis, state: ConversationState, mode: string): number {
+  let score = 0.15; // Base score
+
+  // Progressive increase based on conversation length
+  score += Math.min(state.messageCount * 0.04, 0.4);
+  
+  // Boost for argumentative/collaborative content
+  if (analysis.questionType === 'argumentative') score += 0.4;
+  if (analysis.questionType === 'collaborative') score += 0.5;
+  if (analysis.discussionPotential > 0.6) score += 0.3;
+  
+  // Boost if IBIS elements are building up
+  const ibisCount = state.ibisElements.issues.length + 
+                   state.ibisElements.positions.length + 
+                   state.ibisElements.arguments.length;
+  score += Math.min(ibisCount * 0.1, 0.3);
+  
+  // Boost for high engagement
+  if (state.userEngagement > 0.7) score += 0.2;
+  
+  // Reduce at very start of conversation
+  if (state.messageCount < 2) score -= 0.3;
+
+  // Mode-specific adjustments
+  if (mode === 'learn') score -= 0.2;
+
+  return Math.max(0, Math.min(1, score));
+}
+
+// Get or initialize conversation state
+async function getConversationState(supabase: any, userId: string, deliberationId: string): Promise<ConversationState> {
+  console.log('📊 Getting conversation state for user:', userId);
+
+  // Fetch recent messages from the conversation
+  let query = supabase
     .from('messages')
-    .select('content, message_type, created_at')
+    .select('content, message_type, created_at, agent_context')
     .eq('user_id', userId)
-    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Last 24 hours
+    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
     .order('created_at', { ascending: false });
 
-  if (!recentMessages) {
-    return getDefaultSessionState();
+  if (deliberationId) {
+    query = query.eq('deliberation_id', deliberationId);
+  }
+
+  const { data: recentMessages } = await query;
+
+  if (!recentMessages || recentMessages.length === 0) {
+    return getDefaultConversationState();
   }
 
   const userMessages = recentMessages.filter(m => m.message_type === 'user');
+  const agentMessages = recentMessages.filter(m => m.message_type !== 'user');
   
-  // Analyze message patterns
-  let statementCount = 0;
-  let questionCount = 0;
-  const topicsEngaged: string[] = [];
-
+  // Analyze message patterns and extract keywords
+  const topicKeywords: string[] = [];
+  const ibisElements = { issues: [], positions: [], arguments: [] };
+  
   userMessages.forEach(message => {
-    if (message.content.includes('?')) {
-      questionCount++;
-    } else {
-      statementCount++;
-    }
-    
-    // Simple topic extraction (could be enhanced with NLP)
-    const words = message.content.toLowerCase().split(' ');
+    // Extract keywords (entities, topics)
+    const words = message.content.toLowerCase().split(/\s+/);
     words.forEach(word => {
-      if (word.length > 5 && !topicsEngaged.includes(word)) {
-        topicsEngaged.push(word);
+      if (word.length > 4 && !topicKeywords.includes(word)) {
+        topicKeywords.push(word);
       }
     });
+
+    // Simple IBIS pattern detection
+    updateIBISFromContent(message.content, ibisElements);
   });
 
+  // Calculate engagement based on message frequency and sentiment patterns
+  const userEngagement = Math.min(userMessages.length / 10, 1) * 0.7 + 
+                        (agentMessages.length > 0 ? 0.3 : 0);
+
+  const lastAgentUsed = agentMessages.length > 0 ? 
+    agentMessages[0].message_type : 'flow_agent';
+
   return {
-    lastActivityTime: Date.now(),
     messageCount: userMessages.length,
-    statementCount,
-    questionCount,
-    topicsEngaged: topicsEngaged.slice(0, 10), // Keep top 10
-    usedQuestionIds: [],
-    proactivePromptsCount: 0,
-    optedOutOfPrompts: false
-  };
-}
-
-function getDefaultSessionState(): SessionState {
-  return {
+    topicDepth: Math.min(Math.floor(userMessages.length / 3), 5),
+    userEngagement,
+    lastAgentUsed,
+    topicKeywords: topicKeywords.slice(0, 10),
+    ibisElements,
     lastActivityTime: Date.now(),
-    messageCount: 0,
-    statementCount: 0,
-    questionCount: 0,
-    topicsEngaged: [],
     usedQuestionIds: [],
     proactivePromptsCount: 0,
     optedOutOfPrompts: false
   };
 }
 
-async function classifyInput(content: string): Promise<string> {
-  // Simple classification logic - could be enhanced with AI
+function getDefaultConversationState(): ConversationState {
+  return {
+    messageCount: 0,
+    topicDepth: 0,
+    userEngagement: 0.5,
+    lastAgentUsed: 'flow_agent',
+    topicKeywords: [],
+    ibisElements: {
+      issues: [],
+      positions: [],
+      arguments: []
+    },
+    lastActivityTime: Date.now(),
+    usedQuestionIds: [],
+    proactivePromptsCount: 0,
+    optedOutOfPrompts: false
+  };
+}
+
+// Update conversation state after processing
+function updateConversationState(state: ConversationState, analysis: SemanticAnalysis, selectedAgent: string): void {
+  state.messageCount++;
+  state.lastAgentUsed = selectedAgent;
+  state.lastActivityTime = Date.now();
+  
+  // Update topic depth
+  if (analysis.complexity > 0.6 || analysis.requiresExpertise) {
+    state.topicDepth = Math.min(state.topicDepth + 1, 5);
+  }
+  
+  // Update engagement
+  const engagementDelta = analysis.sentiment > 0 ? 0.1 : -0.05;
+  state.userEngagement = Math.max(0, Math.min(1, state.userEngagement + engagementDelta));
+  
+  // Update keywords
+  analysis.entities.forEach(entity => {
+    if (!state.topicKeywords.includes(entity)) {
+      state.topicKeywords.push(entity);
+    }
+  });
+  
+  // Keep only recent keywords
+  if (state.topicKeywords.length > 10) {
+    state.topicKeywords = state.topicKeywords.slice(-10);
+  }
+  
+  // Update IBIS elements
+  updateIBISFromAnalysis(analysis, state.ibisElements);
+}
+
+// Update IBIS elements from content
+function updateIBISFromContent(content: string, ibisElements: any): void {
   const lowerContent = content.toLowerCase();
   
-  if (lowerContent.includes('?')) {
-    return 'QUESTION';
+  // Issue patterns
+  if (lowerContent.includes('?') || lowerContent.includes('problem') || 
+      lowerContent.includes('challenge') || lowerContent.includes('issue')) {
+    ibisElements.issues.push(content.substring(0, 100));
   }
   
-  // Look for statement indicators
-  const statementIndicators = ['i think', 'i believe', 'in my opinion', 'i feel', 'my view'];
-  if (statementIndicators.some(indicator => lowerContent.includes(indicator))) {
-    return 'STATEMENT';
+  // Position patterns
+  if (lowerContent.includes('i think') || lowerContent.includes('in my opinion') || 
+      lowerContent.includes('we should') || lowerContent.includes('the solution')) {
+    ibisElements.positions.push(content.substring(0, 100));
   }
   
-  return 'OTHER';
+  // Argument patterns
+  if (lowerContent.includes('because') || lowerContent.includes('therefore') || 
+      lowerContent.includes('however') || lowerContent.includes('evidence')) {
+    ibisElements.arguments.push(content.substring(0, 100));
+  }
 }
 
-async function determineAgentResponses(
-  inputType: string, 
-  sessionState: SessionState, 
-  mode: string
-): Promise<string[]> {
-  const agents: string[] = [];
-
-  // For learn mode, prioritize Bill Agent
-  if (mode === 'learn') {
-    agents.push('bill_agent');
-  } else {
-    // Chat mode - more dynamic selection
-    
-    // Bill Agent for questions and learning
-    if (inputType === 'QUESTION' || sessionState.messageCount < 3) {
-      agents.push('bill_agent');
+// Update IBIS elements from semantic analysis
+function updateIBISFromAnalysis(analysis: SemanticAnalysis, ibisElements: any): void {
+  if (analysis.questionType === 'argumentative') {
+    if (analysis.intent.includes('because') || analysis.intent.includes('therefore')) {
+      ibisElements.arguments.push(analysis.intent);
     }
-
-    // Peer Agent for ongoing discussion
-    if (sessionState.messageCount > 2 && Math.random() > 0.5) {
-      agents.push('peer_agent');
-    }
-
-    // Flow Agent for facilitation
-    if (sessionState.messageCount > 5 || sessionState.statementCount > 3) {
-      agents.push('flow_agent');
-    }
+  } else if (analysis.discussionPotential > 0.7) {
+    ibisElements.positions.push(analysis.intent);
   }
-
-  // Ensure at least Bill Agent responds
-  if (agents.length === 0) {
-    agents.push('bill_agent');
+  
+  if (analysis.intent.includes('?') || analysis.intent.includes('problem')) {
+    ibisElements.issues.push(analysis.intent);
   }
+}
 
-  return agents;
+// Calculate response confidence
+function calculateConfidence(agent: string, analysis: SemanticAnalysis, state: ConversationState): number {
+  const scores = {
+    flow_agent: calculateFlowScore(analysis, state, 'chat'),
+    bill_agent: calculateBillScore(analysis, state, 'chat'),
+    peer_agent: calculatePeerScore(analysis, state, 'chat')
+  };
+  
+  const selectedScore = scores[agent as keyof typeof scores];
+  const totalScore = Object.values(scores).reduce((a, b) => a + b, 0);
+  
+  return totalScore > 0 ? selectedScore / totalScore : 0;
+}
+
+// Fallback analysis for error scenarios
+function getFallbackAnalysis(content: string): SemanticAnalysis {
+  const isQuestion = content.includes('?');
+  const wordCount = content.split(' ').length;
+  const entities = content.split(' ').filter(word => word.length > 5).slice(0, 3);
+  
+  return {
+    intent: content.substring(0, 50),
+    complexity: Math.min(wordCount / 30, 1),
+    topicRelevance: 0.5,
+    questionType: isQuestion ? 'basic' : 'collaborative',
+    entities,
+    sentiment: 0,
+    requiresExpertise: wordCount > 20,
+    discussionPotential: isQuestion ? 0.3 : 0.6
+  };
 }
 
 async function executeAgentResponse(
   agentType: string,
   context: OrchestrationContext,
   supabase: any,
-  openAIApiKey: string
-): Promise<void> {
+  openAIApiKey: string,
+  analysis: SemanticAnalysis
+): Promise<string> {
   console.log(`🎯 Executing ${agentType} response...`);
 
   try {
@@ -317,7 +542,7 @@ async function executeAgentResponse(
 
     if (!agents || agents.length === 0) {
       console.warn(`⚠️ No active ${agentType} found`);
-      return;
+      return '';
     }
 
     const agent = agents[0];
@@ -407,7 +632,12 @@ async function executeAgentResponse(
           agent_id: agent.id,
           agent_name: agent.name,
           response_style: agent.response_style,
-          input_classification: await classifyInput(context.content)
+          input_classification: analysis.questionType,
+          semantic_analysis: {
+            complexity: analysis.complexity,
+            intent: analysis.intent,
+            requiresExpertise: analysis.requiresExpertise
+          }
         }
       });
 
@@ -416,6 +646,8 @@ async function executeAgentResponse(
     } else {
       console.log('✅ Agent response stored successfully!');
     }
+
+    return agentResponse;
 
   } catch (error) {
     console.error(`💥 Error in ${agentType} execution:`, error);
@@ -472,39 +704,41 @@ async function handleProactiveEngagement(
 
 async function shouldSendProactivePrompt(context: OrchestrationContext): Promise<boolean> {
   // Don't overwhelm - limit proactive prompts
-  if (context.sessionState.proactivePromptsCount >= 3) {
+  if (context.conversationState.proactivePromptsCount >= 3) {
     return false;
   }
 
   // Don't prompt if user opted out
-  if (context.sessionState.optedOutOfPrompts) {
+  if (context.conversationState.optedOutOfPrompts) {
     return false;
   }
 
   // Send prompts based on engagement patterns
-  const timeSinceLastActivity = Date.now() - context.sessionState.lastActivityTime;
-  const isEngaged = context.sessionState.messageCount > 3;
-  const hasStatements = context.sessionState.statementCount > 1;
+  const timeSinceLastActivity = Date.now() - context.conversationState.lastActivityTime;
+  const isEngaged = context.conversationState.messageCount > 3;
+  const hasIbisElements = (context.conversationState.ibisElements.issues.length + 
+                          context.conversationState.ibisElements.positions.length + 
+                          context.conversationState.ibisElements.arguments.length) > 1;
 
-  return isEngaged && hasStatements && timeSinceLastActivity < 5 * 60 * 1000; // Within 5 minutes
+  return isEngaged && hasIbisElements && timeSinceLastActivity < 5 * 60 * 1000; // Within 5 minutes
 }
 
 function selectProactiveQuestion(context: OrchestrationContext): FacilitatorQuestion | null {
   // Filter out already used questions
   const availableQuestions = FACILITATION_QUESTIONS.filter(
-    q => !context.sessionState.usedQuestionIds.includes(q.id)
+    q => !context.conversationState.usedQuestionIds.includes(q.id)
   );
 
   if (availableQuestions.length === 0) {
     return null;
   }
 
-  // Select based on session characteristics
+  // Select based on conversation characteristics
   let preferredCategory: string | null = null;
 
-  if (context.sessionState.questionCount > context.sessionState.statementCount) {
+  if (context.conversationState.ibisElements.arguments.length > context.conversationState.ibisElements.positions.length) {
     preferredCategory = 'clarification';
-  } else if (context.sessionState.messageCount > 8) {
+  } else if (context.conversationState.messageCount > 8) {
     preferredCategory = 'synthesis';
   } else {
     preferredCategory = 'exploration';
