@@ -10,6 +10,7 @@ import { Loader2, Shield } from "lucide-react";
 import { getErrorMessage, ValidationError } from "@/utils/errors";
 import { accessCodeSchema, sanitizeInput, validateAndSanitize } from "@/utils/validation";
 import { authRateLimit, logSecurityEvent } from "@/utils/security";
+import { validateInput, criticalOpRateLimit } from "@/utils/securityValidation";
 
 export const AuthForm = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -47,9 +48,32 @@ export const AuthForm = () => {
       return;
     }
 
-    // Enhanced validation with security measures
+    // Enhanced validation with advanced security measures
     const sanitizedCode = sanitizeInput(accessCode);
-    const validation = validateAndSanitize(accessCodeSchema, sanitizedCode);
+    const securityValidation = validateInput(sanitizedCode, 'accessCode');
+    
+    if (!securityValidation.isValid) {
+      setValidationError(securityValidation.errors.join(', '));
+      toast({
+        variant: "destructive", 
+        title: "Invalid Access Code",
+        description: securityValidation.errors[0]
+      });
+      logSecurityEvent('auth_invalid_format', { 
+        code: accessCode.replace(/./g, '*'),
+        errors: securityValidation.errors,
+        riskLevel: securityValidation.riskLevel 
+      });
+      
+      // Additional rate limiting for high-risk attempts
+      if (securityValidation.riskLevel === 'high' || securityValidation.riskLevel === 'critical') {
+        criticalOpRateLimit.canAttempt(clientId);
+      }
+      return;
+    }
+    
+    // Schema validation for final check
+    const validation = validateAndSanitize(accessCodeSchema, securityValidation.sanitized!);
     
     if (!validation.success) {
       const errorMessage = 'error' in validation ? validation.error : 'Validation failed';
@@ -59,7 +83,10 @@ export const AuthForm = () => {
         title: "Invalid Access Code",
         description: errorMessage
       });
-      logSecurityEvent('auth_invalid_format', { code: accessCode.replace(/./g, '*') });
+      logSecurityEvent('auth_schema_validation_failed', { 
+        code: accessCode.replace(/./g, '*'),
+        riskLevel: 'medium' 
+      });
       return;
     }
 
@@ -72,7 +99,13 @@ export const AuthForm = () => {
       await authenticate(validation.data);
       console.log('✅ Authentication successful, letting Auth page handle redirect...');
       authRateLimit.reset(clientId); // Reset on success
-      logSecurityEvent('auth_success', { timestamp: Date.now() });
+      criticalOpRateLimit.reset(clientId); // Reset critical rate limit too
+      logSecurityEvent('auth_success', { 
+        timestamp: Date.now(),
+        sessionId: crypto.randomUUID(),
+        codeLength: validation.data.length,
+        riskLevel: 'low'
+      });
       toast({
         title: "Welcome!",
         description: "Successfully authenticated"
@@ -83,7 +116,10 @@ export const AuthForm = () => {
       logSecurityEvent('auth_failed', { 
         error: error.message, 
         timestamp: Date.now(),
-        userAgent: window.navigator.userAgent.slice(0, 50)
+        userAgent: window.navigator.userAgent.slice(0, 50),
+        codeLength: accessCode.length,
+        isRateLimited: !authRateLimit.canAttempt(clientId),
+        riskLevel: 'medium'
       });
       toast({
         variant: "destructive",

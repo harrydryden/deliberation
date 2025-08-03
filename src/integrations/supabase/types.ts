@@ -865,6 +865,42 @@ export type Database = {
           },
         ]
       }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          ip_address: unknown | null
+          is_active: boolean | null
+          last_active: string | null
+          session_token_hash: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean | null
+          last_active?: string | null
+          session_token_hash: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean | null
+          last_active?: string | null
+          session_token_hash?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       notions: {
@@ -980,6 +1016,16 @@ export type Database = {
       cleanup_expired_access_codes: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      enhanced_audit_log: {
+        Args: {
+          operation_type: string
+          table_name?: string
+          record_id?: string
+          details?: Json
+          risk_level?: string
+        }
+        Returns: undefined
       }
       generate_secure_access_code: {
         Args: Record<PropertyKey, never>
@@ -1119,6 +1165,18 @@ export type Database = {
           expired: boolean
           max_uses_reached: boolean
         }[]
+      }
+      validate_access_code_security: {
+        Args: { code_to_check: string; user_ip?: unknown }
+        Returns: Json
+      }
+      validate_role_change: {
+        Args: {
+          target_user_id: string
+          new_role: string
+          current_user_role?: string
+        }
+        Returns: boolean
       }
       vector_avg: {
         Args: { "": number[] }
