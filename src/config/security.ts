@@ -63,9 +63,10 @@ export const SECURITY_CONFIG = {
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   },
   
-  // Allowed redirect URLs
+  // Allowed redirect URLs - restrict to known safe origins
   ALLOWED_ORIGINS: [
     'https://95847591-350e-48fd-8530-0c2bb5de6650.lovableproject.com',
+    // Add production domain when available
   ],
   
   // Audit logging

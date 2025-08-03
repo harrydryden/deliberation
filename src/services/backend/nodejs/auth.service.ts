@@ -126,36 +126,24 @@ export class NodeJSAuthService implements IAuthService {
   }
 
   hasValidToken(): boolean {
+    // CRITICAL SECURITY NOTE: This method is INSECURE and should NEVER be used for authorization
+    // Client-side JWT parsing cannot verify signatures and is vulnerable to tampering
+    // This exists ONLY for UX optimization - all security decisions must happen server-side
     if (!this.token) return false;
     
-    // WARNING: Client-side JWT validation is NOT secure
-    // This is only for UX - all security validation must happen server-side
     try {
-      const payload = this.parseTokenPayload(this.token);
-      // Add buffer time to account for clock skew
-      const bufferTime = 30; // 30 seconds
-      return payload.exp > (Date.now() / 1000) + bufferTime;
+      // Basic token format validation (no signature verification)
+      const parts = this.token.split('.');
+      if (parts.length !== 3) return false;
+      
+      // Parse payload WITHOUT signature verification (INSECURE)
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+      
+      // Simple expiry check with generous buffer for UX only
+      const bufferTime = 60; // 60 seconds buffer
+      return payload.exp && payload.exp > (Date.now() / 1000) + bufferTime;
     } catch {
       return false;
-    }
-  }
-
-  private parseTokenPayload(token: string): any {
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      throw new AuthenticationError('Invalid token format');
-    }
-    
-    try {
-      // WARNING: This does NOT verify the JWT signature
-      // Client-side JWT parsing is INSECURE and only for UX
-      // All actual authentication must be verified server-side
-      const payload = parts[1];
-      const padded = payload + '='.repeat((4 - payload.length % 4) % 4);
-      const decoded = atob(padded);
-      return JSON.parse(decoded);
-    } catch {
-      throw new AuthenticationError('Failed to parse token');
     }
   }
 }

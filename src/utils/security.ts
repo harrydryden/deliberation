@@ -47,8 +47,8 @@ export class ClientRateLimit {
   }
 }
 
-// Authentication rate limiter - aligned with backend configuration
-export const authRateLimit = new ClientRateLimit(5, 15 * 60 * 1000); // 5 attempts per 15 minutes (matches backend)
+// Authentication rate limiter - aligned with backend configuration  
+export const authRateLimit = new ClientRateLimit(3, 15 * 60 * 1000); // 3 attempts per 15 minutes (critical security)
 
 // Admin action rate limiter
 export const adminRateLimit = new ClientRateLimit(10, 60 * 1000); // 10 attempts per minute

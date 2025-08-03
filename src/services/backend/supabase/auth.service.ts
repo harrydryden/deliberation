@@ -182,6 +182,8 @@ export class SupabaseAuthService implements IAuthService {
   }
 
   hasValidToken(): boolean {
+    // SECURITY: For Supabase, rely on session management
+    // Token validity is handled by Supabase internally
     return !!this.token;
   }
 
