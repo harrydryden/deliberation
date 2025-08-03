@@ -5,6 +5,9 @@ import { backendServiceFactory } from '@/services/backend/factory';
 import { BACKEND_CONFIG } from '@/config/backend';
 import { supabase } from '@/integrations/supabase/client';
 import { userCache } from '@/utils/validation';
+import { logger } from '@/utils/logger';
+import { useOptimizedBoolean } from '@/hooks/useOptimizedState';
+import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 
 // Create context with a default value to prevent undefined errors
 const defaultAuthContext: AuthContextType = {
@@ -23,42 +26,44 @@ interface BackendAuthProviderProps {
 }
 
 export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
+  useMemoryLeakDetection('BackendAuthProvider');
+  
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [authInProgress, setAuthInProgress] = useState(false);
+  const [isLoading, setIsLoading] = useOptimizedBoolean(true);
+  const [isInitialized, setIsInitialized] = useOptimizedBoolean(false);
+  const [authInProgress, setAuthInProgress] = useOptimizedBoolean(false);
 
   // Get auth service safely
   const authService = React.useMemo(() => {
     try {
       return backendServiceFactory.getAuthService();
     } catch (error) {
-      console.error('Failed to get auth service:', error);
+      logger.error('Failed to get auth service', error);
       return null;
     }
   }, []);
 
   const initializeAuth = useCallback(async () => {
     if (isInitialized || authInProgress || !authService) {
-      console.log('🔄 Auth already initialized or in progress, or no auth service, skipping');
+      logger.auth.progress('Auth already initialized or in progress, or no auth service, skipping');
       return;
     }
 
     setAuthInProgress(true);
-    console.log('🚀 Initializing auth...');
+    logger.auth.start('Initializing auth...');
 
     try {
       if (authService.hasValidToken()) {
-        console.log('🔑 Valid token found, getting current user...');
+        logger.auth.info('Valid token found, getting current user...');
         const currentUser = await authService.getCurrentUser();
         setUser(currentUser);
-        console.log('✅ Auth initialized successfully with user:', currentUser.id);
+        logger.auth.success('Auth initialized successfully with user', { userId: currentUser.id });
       } else {
-        console.log('🔑 No valid token found');
+        logger.auth.info('No valid token found');
         setUser(null);
       }
     } catch (error) {
-      console.error('❌ Failed to initialize auth:', error);
+      logger.auth.failure('Failed to initialize auth', error);
       if (authService) {
         authService.setToken(null);
       }
@@ -67,7 +72,7 @@ export const BackendAuthProvider = ({ children }: BackendAuthProviderProps) => {
       setIsLoading(false);
       setIsInitialized(true);
       setAuthInProgress(false);
-      console.log('🎯 Auth initialization completed');
+      logger.auth.complete('Auth initialization completed');
     }
   }, [authService, isInitialized, authInProgress]);
 
