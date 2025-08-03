@@ -1,36 +1,72 @@
 import { z } from 'zod';
+import DOMPurify from 'dompurify';
 
-// Simplified validation for performance
+// Enhanced input sanitization with XSS protection
 export const sanitizeInput = (input: string): string => {
-  return input.trim(); // Minimal sanitization
+  return DOMPurify.sanitize(input.trim(), { ALLOWED_TAGS: [] });
 };
 
-// Basic access code validation (performance focused)
-export const accessCodeSchema = z.string()
-  .regex(/^\d{10}$/, "Access code must be exactly 10 digits");
+// SQL injection prevention
+export const sanitizeForDatabase = (input: string): string => {
+  return input
+    .trim()
+    .replace(/['"\\;]/g, '') // Remove potential SQL injection characters
+    .replace(/[<>]/g, '') // Remove potential XSS characters
+    .substring(0, 5000); // Limit length
+};
 
-// Simplified profile validation
+// Enhanced validation schemas with stricter security
+export const accessCodeSchema = z.string()
+  .length(10, 'Access code must be exactly 10 characters')
+  .regex(/^[A-Z0-9]+$/, 'Access code must contain only uppercase letters and numbers')
+  .transform(val => val.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+
 export const displayNameSchema = z.string()
-  .min(1, "Display name is required")
-  .max(100, "Display name too long");
+  .min(1, 'Display name is required')
+  .max(100, 'Display name must be less than 100 characters')
+  .regex(/^[a-zA-Z0-9\s\-_\.]+$/, 'Display name contains invalid characters')
+  .transform(sanitizeInput);
 
 export const bioSchema = z.string()
-  .max(1000, "Bio too long")
+  .max(1000, 'Bio must be less than 1000 characters')
+  .transform(sanitizeInput)
   .optional();
 
-// Basic message validation
 export const messageContentSchema = z.string()
-  .min(1, "Message cannot be empty")
-  .max(5000, "Message too long");
+  .min(1, 'Message content is required')
+  .max(5000, 'Message content must be less than 5000 characters')
+  .transform(sanitizeInput);
 
-// Simple deliberation validation
 export const deliberationTitleSchema = z.string()
-  .min(1, "Title is required")
-  .max(200, "Title too long");
+  .min(1, 'Title is required')
+  .max(200, 'Title must be less than 200 characters')
+  .regex(/^[a-zA-Z0-9\s\-_\.\,\!\?]+$/, 'Title contains invalid characters')
+  .transform(sanitizeInput);
 
 export const deliberationDescriptionSchema = z.string()
-  .max(2000, "Description too long")
+  .max(2000, 'Description must be less than 2000 characters')
+  .transform(sanitizeInput)
   .optional();
+
+// Admin role validation
+export const userRoleSchema = z.enum(['admin', 'moderator', 'user'], {
+  errorMap: () => ({ message: 'Invalid user role' })
+});
+
+// Email validation for security
+export const emailSchema = z.string()
+  .email('Invalid email format')
+  .max(254, 'Email too long')
+  .transform(val => val.toLowerCase().trim());
+
+// URL validation for safe redirects
+export const urlSchema = z.string()
+  .url('Invalid URL format')
+  .max(2048, 'URL too long')
+  .refine(url => {
+    const allowed = ['http:', 'https:'];
+    return allowed.includes(new URL(url).protocol);
+  }, 'Only HTTP and HTTPS URLs are allowed');
 
 // Fast validation utility
 export const validateAndSanitize = <T>(

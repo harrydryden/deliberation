@@ -237,6 +237,45 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          ip_address: unknown | null
+          new_values: Json | null
+          old_values: Json | null
+          record_id: string | null
+          table_name: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string | null
+          table_name?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       classified_items: {
         Row: {
           ai_generated: boolean | null
@@ -922,6 +961,10 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      can_user_change_role: {
+        Args: { target_user_id: string; new_role: string }
+        Returns: boolean
+      }
       cleanup_expired_access_codes: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -1001,6 +1044,16 @@ export type Database = {
       l2_normalize: {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: string
+      }
+      log_admin_action: {
+        Args: {
+          p_action: string
+          p_table_name?: string
+          p_record_id?: string
+          p_old_values?: Json
+          p_new_values?: Json
+        }
+        Returns: undefined
       }
       match_agent_knowledge: {
         Args: {
