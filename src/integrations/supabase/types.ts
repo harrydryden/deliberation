@@ -434,6 +434,45 @@ export type Database = {
           },
         ]
       }
+      file_processing_logs: {
+        Row: {
+          created_at: string | null
+          error_details: Json | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          processing_status: string | null
+          security_scan_status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_details?: Json | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          processing_status?: string | null
+          security_scan_status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_details?: Json | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          processing_status?: string | null
+          security_scan_status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       ibis_nodes: {
         Row: {
           created_at: string | null
@@ -814,6 +853,42 @@ export type Database = {
         }
         Relationships: []
       }
+      security_events: {
+        Row: {
+          created_at: string | null
+          details: Json | null
+          event_type: string
+          id: string
+          ip_address: unknown | null
+          resolved: boolean | null
+          risk_level: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          details?: Json | null
+          event_type: string
+          id?: string
+          ip_address?: unknown | null
+          resolved?: boolean | null
+          risk_level?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          details?: Json | null
+          event_type?: string
+          id?: string
+          ip_address?: unknown | null
+          resolved?: boolean | null
+          risk_level?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       submissions: {
         Row: {
           created_at: string | null
@@ -1166,8 +1241,16 @@ export type Database = {
           max_uses_reached: boolean
         }[]
       }
+      validate_access_code_enhanced: {
+        Args: { input_code: string; user_ip?: unknown }
+        Returns: Json
+      }
       validate_access_code_security: {
         Args: { code_to_check: string; user_ip?: unknown }
+        Returns: Json
+      }
+      validate_password_strength: {
+        Args: { password: string }
         Returns: Json
       }
       validate_role_change: {
