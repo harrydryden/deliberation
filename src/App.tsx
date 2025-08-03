@@ -31,7 +31,6 @@ const App = () => (
               <Route path="/backend" element={<BackendSelector />} />
               <Route path="/deliberations" element={<Deliberations />} />
               <Route path="/deliberations/:deliberationId" element={<DeliberationChat />} />
-              <Route path="/knowledge" element={<KnowledgeBase />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
