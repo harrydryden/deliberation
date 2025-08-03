@@ -786,6 +786,7 @@ export type Database = {
           display_name: string | null
           expertise_areas: string[] | null
           id: string
+          role: string | null
           updated_at: string | null
           user_role: string | null
         }
@@ -796,6 +797,7 @@ export type Database = {
           display_name?: string | null
           expertise_areas?: string[] | null
           id: string
+          role?: string | null
           updated_at?: string | null
           user_role?: string | null
         }
@@ -806,6 +808,7 @@ export type Database = {
           display_name?: string | null
           expertise_areas?: string[] | null
           id?: string
+          role?: string | null
           updated_at?: string | null
           user_role?: string | null
         }
