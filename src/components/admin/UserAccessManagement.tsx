@@ -208,7 +208,6 @@ export const UserAccessManagement = ({
                       <TableHead>User ID</TableHead>
                       <TableHead>Access Code</TableHead>
                       <TableHead>Role</TableHead>
-                      <TableHead>Code Type</TableHead>
                       <TableHead>Deliberations</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -249,9 +248,6 @@ export const UserAccessManagement = ({
                               <SelectItem value="admin">Admin</SelectItem>
                             </SelectContent>
                           </Select>
-                        </TableCell>
-                        <TableCell>
-                          {getTypeBadge(getUserCodeType(user.accessCode))}
                         </TableCell>
                         <TableCell>
                           <div className="space-y-1">
