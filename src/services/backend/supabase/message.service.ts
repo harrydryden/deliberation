@@ -56,34 +56,34 @@ export class SupabaseMessageService implements IMessageService {
 
   private async triggerAgentResponses(messageId: string, deliberationId: string, mode: 'chat' | 'learn' = 'chat') {
     try {
-      console.log('🤖 Triggering agent responses with memory for message:', messageId, 'in deliberation:', deliberationId);
+      console.log('🤖 Triggering agent orchestration for message:', messageId, 'in deliberation:', deliberationId);
       
-      // Call the memory-enhanced agent-response edge function
-      console.log('📞 Calling agent-response-with-memory function...');
-      const { data, error } = await supabase.functions.invoke('agent-response-with-memory', {
+      // Call the new orchestration edge function
+      console.log('📞 Calling agent-orchestration function...');
+      const { data, error } = await supabase.functions.invoke('agent-orchestration', {
         body: { messageId, deliberationId, mode }
       });
 
-      console.log('📊 Memory function response:', { data, error });
+      console.log('📊 Orchestration function response:', { data, error });
 
       if (error) {
-        console.error('❌ Failed to trigger agent responses with memory:', error);
-        // Fallback to original function
-        console.log('🔄 Falling back to original agent-response function...');
-        const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('agent-response', {
+        console.error('❌ Failed to trigger agent orchestration:', error);
+        // Fallback to memory function
+        console.log('🔄 Falling back to agent-response-with-memory function...');
+        const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('agent-response-with-memory', {
           body: { messageId, deliberationId, mode }
         });
         
         if (fallbackError) {
           console.error('❌ Fallback agent response also failed:', fallbackError);
         } else {
-          console.log('✅ Fallback agent responses triggered successfully:', fallbackData);
+          console.log('✅ Fallback agent response triggered successfully:', fallbackData);
         }
       } else {
-        console.log('✅ Agent responses with memory triggered successfully:', data);
+        console.log('✅ Agent orchestration triggered successfully:', data);
       }
     } catch (error) {
-      console.error('💥 Error triggering agent responses:', error);
+      console.error('💥 Error triggering agent orchestration:', error);
     }
   }
 
