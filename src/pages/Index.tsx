@@ -6,13 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MessageSquare, Users, Vote, Brain, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
-
 const Index = () => {
-  const { user } = useBackendAuth();
+  const {
+    user
+  } = useBackendAuth();
   const navigate = useNavigate();
   const deliberationService = useDeliberationService();
   const [deliberations, setDeliberations] = useState<any[]>([]);
-
   useEffect(() => {
     if (!user) {
       navigate("/auth");
@@ -20,7 +20,6 @@ const Index = () => {
       loadDeliberations();
     }
   }, [user, navigate]);
-
   const loadDeliberations = async () => {
     try {
       const data = await deliberationService.getDeliberations();
@@ -30,23 +29,17 @@ const Index = () => {
       setDeliberations([]);
     }
   };
-
   if (!user) {
     return null;
   }
-
-  return (
-    <Layout>
+  return <Layout>
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Hero Section */}
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold text-democratic-blue">
             Welcome to Deliberation
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Engage in meaningful conversations that shape our collective future. 
-            Our AI-mediated platform facilitates structured dialogue using the IBIS framework.
-          </p>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Shape the future of democracy</p>
         </div>
 
         {/* Features Grid */}
@@ -57,9 +50,7 @@ const Index = () => {
                 <MessageSquare className="h-5 w-5 text-democratic-blue" />
                 <span>Structured Discussions</span>
               </CardTitle>
-              <CardDescription>
-                Participate in deliberations guided by AI agents that facilitate productive dialogue
-              </CardDescription>
+              <CardDescription>Participate in topically conversations to learn and have your say on important topics</CardDescription>
             </CardHeader>
           </Card>
 
@@ -67,11 +58,9 @@ const Index = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Brain className="h-5 w-5 text-democratic-green" />
-                <span>AI Mediation</span>
+                <span>Mediation</span>
               </CardTitle>
-              <CardDescription>
-                Three specialized AI agents help structure arguments and maintain focus
-              </CardDescription>
+              <CardDescription>Agents facilitate an intuitive dialogue with your peers and with verified knowledge sources</CardDescription>
             </CardHeader>
           </Card>
 
@@ -91,11 +80,9 @@ const Index = () => {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Vote className="h-5 w-5 text-primary" />
-                <span>IBIS Framework</span>
+                <span>Framework</span>
               </CardTitle>
-              <CardDescription>
-                Organize thoughts using Issues, Positions, and Arguments for clarity
-              </CardDescription>
+              <CardDescription>Organise collective thoughts using Issues, Positions, and Arguments for clarity</CardDescription>
             </CardHeader>
           </Card>
         </div>
@@ -106,29 +93,17 @@ const Index = () => {
             Ready to start deliberating?
           </h2>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            {deliberations.length > 0 ? (
-              <Button 
-                className="bg-democratic-blue hover:bg-democratic-blue/90"
-                onClick={() => navigate("/deliberations")}
-              >
+            {deliberations.length > 0 ? <Button className="bg-democratic-blue hover:bg-democratic-blue/90" onClick={() => navigate("/deliberations")}>
                 View Available Deliberations
-              </Button>
-            ) : (
-              <p className="text-muted-foreground text-center">
+              </Button> : <p className="text-muted-foreground text-center">
                 No deliberations are currently available. Please contact an administrator to set up new discussions.
-              </p>
-            )}
-            <Button 
-              variant="ghost"
-              onClick={() => navigate("/backend")}
-            >
+              </p>}
+            <Button variant="ghost" onClick={() => navigate("/backend")}>
               Backend Config
             </Button>
           </div>
         </div>
       </div>
-    </Layout>
-  );
+    </Layout>;
 };
-
 export default Index;
