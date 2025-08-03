@@ -208,7 +208,7 @@ export function RAGChat({ agents }: RAGChatProps) {
                   <div className="bg-muted p-3 rounded-lg">
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">Thinking...</span>
+                      <span className="text-sm">Deliberating...</span>
                     </div>
                   </div>
                 </div>

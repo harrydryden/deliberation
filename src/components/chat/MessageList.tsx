@@ -171,7 +171,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis }: Mess
             </AvatarFallback>
           </Avatar>
           <div className="flex-1">
-            <div className="text-sm font-medium mb-1">AI is thinking...</div>
+            <div className="text-sm font-medium mb-1">AI is deliberating...</div>
             <Card className="p-3 bg-muted">
               <div className="flex gap-1">
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
