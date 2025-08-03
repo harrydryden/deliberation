@@ -57,7 +57,7 @@ export class SupabaseAdminService implements IAdminService {
   async updateUserRole(userId: string, role: string): Promise<void> {
     const { error } = await supabase
       .from('profiles')
-      .update({ user_role: role })
+      .update({ role: role })
       .eq('id', userId);
 
     if (error) throw error;

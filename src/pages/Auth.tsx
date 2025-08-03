@@ -19,6 +19,15 @@ const Auth = () => {
 
   const loadDeliberations = async () => {
     try {
+      console.log('👤 User role:', user?.role);
+      
+      // Check if user is admin and redirect accordingly
+      if (user?.role === 'admin') {
+        console.log('✅ Admin user detected, redirecting to admin dashboard');
+        navigate('/admin');
+        return;
+      }
+      
       const data = await deliberationService.getDeliberations();
       setDeliberations(data);
       
@@ -34,8 +43,14 @@ const Auth = () => {
       }
     } catch (error) {
       console.error('Failed to load deliberations:', error);
-      // Fallback to deliberations page
-      navigate("/deliberations");
+      // Check if user is admin even if deliberations fail to load
+      if (user?.role === 'admin') {
+        console.log('✅ Admin user detected (fallback), redirecting to admin dashboard');
+        navigate('/admin');
+      } else {
+        // Fallback to deliberations page
+        navigate("/deliberations");
+      }
     }
   };
 
@@ -48,9 +63,10 @@ const Auth = () => {
   }
   
   if (user) {
+    const destinationText = user.role === 'admin' ? 'admin dashboard' : 'deliberations';
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div>Redirecting to deliberations...</div>
+        <div>Redirecting to {destinationText}...</div>
       </div>
     );
   }

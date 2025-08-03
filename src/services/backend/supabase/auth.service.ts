@@ -79,7 +79,7 @@ export class SupabaseAuthService implements IAuthService {
       // Get user profile including role
       const { data: profile } = await supabase
         .from('profiles')
-        .select('user_role, display_name, expertise_areas')
+        .select('role, display_name, expertise_areas')
         .eq('id', signInData.user.id)
         .single();
       
@@ -101,7 +101,7 @@ export class SupabaseAuthService implements IAuthService {
     // Get user profile including role
     const { data: profile } = await supabase
       .from('profiles')
-      .select('user_role, display_name, expertise_areas')
+      .select('role, display_name, expertise_areas')
       .eq('id', authData.user.id)
       .single();
     
@@ -159,7 +159,7 @@ export class SupabaseAuthService implements IAuthService {
     // Get user profile including role
     const { data: profile } = await supabase
       .from('profiles')
-      .select('user_role, display_name, expertise_areas')
+      .select('role, display_name, expertise_areas')
       .eq('id', data.user.id)
       .single();
     
@@ -190,7 +190,7 @@ export class SupabaseAuthService implements IAuthService {
     return {
       id: supabaseUser.id,
       accessCode,
-      role: profile?.user_role || 'user',
+      role: profile?.role || 'user',
       profile: {
         displayName: profile?.display_name || `User ${accessCode}`,
         expertiseAreas: profile?.expertise_areas || [],
