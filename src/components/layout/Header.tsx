@@ -28,7 +28,7 @@ export const Header = () => {
               <MessageSquare className="h-4 w-4" />
               <span>Deliberations</span>
             </Button>
-            {user.role === 'admin' && (
+            {(console.log('🔍 Current user role in Header:', user.role), user.role === 'admin') && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -57,6 +57,16 @@ export const Header = () => {
             >
               <LogOut className="h-4 w-4" />
               <span>Sign Out</span>
+            </Button>
+            {/* Temporary admin access button for debugging */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate('/admin')}
+              className="flex items-center space-x-1"
+            >
+              <Brain className="h-4 w-4" />
+              <span>Admin (Direct)</span>
             </Button>
           </div>
         )}
