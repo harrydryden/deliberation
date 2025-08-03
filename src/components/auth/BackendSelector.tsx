@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useBackendAuth } from '@/hooks/useBackendAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,7 +8,21 @@ import { BACKEND_CONFIG } from '@/config/backend';
 import { Database, Server, Zap, Shield } from 'lucide-react';
 
 export const BackendSelector = () => {
+  const { user, isLoading } = useBackendAuth();
+  const navigate = useNavigate();
   const [currentBackend] = useState(BACKEND_CONFIG.type);
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigate("/auth");
+    } else if (!isLoading && user && user.role !== 'admin') {
+      navigate("/");
+    }
+  }, [user, isLoading, navigate]);
+
+  if (isLoading) return null;
+  if (!user) return null;
+  if (user.role !== 'admin') return null;
 
   const backends = [
     {
