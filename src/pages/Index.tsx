@@ -98,9 +98,6 @@ const Index = () => {
               </Button> : <p className="text-muted-foreground text-center">
                 No deliberations are currently available. Please contact an administrator to set up new discussions.
               </p>}
-            <Button variant="ghost" onClick={() => navigate("/backend")}>
-              Backend Config
-            </Button>
           </div>
         </div>
       </div>
