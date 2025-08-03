@@ -58,16 +58,6 @@ export const Header = () => {
               <LogOut className="h-4 w-4" />
               <span>Sign Out</span>
             </Button>
-            {/* Temporary admin access button for debugging */}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate('/admin')}
-              className="flex items-center space-x-1"
-            >
-              <Brain className="h-4 w-4" />
-              <span>Admin (Direct)</span>
-            </Button>
           </div>
         )}
       </div>
