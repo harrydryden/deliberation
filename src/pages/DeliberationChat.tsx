@@ -24,6 +24,7 @@ interface Deliberation {
   is_public: boolean;
   max_participants: number;
   participants?: any[];
+  participant_count?: number;
 }
 
 const DeliberationChat = () => {
@@ -198,7 +199,7 @@ const DeliberationChat = () => {
               
               <div className="flex items-center space-x-1 text-sm text-muted-foreground">
                 <Users className="h-4 w-4" />
-                <span>{deliberation.participants?.length || 0}/{deliberation.max_participants}</span>
+                <span>{deliberation.participants?.length || deliberation.participant_count || 0}/{deliberation.max_participants}</span>
               </div>
               
               {!isParticipant && (

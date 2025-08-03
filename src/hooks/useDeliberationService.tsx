@@ -170,6 +170,9 @@ class SupabaseDeliberationService implements DeliberationService {
       throw new Error('Deliberation not found');
     }
     
+    // Add participant count as a fallback
+    data.participant_count = data.participants?.length || 0;
+    
     console.log('✅ Deliberation details retrieved successfully');
     return data;
   }
