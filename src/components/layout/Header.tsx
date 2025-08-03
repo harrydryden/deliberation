@@ -28,15 +28,6 @@ export const Header = () => {
               <MessageSquare className="h-4 w-4" />
               <span>Deliberations</span>
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/knowledge')}
-              className="flex items-center space-x-1"
-            >
-              <Brain className="h-4 w-4" />
-              <span>Knowledge</span>
-            </Button>
             {user.role === 'admin' && (
               <Button
                 variant="ghost"
