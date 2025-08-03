@@ -46,7 +46,8 @@ export function RAGChat({ agents }: RAGChatProps) {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('query-agent-knowledge', {
+      // Try LangChain function first, fallback to original if needed
+      const { data, error } = await supabase.functions.invoke('langchain-query-knowledge', {
         body: {
           query: inputMessage,
           agentId: selectedAgent,
@@ -54,25 +55,50 @@ export function RAGChat({ agents }: RAGChatProps) {
         }
       });
 
-      if (error) {
-        throw new Error(error.message || 'Query failed');
+      let responseData = data;
+      let hasError = error;
+
+      // If LangChain function fails, try the original function
+      if (error || !data?.success) {
+        console.log('LangChain function failed, trying original function...');
+        
+        const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('query-agent-knowledge', {
+          body: {
+            query: inputMessage,
+            agentId: selectedAgent,
+            maxResults: 5
+          }
+        });
+        
+        responseData = fallbackData;
+        hasError = fallbackError;
+      }
+
+      if (hasError) {
+        throw new Error(hasError.message || 'Query failed');
       }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: data?.response || 'No response received',
+        content: responseData?.response || 'No response received',
         timestamp: new Date(),
-        knowledgeChunks: data?.knowledgeChunks || 0,
-        relevantKnowledge: data?.relevantKnowledge || []
+        knowledgeChunks: responseData?.knowledgeChunks || 0,
+        relevantKnowledge: responseData?.relevantKnowledge || []
       };
 
       setMessages(prev => [...prev, assistantMessage]);
 
-      if (data?.knowledgeChunks === 0) {
+      if (responseData?.knowledgeChunks === 0) {
         toast({
           title: "Notice",
           description: "No relevant knowledge found for this query. Consider uploading relevant documents.",
+          variant: "default"
+        });
+      } else if (responseData?.langchainProcessed) {
+        toast({
+          title: "LangChain Enhanced",
+          description: "Response generated using LangChain RAG for improved accuracy.",
           variant: "default"
         });
       }

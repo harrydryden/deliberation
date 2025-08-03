@@ -65,30 +65,55 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       setUploadProgress(50);
       console.log('File uploaded successfully:', uploadData.path);
 
-      // Trigger background processing
-      const { data, error } = await supabase.functions.invoke('process-document', {
-        body: {
-          agentId: selectedAgent,
-          storagePath: uploadData.path,
-          fileName: file.name,
-          contentType: file.type
-        }
-      });
+      // Try LangChain processing first, fallback to original if needed
+      let processingData, processingError;
+      
+      try {
+        const result = await supabase.functions.invoke('langchain-process-document', {
+          body: {
+            agentId: selectedAgent,
+            storagePath: uploadData.path,
+            fileName: file.name,
+            contentType: fileExt === 'pdf' ? 'pdf' : 'text'
+          }
+        });
+        
+        processingData = result.data;
+        processingError = result.error;
+        
+        console.log('LangChain processing result:', { data: processingData, error: processingError });
+      } catch (langchainError) {
+        console.log('LangChain processing failed, trying original function...', langchainError);
+        
+        // Fallback to original processing function
+        const result = await supabase.functions.invoke('process-document', {
+          body: {
+            agentId: selectedAgent,
+            storagePath: uploadData.path,
+            fileName: file.name,
+            contentType: file.type
+          }
+        });
+        
+        processingData = result.data;
+        processingError = result.error;
+      }
 
       setUploadProgress(70);
 
-      if (error) {
-        console.error('Processing error:', error);
+      if (processingError) {
+        console.error('Processing error:', processingError);
         // Clean up uploaded file on processing error
         await supabase.storage.from('documents').remove([uploadData.path]);
-        throw new Error(error.message || 'Processing failed');
+        throw new Error(processingError.message || 'Processing failed');
       }
 
-      if (data?.success) {
+      if (processingData?.success) {
         setUploadProgress(100);
+        const processingMethod = processingData.langchainProcessed ? 'LangChain' : 'Standard';
         toast({
           title: "Success",
-          description: `Successfully uploaded and processed ${file.name}. Created ${data.chunksProcessed} knowledge chunks.`
+          description: `Successfully uploaded and processed ${file.name} using ${processingMethod}. Created ${processingData.chunksProcessed} knowledge chunks.`
         });
         
         // Reset form
@@ -101,7 +126,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       } else {
         // Clean up uploaded file on processing failure
         await supabase.storage.from('documents').remove([uploadData.path]);
-        throw new Error(data?.error || 'Processing failed');
+        throw new Error(processingData?.error || 'Processing failed');
       }
     } catch (error: any) {
       console.error('Upload error:', error);
