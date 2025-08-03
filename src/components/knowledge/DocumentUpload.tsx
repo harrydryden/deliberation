@@ -21,6 +21,13 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
   const [selectedAgent, setSelectedAgent] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [processingStatus, setProcessingStatus] = useState<string>('');
+  const [performanceStats, setPerformanceStats] = useState<{
+    chunksProcessed: number;
+    batchesProcessed: number;
+    processingTime: number;
+    optimized: boolean;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -37,6 +44,9 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
 
     setUploading(true);
     setUploadProgress(0);
+    setProcessingStatus('Initializing upload...');
+    setPerformanceStats(null);
+    const startTime = performance.now();
 
     try {
       // Get current user
@@ -62,44 +72,31 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      setUploadProgress(50);
+      setUploadProgress(30);
+      setProcessingStatus('File uploaded, starting intelligent processing...');
       console.log('File uploaded successfully:', uploadData.path);
 
-      // Try LangChain processing first, fallback to original if needed
-      let processingData, processingError;
+      // Use optimized LangChain processing with progress monitoring
+      setProcessingStatus('Processing with optimized batch operations...');
+      const processingStartTime = performance.now();
       
-      try {
-        const result = await supabase.functions.invoke('langchain-process-document', {
-          body: {
-            agentId: selectedAgent,
-            storagePath: uploadData.path,
-            fileName: file.name,
-            contentType: fileExt === 'pdf' ? 'pdf' : 'text'
-          }
-        });
-        
-        processingData = result.data;
-        processingError = result.error;
-        
-        console.log('LangChain processing result:', { data: processingData, error: processingError });
-      } catch (langchainError) {
-        console.log('LangChain processing failed, trying original function...', langchainError);
-        
-        // Fallback to original processing function
-        const result = await supabase.functions.invoke('process-document', {
-          body: {
-            agentId: selectedAgent,
-            storagePath: uploadData.path,
-            fileName: file.name,
-            contentType: file.type
-          }
-        });
-        
-        processingData = result.data;
-        processingError = result.error;
-      }
-
-      setUploadProgress(70);
+      const result = await supabase.functions.invoke('langchain-process-document', {
+        body: {
+          agentId: selectedAgent,
+          storagePath: uploadData.path,
+          fileName: file.name,
+          contentType: fileExt === 'pdf' ? 'pdf' : 'text'
+        }
+      });
+      
+      const processingData = result.data;
+      const processingError = result.error;
+      const processingTime = performance.now() - processingStartTime;
+      
+      console.log('Optimized processing result:', { data: processingData, error: processingError });
+      
+      setUploadProgress(90);
+      setProcessingStatus('Finalizing and saving results...');
 
       if (processingError) {
         console.error('Processing error:', processingError);
@@ -110,11 +107,35 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
 
       if (processingData?.success) {
         setUploadProgress(100);
-        const processingMethod = processingData.langchainProcessed ? 'LangChain' : 'Standard';
-        toast({
-          title: "Success",
-          description: `Successfully uploaded and processed ${file.name} using ${processingMethod}. Created ${processingData.chunksProcessed} knowledge chunks.`
-        });
+        setProcessingStatus('Processing completed successfully!');
+        
+        // Handle duplicate detection
+        if (processingData.skipped) {
+          toast({
+            title: "Document Already Processed",
+            description: `${file.name} was already processed for this agent and has been skipped.`
+          });
+        } else {
+          // Set performance stats
+          const totalTime = performance.now() - startTime;
+          setPerformanceStats({
+            chunksProcessed: processingData.chunksProcessed || 0,
+            batchesProcessed: processingData.performance?.embeddingBatches || 0,
+            processingTime: totalTime,
+            optimized: processingData.optimized || false
+          });
+
+          const processingMethod = processingData.optimized ? 'Optimized Batch Processing' : 
+                                 processingData.langchainProcessed ? 'LangChain' : 'Standard';
+          
+          const performanceInfo = processingData.optimized ? 
+            ` (${processingData.performance?.embeddingBatches} batches, ${(totalTime/1000).toFixed(1)}s)` : '';
+          
+          toast({
+            title: "Success",
+            description: `Successfully processed ${file.name} using ${processingMethod}. Created ${processingData.chunksProcessed} knowledge chunks${performanceInfo}.`
+          });
+        }
         
         // Reset form
         setSelectedAgent('');
@@ -193,12 +214,41 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         </div>
 
         {uploading && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Processing document...</span>
+              <span className="text-sm font-medium">Processing document...</span>
             </div>
             <Progress value={uploadProgress} className="w-full" />
+            {processingStatus && (
+              <p className="text-sm text-muted-foreground">{processingStatus}</p>
+            )}
+          </div>
+        )}
+
+        {performanceStats && (
+          <div className="mt-4 p-3 bg-muted rounded-lg">
+            <h4 className="text-sm font-semibold mb-2 flex items-center gap-1">
+              ⚡ Performance Stats
+            </h4>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground">Chunks:</span>
+                <span className="ml-1 font-medium">{performanceStats.chunksProcessed}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Batches:</span>
+                <span className="ml-1 font-medium">{performanceStats.batchesProcessed}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Time:</span>
+                <span className="ml-1 font-medium">{(performanceStats.processingTime / 1000).toFixed(1)}s</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Method:</span>
+                <span className="ml-1 font-medium">{performanceStats.optimized ? 'Optimized' : 'Standard'}</span>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>
