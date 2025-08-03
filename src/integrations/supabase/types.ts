@@ -1092,6 +1092,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      detect_suspicious_activity: {
+        Args: {
+          p_user_id?: string
+          p_ip_address?: unknown
+          p_time_window?: unknown
+        }
+        Returns: Json
+      }
       enhanced_audit_log: {
         Args: {
           operation_type: string

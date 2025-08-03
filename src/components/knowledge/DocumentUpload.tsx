@@ -9,6 +9,8 @@ import { Upload, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
+import { securityMonitor } from '@/services/securityMonitor.service';
+import { SecurityEventType, RiskLevel } from '@/config/securityConfig';
 import { logger } from '@/utils/logger';
 
 // Remove PDF.js imports since we're using server-side processing
@@ -55,6 +57,43 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       if (!user) {
         throw new Error('User not authenticated');
       }
+
+      // Enhanced security validation
+      const securityCheck = await securityMonitor.monitorFileUpload(file, user.id);
+      
+      if (!securityCheck.allowed) {
+        await securityMonitor.logSecurityEvent({
+          eventType: SecurityEventType.SUSPICIOUS_ACTIVITY,
+          userId: user.id,
+          details: { 
+            action: 'blocked_file_upload',
+            reason: securityCheck.reason,
+            fileName: file.name,
+            fileType: file.type
+          },
+          riskLevel: RiskLevel.HIGH
+        });
+
+        toast({
+          title: "File Upload Blocked",
+          description: securityCheck.reason || "File failed security validation.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Log successful security validation
+      await securityMonitor.logSecurityEvent({
+        eventType: SecurityEventType.AUTH_SUCCESS,
+        userId: user.id,
+        details: { 
+          action: 'file_upload_validated',
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size
+        },
+        riskLevel: RiskLevel.LOW
+      });
 
       setUploadProgress(10);
 

@@ -33,8 +33,15 @@ export const SECURITY_CONFIG = {
     maxInputLength: 5000,
     maxDisplayNameLength: 100,
     maxEmailLength: 254,
-    accessCodeLength: 10,
-    strongPasswordMinLength: 12
+    accessCodeLength: 12, // Increased from 10 to 12 for better security
+    strongPasswordMinLength: 12,
+    maxFileSize: 10 * 1024 * 1024, // 10MB
+    allowedFileTypes: [
+      'application/pdf',
+      'text/plain', 
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword'
+    ]
   },
 
   // Security monitoring
@@ -45,7 +52,14 @@ export const SECURITY_CONFIG = {
     alertThresholds: {
       criticalEventsPerHour: 5,
       highRiskEventsPerHour: 10,
-      failedAuthAttemptsPerHour: 20
+      failedAuthAttemptsPerHour: 20,
+      suspiciousFileUploads: 5,
+      bruteForceThreshold: 3
+    },
+    quarantineThresholds: {
+      maliciousFileDetection: true,
+      suspiciousPatternDetection: true,
+      rateLimitViolations: 10
     }
   },
 
@@ -132,6 +146,57 @@ export const SecurityUtils = {
     };
 
     return btoa(JSON.stringify(fingerprint)).slice(0, 16);
+  },
+
+  // Enhanced file validation with security scanning
+  validateFileSecurely: (file: File): { valid: boolean; error?: string; riskLevel: string } => {
+    if (!file) return { valid: false, error: 'No file provided', riskLevel: 'medium' };
+    
+    // Size validation
+    if (file.size > SECURITY_CONFIG.VALIDATION.maxFileSize) {
+      return { valid: false, error: 'File size exceeds limit', riskLevel: 'low' };
+    }
+    
+    // Type validation
+    if (!SECURITY_CONFIG.VALIDATION.allowedFileTypes.includes(file.type)) {
+      return { valid: false, error: 'File type not allowed', riskLevel: 'high' };
+    }
+    
+    // Filename security check
+    const suspiciousPatterns = [
+      /\.exe$/i, /\.bat$/i, /\.cmd$/i, /\.scr$/i, /\.pif$/i,
+      /\.com$/i, /\.dll$/i, /\.vbs$/i, /\.js$/i, /\.jar$/i,
+      /[<>:"|?*]/,  // Invalid filename characters
+      /^\./,        // Hidden files
+      /\.{2,}/      // Multiple dots
+    ];
+    
+    const isFilenameSuspicious = suspiciousPatterns.some(pattern => pattern.test(file.name));
+    if (isFilenameSuspicious) {
+      return { valid: false, error: 'Suspicious filename detected', riskLevel: 'critical' };
+    }
+    
+    return { valid: true, riskLevel: 'low' };
+  },
+
+  // Detect potential injection attempts
+  detectInjectionAttempt: (input: string): { detected: boolean; type?: string; riskLevel: string } => {
+    const injectionPatterns = [
+      { pattern: /<script[\s\S]*?>[\s\S]*?<\/script>/gi, type: 'xss', risk: 'high' },
+      { pattern: /javascript:/gi, type: 'xss', risk: 'high' },
+      { pattern: /on\w+\s*=/gi, type: 'xss', risk: 'medium' },
+      { pattern: /(union|select|insert|update|delete|drop|create|alter|exec|execute)[\s\+]/gi, type: 'sql', risk: 'critical' },
+      { pattern: /['";]/g, type: 'sql', risk: 'medium' },
+      { pattern: /%3c|%3e|%22|%27/gi, type: 'encoded', risk: 'medium' }
+    ];
+
+    for (const { pattern, type, risk } of injectionPatterns) {
+      if (pattern.test(input)) {
+        return { detected: true, type, riskLevel: risk };
+      }
+    }
+
+    return { detected: false, riskLevel: 'low' };
   }
 };
 
