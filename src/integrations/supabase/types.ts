@@ -960,6 +960,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      audit_sensitive_operation: {
+        Args: {
+          operation_type: string
+          table_name: string
+          record_id?: string
+          details?: Json
+        }
+        Returns: undefined
+      }
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
@@ -1085,6 +1094,10 @@ export type Database = {
           similarity: number
           created_at: string
         }[]
+      }
+      secure_increment_access_code_usage: {
+        Args: { input_code: string }
+        Returns: boolean
       }
       sparsevec_out: {
         Args: { "": unknown }

@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { sanitizeMarkdown } from '@/utils/sanitize';
 
 interface MarkdownMessageProps {
   content: string;
@@ -8,6 +9,9 @@ interface MarkdownMessageProps {
 }
 
 export const MarkdownMessage = ({ content, className }: MarkdownMessageProps) => {
+  // Sanitize content to prevent XSS attacks
+  const sanitizedContent = sanitizeMarkdown(content);
+  
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -101,7 +105,7 @@ export const MarkdownMessage = ({ content, className }: MarkdownMessageProps) =>
         ),
       }}
     >
-      {content}
+      {sanitizedContent}
     </ReactMarkdown>
   );
 };

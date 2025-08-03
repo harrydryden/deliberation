@@ -85,6 +85,26 @@ export class NodeJSAuthService implements IAuthService {
   }
 
   async signOut(): Promise<void> {
+    // TODO: Implement token blacklisting on the server
+    // Currently only clearing client-side token
+    const token = this.getToken();
+    
+    if (token) {
+      // Attempt to invalidate token on server (if endpoint exists)
+      try {
+        await fetch(`${BACKEND_CONFIG.apiUrl}/api/v1/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      } catch (error) {
+        // Continue with client-side logout even if server logout fails
+        console.warn('Server logout failed:', error);
+      }
+    }
+    
     this.setToken(null);
   }
 
@@ -108,9 +128,13 @@ export class NodeJSAuthService implements IAuthService {
   hasValidToken(): boolean {
     if (!this.token) return false;
     
+    // WARNING: Client-side JWT validation is NOT secure
+    // This is only for UX - all security validation must happen server-side
     try {
       const payload = this.parseTokenPayload(this.token);
-      return payload.exp > Date.now() / 1000;
+      // Add buffer time to account for clock skew
+      const bufferTime = 30; // 30 seconds
+      return payload.exp > (Date.now() / 1000) + bufferTime;
     } catch {
       return false;
     }
@@ -123,8 +147,12 @@ export class NodeJSAuthService implements IAuthService {
     }
     
     try {
+      // WARNING: This does NOT verify the JWT signature
+      // Client-side JWT parsing is INSECURE and only for UX
+      // All actual authentication must be verified server-side
       const payload = parts[1];
-      const decoded = atob(payload);
+      const padded = payload + '='.repeat((4 - payload.length % 4) % 4);
+      const decoded = atob(padded);
       return JSON.parse(decoded);
     } catch {
       throw new AuthenticationError('Failed to parse token');

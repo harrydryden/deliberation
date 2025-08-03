@@ -38,9 +38,13 @@ export class AuthService {
   hasValidToken(): boolean {
     if (!this.token) return false;
     
+    // WARNING: Client-side JWT validation is NOT secure
+    // This is only for UX - all security validation must happen server-side
     try {
       const payload = this.parseTokenPayload(this.token);
-      return payload.exp > Date.now() / 1000;
+      // Add buffer time to account for clock skew
+      const bufferTime = 30; // 30 seconds
+      return payload.exp > (Date.now() / 1000) + bufferTime;
     } catch {
       return false;
     }
@@ -53,8 +57,12 @@ export class AuthService {
     }
     
     try {
+      // WARNING: This does NOT verify the JWT signature
+      // Client-side JWT parsing is INSECURE and only for UX
+      // All actual authentication must be verified server-side
       const payload = parts[1];
-      const decoded = atob(payload);
+      const padded = payload + '='.repeat((4 - payload.length % 4) % 4);
+      const decoded = atob(padded);
       return JSON.parse(decoded);
     } catch {
       throw new AuthenticationError('Failed to parse token');
