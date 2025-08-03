@@ -41,7 +41,7 @@ const Index = () => {
         {/* Hero Section */}
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold text-democratic-blue">
-            Welcome to Democratic Deliberation
+            Welcome to Deliberation
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Engage in meaningful conversations that shape our collective future. 
