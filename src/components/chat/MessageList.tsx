@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Bot, User, Users, Workflow, FileText, Plus } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatToUKTime } from "@/utils/timeUtils";
+import { MarkdownMessage } from "@/components/common/MarkdownMessage";
 
 import type { ChatMessage } from "@/types/chat";
 
@@ -113,8 +114,11 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis }: Mess
                 </div>
                 
                 <Card className={`p-3 ${isUser ? 'bg-democratic-blue text-white' : 'bg-muted'}`}>
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                    {message.content}
+                  <div className="text-sm leading-relaxed">
+                    <MarkdownMessage 
+                      content={message.content} 
+                      className={isUser ? 'prose-invert' : ''}
+                    />
                   </div>
                   
                   {/* Proactive engagement indicator */}

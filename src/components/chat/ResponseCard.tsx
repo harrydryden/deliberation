@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ThumbsUp, ThumbsDown, Share, BookOpen } from "lucide-react";
 import { formatToUKTime } from "@/utils/timeUtils";
 import { getAgentInfo } from "@/utils/agentHelpers";
+import { MarkdownMessage } from "@/components/common/MarkdownMessage";
 import type { ChatMessage, AgentType } from "@/types/chat";
 import { cn } from "@/lib/utils";
 
@@ -46,8 +47,11 @@ export const ResponseCard = ({ message, onFeedback, onShare }: ResponseCardProps
         </Avatar>
         
         <Card className="flex-1 max-w-[80%] p-3 bg-democratic-blue text-white">
-          <div className="whitespace-pre-wrap text-sm leading-relaxed">
-            {message.content}
+          <div className="text-sm leading-relaxed">
+            <MarkdownMessage 
+              content={message.content} 
+              className="prose-invert"
+            />
           </div>
           <div className="mt-2 text-xs opacity-80">
             {formatToUKTime(message.created_at)}
@@ -77,8 +81,8 @@ export const ResponseCard = ({ message, onFeedback, onShare }: ResponseCardProps
         </div>
         
         <Card className="p-4 bg-muted">
-          <div className="whitespace-pre-wrap text-sm leading-relaxed mb-3">
-            {cleanContent}
+          <div className="text-sm leading-relaxed mb-3">
+            <MarkdownMessage content={cleanContent} />
           </div>
           
           {/* Confidence and relevance scores */}
