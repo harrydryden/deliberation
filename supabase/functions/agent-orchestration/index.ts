@@ -601,14 +601,28 @@ async function executeAgentResponse(
   console.log(`🎯 Executing ${agentType} response...`);
 
   try {
-    // Fetch agent configuration
-    const { data: agents } = await supabase
+    // Fetch agent configuration - prioritize agents with knowledge for bill_agent
+    let { data: agents } = await supabase
       .from('agent_configurations')
       .select('*')
       .eq('agent_type', agentType)
       .eq('is_active', true)
-      .order('is_default', { ascending: false })
-      .limit(1);
+      .order('is_default', { ascending: false });
+    
+    if (agentType === 'bill_agent' && agents && agents.length > 1) {
+      // For bill_agent, check which agent has knowledge and prioritize it
+      for (const agent of agents) {
+        const { count } = await supabase
+          .from('agent_knowledge')
+          .select('*', { count: 'exact', head: true })
+          .eq('agent_id', agent.id);
+        
+        if (count && count > 0) {
+          agents = [agent]; // Use the agent with knowledge
+          break;
+        }
+      }
+    }
 
     if (!agents || agents.length === 0) {
       console.warn(`⚠️ No active ${agentType} found`);
@@ -616,7 +630,7 @@ async function executeAgentResponse(
     }
 
     const agent = agents[0];
-    console.log(`🤖 Using agent: ${agent.name}`);
+    console.log(`🤖 Using agent: ${agent.name} (ID: ${agent.id})`);
 
     // Fetch conversation history
     const { data: conversationHistory } = await supabase
@@ -631,6 +645,7 @@ async function executeAgentResponse(
     let sources: string[] = [];
     if (agentType === 'bill_agent') {
       try {
+        console.log(`🔍 Fetching knowledge for agent: ${agent.id} with query: "${context.content}"`);
         const knowledgeResponse = await supabase.functions.invoke('query-agent-knowledge', {
           body: {
             query: context.content,
@@ -639,8 +654,11 @@ async function executeAgentResponse(
           }
         });
 
+        console.log('📚 Knowledge response:', knowledgeResponse);
+
         if (knowledgeResponse.data?.success && knowledgeResponse.data?.relevantKnowledge?.length > 0) {
           const knowledge = knowledgeResponse.data.relevantKnowledge;
+          console.log(`✅ Found ${knowledge.length} relevant knowledge items`);
           knowledgeContext = '\n\nRELEVANT KNOWLEDGE:\n' + 
             knowledge.map((item: any, index: number) => 
               `[${index + 1}] ${item.title}: ${item.content.substring(0, 500)}...`
@@ -651,6 +669,9 @@ async function executeAgentResponse(
             .map((item: any) => item.file_name || item.title)
             .filter((source: string) => source)
           )];
+          console.log('📖 Sources found:', sources);
+        } else {
+          console.log('ℹ️ No relevant knowledge found for this query');
         }
       } catch (error) {
         console.warn('⚠️ Knowledge retrieval failed:', error);
