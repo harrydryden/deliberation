@@ -24,7 +24,7 @@ export const ChatInterface = () => {
   };
   return <Layout>
       <div className="h-[calc(100vh-120px)] flex flex-col bg-background rounded-lg border">
-        <div className="sticky top-16 z-10 border-b p-4 bg-card/95 backdrop-blur-sm">
+        <div className="sticky top-16 z-40 border-b p-4 bg-card/95 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold text-democratic-blue">Assisted Dying</h1>
