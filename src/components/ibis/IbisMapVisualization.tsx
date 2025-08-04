@@ -138,10 +138,50 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     }
   }, [onNodesChange]);
 
-  const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  );
+  // Handle new connections between nodes
+  const onConnect = useCallback(async (connection: Connection) => {
+    if (!connection.source || !connection.target) return;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to create connections",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create relationship in database
+      const { error } = await supabase
+        .from('ibis_relationships')
+        .insert({
+          source_node_id: connection.source,
+          target_node_id: connection.target,
+          relationship_type: connectionType,
+          deliberation_id: deliberationId,
+          created_by: user.id,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `${relationshipConfig[connectionType].label} relationship created`,
+      });
+
+      // Refresh data to show new relationship
+      fetchData();
+    } catch (error) {
+      console.error('Error creating relationship:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create relationship",
+        variant: "destructive",
+      });
+    }
+  }, [connectionType, deliberationId]);
 
   // Fetch IBIS nodes, relationships, and messages from Supabase
   const fetchData = useCallback(async () => {
@@ -161,7 +201,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
       const { data: relationshipsData, error: relationshipsError } = await supabase
         .from('ibis_relationships')
         .select('*')
-        .in('source_node_id', (nodesData || []).map(n => n.id))
+        .eq('deliberation_id', deliberationId)
         .order('created_at', { ascending: true });
 
       if (relationshipsError) console.error('Relationships error:', relationshipsError);
@@ -415,12 +455,12 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     }
   };
 
-  // Create new node directly in visualization
+  // Update filtering when search term or filter type changes
   useEffect(() => {
     if (ibisNodes.length > 0) {
-      convertToFlowNodes(ibisNodes);
+      convertToFlowNodes(ibisNodes, ibisRelationships);
     }
-  }, [searchTerm, filterType, ibisNodes]);
+  }, [searchTerm, filterType, ibisNodes, ibisRelationships]);
 
   // Set up real-time subscription
   useEffect(() => {
@@ -524,7 +564,43 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
                 </Select>
               </div>
               
-              <div className="flex gap-2">
+              {/* Connection Controls */}
+              <div className="border-t pt-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <Button
+                    variant={isConnecting ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setIsConnecting(!isConnecting)}
+                    className="flex-1"
+                  >
+                    {isConnecting ? 'Stop Connecting' : 'Connect Nodes'}
+                  </Button>
+                </div>
+                
+                {isConnecting && (
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">
+                      Select connection type, then drag from one node to another
+                    </div>
+                    <Select 
+                      value={connectionType} 
+                      onValueChange={(value: any) => setConnectionType(value)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="supports">Supports</SelectItem>
+                        <SelectItem value="opposes">Opposes</SelectItem>
+                        <SelectItem value="relates_to">Relates to</SelectItem>
+                        <SelectItem value="responds_to">Responds to</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex gap-2 pt-2 border-t">
                 <Button
                   variant="outline"
                   size="sm"

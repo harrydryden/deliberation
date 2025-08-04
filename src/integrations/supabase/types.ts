@@ -540,6 +540,36 @@ export type Database = {
           },
         ]
       }
+      ibis_relationships: {
+        Row: {
+          created_at: string
+          created_by: string
+          deliberation_id: string
+          id: string
+          relationship_type: string
+          source_node_id: string
+          target_node_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          deliberation_id: string
+          id?: string
+          relationship_type: string
+          source_node_id: string
+          target_node_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          deliberation_id?: string
+          id?: string
+          relationship_type?: string
+          source_node_id?: string
+          target_node_id?: string
+        }
+        Relationships: []
+      }
       item_keywords: {
         Row: {
           classified_item_id: string | null
