@@ -610,20 +610,6 @@ async function executeAgentResponse(
       .eq('is_active', true)
       .order('is_default', { ascending: false });
     
-    // If no deliberation-specific agents found, check for global agents (deliberation_id is null)
-    if (!agents || agents.length === 0) {
-      console.log(`🔍 No deliberation-specific ${agentType} found, checking for global agents...`);
-      const { data: globalAgents } = await supabase
-        .from('agent_configurations')
-        .select('*')
-        .eq('agent_type', agentType)
-        .is('deliberation_id', null)
-        .eq('is_active', true)
-        .order('is_default', { ascending: false });
-      
-      agents = globalAgents;
-    }
-    
     if (agentType === 'bill_agent' && agents && agents.length > 1) {
       // For bill_agent, check which agent has knowledge and prioritize it
       for (const agent of agents) {
