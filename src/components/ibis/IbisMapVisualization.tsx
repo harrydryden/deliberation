@@ -11,6 +11,9 @@ import {
   MiniMap,
   Background,
   Panel,
+  NodeChange,
+  EdgeChange,
+  MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './ibis-flow.css';
@@ -18,7 +21,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Maximize2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { RefreshCw, Plus, Search, Filter, MessageSquare, GitBranch } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface IbisNode {
@@ -27,9 +35,18 @@ interface IbisNode {
   description?: string;
   node_type: 'issue' | 'position' | 'argument';
   parent_id?: string;
-  position?: { x: number; y: number };
+  position_x?: number;
+  position_y?: number;
+  message_id?: string;
   created_at: string;
   updated_at: string;
+}
+
+interface Message {
+  id: string;
+  content: string;
+  created_at: string;
+  user_id: string;
 }
 
 interface IbisMapVisualizationProps {
@@ -56,37 +73,86 @@ const nodeTypeConfig = {
 
 export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationProps) => {
   const [ibisNodes, setIbisNodes] = useState<IbisNode[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [selectedNode, setSelectedNode] = useState<IbisNode | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'issue' | 'position' | 'argument'>('all');
+  const [isCreatingNode, setIsCreatingNode] = useState(false);
+  const [newNodeData, setNewNodeData] = useState({
+    title: '',
+    description: '',
+    node_type: 'issue' as 'issue' | 'position' | 'argument',
+    parent_id: '',
+  });
   const { toast } = useToast();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  // Handle node position changes and persist to database
+  const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
+    onNodesChange(changes);
+    
+    // Find position changes and persist them
+    const positionChanges = changes.filter(change => 
+      change.type === 'position' && change.dragging === false
+    );
+    
+    for (const change of positionChanges) {
+      if (change.type === 'position' && change.position) {
+        try {
+          await supabase
+            .from('ibis_nodes')
+            .update({
+              position_x: change.position.x,
+              position_y: change.position.y,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', change.id);
+        } catch (error) {
+          console.error('Error updating node position:', error);
+        }
+      }
+    }
+  }, [onNodesChange]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
 
-  // Fetch IBIS nodes from Supabase
-  const fetchIbisNodes = useCallback(async () => {
+  // Fetch IBIS nodes and messages from Supabase
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // Fetch IBIS nodes
+      const { data: nodesData, error: nodesError } = await supabase
         .from('ibis_nodes')
         .select('*')
         .eq('deliberation_id', deliberationId)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (nodesError) throw nodesError;
+      
+      // Fetch messages for traceability
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('messages')
+        .select('id, content, created_at, user_id')
+        .eq('deliberation_id', deliberationId);
 
-      setIbisNodes(data || []);
-      convertToFlowNodes(data || []);
+      if (messagesError) throw messagesError;
+
+      setIbisNodes(nodesData || []);
+      setMessages(messagesData || []);
+      convertToFlowNodes(nodesData || []);
     } catch (error) {
-      console.error('Error fetching IBIS nodes:', error);
+      console.error('Error fetching data:', error);
       toast({
         title: "Error",
-        description: "Failed to load IBIS nodes",
+        description: "Failed to load IBIS data",
         variant: "destructive",
       });
     } finally {
@@ -94,34 +160,47 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     }
   }, [deliberationId, toast]);
 
-  // Convert IBIS nodes to React Flow nodes and edges
+  // Convert IBIS nodes to React Flow nodes and edges with filtering
   const convertToFlowNodes = (ibisNodesData: IbisNode[]) => {
+    // Apply filtering
+    const filteredNodes = ibisNodesData.filter(node => {
+      const matchesSearch = searchTerm === '' || 
+        node.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (node.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = filterType === 'all' || node.node_type === filterType;
+      return matchesSearch && matchesType;
+    });
+
     const flowNodes: Node[] = [];
     const flowEdges: Edge[] = [];
 
-    ibisNodesData.forEach((node, index) => {
+    filteredNodes.forEach((node, index) => {
       const config = nodeTypeConfig[node.node_type];
       
       // Create node with custom styling based on type
       const flowNode: Node = {
         id: node.id,
         type: 'default',
-        position: node.position || { 
-          x: 200 + (index % 3) * 250, 
-          y: 100 + Math.floor(index / 3) * 150 
+        position: { 
+          x: node.position_x || 200 + (index % 3) * 250, 
+          y: node.position_y || 100 + Math.floor(index / 3) * 150 
         },
         data: {
           label: (
-            <div className="text-center p-2">
+            <div className="text-center p-2 node-content">
               <div className={`font-semibold text-sm ${node.node_type === 'issue' ? 'text-white' : 'text-gray-800'}`}>
                 {node.title}
               </div>
               <Badge variant="secondary" className="mt-1 text-xs">
                 {config.label}
               </Badge>
+              {node.message_id && (
+                <MessageSquare className="h-3 w-3 mt-1 mx-auto opacity-60" />
+              )}
             </div>
           ),
         },
+        className: `ibis-node-${node.node_type}`,
         style: {
           backgroundColor: config.color,
           borderRadius: node.node_type === 'issue' ? '50%' : 
@@ -129,21 +208,30 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
           border: '2px solid #fff',
           minWidth: node.node_type === 'issue' ? 120 : 140,
           minHeight: node.node_type === 'issue' ? 120 : 80,
-          transform: node.node_type === 'argument' ? 'rotate(45deg)' : 'none',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
         },
+        draggable: true,
       };
 
       flowNodes.push(flowNode);
 
-      // Create edge if node has a parent
-      if (node.parent_id) {
+      // Create enhanced edge if node has a parent
+      if (node.parent_id && filteredNodes.some(n => n.id === node.parent_id)) {
         flowEdges.push({
           id: `${node.parent_id}-${node.id}`,
           source: node.parent_id,
           target: node.id,
           type: 'smoothstep',
           animated: false,
-          style: { stroke: '#64748b', strokeWidth: 2 },
+          style: { 
+            stroke: '#64748b', 
+            strokeWidth: 3,
+            strokeDasharray: node.node_type === 'argument' ? '5,5' : 'none',
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: '#64748b',
+          },
         });
       }
     });
@@ -152,15 +240,89 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     setEdges(flowEdges);
   };
 
-  // Handle node click to show details
+  // Handle node click to show details and message traceability
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     const ibisNode = ibisNodes.find(n => n.id === node.id);
     setSelectedNode(ibisNode || null);
-  }, [ibisNodes]);
+    
+    // Find associated message if exists
+    if (ibisNode?.message_id) {
+      const message = messages.find(m => m.id === ibisNode.message_id);
+      setSelectedMessage(message || null);
+    } else {
+      setSelectedMessage(null);
+    }
+  }, [ibisNodes, messages]);
+
+  // Create new node directly in visualization
+  const handleCreateNode = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to create nodes",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const newPosition = {
+        x: Math.random() * 400 + 200,
+        y: Math.random() * 300 + 100,
+      };
+
+      const { error } = await supabase
+        .from('ibis_nodes')
+        .insert({
+          deliberation_id: deliberationId,
+          title: newNodeData.title,
+          description: newNodeData.description || null,
+          node_type: newNodeData.node_type,
+          parent_node_id: newNodeData.parent_id || null,
+          position_x: newPosition.x,
+          position_y: newPosition.y,
+          created_by: user.id,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Node created successfully",
+      });
+
+      // Reset form and close modal
+      setNewNodeData({
+        title: '',
+        description: '',
+        node_type: 'issue',
+        parent_id: '',
+      });
+      setIsCreatingNode(false);
+      
+      // Refresh data
+      fetchData();
+    } catch (error) {
+      console.error('Error creating node:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create node",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Update filtering when search term or filter type changes
+  useEffect(() => {
+    if (ibisNodes.length > 0) {
+      convertToFlowNodes(ibisNodes);
+    }
+  }, [searchTerm, filterType, ibisNodes]);
 
   // Set up real-time subscription
   useEffect(() => {
-    fetchIbisNodes();
+    fetchData();
 
     const channel = supabase
       .channel('ibis_nodes_changes')
@@ -174,7 +336,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
         },
         (payload) => {
           console.log('IBIS nodes changed:', payload);
-          fetchIbisNodes(); // Refresh nodes on any change
+          fetchData(); // Refresh nodes on any change
         }
       )
       .subscribe();
@@ -182,10 +344,10 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [deliberationId, fetchIbisNodes]);
+  }, [deliberationId, fetchData]);
 
   const handleRefresh = () => {
-    fetchIbisNodes();
+    fetchData();
     toast({
       title: "Refreshed",
       description: "IBIS map has been refreshed",
@@ -210,13 +372,16 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
+          onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClick}
           fitView
           attributionPosition="bottom-left"
           className="bg-background"
+          nodesDraggable={true}
+          nodesConnectable={false}
+          elementsSelectable={true}
         >
           <Background color="#e2e8f0" gap={20} />
           <Controls />
@@ -227,17 +392,131 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
             }}
             position="top-right"
           />
+          
+          {/* Search and Filter Panel */}
           <Panel position="top-left">
-            <div className="bg-white p-2 rounded-lg shadow-md border">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Refresh
-              </Button>
+            <div className="bg-white p-3 rounded-lg shadow-md border space-y-2 w-80">
+              <div className="flex items-center gap-2">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search nodes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="issue">Issues</SelectItem>
+                    <SelectItem value="position">Positions</SelectItem>
+                    <SelectItem value="argument">Arguments</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  className="flex-1"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Refresh
+                </Button>
+                
+                <Dialog open={isCreatingNode} onOpenChange={setIsCreatingNode}>
+                  <DialogTrigger asChild>
+                    <Button variant="default" size="sm" className="flex-1">
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Node
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Create New IBIS Node</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="title">Title</Label>
+                        <Input
+                          id="title"
+                          value={newNodeData.title}
+                          onChange={(e) => setNewNodeData(prev => ({ ...prev, title: e.target.value }))}
+                          placeholder="Enter node title"
+                        />
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="node_type">Type</Label>
+                        <Select 
+                          value={newNodeData.node_type} 
+                          onValueChange={(value: any) => setNewNodeData(prev => ({ ...prev, node_type: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="issue">Issue</SelectItem>
+                            <SelectItem value="position">Position</SelectItem>
+                            <SelectItem value="argument">Argument</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="parent_id">Parent Node (Optional)</Label>
+                        <Select 
+                          value={newNodeData.parent_id} 
+                          onValueChange={(value) => setNewNodeData(prev => ({ ...prev, parent_id: value }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select parent node" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">No parent</SelectItem>
+                            {ibisNodes.map((node) => (
+                              <SelectItem key={node.id} value={node.id}>
+                                {node.title} ({nodeTypeConfig[node.node_type].label})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="description">Description (Optional)</Label>
+                        <Textarea
+                          id="description"
+                          value={newNodeData.description}
+                          onChange={(e) => setNewNodeData(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder="Enter node description"
+                          rows={3}
+                        />
+                      </div>
+                      
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsCreatingNode(false)}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={handleCreateNode}
+                          disabled={!newNodeData.title.trim()}
+                        >
+                          Create Node
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
           </Panel>
         </ReactFlow>
@@ -259,7 +538,10 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setSelectedNode(null)}
+                  onClick={() => {
+                    setSelectedNode(null);
+                    setSelectedMessage(null);
+                  }}
                 >
                   ×
                 </Button>
@@ -280,9 +562,27 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
                 </div>
               )}
               
-              <div className="text-xs text-muted-foreground space-y-1">
+              {selectedMessage && (
+                <div className="border-t pt-4">
+                  <h4 className="font-medium text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                    <MessageSquare className="h-4 w-4" />
+                    Source Message
+                  </h4>
+                  <div className="bg-muted p-3 rounded text-sm">
+                    <p className="text-xs text-muted-foreground mb-1">
+                      {new Date(selectedMessage.created_at).toLocaleString()}
+                    </p>
+                    <p>{selectedMessage.content}</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="text-xs text-muted-foreground space-y-1 border-t pt-4">
                 <div>Created: {new Date(selectedNode.created_at).toLocaleDateString()}</div>
                 <div>Updated: {new Date(selectedNode.updated_at).toLocaleDateString()}</div>
+                {selectedNode.position_x !== undefined && (
+                  <div>Position: ({Math.round(selectedNode.position_x!)}, {Math.round(selectedNode.position_y!)})</div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -293,7 +593,10 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
       <Panel position="bottom-right">
         <Card className="w-48">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Node Types</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-1">
+              <GitBranch className="h-4 w-4" />
+              Node Types
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 pt-0">
             {Object.entries(nodeTypeConfig).map(([type, config]) => (
@@ -303,12 +606,15 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
                   style={{ 
                     backgroundColor: config.color,
                     borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px',
-                    transform: type === 'argument' ? 'rotate(45deg)' : 'none'
                   }}
                 />
                 <span>{config.label}</span>
               </div>
             ))}
+            <div className="mt-3 pt-2 border-t text-xs text-muted-foreground">
+              <div className="mb-1">Drag nodes to reposition</div>
+              <div>Click nodes for details</div>
+            </div>
           </CardContent>
         </Card>
       </Panel>
