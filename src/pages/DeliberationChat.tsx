@@ -8,11 +8,13 @@ import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
+import { IbisMapVisualization } from "@/components/ibis/IbisMapVisualization";
 import { useBackendChat } from "@/hooks/useBackendChat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Settings, ExternalLink } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Users, Settings, ExternalLink, MessageSquare, GitBranch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface Deliberation {
@@ -39,6 +41,7 @@ const DeliberationChat = () => {
   const [isParticipant, setIsParticipant] = useState(false);
   const [joiningDeliberation, setJoiningDeliberation] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>('chat');
+  const [activeTab, setActiveTab] = useState<'chat' | 'ibis'>('chat');
   const [ibisModal, setIbisModal] = useState<{
     isOpen: boolean;
     messageId: string;
@@ -226,18 +229,41 @@ const DeliberationChat = () => {
           </div>
         </div>
         
-        {/* Chat Interface */}
-        <MessageList 
-          messages={messages} 
-          isLoading={chatLoading} 
-          isTyping={isTyping}
-          onAddToIbis={handleAddToIbis}
-        />
-        
-        <MessageInput 
-          onSendMessage={sendMessage} 
-          disabled={isTyping || deliberation.status === 'completed'}
-        />
+        {/* Main Content Tabs */}
+        <div className="flex-1 flex flex-col">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'ibis')} className="flex-1 flex flex-col">
+            <div className="border-b px-4">
+              <TabsList className="grid w-[400px] grid-cols-2">
+                <TabsTrigger value="chat" className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Chat
+                </TabsTrigger>
+                <TabsTrigger value="ibis" className="flex items-center gap-2">
+                  <GitBranch className="h-4 w-4" />
+                  IBIS Map
+                </TabsTrigger>
+              </TabsList>
+            </div>
+            
+            <TabsContent value="chat" className="flex-1 flex flex-col mt-0">
+              <MessageList 
+                messages={messages} 
+                isLoading={chatLoading} 
+                isTyping={isTyping}
+                onAddToIbis={handleAddToIbis}
+              />
+              
+              <MessageInput 
+                onSendMessage={sendMessage} 
+                disabled={isTyping || deliberation.status === 'completed'}
+              />
+            </TabsContent>
+            
+            <TabsContent value="ibis" className="flex-1 mt-0">
+              <IbisMapVisualization deliberationId={deliberation.id} />
+            </TabsContent>
+          </Tabs>
+        </div>
         
         {/* IBIS Submission Modal */}
         {deliberation && (
