@@ -33,6 +33,7 @@ interface SemanticAnalysis {
   sentiment: number; // -1 to 1
   requiresExpertise: boolean;
   discussionPotential: number; // 0-1
+  isFactualQuery: boolean; // New field for factual query detection
 }
 
 interface OrchestrationContext {
@@ -50,6 +51,34 @@ interface FacilitatorQuestion {
   category: 'exploration' | 'perspective' | 'clarification' | 'synthesis' | 'action';
   weight: number;
 }
+
+// Domain override patterns for legislative/factual queries
+const DOMAIN_OVERRIDES = [
+  {
+    patterns: [
+      /recommendation|recommendations?/i,
+      /legislation|legislative/i,
+      /policy|policies/i,
+      /law|laws|legal/i,
+      /regulation|regulations?/i,
+      /official|government|authority/i,
+      /guideline|guidelines?/i,
+      /what is the.*position/i,
+      /facts? about/i,
+      /what does the.*say/i
+    ],
+    requiredAgent: 'bill_agent',
+    minConfidence: 0.7
+  }
+];
+
+// Factual query indicators
+const FACTUAL_INDICATORS = [
+  'what is', 'what are', 'what does', 'what do',
+  'recommendation', 'recommendations', 'official',
+  'law', 'legal', 'legislation', 'policy', 'regulation',
+  'guideline', 'government', 'authority', 'position'
+];
 
 const FACILITATION_QUESTIONS: FacilitatorQuestion[] = [
   {
@@ -197,6 +226,11 @@ serve(async (req) => {
 async function analyzeMessage(content: string, state: ConversationState, openAIApiKey: string): Promise<SemanticAnalysis> {
   const prompt = `
 Analyze this message in the context of an ongoing conversation about a specific topic.
+Pay special attention to:
+1. Is this asking for FACTS, LAWS, or OFFICIAL INFORMATION?
+2. Does it contain: recommendation, legislation, policy, guideline?
+3. Is this seeking authoritative knowledge vs. discussion?
+
 Current conversation depth: ${state.messageCount} messages
 Topic depth: ${state.topicDepth}
 Previous keywords: ${state.topicKeywords.join(', ')}
@@ -213,7 +247,8 @@ Provide analysis in the following JSON format:
   "entities": ["key entities, topics, or concepts mentioned"],
   "sentiment": -1.0 to 1.0,
   "requiresExpertise": true|false,
-  "discussionPotential": 0.0-1.0
+  "discussionPotential": 0.0-1.0,
+  "isFactualQuery": true|false
 }`;
 
   try {
@@ -251,6 +286,14 @@ Provide analysis in the following JSON format:
 
 // Agent selection algorithm with sophisticated scoring
 function selectAgent(analysis: SemanticAnalysis, state: ConversationState, mode: string): string {
+  // Check domain overrides first
+  for (const override of DOMAIN_OVERRIDES) {
+    if (override.patterns.some(pattern => pattern.test(analysis.intent))) {
+      console.log('🎯 Domain override triggered - routing to:', override.requiredAgent);
+      return override.requiredAgent;
+    }
+  }
+
   // Calculate agent scores
   const scores = {
     flow_agent: calculateFlowScore(analysis, state, mode),
@@ -288,19 +331,29 @@ function calculateFlowScore(analysis: SemanticAnalysis, state: ConversationState
 
 // Bill Agent scoring (expert knowledge)
 function calculateBillScore(analysis: SemanticAnalysis, state: ConversationState, mode: string): number {
-  let score = 0.25; // Base score
+  let score = 0.3; // Increased base score
+
+  // Strong boost for factual queries
+  if (analysis.isFactualQuery) score += 0.4;
+  
+  // Check for factual indicators in content
+  const contentLower = analysis.intent.toLowerCase();
+  const hasFactualIndicator = FACTUAL_INDICATORS.some(indicator => 
+    contentLower.includes(indicator.toLowerCase())
+  );
+  if (hasFactualIndicator) score += 0.4;
 
   // Boost for detailed/expert questions
   if (analysis.questionType === 'detailed') score += 0.5;
-  if (analysis.requiresExpertise) score += 0.4;
+  if (analysis.requiresExpertise) score += 0.3; // Reduced to balance with factual boost
   if (analysis.complexity > 0.6) score += 0.3;
   if (analysis.topicRelevance > 0.8) score += 0.2;
   
   // Consider conversation depth
   if (state.topicDepth > 2) score += 0.2;
   
-  // Reduce if too collaborative
-  if (analysis.discussionPotential > 0.7) score -= 0.2;
+  // Reduce if too collaborative (but only if not factual)
+  if (analysis.discussionPotential > 0.7 && !analysis.isFactualQuery) score -= 0.2;
 
   // Mode-specific adjustments
   if (mode === 'learn') score += 0.3;
@@ -312,22 +365,32 @@ function calculateBillScore(analysis: SemanticAnalysis, state: ConversationState
 function calculatePeerScore(analysis: SemanticAnalysis, state: ConversationState, mode: string): number {
   let score = 0.15; // Base score
 
-  // Progressive increase based on conversation length
-  score += Math.min(state.messageCount * 0.04, 0.4);
+  // Progressive increase based on conversation length (reduced rate)
+  score += Math.min(state.messageCount * 0.025, 0.25); // Reduced from 0.04 to 0.025, capped at 0.25
   
-  // Boost for argumentative/collaborative content
-  if (analysis.questionType === 'argumentative') score += 0.4;
-  if (analysis.questionType === 'collaborative') score += 0.5;
-  if (analysis.discussionPotential > 0.6) score += 0.3;
+  // Penalize heavily for expertise/factual queries
+  if (analysis.requiresExpertise || analysis.isFactualQuery) {
+    score *= 0.5; // 50% reduction for expertise queries
+  }
   
-  // Boost if IBIS elements are building up
-  const ibisCount = state.ibisElements.issues.length + 
-                   state.ibisElements.positions.length + 
-                   state.ibisElements.arguments.length;
-  score += Math.min(ibisCount * 0.1, 0.3);
+  // Only boost for discussion if not requiring expertise
+  if (!analysis.requiresExpertise && !analysis.isFactualQuery) {
+    // Boost for argumentative/collaborative content
+    if (analysis.questionType === 'argumentative') score += 0.4;
+    if (analysis.questionType === 'collaborative') score += 0.5;
+    if (analysis.discussionPotential > 0.6) score += 0.25; // Reduced from 0.3
+  }
   
-  // Boost for high engagement
-  if (state.userEngagement > 0.7) score += 0.2;
+  // Boost if IBIS elements are building up (only if not factual)
+  if (!analysis.isFactualQuery) {
+    const ibisCount = state.ibisElements.issues.length + 
+                     state.ibisElements.positions.length + 
+                     state.ibisElements.arguments.length;
+    score += Math.min(ibisCount * 0.1, 0.3);
+  }
+  
+  // Boost for high engagement (only if not factual)
+  if (state.userEngagement > 0.7 && !analysis.isFactualQuery) score += 0.2;
   
   // Reduce at very start of conversation
   if (state.messageCount < 2) score -= 0.3;
@@ -509,6 +572,12 @@ function getFallbackAnalysis(content: string): SemanticAnalysis {
   const wordCount = content.split(' ').length;
   const entities = content.split(' ').filter(word => word.length > 5).slice(0, 3);
   
+  // Check for factual indicators in fallback
+  const contentLower = content.toLowerCase();
+  const isFactual = FACTUAL_INDICATORS.some(indicator => 
+    contentLower.includes(indicator.toLowerCase())
+  );
+  
   return {
     intent: content.substring(0, 50),
     complexity: Math.min(wordCount / 30, 1),
@@ -516,8 +585,9 @@ function getFallbackAnalysis(content: string): SemanticAnalysis {
     questionType: isQuestion ? 'basic' : 'collaborative',
     entities,
     sentiment: 0,
-    requiresExpertise: wordCount > 20,
-    discussionPotential: isQuestion ? 0.3 : 0.6
+    requiresExpertise: wordCount > 20 || isFactual,
+    discussionPotential: isQuestion ? 0.3 : 0.6,
+    isFactualQuery: isFactual
   };
 }
 
