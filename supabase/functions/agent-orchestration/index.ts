@@ -626,6 +626,37 @@ async function executeAgentResponse(
       .order('created_at', { ascending: false })
       .limit(10);
 
+    // Fetch relevant knowledge for bill_agent
+    let knowledgeContext = '';
+    let sources: string[] = [];
+    if (agentType === 'bill_agent') {
+      try {
+        const knowledgeResponse = await supabase.functions.invoke('query-agent-knowledge', {
+          body: {
+            query: context.content,
+            agentId: agent.id,
+            maxResults: 3
+          }
+        });
+
+        if (knowledgeResponse.data?.success && knowledgeResponse.data?.relevantKnowledge?.length > 0) {
+          const knowledge = knowledgeResponse.data.relevantKnowledge;
+          knowledgeContext = '\n\nRELEVANT KNOWLEDGE:\n' + 
+            knowledge.map((item: any, index: number) => 
+              `[${index + 1}] ${item.title}: ${item.content.substring(0, 500)}...`
+            ).join('\n\n');
+
+          // Extract unique source files for reference
+          sources = [...new Set(knowledge
+            .map((item: any) => item.file_name || item.title)
+            .filter((source: string) => source)
+          )];
+        }
+      } catch (error) {
+        console.warn('⚠️ Knowledge retrieval failed:', error);
+      }
+    }
+
     // Fetch deliberation context
     let deliberationContext = '';
     if (context.deliberationId) {
@@ -653,10 +684,17 @@ async function executeAgentResponse(
     }
 
     // Prepare messages for OpenAI
+    const systemPrompt = agent.system_prompt + deliberationContext + conversationContext + knowledgeContext;
+    
+    // Add source citation instruction for bill_agent
+    const finalSystemPrompt = agentType === 'bill_agent' && sources.length > 0 
+      ? systemPrompt + '\n\nIMPORTANT: When referencing information from the knowledge base, add a brief "Sources:" section at the end of your response listing the document names in abbreviated format.'
+      : systemPrompt;
+
     const messages = [
       {
         role: 'system',
-        content: agent.system_prompt + deliberationContext + conversationContext
+        content: finalSystemPrompt
       },
       {
         role: 'user',
@@ -686,7 +724,20 @@ async function executeAgentResponse(
     }
 
     const data = await response.json();
-    const agentResponse = data.choices[0].message.content;
+    let agentResponse = data.choices[0].message.content;
+
+    // Append source references for bill_agent if sources are available
+    if (agentType === 'bill_agent' && sources.length > 0) {
+      const sourceList = sources.map(source => {
+        // Create abbreviated format - take first few words or file name without extension
+        if (source.includes('.')) {
+          return source.split('.')[0]; // Remove file extension
+        }
+        return source.length > 30 ? source.substring(0, 30) + '...' : source;
+      }).join(', ');
+      
+      agentResponse += `\n\n**Sources:** ${sourceList}`;
+    }
 
     console.log(`💬 ${agentType} response: ${agentResponse.substring(0, 100)}...`);
 
