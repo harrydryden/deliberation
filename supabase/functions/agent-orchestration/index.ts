@@ -711,7 +711,7 @@ async function executeAgentResponse(
     
     // Add source citation instruction for bill_agent
     const finalSystemPrompt = agentType === 'bill_agent' && sources.length > 0 
-      ? systemPrompt + '\n\nIMPORTANT: When referencing information from the knowledge base, add a brief "Sources:" section at the end of your response listing the document names in abbreviated format.'
+      ? systemPrompt + '\n\nIMPORTANT: When referencing information from the knowledge base, add a brief "Sources:" section at the end of your response. List only the document names without file extensions (e.g., "Assisted Dying Bill - UK" not "Assisted Dying Bill - UK.pdf").'
       : systemPrompt;
 
     const messages = [
@@ -748,19 +748,6 @@ async function executeAgentResponse(
 
     const data = await response.json();
     let agentResponse = data.choices[0].message.content;
-
-    // Append source references for bill_agent if sources are available
-    if (agentType === 'bill_agent' && sources.length > 0) {
-      const sourceList = sources.map(source => {
-        // Create abbreviated format - take first few words or file name without extension
-        if (source.includes('.')) {
-          return source.split('.')[0]; // Remove file extension
-        }
-        return source.length > 30 ? source.substring(0, 30) + '...' : source;
-      }).join(', ');
-      
-      agentResponse += `\n\n**Sources:** ${sourceList}`;
-    }
 
     console.log(`💬 ${agentType} response: ${agentResponse.substring(0, 100)}...`);
 
