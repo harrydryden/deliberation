@@ -8,7 +8,7 @@ import {
   addEdge,
   Connection,
   Controls,
-  MiniMap,
+  
   Background,
   Panel,
   NodeChange,
@@ -528,13 +528,6 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
         >
           <Background color="#e2e8f0" gap={20} />
           <Controls />
-          <MiniMap 
-            nodeColor={(node) => {
-              const ibisNode = ibisNodes.find(n => n.id === node.id);
-              return ibisNode ? nodeTypeConfig[ibisNode.node_type].color : '#64748b';
-            }}
-            position="top-right"
-          />
           
           {/* Search, Filter, and Connection Panel */}
           <Panel position="top-left">
