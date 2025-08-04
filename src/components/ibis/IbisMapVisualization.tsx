@@ -14,6 +14,7 @@ import {
   NodeChange,
   EdgeChange,
   MarkerType,
+  ConnectionMode,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './ibis-flow.css';
@@ -40,6 +41,15 @@ interface IbisNode {
   message_id?: string;
   created_at: string;
   updated_at: string;
+}
+
+interface IbisRelationship {
+  id: string;
+  source_node_id: string;
+  target_node_id: string;
+  relationship_type: 'supports' | 'opposes' | 'relates_to' | 'responds_to';
+  created_at: string;
+  created_by: string;
 }
 
 interface Message {
@@ -71,8 +81,16 @@ const nodeTypeConfig = {
   }
 };
 
+const relationshipConfig = {
+  supports: { color: '#22c55e', style: 'solid', label: 'Supports' },
+  opposes: { color: '#ef4444', style: 'dashed', label: 'Opposes' },
+  relates_to: { color: '#8b5cf6', style: 'dotted', label: 'Relates to' },
+  responds_to: { color: '#f59e0b', style: 'solid', label: 'Responds to' },
+};
+
 export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationProps) => {
   const [ibisNodes, setIbisNodes] = useState<IbisNode[]>([]);
+  const [ibisRelationships, setIbisRelationships] = useState<IbisRelationship[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedNode, setSelectedNode] = useState<IbisNode | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
@@ -80,6 +98,8 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'issue' | 'position' | 'argument'>('all');
   const [isCreatingNode, setIsCreatingNode] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionType, setConnectionType] = useState<'supports' | 'opposes' | 'relates_to' | 'responds_to'>('supports');
   const [newNodeData, setNewNodeData] = useState({
     title: '',
     description: '',
@@ -123,7 +143,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     [setEdges]
   );
 
-  // Fetch IBIS nodes and messages from Supabase
+  // Fetch IBIS nodes, relationships, and messages from Supabase
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -137,6 +157,15 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
 
       if (nodesError) throw nodesError;
       
+      // Fetch relationships
+      const { data: relationshipsData, error: relationshipsError } = await supabase
+        .from('ibis_relationships')
+        .select('*')
+        .in('source_node_id', (nodesData || []).map(n => n.id))
+        .order('created_at', { ascending: true });
+
+      if (relationshipsError) console.error('Relationships error:', relationshipsError);
+      
       // Fetch messages for traceability
       const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
@@ -146,8 +175,9 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
       if (messagesError) throw messagesError;
 
       setIbisNodes(nodesData || []);
+      setIbisRelationships(relationshipsData || []);
       setMessages(messagesData || []);
-      convertToFlowNodes(nodesData || []);
+      convertToFlowNodes(nodesData || [], relationshipsData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -160,8 +190,23 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     }
   }, [deliberationId, toast]);
 
-  // Convert IBIS nodes to React Flow nodes and edges with filtering
-  const convertToFlowNodes = (ibisNodesData: IbisNode[]) => {
+  // Cluster similar issues together using content similarity
+  const clusterSimilarIssues = (nodes: IbisNode[]) => {
+    const issues = nodes.filter(n => n.node_type === 'issue');
+    const clusters: { [key: string]: IbisNode[] } = {};
+    
+    // Simple keyword-based clustering
+    issues.forEach(issue => {
+      const words = issue.title.toLowerCase().split(' ').filter(w => w.length > 3);
+      const key = words.length > 0 ? words[0] : 'general';
+      if (!clusters[key]) clusters[key] = [];
+      clusters[key].push(issue);
+    });
+    
+    return clusters;
+  };
+  // Convert IBIS nodes to React Flow nodes and edges with clustering and relationships
+  const convertToFlowNodes = (ibisNodesData: IbisNode[], relationshipsData: IbisRelationship[] = []) => {
     // Apply filtering
     const filteredNodes = ibisNodesData.filter(node => {
       const matchesSearch = searchTerm === '' || 
@@ -171,66 +216,88 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
       return matchesSearch && matchesType;
     });
 
+    // Cluster similar issues
+    const issueClusters = clusterSimilarIssues(filteredNodes);
     const flowNodes: Node[] = [];
     const flowEdges: Edge[] = [];
 
-    filteredNodes.forEach((node, index) => {
-      const config = nodeTypeConfig[node.node_type];
-      
-      // Create node with custom styling based on type
-      const flowNode: Node = {
-        id: node.id,
-        type: 'default',
-        position: { 
-          x: node.position_x || 200 + (index % 3) * 250, 
-          y: node.position_y || 100 + Math.floor(index / 3) * 150 
-        },
-        data: {
-          label: (
-            <div className="text-center p-2 node-content">
-              <div className={`font-semibold text-sm ${node.node_type === 'issue' ? 'text-white' : 'text-gray-800'}`}>
-                {node.title}
-              </div>
-              <Badge variant="secondary" className="mt-1 text-xs">
-                {config.label}
-              </Badge>
-              {node.message_id && (
-                <MessageSquare className="h-3 w-3 mt-1 mx-auto opacity-60" />
-              )}
-            </div>
-          ),
-        },
-        className: `ibis-node-${node.node_type}`,
-        style: {
-          backgroundColor: config.color,
-          borderRadius: node.node_type === 'issue' ? '50%' : 
-                        node.node_type === 'argument' ? '0' : '8px',
-          border: '2px solid #fff',
-          minWidth: node.node_type === 'issue' ? 120 : 140,
-          minHeight: node.node_type === 'issue' ? 120 : 80,
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-        },
-        draggable: true,
-      };
+    // Position nodes with clustering
+    let clusterY = 100;
+    Object.entries(issueClusters).forEach(([clusterKey, clusterNodes]) => {
+      clusterNodes.forEach((node, index) => {
+        const position = {
+          x: node.position_x || 100 + index * 180,
+          y: node.position_y || clusterY
+        };
+        
+        const flowNode = createFlowNode(node, position);
+        flowNodes.push(flowNode);
+      });
+      clusterY += 200; // Space between clusters
+    });
 
-      flowNodes.push(flowNode);
+    // Add non-issue nodes
+    filteredNodes
+      .filter(node => node.node_type !== 'issue')
+      .forEach((node, index) => {
+        const position = {
+          x: node.position_x || 600 + (index % 3) * 200,
+          y: node.position_y || 100 + Math.floor(index / 3) * 150
+        };
+        
+        const flowNode = createFlowNode(node, position);
+        flowNodes.push(flowNode);
+      });
 
-      // Create enhanced edge if node has a parent
+    // Create parent-child edges (hierarchy)
+    filteredNodes.forEach(node => {
       if (node.parent_id && filteredNodes.some(n => n.id === node.parent_id)) {
         flowEdges.push({
-          id: `${node.parent_id}-${node.id}`,
+          id: `parent-${node.parent_id}-${node.id}`,
           source: node.parent_id,
           target: node.id,
           type: 'smoothstep',
           animated: false,
           style: { 
-            stroke: '#64748b', 
-            strokeWidth: 3,
-            strokeDasharray: node.node_type === 'argument' ? '5,5' : 'none',
+            stroke: '#94a3b8', 
+            strokeWidth: 2,
+            strokeDasharray: '3,3',
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: '#64748b',
+            color: '#94a3b8',
+          },
+          data: { type: 'hierarchy' },
+        });
+      }
+    });
+
+    // Create relationship edges (semantic connections)
+    relationshipsData.forEach(relationship => {
+      if (filteredNodes.some(n => n.id === relationship.source_node_id) && 
+          filteredNodes.some(n => n.id === relationship.target_node_id)) {
+        const config = relationshipConfig[relationship.relationship_type];
+        
+        flowEdges.push({
+          id: `rel-${relationship.id}`,
+          source: relationship.source_node_id,
+          target: relationship.target_node_id,
+          type: 'smoothstep',
+          animated: relationship.relationship_type === 'supports',
+          style: { 
+            stroke: config.color, 
+            strokeWidth: 3,
+            strokeDasharray: config.style === 'dashed' ? '8,4' : 
+                           config.style === 'dotted' ? '2,2' : 'none',
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: config.color,
+          },
+          label: config.label,
+          data: { 
+            type: 'relationship',
+            relationship: relationship 
           },
         });
       }
@@ -240,7 +307,42 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     setEdges(flowEdges);
   };
 
-  // Handle node click to show details and message traceability
+  // Helper function to create flow nodes
+  const createFlowNode = (node: IbisNode, position: { x: number; y: number }): Node => {
+    const config = nodeTypeConfig[node.node_type];
+    
+    return {
+      id: node.id,
+      type: 'default',
+      position,
+      data: {
+        label: (
+          <div className="text-center p-2 node-content">
+            <div className={`font-semibold text-sm ${node.node_type === 'issue' ? 'text-white' : 'text-gray-800'}`}>
+              {node.title}
+            </div>
+            <Badge variant="secondary" className="mt-1 text-xs">
+              {config.label}
+            </Badge>
+            {node.message_id && (
+              <MessageSquare className="h-3 w-3 mt-1 mx-auto opacity-60" />
+            )}
+          </div>
+        ),
+      },
+      className: `ibis-node-${node.node_type}`,
+      style: {
+        backgroundColor: config.color,
+        borderRadius: node.node_type === 'issue' ? '50%' : 
+                      node.node_type === 'argument' ? '0' : '8px',
+        border: '2px solid #fff',
+        minWidth: node.node_type === 'issue' ? 120 : 140,
+        minHeight: node.node_type === 'issue' ? 120 : 80,
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      },
+      draggable: true,
+    };
+  };
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     const ibisNode = ibisNodes.find(n => n.id === node.id);
     setSelectedNode(ibisNode || null);
@@ -254,7 +356,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     }
   }, [ibisNodes, messages]);
 
-  // Create new node directly in visualization
+  // Handle node click to show details and message traceability
   const handleCreateNode = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -313,7 +415,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     }
   };
 
-  // Update filtering when search term or filter type changes
+  // Create new node directly in visualization
   useEffect(() => {
     if (ibisNodes.length > 0) {
       convertToFlowNodes(ibisNodes);
@@ -380,8 +482,9 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
           attributionPosition="bottom-left"
           className="bg-background"
           nodesDraggable={true}
-          nodesConnectable={false}
+          nodesConnectable={isConnecting}
           elementsSelectable={true}
+          connectionMode={ConnectionMode.Loose}
         >
           <Background color="#e2e8f0" gap={20} />
           <Controls />
@@ -393,7 +496,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
             position="top-right"
           />
           
-          {/* Search and Filter Panel */}
+          {/* Search, Filter, and Connection Panel */}
           <Panel position="top-left">
             <div className="bg-white p-3 rounded-lg shadow-md border space-y-2 w-80">
               <div className="flex items-center gap-2">
@@ -589,31 +692,54 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
         </div>
       )}
 
-      {/* Legend */}
+      {/* Enhanced Legend */}
       <Panel position="bottom-right">
-        <Card className="w-48">
+        <Card className="w-64">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-1">
               <GitBranch className="h-4 w-4" />
-              Node Types
+              Visualization Guide
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 pt-0">
-            {Object.entries(nodeTypeConfig).map(([type, config]) => (
-              <div key={type} className="flex items-center gap-2 text-xs">
-                <div 
-                  className="w-3 h-3 border border-white"
-                  style={{ 
-                    backgroundColor: config.color,
-                    borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px',
-                  }}
-                />
-                <span>{config.label}</span>
-              </div>
-            ))}
-            <div className="mt-3 pt-2 border-t text-xs text-muted-foreground">
-              <div className="mb-1">Drag nodes to reposition</div>
-              <div>Click nodes for details</div>
+          <CardContent className="space-y-3 pt-0">
+            <div>
+              <h4 className="text-xs font-semibold mb-2">Node Types</h4>
+              {Object.entries(nodeTypeConfig).map(([type, config]) => (
+                <div key={type} className="flex items-center gap-2 text-xs mb-1">
+                  <div 
+                    className="w-3 h-3 border border-white"
+                    style={{ 
+                      backgroundColor: config.color,
+                      borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px',
+                    }}
+                  />
+                  <span>{config.label}</span>
+                </div>
+              ))}
+            </div>
+            
+            <div>
+              <h4 className="text-xs font-semibold mb-2">Relationships</h4>
+              {Object.entries(relationshipConfig).map(([type, config]) => (
+                <div key={type} className="flex items-center gap-2 text-xs mb-1">
+                  <div 
+                    className="w-4 h-0.5"
+                    style={{ 
+                      backgroundColor: config.color,
+                      borderStyle: config.style === 'dashed' ? 'dashed' : 'solid',
+                      borderTopWidth: config.style === 'dotted' ? '1px' : '0',
+                    }}
+                  />
+                  <span>{config.label}</span>
+                </div>
+              ))}
+            </div>
+            
+            <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
+              <div>• Similar issues are clustered</div>
+              <div>• Drag nodes to reposition</div>
+              <div>• Use Connect mode to link nodes</div>
+              <div>• Click nodes for details</div>
             </div>
           </CardContent>
         </Card>
