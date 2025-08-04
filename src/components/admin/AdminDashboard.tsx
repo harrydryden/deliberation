@@ -53,29 +53,31 @@ export const AdminDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with Backend Toggle */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">
-            Manage users, access codes, agents, and deliberations
-          </p>
-        </div>
-        
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Label htmlFor="backend-toggle">Backend:</Label>
-            <Badge variant={currentBackend === 'supabase' ? 'default' : 'secondary'}>
-              Supabase
-            </Badge>
-            <Switch
-              id="backend-toggle"
-              checked={currentBackend === 'nodejs'}
-              onCheckedChange={handleBackendToggle}
-            />
-            <Badge variant={currentBackend === 'nodejs' ? 'default' : 'secondary'}>
-              Node.js
-            </Badge>
+      {/* Header with Backend Toggle - Sticky */}
+      <div className="sticky top-16 z-40 bg-deliberation-bg/95 backdrop-blur-sm py-4 -mx-6 px-6 mb-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+            <p className="text-muted-foreground">
+              Manage users, access codes, agents, and deliberations
+            </p>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="backend-toggle">Backend:</Label>
+              <Badge variant={currentBackend === 'supabase' ? 'default' : 'secondary'}>
+                Supabase
+              </Badge>
+              <Switch
+                id="backend-toggle"
+                checked={currentBackend === 'nodejs'}
+                onCheckedChange={handleBackendToggle}
+              />
+              <Badge variant={currentBackend === 'nodejs' ? 'default' : 'secondary'}>
+                Node.js
+              </Badge>
+            </div>
           </div>
         </div>
       </div>
@@ -87,14 +89,16 @@ export const AdminDashboard = () => {
         onRefresh={adminService.fetchStats}
       />
 
-      {/* Main Content Tabs */}
+      {/* Main Content Tabs - Sticky */}
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <div className="sticky top-32 z-30 bg-deliberation-bg/95 backdrop-blur-sm py-2 -mx-6 px-6">
+          <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users">Users & Access</TabsTrigger>
           <TabsTrigger value="agents">Agents</TabsTrigger>
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="deliberations">Deliberations</TabsTrigger>
-        </TabsList>
+          </TabsList>
+        </div>
 
         <TabsContent value="users" className="space-y-4">
           <UserAccessManagement
