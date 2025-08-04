@@ -29,6 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RefreshCw, Plus, Search, Filter, MessageSquare, GitBranch } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useBackendAuth } from '@/hooks/useBackendAuth';
 
 interface IbisNode {
   id: string;
@@ -107,15 +108,37 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     parent_id: '',
   });
   const { toast } = useToast();
+  const { user } = useBackendAuth();
+  
+  // Check if user is admin
+  const isAdmin = user?.role === 'admin';
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  // Handle node position changes and persist to database
+  // Handle node position changes and persist to database (admin only)
   const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
+    // Only allow position changes for admins
+    if (!isAdmin) {
+      // For non-admins, filter out position changes but allow other changes like selection
+      const filteredChanges = changes.filter(change => change.type !== 'position');
+      onNodesChange(filteredChanges);
+      
+      // Show warning if user tried to move a node
+      const hasPositionChanges = changes.some(change => change.type === 'position');
+      if (hasPositionChanges) {
+        toast({
+          title: "Access Restricted",
+          description: "Only administrators can move nodes",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+    
     onNodesChange(changes);
     
-    // Find position changes and persist them
+    // Find position changes and persist them (admin only)
     const positionChanges = changes.filter(change => 
       change.type === 'position' && change.dragging === false
     );
@@ -136,7 +159,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
         }
       }
     }
-  }, [onNodesChange]);
+  }, [onNodesChange, isAdmin, toast]);
 
   // Handle new connections between nodes
   const onConnect = useCallback(async (connection: Connection) => {
@@ -380,7 +403,8 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
         minHeight: node.node_type === 'issue' ? 120 : 80,
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
       },
-      draggable: true,
+      // Only allow dragging for admins
+      draggable: isAdmin,
     };
   };
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -460,7 +484,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     if (ibisNodes.length > 0) {
       convertToFlowNodes(ibisNodes, ibisRelationships);
     }
-  }, [searchTerm, filterType, ibisNodes, ibisRelationships]);
+  }, [searchTerm, filterType, ibisNodes, ibisRelationships, isAdmin]);
 
   // Set up real-time subscription
   useEffect(() => {
@@ -521,7 +545,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
           fitView
           attributionPosition="bottom-left"
           className="bg-background"
-          nodesDraggable={true}
+          nodesDraggable={isAdmin}
           nodesConnectable={isConnecting}
           elementsSelectable={true}
           connectionMode={ConnectionMode.Loose}
@@ -806,9 +830,16 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
             
             <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
               <div>• Similar issues are clustered</div>
-              <div>• Drag nodes to reposition</div>
+              {isAdmin ? (
+                <div>• Drag nodes to reposition (Admin)</div>
+              ) : (
+                <div>• Add new nodes and connections</div>
+              )}
               <div>• Use Connect mode to link nodes</div>
               <div>• Click nodes for details</div>
+              {!isAdmin && (
+                <div className="text-amber-600">• Editing restricted to admins</div>
+              )}
             </div>
           </CardContent>
         </Card>
