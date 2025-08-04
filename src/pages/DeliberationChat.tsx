@@ -177,9 +177,17 @@ const DeliberationChat = () => {
 
   return (
     <Layout>
-      <div className="h-[calc(100vh-120px)] flex flex-col bg-background rounded-lg border">
+      <div className="flex flex-col bg-background rounded-lg border min-h-[calc(100vh-120px)]">
         {/* Deliberation Header - Sticky below main header */}
-        <div className="sticky top-16 z-40 border-b p-4 bg-card/95 backdrop-blur-sm">
+        <div 
+          className="border-b p-4 bg-card backdrop-blur-sm"
+          style={{ 
+            position: 'sticky', 
+            top: '64px', 
+            zIndex: 40,
+            backgroundColor: 'hsl(var(--card) / 0.95)'
+          }}
+        >
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex items-center space-x-3">
@@ -232,7 +240,15 @@ const DeliberationChat = () => {
         {/* Main Content Tabs */}
         <div className="flex-1 flex flex-col">
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'ibis')} className="flex-1 flex flex-col">
-            <div className="sticky top-[152px] z-30 border-b px-4 bg-background/95 backdrop-blur-sm">
+            <div 
+              className="border-b px-4 bg-background backdrop-blur-sm"
+              style={{ 
+                position: 'sticky', 
+                top: '152px', 
+                zIndex: 30,
+                backgroundColor: 'hsl(var(--background) / 0.95)'
+              }}
+            >
               <TabsList className="grid w-[400px] grid-cols-2">
                 <TabsTrigger value="chat" className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
