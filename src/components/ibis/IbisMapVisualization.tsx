@@ -237,6 +237,15 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
 
       if (messagesError) throw messagesError;
 
+      console.log('📊 IBIS Data loaded:', {
+        totalNodes: nodesData?.length || 0,
+        issues: nodesData?.filter(n => n.node_type === 'issue').length || 0,
+        positions: nodesData?.filter(n => n.node_type === 'position').length || 0,
+        arguments: nodesData?.filter(n => n.node_type === 'argument').length || 0,
+        relationships: relationshipsData?.length || 0,
+        nodesSample: nodesData?.slice(0, 2)
+      });
+
       setIbisNodes(nodesData || []);
       setIbisRelationships(relationshipsData || []);
       setMessages(messagesData || []);
@@ -468,6 +477,11 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
   };
   // Convert IBIS nodes to React Flow nodes and edges with enhanced layout
   const convertToFlowNodes = (ibisNodesData: IbisNode[], relationshipsData: IbisRelationship[] = []) => {
+    console.log('🔄 Converting to flow nodes:', {
+      totalInput: ibisNodesData.length,
+      beforeFilter: ibisNodesData.map(n => ({ id: n.id, type: n.node_type, title: n.title }))
+    });
+
     // Apply filtering
     const filteredNodes = ibisNodesData.filter(node => {
       const matchesSearch = searchTerm === '' || 
@@ -475,6 +489,13 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
         (node.description || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = filterType === 'all' || node.node_type === filterType;
       return matchesSearch && matchesType;
+    });
+
+    console.log('🔍 After filtering:', {
+      filteredCount: filteredNodes.length,
+      searchTerm,
+      filterType,
+      filteredNodes: filteredNodes.map(n => ({ id: n.id, type: n.node_type, title: n.title }))
     });
 
     // Apply force-directed layout for better positioning
@@ -528,7 +549,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
           id: `rel-${relationship.id}`,
           source: relationship.source_node_id,
           target: relationship.target_node_id,
-          type: 'bezier', // Use curved bezier paths for better visual flow
+          type: 'smoothstep', // Use smoothstep instead of bezier for better compatibility
           animated: relationship.relationship_type === 'supports' && strength > 0.7,
           style: { 
             stroke: config.color, 
