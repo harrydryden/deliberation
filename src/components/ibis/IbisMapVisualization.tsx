@@ -8,13 +8,13 @@ import {
   addEdge,
   Connection,
   Controls,
-  
   Background,
   Panel,
   NodeChange,
   EdgeChange,
   MarkerType,
   ConnectionMode,
+  getBezierPath,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import './ibis-flow.css';
@@ -253,81 +253,220 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     }
   }, [deliberationId, toast]);
 
-  // Cluster similar issues together using content similarity
-  const clusterSimilarIssues = (nodes: IbisNode[]) => {
+  // Calculate semantic similarity between nodes
+  const calculateSemanticSimilarity = (node1: IbisNode, node2: IbisNode): number => {
+    const words1 = new Set(node1.title.toLowerCase().split(' ').filter(w => w.length > 3));
+    const words2 = new Set(node2.title.toLowerCase().split(' ').filter(w => w.length > 3));
+    
+    const intersection = new Set([...words1].filter(x => words2.has(x)));
+    const union = new Set([...words1, ...words2]);
+    
+    return union.size > 0 ? intersection.size / union.size : 0;
+  };
+
+  // Calculate relationship strength based on type and frequency
+  const calculateRelationshipStrength = (
+    sourceId: string, 
+    targetId: string, 
+    relationships: IbisRelationship[]
+  ): number => {
+    const connections = relationships.filter(
+      rel => (rel.source_node_id === sourceId && rel.target_node_id === targetId) ||
+             (rel.source_node_id === targetId && rel.target_node_id === sourceId)
+    );
+    
+    if (connections.length === 0) return 0;
+    
+    // Weight different relationship types
+    const weights = {
+      supports: 1.0,
+      opposes: 0.8,
+      relates_to: 0.6,
+      responds_to: 0.7
+    };
+    
+    return connections.reduce((sum, rel) => sum + weights[rel.relationship_type], 0);
+  };
+
+  // Force-directed layout algorithm with hierarchy respect
+  const applyForceDirectedLayout = (
+    nodes: IbisNode[], 
+    relationships: IbisRelationship[],
+    canvas: { width: number; height: number } = { width: 1200, height: 800 }
+  ) => {
+    const positions = new Map<string, { x: number; y: number; vx: number; vy: number }>();
     const issues = nodes.filter(n => n.node_type === 'issue');
-    const clusters: { [key: string]: IbisNode[] } = {};
+    const positions_args = nodes.filter(n => n.node_type !== 'issue');
     
-    // Simple keyword-based clustering
-    issues.forEach(issue => {
-      const words = issue.title.toLowerCase().split(' ').filter(w => w.length > 3);
-      const key = words.length > 0 ? words[0] : 'general';
-      if (!clusters[key]) clusters[key] = [];
-      clusters[key].push(issue);
+    // Initialize positions with saved coordinates or calculated positions
+    nodes.forEach((node, index) => {
+      if (node.position_x && node.position_y) {
+        positions.set(node.id, { 
+          x: node.position_x, 
+          y: node.position_y, 
+          vx: 0, 
+          vy: 0 
+        });
+      } else {
+        // Place issues in center area, others in outer ring
+        if (node.node_type === 'issue') {
+          const angle = (index / issues.length) * 2 * Math.PI;
+          const radius = 100 + issues.length * 10;
+          positions.set(node.id, {
+            x: canvas.width / 2 + Math.cos(angle) * radius,
+            y: canvas.height / 2 + Math.sin(angle) * radius,
+            vx: 0,
+            vy: 0
+          });
+        } else {
+          const angle = (index / positions_args.length) * 2 * Math.PI;
+          const radius = 200 + positions_args.length * 15;
+          positions.set(node.id, {
+            x: canvas.width / 2 + Math.cos(angle) * radius,
+            y: canvas.height / 2 + Math.sin(angle) * radius,
+            vx: 0,
+            vy: 0
+          });
+        }
+      }
     });
+
+    // Force simulation parameters
+    const iterations = 100;
+    const damping = 0.9;
+    const repulsionStrength = 5000;
+    const attractionStrength = 0.01;
+    const semanticAttractionStrength = 0.005;
     
-    return clusters;
+    for (let i = 0; i < iterations; i++) {
+      // Reset forces
+      nodes.forEach(node => {
+        const pos = positions.get(node.id)!;
+        pos.vx *= damping;
+        pos.vy *= damping;
+      });
+
+      // Repulsion forces between all nodes
+      for (let j = 0; j < nodes.length; j++) {
+        for (let k = j + 1; k < nodes.length; k++) {
+          const node1 = nodes[j];
+          const node2 = nodes[k];
+          const pos1 = positions.get(node1.id)!;
+          const pos2 = positions.get(node2.id)!;
+          
+          const dx = pos1.x - pos2.x;
+          const dy = pos1.y - pos2.y;
+          const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+          
+          const force = repulsionStrength / (distance * distance);
+          const fx = (dx / distance) * force;
+          const fy = (dy / distance) * force;
+          
+          pos1.vx += fx;
+          pos1.vy += fy;
+          pos2.vx -= fx;
+          pos2.vy -= fy;
+        }
+      }
+
+      // Attraction forces from relationships
+      relationships.forEach(rel => {
+        const sourcePos = positions.get(rel.source_node_id);
+        const targetPos = positions.get(rel.target_node_id);
+        if (!sourcePos || !targetPos) return;
+        
+        const dx = targetPos.x - sourcePos.x;
+        const dy = targetPos.y - sourcePos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+        
+        const strength = calculateRelationshipStrength(rel.source_node_id, rel.target_node_id, relationships);
+        const force = attractionStrength * strength * distance;
+        const fx = (dx / distance) * force;
+        const fy = (dy / distance) * force;
+        
+        sourcePos.vx += fx;
+        sourcePos.vy += fy;
+        targetPos.vx -= fx;
+        targetPos.vy -= fy;
+      });
+
+      // Semantic attraction (weaker)
+      for (let j = 0; j < nodes.length; j++) {
+        for (let k = j + 1; k < nodes.length; k++) {
+          const node1 = nodes[j];
+          const node2 = nodes[k];
+          const similarity = calculateSemanticSimilarity(node1, node2);
+          
+          if (similarity > 0.3) { // Only attract semantically similar nodes
+            const pos1 = positions.get(node1.id)!;
+            const pos2 = positions.get(node2.id)!;
+            
+            const dx = pos2.x - pos1.x;
+            const dy = pos2.y - pos1.y;
+            const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+            
+            const force = semanticAttractionStrength * similarity * distance;
+            const fx = (dx / distance) * force;
+            const fy = (dy / distance) * force;
+            
+            pos1.vx += fx;
+            pos1.vy += fy;
+            pos2.vx -= fx;
+            pos2.vy -= fy;
+          }
+        }
+      }
+
+      // Apply velocities with constraints
+      nodes.forEach(node => {
+        const pos = positions.get(node.id)!;
+        
+        // Only apply forces if admin hasn't manually positioned or it's a new node
+        if (!node.position_x || !node.position_y) {
+          pos.x += pos.vx;
+          pos.y += pos.vy;
+          
+          // Keep nodes within canvas bounds
+          pos.x = Math.max(100, Math.min(canvas.width - 100, pos.x));
+          pos.y = Math.max(100, Math.min(canvas.height - 100, pos.y));
+        }
+      });
+    }
+
+    return positions;
   };
 
   // Node dimensions for collision detection
   const getNodeDimensions = (nodeType: string) => {
     switch (nodeType) {
       case 'issue':
-        return { width: 120, height: 120 };
+        return { width: 140, height: 140 }; // Slightly larger for central importance
       case 'position':
-        return { width: 140, height: 80 };
+        return { width: 160, height: 90 };
       case 'argument':
-        return { width: 140, height: 80 };
+        return { width: 160, height: 90 };
       default:
-        return { width: 140, height: 80 };
+        return { width: 160, height: 90 };
     }
   };
 
-  // Check if two nodes overlap
-  const nodesOverlap = (pos1: { x: number; y: number }, size1: { width: number; height: number }, 
-                       pos2: { x: number; y: number }, size2: { width: number; height: number }) => {
-    const margin = 20; // Minimum spacing between nodes
-    return !(pos1.x + size1.width + margin < pos2.x || 
-             pos2.x + size2.width + margin < pos1.x || 
-             pos1.y + size1.height + margin < pos2.y || 
-             pos2.y + size2.height + margin < pos1.y);
-  };
-
-  // Find non-overlapping position for a node
-  const findNonOverlappingPosition = (
-    preferredPosition: { x: number; y: number },
-    nodeType: string,
-    existingPositions: Array<{ position: { x: number; y: number }; type: string }>
-  ) => {
-    const nodeDimensions = getNodeDimensions(nodeType);
-    let position = { ...preferredPosition };
-    let attempts = 0;
-    const maxAttempts = 50;
+  // Enhanced node importance calculation
+  const calculateNodeImportance = (nodeId: string, relationships: IbisRelationship[]): number => {
+    const connections = relationships.filter(
+      rel => rel.source_node_id === nodeId || rel.target_node_id === nodeId
+    );
     
-    while (attempts < maxAttempts) {
-      const hasOverlap = existingPositions.some(existing => {
-        const existingDimensions = getNodeDimensions(existing.type);
-        return nodesOverlap(position, nodeDimensions, existing.position, existingDimensions);
-      });
-      
-      if (!hasOverlap) {
-        return position;
+    // Base importance on connection count and types
+    let importance = connections.length;
+    connections.forEach(rel => {
+      if (rel.relationship_type === 'supports' || rel.relationship_type === 'opposes') {
+        importance += 0.5; // These are more important relationship types
       }
-      
-      // Try different positions in a spiral pattern
-      const spiralRadius = 50 + Math.floor(attempts / 8) * 30;
-      const angle = (attempts % 8) * (Math.PI / 4);
-      position = {
-        x: preferredPosition.x + Math.cos(angle) * spiralRadius,
-        y: preferredPosition.y + Math.sin(angle) * spiralRadius
-      };
-      
-      attempts++;
-    }
+    });
     
-    return position;
+    return Math.min(importance / 5, 2); // Normalize to max 2x scaling
   };
-  // Convert IBIS nodes to React Flow nodes and edges with clustering and relationships
+  // Convert IBIS nodes to React Flow nodes and edges with enhanced layout
   const convertToFlowNodes = (ibisNodesData: IbisNode[], relationshipsData: IbisRelationship[] = []) => {
     // Apply filtering
     const filteredNodes = ibisNodesData.filter(node => {
@@ -338,77 +477,20 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
       return matchesSearch && matchesType;
     });
 
-    // Cluster similar issues
-    const issueClusters = clusterSimilarIssues(filteredNodes);
+    // Apply force-directed layout for better positioning
+    const optimizedPositions = applyForceDirectedLayout(filteredNodes, relationshipsData);
     const flowNodes: Node[] = [];
     const flowEdges: Edge[] = [];
-    const existingPositions: Array<{ position: { x: number; y: number }; type: string }> = [];
 
-    // Position nodes with clustering and collision detection
-    let clusterY = 100;
-    const clusterSpacing = 250; // Increased spacing between clusters
-    
-    Object.entries(issueClusters).forEach(([clusterKey, clusterNodes]) => {
-      let clusterX = 100;
-      
-      clusterNodes.forEach((node, index) => {
-        let preferredPosition = {
-          x: node.position_x || clusterX,
-          y: node.position_y || clusterY
-        };
-        
-        // Find non-overlapping position if no saved position
-        if (!node.position_x || !node.position_y) {
-          preferredPosition = findNonOverlappingPosition(
-            preferredPosition,
-            node.node_type,
-            existingPositions
-          );
-        }
-        
-        const flowNode = createFlowNode(node, preferredPosition);
-        flowNodes.push(flowNode);
-        existingPositions.push({ 
-          position: preferredPosition, 
-          type: node.node_type 
-        });
-        
-        // Update position for next node in cluster
-        clusterX += 180;
-      });
-      
-      clusterY += clusterSpacing;
-    });
-
-    // Add non-issue nodes with collision detection
-    const nonIssueNodes = filteredNodes.filter(node => node.node_type !== 'issue');
-    let nonIssueBaseX = Math.max(600, clusterY > 100 ? 100 : 600); // Adjust based on issue clusters
-    let nonIssueBaseY = 100;
-    
-    nonIssueNodes.forEach((node, index) => {
-      let preferredPosition = {
-        x: node.position_x || (nonIssueBaseX + (index % 3) * 200),
-        y: node.position_y || (nonIssueBaseY + Math.floor(index / 3) * 150)
-      };
-      
-      // Find non-overlapping position if no saved position
-      if (!node.position_x || !node.position_y) {
-        preferredPosition = findNonOverlappingPosition(
-          preferredPosition,
-          node.node_type,
-          existingPositions
-        );
-      }
-      
-      const flowNode = createFlowNode(node, preferredPosition);
+    // Create nodes with optimized positions and enhanced styling
+    filteredNodes.forEach(node => {
+      const position = optimizedPositions.get(node.id) || { x: 100, y: 100 };
+      const importance = calculateNodeImportance(node.id, relationshipsData);
+      const flowNode = createEnhancedFlowNode(node, position, importance);
       flowNodes.push(flowNode);
-      existingPositions.push({ 
-        position: preferredPosition, 
-        type: node.node_type 
-      });
     });
 
-    // Create parent-child edges (hierarchy)
+    // Create hierarchical edges (parent-child relationships)
     filteredNodes.forEach(node => {
       if (node.parent_id && filteredNodes.some(n => n.id === node.parent_id)) {
         flowEdges.push({
@@ -420,7 +502,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
           style: { 
             stroke: '#94a3b8', 
             strokeWidth: 2,
-            strokeDasharray: '3,3',
+            strokeDasharray: '5,5',
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
@@ -431,32 +513,39 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
       }
     });
 
-    // Create relationship edges (semantic connections)
+    // Create enhanced relationship edges with curved paths and strength indicators
     relationshipsData.forEach(relationship => {
       if (filteredNodes.some(n => n.id === relationship.source_node_id) && 
           filteredNodes.some(n => n.id === relationship.target_node_id)) {
         const config = relationshipConfig[relationship.relationship_type];
+        const strength = calculateRelationshipStrength(
+          relationship.source_node_id, 
+          relationship.target_node_id, 
+          relationshipsData
+        );
         
         flowEdges.push({
           id: `rel-${relationship.id}`,
           source: relationship.source_node_id,
           target: relationship.target_node_id,
-          type: 'smoothstep',
-          animated: relationship.relationship_type === 'supports',
+          type: 'bezier', // Use curved bezier paths for better visual flow
+          animated: relationship.relationship_type === 'supports' && strength > 0.7,
           style: { 
             stroke: config.color, 
-            strokeWidth: 3,
+            strokeWidth: Math.max(2, Math.min(6, 2 + strength * 2)), // Variable width based on strength
             strokeDasharray: config.style === 'dashed' ? '8,4' : 
-                           config.style === 'dotted' ? '2,2' : 'none',
+                           config.style === 'dotted' ? '3,3' : 'none',
+            opacity: Math.max(0.6, strength), // Variable opacity based on strength
           },
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: config.color,
           },
-          label: config.label,
+          label: strength > 0.8 ? config.label : '', // Only show labels for strong relationships
           data: { 
             type: 'relationship',
-            relationship: relationship 
+            relationship: relationship,
+            strength: strength
           },
         });
       }
@@ -466,7 +555,69 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     setEdges(flowEdges);
   };
 
-  // Helper function to create flow nodes
+  // Enhanced node creation with importance-based styling
+  const createEnhancedFlowNode = (
+    node: IbisNode, 
+    position: { x: number; y: number }, 
+    importance: number
+  ): Node => {
+    const config = nodeTypeConfig[node.node_type];
+    const dimensions = getNodeDimensions(node.node_type);
+    
+    // Scale based on importance (1.0 to 1.5x)
+    const scale = 1 + (importance - 1) * 0.3;
+    const scaledWidth = dimensions.width * scale;
+    const scaledHeight = dimensions.height * scale;
+    
+    // Enhanced text handling for longer titles
+    const truncateText = (text: string, maxLength: number) => {
+      return text.length > maxLength ? text.slice(0, maxLength) + '...' : text;
+    };
+    
+    return {
+      id: node.id,
+      type: 'default',
+      position,
+      data: {
+        label: (
+          <div className="text-center p-3 node-content transition-all duration-300 hover:scale-105">
+            <div className={`font-semibold leading-tight mb-2 ${
+              node.node_type === 'issue' ? 'text-white text-sm' : 'text-gray-800 text-xs'
+            }`}>
+              {truncateText(node.title, node.node_type === 'issue' ? 25 : 30)}
+            </div>
+            <Badge 
+              variant="secondary" 
+              className={`text-xs transition-all ${importance > 1.2 ? 'bg-yellow-100 text-yellow-800' : ''}`}
+            >
+              {config.label}
+              {importance > 1.2 && " ⭐"}
+            </Badge>
+            {node.message_id && (
+              <MessageSquare className="h-3 w-3 mt-1 mx-auto opacity-70" />
+            )}
+          </div>
+        ),
+      },
+      className: `ibis-node-${node.node_type} animate-fade-in`,
+      style: {
+        backgroundColor: config.color,
+        borderRadius: node.node_type === 'issue' ? '50%' : 
+                      node.node_type === 'argument' ? '0' : '12px',
+        border: `${importance > 1.2 ? '3' : '2'}px solid ${importance > 1.2 ? '#fbbf24' : '#fff'}`,
+        minWidth: scaledWidth,
+        minHeight: scaledHeight,
+        boxShadow: importance > 1.2 
+          ? '0 8px 25px rgba(251, 191, 36, 0.3), 0 4px 15px rgba(0, 0, 0, 0.15)'
+          : '0 4px 15px rgba(0, 0, 0, 0.15)',
+        transform: `scale(${Math.min(1.1, scale)})`,
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      },
+      draggable: isAdmin,
+    };
+  };
+
+  // Helper function to create flow nodes (legacy - keeping for compatibility)
   const createFlowNode = (node: IbisNode, position: { x: number; y: number }): Node => {
     const config = nodeTypeConfig[node.node_type];
     
