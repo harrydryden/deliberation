@@ -268,6 +268,65 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     
     return clusters;
   };
+
+  // Node dimensions for collision detection
+  const getNodeDimensions = (nodeType: string) => {
+    switch (nodeType) {
+      case 'issue':
+        return { width: 120, height: 120 };
+      case 'position':
+        return { width: 140, height: 80 };
+      case 'argument':
+        return { width: 140, height: 80 };
+      default:
+        return { width: 140, height: 80 };
+    }
+  };
+
+  // Check if two nodes overlap
+  const nodesOverlap = (pos1: { x: number; y: number }, size1: { width: number; height: number }, 
+                       pos2: { x: number; y: number }, size2: { width: number; height: number }) => {
+    const margin = 20; // Minimum spacing between nodes
+    return !(pos1.x + size1.width + margin < pos2.x || 
+             pos2.x + size2.width + margin < pos1.x || 
+             pos1.y + size1.height + margin < pos2.y || 
+             pos2.y + size2.height + margin < pos1.y);
+  };
+
+  // Find non-overlapping position for a node
+  const findNonOverlappingPosition = (
+    preferredPosition: { x: number; y: number },
+    nodeType: string,
+    existingPositions: Array<{ position: { x: number; y: number }; type: string }>
+  ) => {
+    const nodeDimensions = getNodeDimensions(nodeType);
+    let position = { ...preferredPosition };
+    let attempts = 0;
+    const maxAttempts = 50;
+    
+    while (attempts < maxAttempts) {
+      const hasOverlap = existingPositions.some(existing => {
+        const existingDimensions = getNodeDimensions(existing.type);
+        return nodesOverlap(position, nodeDimensions, existing.position, existingDimensions);
+      });
+      
+      if (!hasOverlap) {
+        return position;
+      }
+      
+      // Try different positions in a spiral pattern
+      const spiralRadius = 50 + Math.floor(attempts / 8) * 30;
+      const angle = (attempts % 8) * (Math.PI / 4);
+      position = {
+        x: preferredPosition.x + Math.cos(angle) * spiralRadius,
+        y: preferredPosition.y + Math.sin(angle) * spiralRadius
+      };
+      
+      attempts++;
+    }
+    
+    return position;
+  };
   // Convert IBIS nodes to React Flow nodes and edges with clustering and relationships
   const convertToFlowNodes = (ibisNodesData: IbisNode[], relationshipsData: IbisRelationship[] = []) => {
     // Apply filtering
@@ -283,34 +342,71 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
     const issueClusters = clusterSimilarIssues(filteredNodes);
     const flowNodes: Node[] = [];
     const flowEdges: Edge[] = [];
+    const existingPositions: Array<{ position: { x: number; y: number }; type: string }> = [];
 
-    // Position nodes with clustering
+    // Position nodes with clustering and collision detection
     let clusterY = 100;
+    const clusterSpacing = 250; // Increased spacing between clusters
+    
     Object.entries(issueClusters).forEach(([clusterKey, clusterNodes]) => {
+      let clusterX = 100;
+      
       clusterNodes.forEach((node, index) => {
-        const position = {
-          x: node.position_x || 100 + index * 180,
+        let preferredPosition = {
+          x: node.position_x || clusterX,
           y: node.position_y || clusterY
         };
         
-        const flowNode = createFlowNode(node, position);
+        // Find non-overlapping position if no saved position
+        if (!node.position_x || !node.position_y) {
+          preferredPosition = findNonOverlappingPosition(
+            preferredPosition,
+            node.node_type,
+            existingPositions
+          );
+        }
+        
+        const flowNode = createFlowNode(node, preferredPosition);
         flowNodes.push(flowNode);
+        existingPositions.push({ 
+          position: preferredPosition, 
+          type: node.node_type 
+        });
+        
+        // Update position for next node in cluster
+        clusterX += 180;
       });
-      clusterY += 200; // Space between clusters
+      
+      clusterY += clusterSpacing;
     });
 
-    // Add non-issue nodes
-    filteredNodes
-      .filter(node => node.node_type !== 'issue')
-      .forEach((node, index) => {
-        const position = {
-          x: node.position_x || 600 + (index % 3) * 200,
-          y: node.position_y || 100 + Math.floor(index / 3) * 150
-        };
-        
-        const flowNode = createFlowNode(node, position);
-        flowNodes.push(flowNode);
+    // Add non-issue nodes with collision detection
+    const nonIssueNodes = filteredNodes.filter(node => node.node_type !== 'issue');
+    let nonIssueBaseX = Math.max(600, clusterY > 100 ? 100 : 600); // Adjust based on issue clusters
+    let nonIssueBaseY = 100;
+    
+    nonIssueNodes.forEach((node, index) => {
+      let preferredPosition = {
+        x: node.position_x || (nonIssueBaseX + (index % 3) * 200),
+        y: node.position_y || (nonIssueBaseY + Math.floor(index / 3) * 150)
+      };
+      
+      // Find non-overlapping position if no saved position
+      if (!node.position_x || !node.position_y) {
+        preferredPosition = findNonOverlappingPosition(
+          preferredPosition,
+          node.node_type,
+          existingPositions
+        );
+      }
+      
+      const flowNode = createFlowNode(node, preferredPosition);
+      flowNodes.push(flowNode);
+      existingPositions.push({ 
+        position: preferredPosition, 
+        type: node.node_type 
       });
+    });
 
     // Create parent-child edges (hierarchy)
     filteredNodes.forEach(node => {
