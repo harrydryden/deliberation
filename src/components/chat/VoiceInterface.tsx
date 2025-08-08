@@ -109,8 +109,16 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     if (event?.type === 'response.done' || event?.type === 'response.audio.done') setSpeaking(false);
   };
 
+  const ensureIdle = async () => {
+    if (mode !== 'idle') {
+      stop();
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  };
+
   const startBill = async () => {
     try {
+      await ensureIdle();
       await ensureBillAgentId();
       rtcRef.current = new RealtimeRTC();
       await rtcRef.current.init({ onEvent: handleEvent, onToolCall: toolHandler });
@@ -125,6 +133,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
 
   const startIbis = async () => {
     try {
+      await ensureIdle();
       rtcRef.current = new RealtimeRTC();
       await rtcRef.current.init({ onEvent: handleEvent, onToolCall: toolHandler });
       setConnected(true);
@@ -155,25 +164,27 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   return (
     <div className={className}>
       <div className="flex items-center gap-2">
-        {mode !== 'bill' ? (
+        {mode === 'idle' ? (
           <Button onClick={startBill} variant="secondary" size="sm" aria-label="Talk to Bill">
             <Mic className="h-4 w-4 mr-2" /> Talk to Bill
           </Button>
-        ) : (
+        ) : mode === 'bill' ? (
           <Button onClick={stop} variant="destructive" size="sm" aria-label="Stop Bill conversation">
             <MicOff className="h-4 w-4 mr-2" /> Stop Bill {speaking && <Waves className="h-4 w-4 ml-2" />}
           </Button>
-        )}
+        ) : null}
 
-        {mode !== 'ibis' ? (
+
+        {mode === 'idle' ? (
           <Button onClick={startIbis} variant="default" size="sm" aria-label="Hear IBIS summary">
             Hear IBIS Summary
           </Button>
-        ) : (
+        ) : mode === 'ibis' ? (
           <Button onClick={stop} variant="destructive" size="sm" aria-label="Stop IBIS summary">
             Stop Summary
           </Button>
-        )}
+        ) : null}
+
       </div>
       {connected && mode === 'idle' && (
         <span className="ml-2 text-sm">Connected</span>
