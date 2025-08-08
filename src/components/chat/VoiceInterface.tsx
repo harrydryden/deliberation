@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Mic, MicOff, Waves } from 'lucide-react';
@@ -9,9 +10,10 @@ interface VoiceInterfaceProps {
   deliberationId: string;
   preferredBillAgentId?: string;
   className?: string;
+  variant?: 'default' | 'toggle';
 }
 
-const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferredBillAgentId, className }) => {
+const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferredBillAgentId, className, variant = 'default' }) => {
   const { toast } = useToast();
   const [connected, setConnected] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -165,31 +167,47 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
 
   return (
     <div className={className}>
-      <div className="flex items-center gap-2">
-        {mode === 'idle' ? (
-          <Button onClick={startBill} variant="secondary" size="sm" aria-label="Talk to Bill">
-            <Mic className="h-4 w-4 mr-2" /> Talk to Bill
-          </Button>
-        ) : mode === 'bill' ? (
-          <Button onClick={stop} variant="destructive" size="sm" aria-label="Stop Bill conversation">
-            <MicOff className="h-4 w-4 mr-2" /> Stop Bill {speaking && <Waves className="h-4 w-4 ml-2" />}
-          </Button>
-        ) : null}
+      {variant === 'toggle' ? (
+        <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/50 border">
+          <div className={`flex items-center gap-2 text-sm ${mode !== 'idle' ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+            {mode !== 'idle' ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+            <span>Voice</span>
+            {speaking && <Waves className="h-4 w-4" />}
+          </div>
+          <Switch
+            checked={mode !== 'idle'}
+            onCheckedChange={(checked) => {
+              if (checked) {
+                void startBill();
+              } else {
+                void stop();
+              }
+            }}
+            className="data-[state=checked]:bg-primary"
+          />
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          {mode === 'idle' ? (
+            <Button onClick={startBill} variant="secondary" size="sm" aria-label="Talk to Bill">
+              <Mic className="h-4 w-4 mr-2" /> Talk to Bill
+            </Button>
+          ) : mode === 'bill' ? (
+            <Button onClick={stop} variant="destructive" size="sm" aria-label="Stop Bill conversation">
+              <MicOff className="h-4 w-4 mr-2" /> Stop Bill {speaking && <Waves className="h-4 w-4 ml-2" />}
+            </Button>
+          ) : null}
 
-
-        {mode === 'idle' ? (
-          <Button onClick={startIbis} variant="default" size="sm" aria-label="Hear IBIS summary">
-            Hear IBIS Summary
-          </Button>
-        ) : mode === 'ibis' ? (
-          <Button onClick={stop} variant="destructive" size="sm" aria-label="Stop IBIS summary">
-            Stop Summary
-          </Button>
-        ) : null}
-
-      </div>
-      {connected && mode === 'idle' && (
-        <span className="ml-2 text-sm">Connected</span>
+          {mode === 'idle' ? (
+            <Button onClick={startIbis} variant="default" size="sm" aria-label="Hear IBIS summary">
+              Hear IBIS Summary
+            </Button>
+          ) : mode === 'ibis' ? (
+            <Button onClick={stop} variant="destructive" size="sm" aria-label="Stop IBIS summary">
+              Stop Summary
+            </Button>
+          ) : null}
+        </div>
       )}
     </div>
   );

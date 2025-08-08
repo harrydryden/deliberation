@@ -172,9 +172,6 @@ const DeliberationChat = () => {
     }
   };
   const ChatPanel = () => <div className="flex-1 flex flex-col">
-      <div className="p-4">
-        <VoiceInterface deliberationId={deliberation!.id} />
-      </div>
       <div className="flex-1 overflow-hidden">
         <MessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} />
       </div>
@@ -215,22 +212,23 @@ const DeliberationChat = () => {
                 </p>}
             </div>
             
-            <div className="flex items-center space-x-2">
-              <ChatModeSelector mode={chatMode} onModeChange={setChatMode} />
+              <div className="flex items-center space-x-2">
+                <ChatModeSelector mode={chatMode} onModeChange={setChatMode} />
+                
+                <VoiceInterface deliberationId={deliberation.id} variant="toggle" />
+                
+                <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
+                
+                <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                  <Users className="h-4 w-4" />
+                  <span>{deliberation.participants?.length || deliberation.participant_count || 0}/{deliberation.max_participants}</span>
+                </div>
+                
+                {!isParticipant && <Button variant="default" size="sm" onClick={handleJoinDeliberation} disabled={joiningDeliberation}>
+                    {joiningDeliberation ? 'Joining...' : 'Join Deliberation'}
+                  </Button>}
               
-              <div className="flex items-center space-x-1 text-sm text-muted-foreground">
-                <Users className="h-4 w-4" />
-                <span>{deliberation.participants?.length || deliberation.participant_count || 0}/{deliberation.max_participants}</span>
               </div>
-              
-              {!isParticipant && <Button variant="default" size="sm" onClick={handleJoinDeliberation} disabled={joiningDeliberation}>
-                  {joiningDeliberation ? 'Joining...' : 'Join Deliberation'}
-                </Button>}
-              
-              <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
-              
-              
-            </div>
           </div>
         </div>
         
