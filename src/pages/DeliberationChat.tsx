@@ -197,22 +197,28 @@ const DeliberationChat = () => {
         zIndex: 40,
         backgroundColor: 'hsl(var(--card) / 0.95)'
       }}>
-          <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center space-x-3">
-                <h1 className="text-xl font-semibold text-democratic-blue truncate">
-                  {deliberation.title}
-                </h1>
-                <Badge className={`${getStatusColor(deliberation.status)} text-white`}>
-                  {deliberation.status}
-                </Badge>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center space-x-3">
+                  <h1 className="text-xl font-semibold text-democratic-blue truncate">
+                    {deliberation.title}
+                  </h1>
+                  <Badge className={`${getStatusColor(deliberation.status)} text-white`}>
+                    {deliberation.status}
+                  </Badge>
+                </div>
+                {deliberation.description && (
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                    {deliberation.description}
+                  </p>
+                )}
               </div>
-              {deliberation.description && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                  {deliberation.description}
-                </p>}
             </div>
-            
-              <div className="flex items-center space-x-3">
+
+            {/* Sub-header with three boxes */}
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
                 <div className="rounded-lg border bg-muted/40 p-3">
                   <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
                   <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
@@ -223,18 +229,27 @@ const DeliberationChat = () => {
                 </div>
                 <div className="rounded-lg border bg-muted/40 p-3">
                   <div className="text-xs font-medium text-muted-foreground mb-2">View</div>
-                  <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
+                  <ViewModeSelector mode={viewMode} onModeChange={(v) => v && setViewMode(v)} />
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2">
                 <div className="flex items-center space-x-1 text-sm text-muted-foreground">
                   <Users className="h-4 w-4" />
-                  <span>{deliberation.participants?.length || deliberation.participant_count || 0}/{deliberation.max_participants}</span>
+                  <span>{(deliberation.participants?.length || deliberation.participant_count || 0)}/{deliberation.max_participants}</span>
                 </div>
                 {!isParticipant && (
-                  <Button variant="default" size="sm" onClick={handleJoinDeliberation} disabled={joiningDeliberation}>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleJoinDeliberation}
+                    disabled={joiningDeliberation}
+                  >
                     {joiningDeliberation ? 'Joining...' : 'Join Deliberation'}
                   </Button>
                 )}
               </div>
+            </div>
           </div>
         </div>
         
