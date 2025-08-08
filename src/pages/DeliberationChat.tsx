@@ -244,7 +244,7 @@ const DeliberationChat = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowIbis((v) => !v)}
+                onClick={() => setShowIbis((v) => { const nv = !v; if (!nv) setActiveTab('chat'); return nv; })}
                 aria-label={showIbis ? 'Hide IBIS Map' : 'Show IBIS Map'}
               >
                 <GitBranch className="h-4 w-4 mr-1" />
@@ -293,40 +293,7 @@ const DeliberationChat = () => {
                 </div>
               </TabsContent>
               
-              {showIbis ? (
-                <IbisMapVisualization deliberationId={deliberation.id} />
-              ) : (
-                <div className="h-full flex items-center justify-center p-6">
-                  <div className="text-center text-muted-foreground">
-                    <p className="mb-3">IBIS map is hidden.</p>
-                    <Button variant="secondary" size="sm" onClick={() => setShowIbis(true)}>Show IBIS Map</Button>
-                  </div>
-                </div>
-              )}
-
-            </Tabs>
-          ) : (
-            <PanelGroup
-              direction="horizontal"
-              onLayout={(newSizes) => {
-                try {
-                  setSplitSizes(newSizes as number[]);
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify(newSizes));
-                } catch (e) {
-                  console.warn('Failed to persist split sizes', e);
-                }
-              }}
-              className="flex-1"
-            >
-              <Panel defaultSize={splitSizes[0]} minSize={35} className="flex flex-col">
-                <div className="p-4">
-                  <VoiceInterface deliberationId={deliberation.id} />
-                </div>
-              </Panel>
-
-              <PanelResizeHandle className="w-px bg-border hover:bg-primary transition-colors" />
-
-              <Panel defaultSize={splitSizes[1]} minSize={25} className="flex-1">
+              <TabsContent value="ibis" className="flex-1 mt-0">
                 {showIbis ? (
                   <IbisMapVisualization deliberationId={deliberation.id} />
                 ) : (
@@ -337,8 +304,42 @@ const DeliberationChat = () => {
                     </div>
                   </div>
                 )}
-              </Panel>
-            </PanelGroup>
+              </TabsContent>
+            </Tabs>
+           ) : (
+            showIbis ? (
+              <PanelGroup
+                direction="horizontal"
+                onLayout={(newSizes) => {
+                  try {
+                    setSplitSizes(newSizes as number[]);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(newSizes));
+                  } catch (e) {
+                    console.warn('Failed to persist split sizes', e);
+                  }
+                }}
+                className="flex-1"
+              >
+                <Panel defaultSize={splitSizes[0]} minSize={35} className="flex flex-col">
+                  <div className="p-4">
+                    <VoiceInterface deliberationId={deliberation.id} />
+                  </div>
+                </Panel>
+
+                <PanelResizeHandle className="w-px bg-border hover:bg-primary transition-colors" />
+
+                <Panel defaultSize={splitSizes[1]} minSize={25} className="flex-1">
+                  <IbisMapVisualization deliberationId={deliberation.id} />
+                </Panel>
+              </PanelGroup>
+            ) : (
+              <div className="flex-1">
+                <div className="p-4">
+                  <VoiceInterface deliberationId={deliberation.id} />
+                </div>
+              </div>
+            )
+
           )}
         </div>
         
