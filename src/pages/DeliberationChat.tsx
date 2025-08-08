@@ -65,6 +65,7 @@ const DeliberationChat = () => {
       return [60, 40];
     }
   });
+  const [showIbis, setShowIbis] = useState(true);
   
 
   const {
@@ -243,6 +244,16 @@ const DeliberationChat = () => {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setShowIbis((v) => !v)}
+                aria-label={showIbis ? 'Hide IBIS Map' : 'Show IBIS Map'}
+              >
+                <GitBranch className="h-4 w-4 mr-1" />
+                {showIbis ? 'Hide IBIS Map' : 'Show IBIS Map'}
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => navigate("/deliberations")}
               >
                 <ExternalLink className="h-4 w-4 mr-1" />
@@ -282,9 +293,17 @@ const DeliberationChat = () => {
                 </div>
               </TabsContent>
               
-              <TabsContent value="ibis" className="flex-1 mt-0">
+              {showIbis ? (
                 <IbisMapVisualization deliberationId={deliberation.id} />
-              </TabsContent>
+              ) : (
+                <div className="h-full flex items-center justify-center p-6">
+                  <div className="text-center text-muted-foreground">
+                    <p className="mb-3">IBIS map is hidden.</p>
+                    <Button variant="secondary" size="sm" onClick={() => setShowIbis(true)}>Show IBIS Map</Button>
+                  </div>
+                </div>
+              )}
+
             </Tabs>
           ) : (
             <PanelGroup
@@ -308,7 +327,16 @@ const DeliberationChat = () => {
               <PanelResizeHandle className="w-px bg-border hover:bg-primary transition-colors" />
 
               <Panel defaultSize={splitSizes[1]} minSize={25} className="flex-1">
-                <IbisMapVisualization deliberationId={deliberation.id} />
+                {showIbis ? (
+                  <IbisMapVisualization deliberationId={deliberation.id} />
+                ) : (
+                  <div className="h-full flex items-center justify-center p-6">
+                    <div className="text-center text-muted-foreground">
+                      <p className="mb-3">IBIS map is hidden.</p>
+                      <Button variant="secondary" size="sm" onClick={() => setShowIbis(true)}>Show IBIS Map</Button>
+                    </div>
+                  </div>
+                )}
               </Panel>
             </PanelGroup>
           )}
