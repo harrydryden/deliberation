@@ -29,8 +29,19 @@ export class RealtimeRTC {
 
     // 2) Setup RTCPeerConnection and audio
     this.pc = new RTCPeerConnection();
+
+    // Log state changes for robust debugging
+    this.pc.onconnectionstatechange = () => {
+      console.log('[RealtimeRTC] connectionState:', this.pc?.connectionState);
+    };
+    this.pc.oniceconnectionstatechange = () => {
+      console.log('[RealtimeRTC] iceConnectionState:', this.pc?.iceConnectionState);
+    };
+
+    // Create hidden audio element for remote playback
     this.audioEl = document.createElement('audio');
     this.audioEl.autoplay = true;
+    this.audioEl.setAttribute('playsinline', 'true');
 
     this.pc.ontrack = (e) => {
       try {
@@ -39,7 +50,6 @@ export class RealtimeRTC {
         console.error('[RealtimeRTC] ontrack error', err);
       }
     };
-
     // Mic
     this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     for (const track of this.localStream.getTracks()) {
@@ -116,23 +126,55 @@ export class RealtimeRTC {
   }
 
   disconnect() {
+    // Politely stop model speaking and VAD
     try {
-      this.dc?.close();
+      if (this.dc && this.dc.readyState === 'open') {
+        try { this.dc.send(JSON.stringify({ type: 'session.update', session: { turn_detection: { type: 'none' } } })); } catch {}
+        try { this.dc.send(JSON.stringify({ type: 'response.cancel' })); } catch {}
+      }
+    } catch {}
+
+    // Stop local + remote tracks and detach
+    try {
+      this.pc?.getSenders().forEach((s) => {
+        try { s.replaceTrack(null); } catch {}
+        try { s.track && s.track.stop(); } catch {}
+      });
     } catch {}
     try {
-      this.pc?.close();
+      this.pc?.getReceivers().forEach((r) => {
+        try { r.track && r.track.stop(); } catch {}
+      });
     } catch {}
     try {
       this.localStream?.getTracks().forEach((t) => t.stop());
     } catch {}
+
+    // Close transports
+    try { this.dc?.close(); } catch {}
+    try { if (this.pc && this.pc.signalingState !== 'closed') this.pc.close(); } catch {}
+
+    // Detach and remove audio element
     try {
       if (this.audioEl) {
         this.audioEl.pause();
-        this.audioEl.srcObject = null;
+        (this.audioEl as any).srcObject = null;
+        if (this.audioEl.parentNode) this.audioEl.parentNode.removeChild(this.audioEl);
       }
     } catch {}
+
+    // Clear listeners
+    try {
+      if (this.pc) {
+        this.pc.ontrack = null;
+        this.pc.onconnectionstatechange = null;
+        this.pc.oniceconnectionstatechange = null;
+      }
+    } catch {}
+
     this.dc = null;
     this.pc = null;
     this.localStream = null;
+    this.audioEl = null;
   }
 }
