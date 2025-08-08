@@ -168,9 +168,9 @@ const DeliberationChat = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-500';
-      case 'completed': return 'bg-gray-500';
-      default: return 'bg-yellow-500';
+      case 'active': return 'bg-success';
+      case 'completed': return 'bg-muted-foreground';
+      default: return 'bg-warning';
     }
   };
 

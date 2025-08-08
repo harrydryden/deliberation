@@ -6,10 +6,20 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 // - Forwards all events both ways
 // - Logs verbosely for debugging
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   const upgradeHeader = req.headers.get("upgrade") || "";
   if (upgradeHeader.toLowerCase() !== "websocket") {
-    return new Response("Expected WebSocket connection", { status: 400 });
+    return new Response("Expected WebSocket connection", { status: 400, headers: corsHeaders });
   }
 
   const { socket, response } = Deno.upgradeWebSocket(req);

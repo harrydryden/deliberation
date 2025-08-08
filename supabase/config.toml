@@ -24,3 +24,6 @@ verify_jwt = true
 
 [functions.agent-response]
 verify_jwt = true
+
+[functions.realtime-chat]
+verify_jwt = false
