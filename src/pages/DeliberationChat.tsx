@@ -215,7 +215,7 @@ const DeliberationChat = () => {
                   <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
                 </div>
                 <div className="rounded-lg border bg-muted/40 p-3">
-                  <div className="text-xs font-medium text-muted-foreground mb-2">Voice Model</div>
+                  <div className="text-xs font-medium text-muted-foreground mb-2">Voice Mode</div>
                   <VoiceInterface deliberationId={deliberation.id} variant="panel" />
                 </div>
                 <div className="rounded-lg border bg-muted/40 p-3">
