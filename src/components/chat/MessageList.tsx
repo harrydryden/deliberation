@@ -1,12 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Bot, User, Users, Workflow, FileText, Plus } from "lucide-react";
+import { Bot, User, Users, Workflow, FileText, Plus, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatToUKTime } from "@/utils/timeUtils";
 import { MarkdownMessage } from "@/components/common/MarkdownMessage";
-import { Virtuoso } from "react-virtuoso";
+import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import type { ChatMessage } from "@/types/chat";
 
 interface MessageListProps {
@@ -14,6 +14,7 @@ interface MessageListProps {
   isLoading: boolean;
   isTyping: boolean;
   onAddToIbis?: (messageId: string, content: string) => void;
+  onRetry?: (id: string, content: string) => void;
 }
 
 const getAgentInfo = (messageType: string) => {
@@ -49,14 +50,23 @@ const getAgentInfo = (messageType: string) => {
   }
 };
 
-export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis }: MessageListProps) => {
-  // Auto-follow new output smoothly
-  useEffect(() => {}, [messages, isTyping]);
+export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetry }: MessageListProps) => {
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const [atBottom, setAtBottom] = useState(true);
+  const [unreadIndex, setUnreadIndex] = useState<number | null>(null);
+  const prevCountRef = useRef(0);
+
+  useEffect(() => {
+    if (!atBottom && messages.length > prevCountRef.current) {
+      setUnreadIndex(prevCountRef.current);
+    }
+    prevCountRef.current = messages.length;
+  }, [messages.length, atBottom]);
 
   if (isLoading) {
     return (
       <div className="flex-1 p-4 space-y-4">
-        {[...Array(3)].map((_, i) => (
+        {[...Array(5)].map((_, i) => (
           <div key={i} className="flex gap-3">
             <Skeleton className="h-8 w-8 rounded-full" />
             <div className="flex-1 space-y-2">
@@ -70,7 +80,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis }: Mess
   }
 
   return (
-    <div className="flex-1 overflow-hidden p-4">
+    <div className="relative flex-1 overflow-hidden p-4">
       {messages.length === 0 && !isTyping ? (
         <div className="text-center text-muted-foreground py-12">
           <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -79,78 +89,111 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis }: Mess
         </div>
       ) : (
         <Virtuoso
+          ref={virtuosoRef}
           className="h-full"
           data={messages}
-          followOutput="smooth"
+          followOutput={atBottom ? "smooth" : false}
+          atBottomStateChange={setAtBottom}
           itemContent={(index, message) => {
             const isUser = message.message_type === 'user';
             const agentInfo = isUser ? null : getAgentInfo(message.message_type);
             const AgentIcon = agentInfo?.icon || Bot;
 
             return (
-              <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
-                <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarFallback className={isUser ? 'bg-democratic-blue' : agentInfo?.color}>
-                    {isUser ? <User className="h-4 w-4 text-white" /> : <AgentIcon className="h-4 w-4 text-white" />}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className={`flex-1 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-medium">
-                      {isUser ? 'You' : agentInfo?.name}
-                    </span>
-                    {!isUser && agentInfo?.description && (
-                      <span className="text-xs text-muted-foreground">
-                        {agentInfo.description}
-                      </span>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {formatToUKTime(message.created_at)}
-                    </span>
+              <div>
+                {unreadIndex !== null && index === unreadIndex && (
+                  <div className="my-3 flex items-center gap-2">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-muted-foreground">Unread</span>
+                    <div className="h-px flex-1 bg-border" />
                   </div>
+                )}
 
-                  <Card className={`p-3 ${isUser ? 'bg-democratic-blue text-white' : 'bg-muted'}`}>
-                    <div className="text-sm leading-relaxed">
-                      <MarkdownMessage 
-                        content={message.content} 
-                        className={isUser ? 'prose-invert' : ''}
-                      />
+                <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+                  <Avatar className="h-8 w-8 flex-shrink-0">
+                    <AvatarFallback className={isUser ? 'bg-democratic-blue' : agentInfo?.color}>
+                      {isUser ? <User className="h-4 w-4 text-white" /> : <AgentIcon className="h-4 w-4 text-white" />}
+                    </AvatarFallback>
+                  </Avatar>
+
+                  <div className={`flex-1 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium">
+                        {isUser ? 'You' : agentInfo?.name}
+                      </span>
+                      {!isUser && agentInfo?.description && (
+                        <span className="text-xs text-muted-foreground">
+                          {agentInfo.description}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {formatToUKTime(message.created_at)}
+                      </span>
                     </div>
 
-                    {!isUser && message.agent_context?.isProactive && (
-                      <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Workflow className="h-3 w-3" />
-                          <span>Proactive facilitation</span>
+                    <Card className={`p-3 ${isUser ? 'bg-democratic-blue text-white' : 'bg-muted'}`}>
+                      <div className="text-sm leading-relaxed">
+                        <MarkdownMessage 
+                          content={message.content} 
+                          className={isUser ? 'prose-invert' : ''}
+                        />
+                      </div>
+
+                      {!isUser && message.agent_context?.isProactive && (
+                        <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Workflow className="h-3 w-3" />
+                            <span>Proactive facilitation</span>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {onAddToIbis && isUser && !message.submitted_to_ibis && (
-                      <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onAddToIbis(message.id, message.content)}
-                          className="h-6 px-2 text-xs text-white hover:bg-white/20"
-                        >
-                          <Plus className="h-3 w-3 mr-1" />
-                          Submit
-                        </Button>
-                      </div>
-                    )}
-
-                    {isUser && message.submitted_to_ibis && (
-                      <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                        <div className="flex items-center gap-2 text-xs text-white/80">
-                          <FileText className="h-3 w-3" />
-                          <span>Submitted to IBIS</span>
+                      {onAddToIbis && isUser && !message.submitted_to_ibis && (
+                        <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onAddToIbis(message.id, message.content)}
+                            className="h-6 px-2 text-xs text-white hover:bg-white/20"
+                          >
+                            <Plus className="h-3 w-3 mr-1" />
+                            Submit
+                          </Button>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                  </Card>
+                      {isUser && message.submitted_to_ibis && (
+                        <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                          <div className="flex items-center gap-2 text-xs text-white/80">
+                            <FileText className="h-3 w-3" />
+                            <span>Submitted to IBIS</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {isUser && message.status === 'pending' && (
+                        <div className="mt-2 flex items-center justify-end gap-2 text-xs text-white/90">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>Sending…</span>
+                        </div>
+                      )}
+
+                      {isUser && message.status === 'failed' && (
+                        <div className="mt-2 flex items-center justify-end gap-2 text-xs">
+                          <span className="text-destructive">Failed</span>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-6 px-2 text-xs"
+                            onClick={() => onRetry?.(message.id, message.content)}
+                          >
+                            Retry
+                          </Button>
+                        </div>
+                      )}
+
+                    </Card>
+                  </div>
                 </div>
               </div>
             );
@@ -179,6 +222,20 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis }: Mess
             ),
           }}
         />
+      )}
+
+      {!atBottom && messages.length > 0 && (
+        <div className="absolute bottom-4 right-6">
+          <Button
+            variant="default"
+            onClick={() => {
+              virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'smooth' });
+              setUnreadIndex(null);
+            }}
+          >
+            Jump to latest
+          </Button>
+        </div>
       )}
     </div>
   );

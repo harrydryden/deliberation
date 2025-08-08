@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useBackendAuth } from "./useBackendAuth";
 import { backendServiceFactory } from '@/services/backend/factory';
 import type { ChatMessage } from "@/types/chat";
-import { convertApiMessagesToChatMessages } from "@/utils/chat";
+import { convertApiMessagesToChatMessages, convertApiMessageToChatMessage } from "@/utils/chat";
 import { getErrorMessage } from "@/utils/errors";
 import { useErrorHandler } from './useErrorHandler';
 import { useOptimizedArray } from './useOptimizedState';
@@ -90,17 +90,57 @@ export const useBackendChat = (deliberationId?: string) => {
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!isAuthenticated || !content.trim()) return;
 
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const optimistic: ChatMessage = {
+      id: tempId,
+      local_id: tempId,
+      content: content.trim(),
+      message_type: 'user',
+      created_at: new Date().toISOString(),
+      user_id: user?.id,
+      status: 'pending',
+    };
+
+    // Optimistic append
+    setMessages(prev => [...prev, optimistic]);
     setIsTyping(true);
-    await handleAsyncError(async () => {
+
+    try {
       const timer = performanceMonitor.startTimer('sendMessage');
       const messageService = backendServiceFactory.getMessageService();
-      await messageService.sendMessage(content.trim(), 'user', deliberationId, mode);
+      const saved = await messageService.sendMessage(content.trim(), 'user', deliberationId, mode);
+      const savedChat = convertApiMessageToChatMessage(saved);
       timer();
       logger.api.response('POST', '/messages', 200, { deliberationId, mode, contentLength: content.length });
-    }, 'sending message');
-    
-    // Keep typing indicator on - real-time update will turn it off when response arrives
-  }, [isAuthenticated, deliberationId, handleAsyncError]);
+
+      // Replace optimistic with saved
+      setMessages(prev => prev.map(m => (m.id === tempId ? { ...savedChat, status: 'sent' } : m)));
+    } catch (error) {
+      const errMsg = getErrorMessage(error);
+      setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, status: 'failed', error: errMsg } : m)));
+      setIsTyping(false);
+      throw error;
+    }
+    // Keep typing until agent message arrives (realtime turns it off)
+  }, [isAuthenticated, deliberationId, setMessages, user?.id]);
+
+  const retryMessage = useCallback(async (id: string) => {
+    const target = messages.find(m => m.id === id);
+    if (!target || target.status !== 'failed') return;
+    // Mark pending
+    setMessages(prev => prev.map(m => (m.id === id ? { ...m, status: 'pending', error: undefined } : m)));
+    try {
+      const messageService = backendServiceFactory.getMessageService();
+      const saved = await messageService.sendMessage(target.content, 'user', deliberationId, 'chat');
+      const savedChat = convertApiMessageToChatMessage(saved);
+      setMessages(prev => prev.map(m => (m.id === id ? { ...savedChat, status: 'sent' } : m)));
+      setIsTyping(true);
+    } catch (error) {
+      const errMsg = getErrorMessage(error);
+      setMessages(prev => prev.map(m => (m.id === id ? { ...m, status: 'failed', error: errMsg } : m)));
+      setIsTyping(false);
+    }
+  }, [messages, deliberationId, setMessages]);
 
   return {
     messages,
@@ -108,5 +148,6 @@ export const useBackendChat = (deliberationId?: string) => {
     isTyping,
     sendMessage,
     loadChatHistory,
+    retryMessage,
   };
 };

@@ -14,8 +14,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Settings, ExternalLink, MessageSquare, GitBranch } from "lucide-react";
+import { Users, Settings, ExternalLink, MessageSquare, GitBranch, LayoutSplit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 
 interface Deliberation {
   id: string;
