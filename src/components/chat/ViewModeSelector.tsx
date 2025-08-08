@@ -1,8 +1,6 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MessageSquare, GitBranch, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+// View mode toggle switch (Chat | IBIS), styled like ChatModeSelector
+import { MessageSquare, GitBranch } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 export type ViewMode = 'chat' | 'ibis';
 
@@ -11,53 +9,42 @@ interface ViewModeSelectorProps {
   onModeChange: (mode: ViewMode) => void;
 }
 
-const modeConfig: Record<ViewMode, { label: string; Icon: React.ComponentType<any> }> = {
-  chat: { label: 'Chat', Icon: MessageSquare },
-  ibis: { label: 'IBIS', Icon: GitBranch },
-};
-
 export const ViewModeSelector = ({ mode, onModeChange }: ViewModeSelectorProps) => {
-  const [open, setOpen] = useState(false);
-  const { label, Icon } = modeConfig[mode];
-
-  const handleSelect = (next: ViewMode) => {
-    onModeChange(next);
-    setOpen(false);
+  const handleSwitch = (checked: boolean) => {
+    onModeChange(checked ? 'ibis' : 'chat');
   };
 
+  const containerCls = 'flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/50 border';
+
+  const chatLabelCls =
+    'flex items-center gap-2 text-sm transition-colors ' +
+    (mode === 'chat' ? 'text-foreground font-medium' : 'text-muted-foreground');
+
+  const ibisLabelCls =
+    'flex items-center gap-2 text-sm transition-colors ' +
+    (mode === 'ibis' ? 'text-foreground font-medium' : 'text-muted-foreground');
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="px-3 py-2 h-9 bg-muted/50 border rounded-lg" aria-label={`Change view mode to ${label}`}>
-          <span className="flex items-center gap-2 text-sm">
-            <Icon className="h-4 w-4" />
-            <span>{label}</span>
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          </span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="z-50 w-40 p-1 bg-popover border shadow-md">
-        {(
-          ["chat", "ibis"] as ViewMode[]
-        ).map((key) => {
-          const { label, Icon } = modeConfig[key];
-          const active = key === mode;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => handleSelect(key)}
-              className={cn(
-                "w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-sm",
-                active ? "bg-muted text-foreground" : "hover:bg-muted/60 text-muted-foreground"
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              <span>{label}</span>
-            </button>
-          );
-        })}
-      </PopoverContent>
-    </Popover>
+    <div className={containerCls} aria-label="View mode">
+      {/* Chat label */}
+      <div className={chatLabelCls}>
+        <MessageSquare className="h-4 w-4" />
+        <span>Chat</span>
+      </div>
+
+      {/* Switch */}
+      <Switch
+        checked={mode === 'ibis'}
+        onCheckedChange={handleSwitch}
+        className="data-[state=checked]:bg-primary"
+        aria-label="Toggle view mode between Chat and IBIS"
+      />
+
+      {/* IBIS label */}
+      <div className={ibisLabelCls}>
+        <GitBranch className="h-4 w-4" />
+        <span>IBIS</span>
+      </div>
+    </div>
   );
 };
