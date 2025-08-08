@@ -71,7 +71,8 @@ serve(async (req) => {
               type: "session.update",
               session: {
                 modalities: ["text", "audio"],
-                instructions: "Your knowledge cutoff is 2023-10. You are a helpful assistant.",
+                instructions:
+                  "You are a civic deliberation assistant. Always speak responses. When asked to analyze policy, first search the local agent knowledge with the 'search_knowledge' tool to ground your answer. When asked for IBIS highlights or a summary, use the 'get_ibis_context' tool and then narrate a clear, 30–60 second spoken summary.",
                 voice: "alloy",
                 input_audio_format: "pcm16",
                 output_audio_format: "pcm16",
@@ -85,15 +86,33 @@ serve(async (req) => {
                 tools: [
                   {
                     type: "function",
-                    name: "get_weather",
+                    name: "search_knowledge",
                     description:
-                      "Get the current weather for a location, tell the user you are fetching the weather.",
+                      "Search the deliberation's local agent knowledge base for a query and return a concise textual digest with citations.",
                     parameters: {
                       type: "object",
-                      properties: { location: { type: "string" } },
-                      required: ["location"],
-                    },
+                      properties: {
+                        query: { type: "string", description: "Natural language search query" },
+                        agentId: { type: "string", description: "Target local agent configuration id" },
+                        maxResults: { type: "number", description: "Maximum documents to retrieve", default: 5 }
+                      },
+                      required: ["query", "agentId"]
+                    }
                   },
+                  {
+                    type: "function",
+                    name: "get_ibis_context",
+                    description:
+                      "Fetch key IBIS highlights (issues, positions, arguments) for a deliberation and return a compact bullet summary.",
+                    parameters: {
+                      type: "object",
+                      properties: {
+                        deliberationId: { type: "string", description: "Deliberation identifier" },
+                        maxItems: { type: "number", description: "Max items to include in summary", default: 10 }
+                      },
+                      required: ["deliberationId"]
+                    }
+                  }
                 ],
                 tool_choice: "auto",
                 temperature: 0.8,

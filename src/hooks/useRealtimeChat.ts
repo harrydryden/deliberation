@@ -13,13 +13,16 @@ export interface RealtimeEvent {
 export const useRealtimeChat = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
+  const toolHandlerRef = useRef<null | ((e: { name?: string; call_id: string; arguments: string }) => Promise<string | void> | string | void)>(null);
   const [connected, setConnected] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (opts?: { onToolCall?: (e: { name?: string; call_id: string; arguments: string }) => Promise<string | void> | string | void }) => {
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       console.log('[Realtime] WebSocket already connected/connecting');
+      // Update handler even if already connected
+      toolHandlerRef.current = opts?.onToolCall || null;
       return;
     }
 
@@ -58,7 +61,22 @@ export const useRealtimeChat = () => {
           // Tool call arguments streaming
           console.log('[Tool Delta]', data.delta);
         } else if (data.type === 'response.function_call_arguments.done') {
-          console.log('[Tool Done]', data.arguments);
+          // Tool call completed with full arguments
+          const call_id = (data.call_id || data.item_id || data.response_id || '').toString();
+          const name = (data.name || data.tool_name);
+          const args = (data.arguments || '').toString();
+          console.log('[Tool Done]', { name, call_id, args });
+          if (toolHandlerRef.current && wsRef.current) {
+            try {
+              const output = await toolHandlerRef.current({ name, call_id, arguments: args });
+              if (typeof output === 'string' && output.length > 0) {
+                const evt = { type: 'response.function_call_output', call_id, output } as const;
+                wsRef.current.send(JSON.stringify(evt));
+              }
+            } catch (err) {
+              console.error('[Tool Handler] error', err);
+            }
+          }
         }
       } catch (err) {
         console.error('[Realtime] onmessage error', err);
