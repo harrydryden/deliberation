@@ -106,7 +106,26 @@ export class RealtimeRTC {
     const answer = { type: 'answer' as RTCSdpType, sdp: await sdpResponse.text() };
     await this.pc.setRemoteDescription(answer);
 
+    await this.waitForDataChannelOpen(12000);
     console.log('[RealtimeRTC] WebRTC connected');
+  }
+
+  private async waitForDataChannelOpen(timeoutMs = 12000): Promise<void> {
+    if (this.dc?.readyState === 'open') return;
+    await new Promise<void>((resolve, reject) => {
+      const dc = this.dc;
+      if (!dc) return reject(new Error('No data channel'));
+      const onOpen = () => {
+        dc.removeEventListener('open', onOpen);
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        dc.removeEventListener('open', onOpen);
+        reject(new Error('Data channel open timeout'));
+      }, timeoutMs);
+      dc.addEventListener('open', onOpen);
+    });
   }
 
   sendText(text: string) {
