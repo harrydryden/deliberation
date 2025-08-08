@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Settings, ExternalLink, MessageSquare, GitBranch } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Deliberation {
   id: string;
@@ -51,6 +52,17 @@ const DeliberationChat = () => {
     isOpen: false,
     messageId: '',
     messageContent: ''
+  });
+  
+  const isMobile = useIsMobile();
+  const STORAGE_KEY = deliberationId ? `delib-split-${deliberationId}` : 'delib-split';
+  const [splitSizes, setSplitSizes] = useState<number[]>(() => {
+    try {
+      const s = localStorage.getItem(STORAGE_KEY);
+      return s ? JSON.parse(s) : [60, 40];
+    } catch {
+      return [60, 40];
+    }
   });
   
 
@@ -239,49 +251,83 @@ const DeliberationChat = () => {
           </div>
         </div>
         
-        {/* Main Content Tabs */}
+        {/* Main Content - Responsive: Tabs on mobile, Resizable split on desktop */}
         <div className="flex-1 flex flex-col">
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'ibis')} className="flex-1 flex flex-col">
-            <div 
-              className="border-b px-4 bg-background backdrop-blur-sm"
-              style={{ 
-                position: 'sticky', 
-                top: '152px', 
-                zIndex: 30,
-                backgroundColor: 'hsl(var(--background) / 0.95)'
-              }}
-            >
-              <TabsList className="grid w-[400px] grid-cols-2">
-                <TabsTrigger value="chat" className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  Chat
-                </TabsTrigger>
-                <TabsTrigger value="ibis" className="flex items-center gap-2">
-                  <GitBranch className="h-4 w-4" />
-                  IBIS Map
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            
-            <TabsContent value="chat" className="flex-1 flex flex-col mt-0">
-              <MessageList 
-                messages={messages} 
-                isLoading={chatLoading} 
-                isTyping={isTyping}
-                onAddToIbis={handleAddToIbis}
-                onRetry={(id) => retryMessage(id)}
-              />
+          {isMobile ? (
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'ibis')} className="flex-1 flex flex-col">
+              <div 
+                className="border-b px-4 bg-background backdrop-blur-sm"
+                style={{ 
+                  position: 'sticky', 
+                  top: '152px', 
+                  zIndex: 30,
+                  backgroundColor: 'hsl(var(--background) / 0.95)'
+                }}
+              >
+                <TabsList className="grid w-[400px] grid-cols-2">
+                  <TabsTrigger value="chat" className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Chat
+                  </TabsTrigger>
+                  <TabsTrigger value="ibis" className="flex items-center gap-2">
+                    <GitBranch className="h-4 w-4" />
+                    IBIS Map
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="chat" className="flex-1 flex flex-col mt-0">
+                <MessageList 
+                  messages={messages} 
+                  isLoading={chatLoading} 
+                  isTyping={isTyping}
+                  onAddToIbis={handleAddToIbis}
+                  onRetry={(id) => retryMessage(id)}
+                />
+                
+                <MessageInput 
+                  onSendMessage={sendMessage} 
+                  disabled={isTyping || deliberation.status === 'completed'}
+                />
+              </TabsContent>
               
-              <MessageInput 
-                onSendMessage={sendMessage} 
-                disabled={isTyping || deliberation.status === 'completed'}
-              />
-            </TabsContent>
-            
-            <TabsContent value="ibis" className="flex-1 mt-0">
-              <IbisMapVisualization deliberationId={deliberation.id} />
-            </TabsContent>
-          </Tabs>
+              <TabsContent value="ibis" className="flex-1 mt-0">
+                <IbisMapVisualization deliberationId={deliberation.id} />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <PanelGroup
+              direction="horizontal"
+              onLayout={(newSizes) => {
+                try {
+                  setSplitSizes(newSizes as number[]);
+                  localStorage.setItem(STORAGE_KEY, JSON.stringify(newSizes));
+                } catch (e) {
+                  console.warn('Failed to persist split sizes', e);
+                }
+              }}
+              className="flex-1"
+            >
+              <Panel defaultSize={splitSizes[0]} minSize={35} className="flex flex-col">
+                <MessageList 
+                  messages={messages} 
+                  isLoading={chatLoading} 
+                  isTyping={isTyping}
+                  onAddToIbis={handleAddToIbis}
+                  onRetry={(id) => retryMessage(id)}
+                />
+                <MessageInput 
+                  onSendMessage={sendMessage} 
+                  disabled={isTyping || deliberation.status === 'completed'}
+                />
+              </Panel>
+
+              <PanelResizeHandle className="w-px bg-border hover:bg-primary transition-colors" />
+
+              <Panel defaultSize={splitSizes[1]} minSize={25} className="flex-1">
+                <IbisMapVisualization deliberationId={deliberation.id} />
+              </Panel>
+            </PanelGroup>
+          )}
         </div>
         
         {/* IBIS Submission Modal */}
@@ -295,6 +341,7 @@ const DeliberationChat = () => {
             onSuccess={handleIbisSuccess}
           />
         )}
+
       </div>
     </Layout>
   );
