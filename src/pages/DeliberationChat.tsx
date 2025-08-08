@@ -13,7 +13,7 @@ import { useBackendChat } from "@/hooks/useBackendChat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ViewModeSelector } from "@/components/chat/ViewModeSelector";
 import { Users, Settings, ExternalLink, MessageSquare, GitBranch, Columns3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
@@ -259,17 +259,7 @@ const DeliberationChat = () => {
                 </Button>
               )}
               
-              <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as 'chat' | 'ibis' | 'split')}>
-                <ToggleGroupItem value="chat" aria-label="Chat only">
-                  <MessageSquare className="h-4 w-4 mr-1" /> Chat
-                </ToggleGroupItem>
-                <ToggleGroupItem value="ibis" aria-label="IBIS map only">
-                  <GitBranch className="h-4 w-4 mr-1" /> IBIS
-                </ToggleGroupItem>
-                <ToggleGroupItem value="split" aria-label="Split view">
-                  <Columns3 className="h-4 w-4 mr-1" /> Split
-                </ToggleGroupItem>
-              </ToggleGroup>
+              <ViewModeSelector mode={viewMode} onModeChange={(v) => v && setViewMode(v)} />
               
               <Button
                 variant="outline"
