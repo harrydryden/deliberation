@@ -212,22 +212,25 @@ const DeliberationChat = () => {
                 </p>}
             </div>
             
-              <div className="flex items-center space-x-2">
-                <ChatModeSelector mode={chatMode} onModeChange={setChatMode} />
-                
-                <VoiceInterface deliberationId={deliberation.id} variant="toggle" />
-                
-                <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
-                
+              <div className="flex items-center space-x-3">
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
+                  <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
+                </div>
+                <VoiceInterface deliberationId={deliberation.id} variant="panel" />
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <div className="text-xs font-medium text-muted-foreground mb-2">View</div>
+                  <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
+                </div>
                 <div className="flex items-center space-x-1 text-sm text-muted-foreground">
                   <Users className="h-4 w-4" />
                   <span>{deliberation.participants?.length || deliberation.participant_count || 0}/{deliberation.max_participants}</span>
                 </div>
-                
-                {!isParticipant && <Button variant="default" size="sm" onClick={handleJoinDeliberation} disabled={joiningDeliberation}>
+                {!isParticipant && (
+                  <Button variant="default" size="sm" onClick={handleJoinDeliberation} disabled={joiningDeliberation}>
                     {joiningDeliberation ? 'Joining...' : 'Join Deliberation'}
-                  </Button>}
-              
+                  </Button>
+                )}
               </div>
           </div>
         </div>

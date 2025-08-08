@@ -37,7 +37,7 @@ export const ViewModeSelector = ({ mode, onModeChange }: ViewModeSelectorProps) 
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-40 p-1">
+      <PopoverContent align="end" className="z-50 w-40 p-1 bg-popover border shadow-md">
         {(
           ["chat", "ibis", "split"] as ViewMode[]
         ).map((key) => {

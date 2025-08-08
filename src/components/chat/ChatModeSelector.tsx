@@ -6,21 +6,22 @@ export type ChatMode = 'chat' | 'learn';
 interface ChatModeSelectorProps {
   mode: ChatMode;
   onModeChange: (mode: ChatMode) => void;
+  variant?: 'boxed' | 'bare';
 }
 
-export const ChatModeSelector = ({ mode, onModeChange }: ChatModeSelectorProps) => {
+export const ChatModeSelector = ({ mode, onModeChange, variant = 'boxed' }: ChatModeSelectorProps) => {
   const handleModeSwitch = (checked: boolean) => {
     onModeChange(checked ? 'learn' : 'chat');
   };
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/50 border">
+    <div className={variant === 'boxed' ? "flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/50 border" : "flex items-center gap-3">
       {/* Chat Mode Label */}
       <div className={`flex items-center gap-2 text-sm transition-colors ${
         mode === 'chat' ? 'text-foreground font-medium' : 'text-muted-foreground'
       }`}>
         <MessageCircle className="h-4 w-4" />
-        <span>Chat</span>
+        <span>Deliberate</span>
       </div>
 
       {/* Switch */}
@@ -35,7 +36,7 @@ export const ChatModeSelector = ({ mode, onModeChange }: ChatModeSelectorProps) 
         mode === 'learn' ? 'text-foreground font-medium' : 'text-muted-foreground'
       }`}>
         <GraduationCap className="h-4 w-4" />
-        <span>Learn</span>
+        <span>Ask an Expert</span>
       </div>
     </div>
   );

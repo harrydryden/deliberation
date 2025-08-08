@@ -11,7 +11,7 @@ interface VoiceInterfaceProps {
   deliberationId: string;
   preferredBillAgentId?: string;
   className?: string;
-  variant?: 'default' | 'toggle';
+  variant?: 'default' | 'toggle' | 'panel';
 }
 
 const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferredBillAgentId, className, variant = 'default' }) => {
