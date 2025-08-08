@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Mic, MicOff, Waves } from 'lucide-react';
+import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown } from 'lucide-react';
 import { RealtimeRTC } from '@/utils/realtimeRtc';
 
 interface VoiceInterfaceProps {
@@ -20,6 +21,16 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   const [mode, setMode] = useState<'idle' | 'bill' | 'ibis'>('idle');
   const [billAgentId, setBillAgentId] = useState<string | null>(preferredBillAgentId || null);
   const rtcRef = useRef<RealtimeRTC | null>(null);
+  const [preferred, setPreferred] = useState<'bill' | 'ibis'>('bill');
+
+  const selectPreferred = async (next: 'bill' | 'ibis') => {
+    setPreferred(next);
+    if (mode !== 'idle') {
+      await stop();
+      if (next === 'bill') await startBill();
+      else await startIbis();
+    }
+  };
 
   const ensureBillAgentId = async (): Promise<string | null> => {
     if (billAgentId) return billAgentId;
@@ -174,11 +185,44 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
             <span>Voice</span>
             {speaking && <Waves className="h-4 w-4" />}
           </div>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="px-2 h-8 bg-muted/50">
+                {preferred === 'bill' ? <GraduationCap className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
+                <span className="ml-1">{preferred === 'bill' ? 'Learn (Bill)' : 'IBIS Summary'}</span>
+                <ChevronDown className="h-4 w-4 ml-1 text-muted-foreground" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-48 p-1">
+              <button
+                type="button"
+                onClick={() => { void selectPreferred('bill'); }}
+                className={`w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-sm ${preferred === 'bill' ? 'bg-muted text-foreground' : 'hover:bg-muted/60 text-muted-foreground'}`}
+              >
+                <GraduationCap className="h-4 w-4" />
+                <span>Learn (Bill)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { void selectPreferred('ibis'); }}
+                className={`w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-sm ${preferred === 'ibis' ? 'bg-muted text-foreground' : 'hover:bg-muted/60 text-muted-foreground'}`}
+              >
+                <GitBranch className="h-4 w-4" />
+                <span>IBIS Summary</span>
+              </button>
+            </PopoverContent>
+          </Popover>
+
           <Switch
             checked={mode !== 'idle'}
             onCheckedChange={(checked) => {
               if (checked) {
-                void startBill();
+                if (preferred === 'bill') {
+                  void startBill();
+                } else {
+                  void startIbis();
+                }
               } else {
                 void stop();
               }
