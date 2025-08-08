@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MessageSquare, GitBranch, Columns3, ChevronDown } from "lucide-react";
+import { MessageSquare, GitBranch, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type ViewMode = 'chat' | 'ibis' | 'split';
+export type ViewMode = 'chat' | 'ibis';
 
 interface ViewModeSelectorProps {
   mode: ViewMode;
@@ -14,7 +14,6 @@ interface ViewModeSelectorProps {
 const modeConfig: Record<ViewMode, { label: string; Icon: React.ComponentType<any> }> = {
   chat: { label: 'Chat', Icon: MessageSquare },
   ibis: { label: 'IBIS', Icon: GitBranch },
-  split: { label: 'Split', Icon: Columns3 },
 };
 
 export const ViewModeSelector = ({ mode, onModeChange }: ViewModeSelectorProps) => {
@@ -29,7 +28,7 @@ export const ViewModeSelector = ({ mode, onModeChange }: ViewModeSelectorProps) 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="px-3 py-2 h-9 bg-muted/50 border rounded-lg">
+        <Button variant="outline" size="sm" className="px-3 py-2 h-9 bg-muted/50 border rounded-lg" aria-label={`Change view mode to ${label}`}>
           <span className="flex items-center gap-2 text-sm">
             <Icon className="h-4 w-4" />
             <span>{label}</span>
@@ -39,7 +38,7 @@ export const ViewModeSelector = ({ mode, onModeChange }: ViewModeSelectorProps) 
       </PopoverTrigger>
       <PopoverContent align="end" className="z-50 w-40 p-1 bg-popover border shadow-md">
         {(
-          ["chat", "ibis", "split"] as ViewMode[]
+          ["chat", "ibis"] as ViewMode[]
         ).map((key) => {
           const { label, Icon } = modeConfig[key];
           const active = key === mode;

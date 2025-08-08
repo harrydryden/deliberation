@@ -9,13 +9,13 @@ import { MessageInput } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
 import { IbisMapVisualization } from "@/components/ibis/IbisMapVisualization";
 import { useBackendChat } from "@/hooks/useBackendChat";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ViewModeSelector } from "@/components/chat/ViewModeSelector";
-import { Users, Settings, ExternalLink, MessageSquare, GitBranch, Columns3 } from "lucide-react";
+import { Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
+
 import { useIsMobile } from "@/hooks/use-mobile";
 import VoiceInterface from "@/components/chat/VoiceInterface";
 interface Deliberation {
@@ -59,16 +59,7 @@ const DeliberationChat = () => {
     messageContent: ''
   });
   const isMobile = useIsMobile();
-  const STORAGE_KEY = deliberationId ? `delib-split-${deliberationId}` : 'delib-split';
-  const [splitSizes, setSplitSizes] = useState<number[]>(() => {
-    try {
-      const s = localStorage.getItem(STORAGE_KEY);
-      return s ? JSON.parse(s) : [60, 40];
-    } catch {
-      return [60, 40];
-    }
-  });
-  const [viewMode, setViewMode] = useState<'chat' | 'ibis' | 'split'>('split');
+  const [viewMode, setViewMode] = useState<'chat' | 'ibis'>('chat');
   const {
     messages,
     isLoading: chatLoading,
@@ -99,7 +90,7 @@ const DeliberationChat = () => {
     loadChatHistory();
   };
   useEffect(() => {
-    setViewMode(isMobile ? 'chat' : 'split');
+    setViewMode('chat');
   }, [isMobile]);
   useEffect(() => {
     if (!isLoading && !user) {
@@ -253,37 +244,13 @@ const DeliberationChat = () => {
           </div>
         </div>
         
-        {/* Main Content - Responsive with 3-way toggle */}
+        {/* Main Content */}
         <div className="flex-1 flex flex-col">
-          {isMobile ?
-        // Mobile: show one at a time, "split" stacks vertically
-        viewMode === 'chat' ? <ChatPanel /> : viewMode === 'ibis' ? <IbisMapVisualization deliberationId={deliberation.id} /> : <div className="flex-1 flex flex-col">
-                <div className="border-b">
-                  <ChatPanel />
-                </div>
-                <div className="flex-1">
-                  <IbisMapVisualization deliberationId={deliberation.id} />
-                </div>
-              </div> :
-        // Desktop: side-by-side when split
-        viewMode === 'split' ? <PanelGroup direction="horizontal" onLayout={newSizes => {
-          try {
-            setSplitSizes(newSizes as number[]);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(newSizes));
-          } catch (e) {
-            console.warn('Failed to persist split sizes', e);
-          }
-        }} className="flex-1">
-                <Panel defaultSize={splitSizes[0]} minSize={35} className="flex flex-col">
-                  <ChatPanel />
-                </Panel>
-
-                <PanelResizeHandle className="w-px bg-border hover:bg-primary transition-colors" />
-
-                <Panel defaultSize={splitSizes[1]} minSize={25} className="flex-1">
-                  <IbisMapVisualization deliberationId={deliberation.id} />
-                </Panel>
-              </PanelGroup> : viewMode === 'chat' ? <ChatPanel /> : <IbisMapVisualization deliberationId={deliberation.id} />}
+          {viewMode === 'chat' ? (
+            <ChatPanel />
+          ) : (
+            <IbisMapVisualization deliberationId={deliberation.id} />
+          )}
         </div>
         
         {/* IBIS Submission Modal */}
