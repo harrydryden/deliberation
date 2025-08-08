@@ -18,6 +18,7 @@ import { Users, Settings, ExternalLink, MessageSquare, GitBranch } from "lucide-
 import { useToast } from "@/hooks/use-toast";
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 import { useIsMobile } from "@/hooks/use-mobile";
+import VoiceInterface from "@/components/chat/VoiceInterface";
 
 interface Deliberation {
   id: string;
