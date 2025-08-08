@@ -332,7 +332,6 @@ const DeliberationChat = () => {
               <IbisMapVisualization deliberationId={deliberation.id} />
             )
           )}
-        </div
         </div>
         
         {/* IBIS Submission Modal */}
