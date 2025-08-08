@@ -1,5 +1,5 @@
 // Optimized state management hook to reduce re-renders
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 interface StateConfig<T> {
   initialValue: T;
@@ -31,7 +31,7 @@ const deepEqual = (a: any, b: any): boolean => {
 export function useOptimizedState<T>(config: StateConfig<T>) {
   const { initialValue, compare = deepEqual, debounceMs = 0 } = config;
   const [state, setState] = useState<T>(initialValue);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const lastUpdateRef = useRef<T>(initialValue);
 
   const setOptimizedState = useCallback((newValue: T | ((prev: T) => T)) => {
@@ -58,6 +58,12 @@ export function useOptimizedState<T>(config: StateConfig<T>) {
   }, [compare, debounceMs]);
 
   // Memoized return to prevent unnecessary re-renders
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
   return useMemo(() => [state, setOptimizedState] as const, [state, setOptimizedState]);
 }
 

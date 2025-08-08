@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
@@ -8,7 +9,7 @@ interface MarkdownMessageProps {
   className?: string;
 }
 
-export const MarkdownMessage = ({ content, className }: MarkdownMessageProps) => {
+const MarkdownMessageComponent = ({ content, className }: MarkdownMessageProps) => {
   // Sanitize content to prevent XSS attacks
   const sanitizedContent = sanitizeMarkdown(content);
   
@@ -109,3 +110,5 @@ export const MarkdownMessage = ({ content, className }: MarkdownMessageProps) =>
     </ReactMarkdown>
   );
 };
+
+export const MarkdownMessage = memo(MarkdownMessageComponent, (prev, next) => prev.content === next.content && prev.className === next.className);

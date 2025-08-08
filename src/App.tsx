@@ -6,14 +6,15 @@ import { BackendAuthProvider } from "@/hooks/useBackendAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthLoadingBoundary } from "@/components/auth/AuthLoadingBoundary";
 import { BackendSelector } from "@/components/auth/BackendSelector";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import Chat from "./pages/Chat";
-import Admin from "./pages/Admin";
-import Deliberations from "./pages/Deliberations";
-import DeliberationChat from "./pages/DeliberationChat";
-import { KnowledgeBase } from "./pages/KnowledgeBase";
+import { Suspense, lazy } from "react";
+
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Chat = lazy(() => import("./pages/Chat"));
+const Admin = lazy(() => import("./pages/Admin"));
+const Deliberations = lazy(() => import("./pages/Deliberations"));
+const DeliberationChat = lazy(() => import("./pages/DeliberationChat"));
 
 const App = () => (
   <ErrorBoundary>
@@ -23,16 +24,18 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/chat" element={<Chat />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/backend" element={<BackendSelector />} />
-              <Route path="/deliberations" element={<Deliberations />} />
-              <Route path="/deliberations/:deliberationId" element={<DeliberationChat />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-center space-y-4"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" /><p className="text-muted-foreground">Loading...</p></div></div>}>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/chat" element={<Chat />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/backend" element={<BackendSelector />} />
+                <Route path="/deliberations" element={<Deliberations />} />
+                <Route path="/deliberations/:deliberationId" element={<DeliberationChat />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </AuthLoadingBoundary>
