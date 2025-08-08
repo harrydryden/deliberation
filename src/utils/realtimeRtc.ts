@@ -31,7 +31,6 @@ export class RealtimeRTC {
     this.pc = new RTCPeerConnection();
     this.audioEl = document.createElement('audio');
     this.audioEl.autoplay = true;
-    this.audioEl.playsInline = true;
 
     this.pc.ontrack = (e) => {
       try {
