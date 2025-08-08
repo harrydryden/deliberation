@@ -13,8 +13,8 @@ import { useBackendChat } from "@/hooks/useBackendChat";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Settings, ExternalLink, MessageSquare, GitBranch } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Users, Settings, ExternalLink, MessageSquare, GitBranch, Columns3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -44,7 +44,6 @@ const DeliberationChat = () => {
   const [isParticipant, setIsParticipant] = useState(false);
   const [joiningDeliberation, setJoiningDeliberation] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>('chat');
-  const [activeTab, setActiveTab] = useState<'chat' | 'ibis'>('chat');
   const [ibisModal, setIbisModal] = useState<{
     isOpen: boolean;
     messageId: string;
@@ -65,7 +64,7 @@ const DeliberationChat = () => {
       return [60, 40];
     }
   });
-  const [showIbis, setShowIbis] = useState(true);
+  const [viewMode, setViewMode] = useState<'chat' | 'ibis' | 'split'>('split');
   
 
   const {
@@ -101,6 +100,8 @@ const DeliberationChat = () => {
     // Reload chat messages to reflect the updated submitted_to_ibis status
     loadChatHistory();
   };
+
+  useEffect(() => { setViewMode(isMobile ? 'chat' : 'split'); }, [isMobile]);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -176,6 +177,24 @@ const DeliberationChat = () => {
     }
   };
 
+  const ChatPanel = () => (
+    <div className="flex-1 flex flex-col">
+      <div className="p-4">
+        <VoiceInterface deliberationId={deliberation!.id} />
+      </div>
+      <div className="flex-1 overflow-hidden">
+        <MessageList
+          messages={messages}
+          isLoading={chatLoading}
+          isTyping={isTyping}
+          onAddToIbis={handleAddToIbis}
+          onRetry={retryMessage}
+        />
+      </div>
+      <MessageInput onSendMessage={sendMessage} disabled={chatLoading} />
+    </div>
+  );
+
   if (isLoading || loading) {
     return (
       <Layout>
@@ -240,16 +259,17 @@ const DeliberationChat = () => {
                 </Button>
               )}
               
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowIbis((v) => { const nv = !v; if (!nv) setActiveTab('chat'); return nv; })}
-                aria-label={showIbis ? 'Hide IBIS Map' : 'Show IBIS Map'}
-              >
-                <GitBranch className="h-4 w-4 mr-1" />
-                {showIbis ? 'Hide IBIS Map' : 'Show IBIS Map'}
-              </Button>
+              <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as 'chat' | 'ibis' | 'split')}>
+                <ToggleGroupItem value="chat" aria-label="Chat only">
+                  <MessageSquare className="h-4 w-4 mr-1" /> Chat
+                </ToggleGroupItem>
+                <ToggleGroupItem value="ibis" aria-label="IBIS map only">
+                  <GitBranch className="h-4 w-4 mr-1" /> IBIS
+                </ToggleGroupItem>
+                <ToggleGroupItem value="split" aria-label="Split view">
+                  <Columns3 className="h-4 w-4 mr-1" /> Split
+                </ToggleGroupItem>
+              </ToggleGroup>
               
               <Button
                 variant="outline"
@@ -263,51 +283,27 @@ const DeliberationChat = () => {
           </div>
         </div>
         
-        {/* Main Content - Responsive: Tabs on mobile, Resizable split on desktop */}
+        {/* Main Content - Responsive with 3-way toggle */}
         <div className="flex-1 flex flex-col">
           {isMobile ? (
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'ibis')} className="flex-1 flex flex-col">
-              <div 
-                className="border-b px-4 bg-background backdrop-blur-sm"
-                style={{ 
-                  position: 'sticky', 
-                  top: '152px', 
-                  zIndex: 30,
-                  backgroundColor: 'hsl(var(--background) / 0.95)'
-                }}
-              >
-                <TabsList className="grid w-[400px] grid-cols-2">
-                  <TabsTrigger value="chat" className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    Chat
-                  </TabsTrigger>
-                  <TabsTrigger value="ibis" className="flex items-center gap-2">
-                    <GitBranch className="h-4 w-4" />
-                    IBIS Map
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-              <TabsContent value="chat" className="flex-1 flex flex-col mt-0">
-                <div className="p-4">
-                  <VoiceInterface deliberationId={deliberation.id} />
+            // Mobile: show one at a time, "split" stacks vertically
+            viewMode === 'chat' ? (
+              <ChatPanel />
+            ) : viewMode === 'ibis' ? (
+              <IbisMapVisualization deliberationId={deliberation.id} />
+            ) : (
+              <div className="flex-1 flex flex-col">
+                <div className="border-b">
+                  <ChatPanel />
                 </div>
-              </TabsContent>
-              
-              <TabsContent value="ibis" className="flex-1 mt-0">
-                {showIbis ? (
+                <div className="flex-1">
                   <IbisMapVisualization deliberationId={deliberation.id} />
-                ) : (
-                  <div className="h-full flex items-center justify-center p-6">
-                    <div className="text-center text-muted-foreground">
-                      <p className="mb-3">IBIS map is hidden.</p>
-                      <Button variant="secondary" size="sm" onClick={() => setShowIbis(true)}>Show IBIS Map</Button>
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-           ) : (
-            showIbis ? (
+                </div>
+              </div>
+            )
+          ) : (
+            // Desktop: side-by-side when split
+            viewMode === 'split' ? (
               <PanelGroup
                 direction="horizontal"
                 onLayout={(newSizes) => {
@@ -321,9 +317,7 @@ const DeliberationChat = () => {
                 className="flex-1"
               >
                 <Panel defaultSize={splitSizes[0]} minSize={35} className="flex flex-col">
-                  <div className="p-4">
-                    <VoiceInterface deliberationId={deliberation.id} />
-                  </div>
+                  <ChatPanel />
                 </Panel>
 
                 <PanelResizeHandle className="w-px bg-border hover:bg-primary transition-colors" />
@@ -332,15 +326,13 @@ const DeliberationChat = () => {
                   <IbisMapVisualization deliberationId={deliberation.id} />
                 </Panel>
               </PanelGroup>
+            ) : viewMode === 'chat' ? (
+              <ChatPanel />
             ) : (
-              <div className="flex-1">
-                <div className="p-4">
-                  <VoiceInterface deliberationId={deliberation.id} />
-                </div>
-              </div>
+              <IbisMapVisualization deliberationId={deliberation.id} />
             )
-
           )}
+        </div
         </div>
         
         {/* IBIS Submission Modal */}
