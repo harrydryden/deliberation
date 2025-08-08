@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 import { supabase } from '@/integrations/supabase/client';
 import { Mic, MicOff, Waves } from 'lucide-react';
+import { RealtimeRTC } from '@/utils/realtimeRtc';
 
 interface VoiceInterfaceProps {
   deliberationId: string;
@@ -13,9 +13,11 @@ interface VoiceInterfaceProps {
 
 const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferredBillAgentId, className }) => {
   const { toast } = useToast();
-  const { connected, speaking, connect, disconnect, startMic, stopMic, sendText } = useRealtimeChat();
+  const [connected, setConnected] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [mode, setMode] = useState<'idle' | 'bill' | 'ibis'>('idle');
   const [billAgentId, setBillAgentId] = useState<string | null>(preferredBillAgentId || null);
+  const rtcRef = useRef<RealtimeRTC | null>(null);
 
   const ensureBillAgentId = async (): Promise<string | null> => {
     if (billAgentId) return billAgentId;
@@ -101,11 +103,18 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     return;
   };
 
+  const handleEvent = (event: any) => {
+    // Minimal speaking indicator using response lifecycle
+    if (event?.type === 'response.created') setSpeaking(true);
+    if (event?.type === 'response.done' || event?.type === 'response.audio.done') setSpeaking(false);
+  };
+
   const startBill = async () => {
     try {
       await ensureBillAgentId();
-      await connect({ onToolCall: toolHandler });
-      await startMic();
+      rtcRef.current = new RealtimeRTC();
+      await rtcRef.current.init({ onEvent: handleEvent, onToolCall: toolHandler });
+      setConnected(true);
       setMode('bill');
       toast({ title: 'Bill voice connected', description: 'Two-way with knowledge tools enabled.' });
     } catch (err: any) {
@@ -116,13 +125,15 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
 
   const startIbis = async () => {
     try {
-      await connect({ onToolCall: toolHandler });
+      rtcRef.current = new RealtimeRTC();
+      await rtcRef.current.init({ onEvent: handleEvent, onToolCall: toolHandler });
+      setConnected(true);
       setMode('ibis');
 
       // Fetch IBIS context directly as a fallback to ensure audio
       const ctx = await doGetIbisContext(deliberationId, 10);
       const prompt = `${ctx}\n\nPlease speak a clear 30–60 second summary for participants.`;
-      await sendText(prompt);
+      rtcRef.current.sendText(prompt);
 
       toast({ title: 'IBIS summary', description: 'Generating spoken summary...' });
     } catch (err: any) {
@@ -132,8 +143,10 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   };
 
   const stop = () => {
-    try { stopMic(); } catch {}
-    try { disconnect(); } catch {}
+    try { rtcRef.current?.disconnect(); } catch {}
+    rtcRef.current = null;
+    setConnected(false);
+    setSpeaking(false);
     setMode('idle');
   };
 

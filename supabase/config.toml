@@ -27,3 +27,6 @@ verify_jwt = true
 
 [functions.realtime-chat]
 verify_jwt = false
+
+[functions.realtime-session]
+verify_jwt = false
