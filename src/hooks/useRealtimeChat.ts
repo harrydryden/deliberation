@@ -19,23 +19,39 @@ export const useRealtimeChat = () => {
   const [transcript, setTranscript] = useState('');
 
   const connect = useCallback(async (opts?: { onToolCall?: (e: { name?: string; call_id: string; arguments: string }) => Promise<string | void> | string | void }) => {
-    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
-      console.log('[Realtime] WebSocket already connected/connecting');
-      // Update handler even if already connected
-      toolHandlerRef.current = opts?.onToolCall || null;
-      return;
+    if (wsRef.current) {
+      if (wsRef.current.readyState === WebSocket.OPEN) {
+        toolHandlerRef.current = opts?.onToolCall || null;
+        return;
+      }
+      if (wsRef.current.readyState === WebSocket.CONNECTING) {
+        toolHandlerRef.current = opts?.onToolCall || null;
+        await new Promise<void>((resolve) => {
+          const handler = () => {
+            wsRef.current?.removeEventListener('open', handler as any);
+            resolve();
+          };
+          wsRef.current?.addEventListener('open', handler as any);
+        });
+        return;
+      }
     }
 
     console.log('[Realtime] Connecting WS ->', FUNCTION_WS);
     const ws = new WebSocket(FUNCTION_WS);
     wsRef.current = ws;
 
-    ws.onopen = () => {
-      console.log('[Realtime] WS connected');
-      setConnected(true);
-      // Ensure AudioQueue exists for playback
-      ensureAudioQueue();
-    };
+    toolHandlerRef.current = opts?.onToolCall || null;
+
+    await new Promise<void>((resolve) => {
+      ws.onopen = () => {
+        console.log('[Realtime] WS connected');
+        setConnected(true);
+        // Ensure AudioQueue exists for playback
+        ensureAudioQueue();
+        resolve();
+      };
+    });
 
     ws.onmessage = async (event) => {
       try {
