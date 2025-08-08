@@ -192,9 +192,9 @@ const DeliberationChat = () => {
             {/* Title moved into left box below */}
 
             {/* Sub-header with three boxes */}
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-stretch justify-between gap-3 flex-wrap">
               <div className="flex-1 min-w-0">
-                <div className="rounded-lg border bg-muted/40 p-3">
+                <div className="rounded-lg border bg-muted/40 p-3 h-full">
                   <div className="flex items-center space-x-3">
                     <h1 className="text-xl font-semibold text-democratic-blue truncate">{deliberation.title}</h1>
                     <Badge className={`${getStatusColor(deliberation.status)} text-white`}>{deliberation.status}</Badge>
