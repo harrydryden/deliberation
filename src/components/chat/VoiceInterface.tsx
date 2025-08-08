@@ -246,30 +246,59 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
           />
         </div>
       ) : (
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => { mode === 'bill' ? void stop() : void startBill(); }}
-            variant={mode === 'bill' ? 'default' : 'secondary'}
-            size="sm"
-            aria-label="Talk to Bill"
-            aria-pressed={mode === 'bill'}
-          >
-            <Mic className="h-4 w-4 mr-2" />
-            Talk to Bill
-            {mode === 'bill' && speaking && <Waves className="h-4 w-4 ml-2" />}
-          </Button>
+        variant === 'panel' ? (
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={() => { mode === 'bill' ? void stop() : void startBill(); }}
+              variant={mode === 'bill' ? 'default' : 'secondary'}
+              size="sm"
+              aria-label="Talk to Bill"
+              aria-pressed={mode === 'bill'}
+              className="w-full"
+            >
+              <Mic className="h-4 w-4 mr-2" />
+              Talk to Bill
+              {mode === 'bill' && speaking && <Waves className="h-4 w-4 ml-2" />}
+            </Button>
 
-          <Button
-            onClick={() => { mode === 'ibis' ? void stop() : void startIbis(); }}
-            variant={mode === 'ibis' ? 'default' : 'secondary'}
-            size="sm"
-            aria-label="Hear IBIS summary"
-            aria-pressed={mode === 'ibis'}
-          >
-            Hear IBIS Summary
-            {mode === 'ibis' && speaking && <Waves className="h-4 w-4 ml-2" />}
-          </Button>
-        </div>
+            <Button
+              onClick={() => { mode === 'ibis' ? void stop() : void startIbis(); }}
+              variant={mode === 'ibis' ? 'default' : 'secondary'}
+              size="sm"
+              aria-label="Hear IBIS summary"
+              aria-pressed={mode === 'ibis'}
+              className="w-full"
+            >
+              Hear IBIS Summary
+              {mode === 'ibis' && speaking && <Waves className="h-4 w-4 ml-2" />}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => { mode === 'bill' ? void stop() : void startBill(); }}
+              variant={mode === 'bill' ? 'default' : 'secondary'}
+              size="sm"
+              aria-label="Talk to Bill"
+              aria-pressed={mode === 'bill'}
+            >
+              <Mic className="h-4 w-4 mr-2" />
+              Talk to Bill
+              {mode === 'bill' && speaking && <Waves className="h-4 w-4 ml-2" />}
+            </Button>
+
+            <Button
+              onClick={() => { mode === 'ibis' ? void stop() : void startIbis(); }}
+              variant={mode === 'ibis' ? 'default' : 'secondary'}
+              size="sm"
+              aria-label="Hear IBIS summary"
+              aria-pressed={mode === 'ibis'}
+            >
+              Hear IBIS Summary
+              {mode === 'ibis' && speaking && <Waves className="h-4 w-4 ml-2" />}
+            </Button>
+          </div>
+        )
       )}
     </div>
   );
