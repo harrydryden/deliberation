@@ -13,7 +13,6 @@ import { queryClient } from "@/lib/queryClient";
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Chat = lazy(() => import("./pages/Chat"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Deliberations = lazy(() => import("./pages/Deliberations"));
 const DeliberationChat = lazy(() => import("./pages/DeliberationChat"));
@@ -31,7 +30,7 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
-                  <Route path="/chat" element={<Chat />} />
+                  {/* chat deprecated */}
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/backend" element={<BackendSelector />} />
                   <Route path="/deliberations" element={<Deliberations />} />
