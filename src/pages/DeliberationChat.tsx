@@ -277,18 +277,9 @@ const DeliberationChat = () => {
                 </TabsList>
               </div>
               <TabsContent value="chat" className="flex-1 flex flex-col mt-0">
-                <MessageList 
-                  messages={messages} 
-                  isLoading={chatLoading} 
-                  isTyping={isTyping}
-                  onAddToIbis={handleAddToIbis}
-                  onRetry={(id) => retryMessage(id)}
-                />
-                
-                <MessageInput 
-                  onSendMessage={sendMessage} 
-                  disabled={isTyping || deliberation.status === 'completed'}
-                />
+                <div className="p-4">
+                  <VoiceInterface deliberationId={deliberation.id} />
+                </div>
               </TabsContent>
               
               <TabsContent value="ibis" className="flex-1 mt-0">
@@ -309,17 +300,9 @@ const DeliberationChat = () => {
               className="flex-1"
             >
               <Panel defaultSize={splitSizes[0]} minSize={35} className="flex flex-col">
-                <MessageList 
-                  messages={messages} 
-                  isLoading={chatLoading} 
-                  isTyping={isTyping}
-                  onAddToIbis={handleAddToIbis}
-                  onRetry={(id) => retryMessage(id)}
-                />
-                <MessageInput 
-                  onSendMessage={sendMessage} 
-                  disabled={isTyping || deliberation.status === 'completed'}
-                />
+                <div className="p-4">
+                  <VoiceInterface deliberationId={deliberation.id} />
+                </div>
               </Panel>
 
               <PanelResizeHandle className="w-px bg-border hover:bg-primary transition-colors" />
