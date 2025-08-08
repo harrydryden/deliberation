@@ -209,23 +209,6 @@ const DeliberationChat = () => {
 
             {/* Sub-header with three boxes */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-stretch gap-3 flex-wrap">
-                <div className="flex flex-col gap-3 h-full">
-                  <div className="rounded-lg border bg-muted/40 p-3 flex-1">
-                    <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
-                    <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
-                  </div>
-                  <div className="rounded-lg border bg-muted/40 p-3 flex-1">
-                    <div className="text-xs font-medium text-muted-foreground mb-2">View Mode</div>
-                    <ViewModeSelector mode={viewMode} onModeChange={(v) => v && setViewMode(v)} />
-                  </div>
-                </div>
-                <div className="rounded-lg border bg-muted/40 p-3 h-full">
-                  <div className="text-xs font-medium text-muted-foreground mb-2">Voice Mode</div>
-                  <VoiceInterface deliberationId={deliberation.id} variant="panel" />
-                </div>
-              </div>
-
               <div className="flex items-center gap-2">
                 <div className="flex items-center space-x-1 text-sm text-muted-foreground">
                   <Users className="h-4 w-4" />
@@ -241,6 +224,25 @@ const DeliberationChat = () => {
                     {joiningDeliberation ? 'Joining...' : 'Join Deliberation'}
                   </Button>
                 )}
+              </div>
+
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <div className="flex items-stretch gap-3 flex-wrap">
+                  <div className="flex flex-col gap-3 h-full">
+                    <div className="rounded-lg border bg-muted/40 p-3 flex-1">
+                      <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
+                      <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
+                    </div>
+                    <div className="rounded-lg border bg-muted/40 p-3 flex-1">
+                      <div className="text-xs font-medium text-muted-foreground mb-2">View Mode</div>
+                      <ViewModeSelector mode={viewMode} onModeChange={(v) => v && setViewMode(v)} />
+                    </div>
+                  </div>
+                  <div className="rounded-lg border bg-muted/40 p-3 h-full">
+                    <div className="text-xs font-medium text-muted-foreground mb-2">Voice Mode</div>
+                    <VoiceInterface deliberationId={deliberation.id} variant="panel" />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
