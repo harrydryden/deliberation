@@ -88,6 +88,8 @@ export const useRealtimeChat = () => {
               if (typeof output === 'string' && output.length > 0) {
                 const evt = { type: 'response.function_call_output', call_id, output } as const;
                 wsRef.current.send(JSON.stringify(evt));
+                // Nudge model to speak the result
+                wsRef.current.send(JSON.stringify({ type: 'response.create' }));
               }
             } catch (err) {
               console.error('[Tool Handler] error', err);

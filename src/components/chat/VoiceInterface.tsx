@@ -118,7 +118,12 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     try {
       await connect({ onToolCall: toolHandler });
       setMode('ibis');
-      await sendText(`Summarize the key IBIS highlights for deliberation ${deliberationId}. Use the get_ibis_context tool and then narrate a clear, 30–60 second spoken summary.`);
+
+      // Fetch IBIS context directly as a fallback to ensure audio
+      const ctx = await doGetIbisContext(deliberationId, 10);
+      const prompt = `${ctx}\n\nPlease speak a clear 30–60 second summary for participants.`;
+      await sendText(prompt);
+
       toast({ title: 'IBIS summary', description: 'Generating spoken summary...' });
     } catch (err: any) {
       console.error('[VoiceInterface] Start IBIS error', err);
