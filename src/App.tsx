@@ -7,6 +7,8 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthLoadingBoundary } from "@/components/auth/AuthLoadingBoundary";
 import { BackendSelector } from "@/components/auth/BackendSelector";
 import { Suspense, lazy } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -18,28 +20,30 @@ const DeliberationChat = lazy(() => import("./pages/DeliberationChat"));
 
 const App = () => (
   <ErrorBoundary>
-    <BackendAuthProvider>
-      <AuthLoadingBoundary>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-center space-y-4"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" /><p className="text-muted-foreground">Loading...</p></div></div>}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/chat" element={<Chat />} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="/backend" element={<BackendSelector />} />
-                <Route path="/deliberations" element={<Deliberations />} />
-                <Route path="/deliberations/:deliberationId" element={<DeliberationChat />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthLoadingBoundary>
-    </BackendAuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <BackendAuthProvider>
+        <AuthLoadingBoundary>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-center space-y-4"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" /><p className="text-muted-foreground">Loading...</p></div></div>}>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/chat" element={<Chat />} />
+                  <Route path="/admin" element={<Admin />} />
+                  <Route path="/backend" element={<BackendSelector />} />
+                  <Route path="/deliberations" element={<Deliberations />} />
+                  <Route path="/deliberations/:deliberationId" element={<DeliberationChat />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </BrowserRouter>
+          </TooltipProvider>
+        </AuthLoadingBoundary>
+      </BackendAuthProvider>
+    </QueryClientProvider>
   </ErrorBoundary>
 );
 
