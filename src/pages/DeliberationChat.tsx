@@ -219,7 +219,7 @@ const DeliberationChat = () => {
                   <VoiceInterface deliberationId={deliberation.id} variant="panel" />
                 </div>
                 <div className="rounded-lg border bg-muted/40 p-3">
-                  <div className="text-xs font-medium text-muted-foreground mb-2">View</div>
+                  <div className="text-xs font-medium text-muted-foreground mb-2">View Mode</div>
                   <ViewModeSelector mode={viewMode} onModeChange={(v) => v && setViewMode(v)} />
                 </div>
               </div>
