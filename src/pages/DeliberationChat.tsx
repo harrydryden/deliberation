@@ -189,41 +189,36 @@ const DeliberationChat = () => {
         backgroundColor: 'hsl(var(--card) / 0.95)'
       }}>
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-3">
-                  <h1 className="text-xl font-semibold text-democratic-blue truncate">
-                    {deliberation.title}
-                  </h1>
-                  <Badge className={`${getStatusColor(deliberation.status)} text-white`}>
-                    {deliberation.status}
-                  </Badge>
-                </div>
-                {deliberation.description && (
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                    {deliberation.description}
-                  </p>
-                )}
-              </div>
-            </div>
+            {/* Title moved into left box below */}
 
             {/* Sub-header with three boxes */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center space-x-1 text-sm text-muted-foreground">
-                  <Users className="h-4 w-4" />
-                  <span>{(deliberation.participants?.length || deliberation.participant_count || 0)}/{deliberation.max_participants}</span>
+              <div className="flex-1 min-w-0">
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <div className="flex items-center space-x-3">
+                    <h1 className="text-xl font-semibold text-democratic-blue truncate">{deliberation.title}</h1>
+                    <Badge className={`${getStatusColor(deliberation.status)} text-white`}>{deliberation.status}</Badge>
+                  </div>
+                  {deliberation.description && (
+                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{deliberation.description}</p>
+                  )}
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                      <Users className="h-4 w-4" />
+                      <span>{(deliberation.participants?.length || deliberation.participant_count || 0)}/{deliberation.max_participants}</span>
+                    </div>
+                    {!isParticipant && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleJoinDeliberation}
+                        disabled={joiningDeliberation}
+                      >
+                        {joiningDeliberation ? 'Joining...' : 'Join Deliberation'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                {!isParticipant && (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={handleJoinDeliberation}
-                    disabled={joiningDeliberation}
-                  >
-                    {joiningDeliberation ? 'Joining...' : 'Join Deliberation'}
-                  </Button>
-                )}
               </div>
 
               <div className="rounded-lg border bg-muted/30 p-3">
