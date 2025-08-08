@@ -144,14 +144,23 @@ export class RealtimeRTC {
     this.dc.send(JSON.stringify({ type: 'response.create' }));
   }
 
-  disconnect() {
-    // Politely stop model speaking and VAD
+  cancelSpeaking() {
     try {
+      if (this.audioEl) {
+        this.audioEl.muted = true;
+        try { (this.audioEl as any).srcObject = null; } catch {}
+        try { this.audioEl.pause(); } catch {}
+      }
       if (this.dc && this.dc.readyState === 'open') {
         try { this.dc.send(JSON.stringify({ type: 'session.update', session: { turn_detection: { type: 'none' } } })); } catch {}
         try { this.dc.send(JSON.stringify({ type: 'response.cancel' })); } catch {}
       }
     } catch {}
+  }
+
+  disconnect() {
+    // Hard stop speaking immediately
+    this.cancelSpeaking();
 
     // Stop local + remote tracks and detach
     try {

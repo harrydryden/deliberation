@@ -151,7 +151,9 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     }
   };
 
-  const stop = () => {
+  const stop = async () => {
+    try { rtcRef.current?.cancelSpeaking?.(); } catch {}
+    await new Promise((r) => setTimeout(r, 150));
     try { rtcRef.current?.disconnect(); } catch {}
     rtcRef.current = null;
     setConnected(false);
@@ -159,7 +161,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     setMode('idle');
   };
 
-  useEffect(() => () => stop(), []);
+  useEffect(() => { return () => { void stop(); }; }, []);
 
   return (
     <div className={className}>
