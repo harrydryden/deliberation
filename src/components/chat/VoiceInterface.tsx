@@ -119,7 +119,22 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   const handleEvent = (event: any) => {
     // Minimal speaking indicator using response lifecycle
     if (event?.type === 'response.created') setSpeaking(true);
-    if (event?.type === 'response.done' || event?.type === 'response.audio.done') setSpeaking(false);
+
+    if (event?.type === 'response.done') {
+      setSpeaking(false);
+      const status = event?.response?.status;
+      if (status === 'failed') {
+        const msg = event?.response?.status_details?.error?.message || 'Voice generation failed.';
+        toast({ title: 'Voice error', description: msg, variant: 'destructive' });
+      }
+    }
+
+    if (event?.type === 'response.audio.done') setSpeaking(false);
+
+    if (event?.type === 'conversation.item.input_audio_transcription.failed') {
+      const msg = event?.error?.message || 'Transcription failed.';
+      toast({ title: 'Transcription error', description: msg, variant: 'destructive' });
+    }
   };
 
   const ensureIdle = async () => {
