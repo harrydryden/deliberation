@@ -4,8 +4,9 @@ import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown } from 'lucide-react';
+import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown, Type } from 'lucide-react';
 import { RealtimeRTC } from '@/utils/realtimeRtc';
+import { useBackendChat } from '@/hooks/useBackendChat';
 
 interface VoiceInterfaceProps {
   deliberationId: string;
@@ -18,17 +19,26 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   const { toast } = useToast();
   const [connected, setConnected] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [mode, setMode] = useState<'idle' | 'bill' | 'ibis'>('idle');
+  const [mode, setMode] = useState<'idle' | 'bill' | 'ibis' | 'stt'>('idle');
   const [billAgentId, setBillAgentId] = useState<string | null>(preferredBillAgentId || null);
   const rtcRef = useRef<RealtimeRTC | null>(null);
-  const [preferred, setPreferred] = useState<'bill' | 'ibis'>('bill');
-
-  const selectPreferred = async (next: 'bill' | 'ibis') => {
+  const [preferred, setPreferred] = useState<'bill' | 'ibis' | 'stt'>('bill');
+  
+  // STT recording state
+  const sttStreamRef = useRef<MediaStream | null>(null);
+  const sttRecorderRef = useRef<MediaRecorder | null>(null);
+  const sttChunksRef = useRef<BlobPart[]>([]);
+  const [sttBusy, setSttBusy] = useState(false);
+  
+  // Chat sender for deliberation messages
+  const { sendMessage: sendChatMessage } = useBackendChat(deliberationId);
+  const selectPreferred = async (next: 'bill' | 'ibis' | 'stt') => {
     setPreferred(next);
     if (mode !== 'idle') {
       await stop();
       if (next === 'bill') await startBill();
-      else await startIbis();
+      else if (next === 'ibis') await startIbis();
+      else await startStt();
     }
   };
 
@@ -179,6 +189,100 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     }
   };
 
+  // Helper to base64-encode Blob
+  const blobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
+    try {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        const base64 = result.includes(',') ? result.split(',')[1] : result;
+        resolve(base64 || '');
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    } catch (e) {
+      reject(e);
+    }
+  });
+
+  const startStt = async () => {
+    try {
+      await ensureIdle();
+      sttChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : undefined;
+      const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+
+      rec.ondataavailable = (e: BlobEvent) => {
+        if (e.data && e.data.size > 0) sttChunksRef.current.push(e.data);
+      };
+      rec.onstop = async () => {
+        try {
+          setSttBusy(true);
+          const blob = new Blob(sttChunksRef.current, { type: 'audio/webm' });
+          const b64 = await blobToBase64(blob);
+          if (!b64) throw new Error('Empty recording');
+          const { data, error } = await supabase.functions.invoke('voice-to-text', { body: { audio: b64 } });
+          if (error) throw error;
+          const text = (data?.text || '').toString().trim();
+          if (text.length > 0) {
+            await sendChatMessage(text, 'chat');
+            toast({ title: 'Added message', description: 'Voice transcription sent to chat.' });
+          } else {
+            toast({ title: 'No speech detected', description: 'Nothing was transcribed.', variant: 'destructive' });
+          }
+        } catch (err: any) {
+          console.error('[VoiceInterface] STT error', err);
+          toast({ title: 'Voice to text failed', description: err?.message || 'Transcription error', variant: 'destructive' });
+        } finally {
+          setSttBusy(false);
+          try { sttStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
+          sttRecorderRef.current = null;
+          sttStreamRef.current = null;
+          setConnected(false);
+          setMode('idle');
+        }
+      };
+
+      sttStreamRef.current = stream;
+      sttRecorderRef.current = rec;
+      rec.start();
+      setConnected(true);
+      setMode('stt');
+      toast({ title: 'Recording…', description: 'Toggle off to transcribe and send to chat.' });
+    } catch (err: any) {
+      console.error('[VoiceInterface] startStt error', err);
+      toast({ title: 'Error', description: err?.message || 'Failed to start recording', variant: 'destructive' });
+    }
+  };
+
+  const stopStt = async (cancel?: boolean) => {
+    try {
+      const rec = sttRecorderRef.current;
+      if (!rec) {
+        setConnected(false);
+        setMode('idle');
+        return;
+      }
+      if (cancel) {
+        // Stop without sending
+        try { rec.stop(); } catch {}
+        sttChunksRef.current = [];
+        try { sttStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
+        sttRecorderRef.current = null;
+        sttStreamRef.current = null;
+        setConnected(false);
+        setMode('idle');
+        return;
+      }
+      rec.stop();
+    } catch (e) {
+      console.error('[VoiceInterface] stopStt error', e);
+      setConnected(false);
+      setMode('idle');
+    }
+  };
+
   const stop = async () => {
     try { rtcRef.current?.cancelSpeaking?.(); } catch {}
     await new Promise((r) => setTimeout(r, 150));
@@ -204,8 +308,8 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm" className="px-2 h-8 bg-muted/50">
-                {preferred === 'bill' ? <GraduationCap className="h-4 w-4" /> : <GitBranch className="h-4 w-4" />}
-                <span className="ml-1">{preferred === 'bill' ? 'Learn (Bill)' : 'IBIS Summary'}</span>
+                {preferred === 'bill' ? <GraduationCap className="h-4 w-4" /> : preferred === 'ibis' ? <GitBranch className="h-4 w-4" /> : <Type className="h-4 w-4" />}
+                <span className="ml-1">{preferred === 'bill' ? 'Learn (Bill)' : preferred === 'ibis' ? 'IBIS Summary' : 'Dictate to Text'}</span>
                 <ChevronDown className="h-4 w-4 ml-1 text-muted-foreground" />
               </Button>
             </PopoverTrigger>
@@ -235,11 +339,17 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
               if (checked) {
                 if (preferred === 'bill') {
                   void startBill();
-                } else {
+                } else if (preferred === 'ibis') {
                   void startIbis();
+                } else {
+                  void startStt();
                 }
               } else {
-                void stop();
+                if (mode === 'stt') {
+                  void stopStt();
+                } else {
+                  void stop();
+                }
               }
             }}
             className="data-[state=checked]:bg-primary"
@@ -272,6 +382,18 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
               Hear IBIS Summary
               {mode === 'ibis' && speaking && <Waves className="h-4 w-4 ml-2" />}
             </Button>
+
+            <Button
+              onClick={() => { mode === 'stt' ? void stopStt() : void startStt(); }}
+              variant={mode === 'stt' ? 'default' : 'secondary'}
+              size="sm"
+              aria-label="Dictate to text"
+              aria-pressed={mode === 'stt'}
+              className="w-full"
+            >
+              <Type className="h-4 w-4 mr-2" />
+              Dictate to Text
+            </Button>
           </div>
         ) : (
           <div className="flex items-center gap-2">
@@ -296,6 +418,17 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
             >
               Hear IBIS Summary
               {mode === 'ibis' && speaking && <Waves className="h-4 w-4 ml-2" />}
+            </Button>
+
+            <Button
+              onClick={() => { mode === 'stt' ? void stopStt() : void startStt(); }}
+              variant={mode === 'stt' ? 'default' : 'secondary'}
+              size="sm"
+              aria-label="Dictate to text"
+              aria-pressed={mode === 'stt'}
+            >
+              <Type className="h-4 w-4 mr-2" />
+              Dictate to Text
             </Button>
           </div>
         )
