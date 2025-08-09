@@ -315,7 +315,7 @@ export const IbisSubmissionModal = ({
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="nodeType">Node Type</Label>
+            <Label htmlFor="nodeType">Type</Label>
             <Select value={formData.nodeType} onValueChange={(value: NodeType) => setFormData(prev => ({
             ...prev,
             nodeType: value
