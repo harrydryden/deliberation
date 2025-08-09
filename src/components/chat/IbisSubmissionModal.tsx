@@ -357,7 +357,7 @@ export const IbisSubmissionModal = ({
             <Input id="title" value={formData.title} onChange={e => setFormData(prev => ({
             ...prev,
             title: e.target.value
-          }))} placeholder="Enter a concise title for this IBIS node" required />
+          }))} placeholder="Enter concise title for the map" required />
           </div>
 
           <div>
