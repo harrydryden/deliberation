@@ -76,6 +76,10 @@ export class SupabaseMessageService implements IMessageService {
         
         if (fallbackError) {
           console.error('❌ Fallback agent response also failed:', fallbackError);
+          // Notify UI that agents failed so it can stop typing and show message
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('agent-error', { detail: { source: 'fallback', error: String(fallbackError) } }));
+          }
         } else {
           console.log('✅ Fallback agent response triggered successfully:', fallbackData);
         }
@@ -84,6 +88,9 @@ export class SupabaseMessageService implements IMessageService {
       }
     } catch (error) {
       console.error('💥 Error triggering agent orchestration:', error);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('agent-error', { detail: { source: 'orchestration', error: String(error) } }));
+      }
     }
   }
 

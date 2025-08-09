@@ -9,6 +9,7 @@ import { useOptimizedArray } from './useOptimizedState';
 import { logger } from '@/utils/logger';
 import { performanceMonitor } from '@/utils/performanceUtils';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
+import { useToast } from '@/hooks/use-toast';
 
 export const useBackendChat = (deliberationId?: string) => {
   const { user, isAuthenticated } = useBackendAuth();
@@ -19,6 +20,8 @@ export const useBackendChat = (deliberationId?: string) => {
   const unsubscribeRef = useRef<(() => void) | null>(null);
   
   useMemoryLeakDetection('useBackendChat');
+
+  const { toast } = useToast();
 
   // Load chat history when user is authenticated or deliberationId changes
   useEffect(() => {
@@ -33,6 +36,22 @@ export const useBackendChat = (deliberationId?: string) => {
       }
     };
   }, [isAuthenticated, deliberationId]);
+
+  // Listen for agent failure events (e.g., OpenAI quota exceeded)
+  useEffect(() => {
+    const handler = () => {
+      setIsTyping(false);
+      toast({ title: 'Contact Platform Admin', description: 'AI responses are temporarily unavailable.', variant: 'destructive' });
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('agent-error', handler);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('agent-error', handler);
+      }
+    };
+  }, [toast]);
 
   const setupRealTimeUpdates = () => {
     if (!isAuthenticated) return;
