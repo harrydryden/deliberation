@@ -237,9 +237,10 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
       )}
 
       {!atBottom && messages.length > 0 && (
-        <div className="absolute right-4 bottom-28 md:bottom-24 lg:bottom-20 z-20">
+        <div className="absolute right-4 bottom-24 md:bottom-20 lg:bottom-16 z-20">
           <Button
-            variant="default"
+            variant="secondary"
+            className="bg-muted text-foreground hover:bg-muted/80"
             onClick={() => {
               virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'smooth' });
               setUnreadIndex(null);
