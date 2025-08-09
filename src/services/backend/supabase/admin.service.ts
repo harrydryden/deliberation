@@ -8,6 +8,7 @@ export class SupabaseAdminService implements IAdminService {
     const { data: userProfiles, error } = await supabase
       .from('user_profiles_with_codes')
       .select('id, display_name, user_role, expertise_areas, access_code, created_at, updated_at')
+      .not('id', 'is', null)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -16,16 +17,21 @@ export class SupabaseAdminService implements IAdminService {
 
     // Get deliberations for all users
     const userIds = userProfiles.map(p => p.id).filter(Boolean);
-    const { data: participantsData, error: participantsError } = await supabase
-      .from('participants')
-      .select(`
-        user_id,
-        role,
-        deliberations(id, title)
-      `)
-      .in('user_id', userIds);
 
-    if (participantsError) throw participantsError;
+    let participantsData: any[] = [];
+    if (userIds.length > 0) {
+      const { data, error: participantsError } = await supabase
+        .from('participants')
+        .select(`
+          user_id,
+          role,
+          deliberations(id, title)
+        `)
+        .in('user_id', userIds);
+
+      if (participantsError) throw participantsError;
+      participantsData = data || [];
+    }
 
     // Group deliberations by user
     const userDeliberations = (participantsData || []).reduce((acc: Record<string, any[]>, participant: any) => {
