@@ -194,7 +194,7 @@ const DeliberationChat = () => {
             {/* Sub-header with three boxes */}
             <div className="flex items-stretch justify-between gap-3 flex-wrap">
               <div className="flex-1 min-w-0">
-                <div className="rounded-lg border bg-muted/40 p-3 h-full">
+                <div className="rounded-lg border bg-muted/40 p-3 h-full flex flex-col">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2 min-w-0">
                         <h1 className="text-xl font-semibold text-democratic-blue truncate">{deliberation.title}</h1>
@@ -206,20 +206,22 @@ const DeliberationChat = () => {
                       </div>
                     </div>
                   {deliberation.description && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-3">{deliberation.description}</p>
-                  )}
-                    <div className="mt-1">
-                      {!isParticipant && (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={handleJoinDeliberation}
-                          disabled={joiningDeliberation}
-                        >
-                          {joiningDeliberation ? 'Joining...' : 'Join Deliberation'}
-                        </Button>
-                      )}
+                    <div className="mt-1 flex-1 overflow-hidden">
+                      <p className="text-sm text-muted-foreground break-words">{deliberation.description}</p>
                     </div>
+                  )}
+                  {!isParticipant && (
+                    <div className="mt-auto pt-2">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleJoinDeliberation}
+                        disabled={joiningDeliberation}
+                      >
+                        {joiningDeliberation ? 'Joining...' : 'Join Deliberation'}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
 
