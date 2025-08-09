@@ -321,7 +321,7 @@ export const IbisSubmissionModal = ({
             nodeType: value
           }))}>
               <SelectTrigger>
-                <SelectValue placeholder="Select IBIS node type" />
+                <SelectValue placeholder="Select Type" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="issue">
