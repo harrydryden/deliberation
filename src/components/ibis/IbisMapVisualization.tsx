@@ -1062,7 +1062,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-1">
                 <GitBranch className="h-4 w-4" />
-                Visualization Guide
+                Guide
               </CardTitle>
               <Button
                 variant="ghost"
