@@ -1057,7 +1057,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
 
       {/* Enhanced Legend */}
       <Panel position="bottom-right">
-        <Card className={isGuideCollapsed ? "w-32" : "w-64"}>
+        <Card className={isGuideCollapsed ? "w-36" : "w-72"}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm flex items-center gap-1">
