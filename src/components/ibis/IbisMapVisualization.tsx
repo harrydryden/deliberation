@@ -990,8 +990,8 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
 
       {/* Node Details Panel */}
       {selectedNode && (
-        <div className="w-80 border-l border-border bg-card">
-          <Card className="h-full border-0 rounded-none">
+        <div className="w-80 h-full border-l border-border bg-card">
+          <Card className="h-full border-0 rounded-none flex flex-col min-h-0">
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -1013,7 +1013,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="p-4 space-y-4">
+            <CardContent className="p-4 space-y-4 flex-1 overflow-y-auto">
               <div>
                 <h3 className="font-semibold text-base mb-2">{selectedNode.title}</h3>
                 <Badge variant="outline">
