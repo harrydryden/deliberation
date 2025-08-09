@@ -362,12 +362,12 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
               onClick={() => { mode === 'bill' ? void stop() : void startBill(); }}
               variant={mode === 'bill' ? 'default' : 'secondary'}
               size="sm"
-              aria-label="Talk to Bill"
+              aria-label="Chat to Policy"
               aria-pressed={mode === 'bill'}
               className="w-full"
             >
               <Mic className="h-4 w-4 mr-2" />
-              Talk to Bill
+              Chat to Policy
               {mode === 'bill' && speaking && <Waves className="h-4 w-4 ml-2" />}
             </Button>
 
