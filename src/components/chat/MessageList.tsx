@@ -225,7 +225,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
       )}
 
       {!atBottom && messages.length > 0 && (
-        <div className="absolute bottom-4 right-6">
+        <div className="absolute right-4 bottom-28 md:bottom-24 lg:bottom-20 z-20">
           <Button
             variant="default"
             onClick={() => {
