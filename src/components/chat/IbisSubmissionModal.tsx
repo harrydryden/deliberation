@@ -10,7 +10,6 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Lightbulb } from "lucide-react";
-
 interface IbisSubmissionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -19,18 +18,18 @@ interface IbisSubmissionModalProps {
   deliberationId: string;
   onSuccess?: () => void;
 }
-
 type NodeType = 'issue' | 'position' | 'argument';
-
-export const IbisSubmissionModal = ({ 
-  isOpen, 
-  onClose, 
-  messageId, 
-  messageContent, 
+export const IbisSubmissionModal = ({
+  isOpen,
+  onClose,
+  messageId,
+  messageContent,
   deliberationId,
-  onSuccess 
+  onSuccess
 }: IbisSubmissionModalProps) => {
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isClassifying, setIsClassifying] = useState(false);
   const [formData, setFormData] = useState({
@@ -47,7 +46,6 @@ export const IbisSubmissionModal = ({
     confidence: number;
     stanceScore?: number;
   } | null>(null);
-
   const [existingNodes, setExistingNodes] = useState<Array<{
     id: string;
     title: string;
@@ -66,36 +64,34 @@ export const IbisSubmissionModal = ({
       classifyMessage();
     }
   }, [isOpen, deliberationId, messageContent]);
-
   const loadExistingNodes = async () => {
     try {
-      const { data, error } = await supabase
-        .from('ibis_nodes')
-        .select('id, title, node_type')
-        .eq('deliberation_id', deliberationId)
-        .order('created_at', { ascending: false });
-
+      const {
+        data,
+        error
+      } = await supabase.from('ibis_nodes').select('id, title, node_type').eq('deliberation_id', deliberationId).order('created_at', {
+        ascending: false
+      });
       if (error) throw error;
       setExistingNodes(data || []);
     } catch (error) {
       console.error('Error loading existing nodes:', error);
     }
   };
-
   const classifyMessage = async () => {
     if (!messageContent.trim()) return;
-    
     setIsClassifying(true);
     try {
-      const { data, error } = await supabase.functions.invoke('classify-message', {
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('classify-message', {
         body: {
           content: messageContent,
           deliberationId: deliberationId
         }
       });
-
       if (error) throw error;
-
       if (data.success && data.classification) {
         const classification = data.classification;
         setAiSuggestions({
@@ -130,65 +126,64 @@ export const IbisSubmissionModal = ({
       setIsClassifying(false);
     }
   };
-
   const applyAiSuggestion = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formData.title.trim() || !formData.nodeType) {
       toast({
         variant: "destructive",
         title: "Validation Error",
-        description: "Please provide a title and select a node type",
+        description: "Please provide a title and select a node type"
       });
       return;
     }
-
     setIsSubmitting(true);
-
     try {
       // Create IBIS node
-      const { data: { user } } = await supabase.auth.getUser();
-      
+      const {
+        data: {
+          user
+        }
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
-
-      const { error: nodeError } = await supabase
-        .from('ibis_nodes')
-        .insert({
-          title: formData.title.trim(),
-          description: formData.description.trim() || null,
-          node_type: formData.nodeType,
-          parent_node_id: formData.parentNodeId && formData.parentNodeId !== 'none' ? formData.parentNodeId : null,
-          deliberation_id: deliberationId,
-          message_id: messageId,
-          created_by: user.id, // This was missing!
-          position_x: Math.random() * 800 + 100, // Random initial position
-          position_y: Math.random() * 600 + 100
-        });
-
+      const {
+        error: nodeError
+      } = await supabase.from('ibis_nodes').insert({
+        title: formData.title.trim(),
+        description: formData.description.trim() || null,
+        node_type: formData.nodeType,
+        parent_node_id: formData.parentNodeId && formData.parentNodeId !== 'none' ? formData.parentNodeId : null,
+        deliberation_id: deliberationId,
+        message_id: messageId,
+        created_by: user.id,
+        // This was missing!
+        position_x: Math.random() * 800 + 100,
+        // Random initial position
+        position_y: Math.random() * 600 + 100
+      });
       if (nodeError) throw nodeError;
 
       // Mark message as submitted to IBIS
-      const { error: messageError } = await supabase
-        .from('messages')
-        .update({ submitted_to_ibis: true })
-        .eq('id', messageId);
-
+      const {
+        error: messageError
+      } = await supabase.from('messages').update({
+        submitted_to_ibis: true
+      }).eq('id', messageId);
       if (messageError) throw messageError;
-
       toast({
         title: "Success",
-        description: "Message successfully submitted to IBIS",
+        description: "Message successfully submitted to IBIS"
       });
-
       onSuccess?.();
       onClose();
-      
+
       // Reset form and AI suggestions
       setFormData({
         title: '',
@@ -197,32 +192,30 @@ export const IbisSubmissionModal = ({
         parentNodeId: ''
       });
       setAiSuggestions(null);
-
     } catch (error: any) {
       console.error('Error submitting to IBIS:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to submit message to IBIS",
+        description: error.message || "Failed to submit message to IBIS"
       });
     } finally {
       setIsSubmitting(false);
     }
   };
-
   const handleGenerateRootIssues = async () => {
     setIsGeneratingRoots(true);
     try {
       // Get deliberation details
-      const { data: deliberation, error: deliberationError } = await supabase
-        .from('deliberations')
-        .select('title, description, notion')
-        .eq('id', deliberationId)
-        .single();
-
+      const {
+        data: deliberation,
+        error: deliberationError
+      } = await supabase.from('deliberations').select('title, description, notion').eq('id', deliberationId).single();
       if (deliberationError) throw deliberationError;
-
-      const { data: rootsData, error: rootsError } = await supabase.functions.invoke('generate-ibis-roots', {
+      const {
+        data: rootsData,
+        error: rootsError
+      } = await supabase.functions.invoke('generate-ibis-roots', {
         body: {
           deliberationId,
           deliberationTitle: deliberation.title,
@@ -230,9 +223,7 @@ export const IbisSubmissionModal = ({
           notion: deliberation.notion
         }
       });
-
       if (rootsError) throw rootsError;
-
       if (rootsData?.success) {
         toast({
           title: "Success",
@@ -252,7 +243,6 @@ export const IbisSubmissionModal = ({
       setIsGeneratingRoots(false);
     }
   };
-
   const getNodeTypeDescription = (nodeType: string) => {
     switch (nodeType) {
       case 'issue':
@@ -265,25 +255,20 @@ export const IbisSubmissionModal = ({
         return '';
     }
   };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+  return <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Submit Message to IBIS</DialogTitle>
+          <DialogTitle>Add to Deliberation Map</DialogTitle>
         </DialogHeader>
 
         {/* AI Classification Status */}
-        {isClassifying && (
-          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+        {isClassifying && <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
             <LoadingSpinner className="h-4 w-4" />
             <span className="text-sm text-muted-foreground">AI is analyzing your message...</span>
-          </div>
-        )}
+          </div>}
 
         {/* No existing nodes - suggest root issues */}
-        {existingNodes.length === 0 && !isClassifying && (
-          <div className="p-3 bg-muted rounded-lg space-y-3">
+        {existingNodes.length === 0 && !isClassifying && <div className="p-3 bg-muted rounded-lg space-y-3">
             <div className="flex items-center gap-2">
               <Lightbulb className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">No IBIS nodes exist yet</span>
@@ -291,32 +276,19 @@ export const IbisSubmissionModal = ({
             <p className="text-xs text-muted-foreground">
               Start this deliberation by generating AI-suggested root issues, or create your own manually.
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleGenerateRootIssues}
-              disabled={isGeneratingRoots}
-              className="flex items-center gap-2"
-            >
-              {isGeneratingRoots ? (
-                <>
+            <Button type="button" variant="outline" size="sm" onClick={handleGenerateRootIssues} disabled={isGeneratingRoots} className="flex items-center gap-2">
+              {isGeneratingRoots ? <>
                   <LoadingSpinner className="h-3 w-3" />
                   Generating...
-                </>
-              ) : (
-                <>
+                </> : <>
                   <Lightbulb className="h-3 w-3" />
                   Suggest Root Issues
-                </>
-              )}
+                </>}
             </Button>
-          </div>
-        )}
+          </div>}
 
         {/* AI Suggestions */}
-        {aiSuggestions && !isClassifying && (
-          <div className="p-3 bg-muted rounded-lg space-y-2">
+        {aiSuggestions && !isClassifying && <div className="p-3 bg-muted rounded-lg space-y-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">AI Suggestions</span>
               <Badge variant="secondary" className="text-xs">
@@ -324,46 +296,30 @@ export const IbisSubmissionModal = ({
               </Badge>
             </div>
             
-            {aiSuggestions.keywords.length > 0 && (
-              <div>
+            {aiSuggestions.keywords.length > 0 && <div>
                 <span className="text-xs text-muted-foreground">Keywords: </span>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {aiSuggestions.keywords.map((keyword, index) => (
-                    <Badge key={index} variant="outline" className="text-xs">
+                  {aiSuggestions.keywords.map((keyword, index) => <Badge key={index} variant="outline" className="text-xs">
                       {keyword}
-                    </Badge>
-                  ))}
+                    </Badge>)}
                 </div>
-              </div>
-            )}
+              </div>}
             
-            {aiSuggestions.stanceScore !== undefined && (
-              <div>
+            {aiSuggestions.stanceScore !== undefined && <div>
                 <span className="text-xs text-muted-foreground">Stance: </span>
-                <Badge 
-                  variant={
-                    aiSuggestions.stanceScore > 0.3 ? "default" : 
-                    aiSuggestions.stanceScore < -0.3 ? "destructive" : 
-                    "secondary"
-                  }
-                  className="text-xs"
-                >
-                  {aiSuggestions.stanceScore > 0.3 ? "Supporting" :
-                   aiSuggestions.stanceScore < -0.3 ? "Opposing" :
-                   "Neutral"} ({(aiSuggestions.stanceScore >= 0 ? '+' : '') + aiSuggestions.stanceScore.toFixed(2)})
+                <Badge variant={aiSuggestions.stanceScore > 0.3 ? "default" : aiSuggestions.stanceScore < -0.3 ? "destructive" : "secondary"} className="text-xs">
+                  {aiSuggestions.stanceScore > 0.3 ? "Supporting" : aiSuggestions.stanceScore < -0.3 ? "Opposing" : "Neutral"} ({(aiSuggestions.stanceScore >= 0 ? '+' : '') + aiSuggestions.stanceScore.toFixed(2)})
                 </Badge>
-              </div>
-            )}
-          </div>
-        )}
+              </div>}
+          </div>}
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="nodeType">Node Type</Label>
-            <Select 
-              value={formData.nodeType} 
-              onValueChange={(value: NodeType) => setFormData(prev => ({ ...prev, nodeType: value }))}
-            >
+            <Select value={formData.nodeType} onValueChange={(value: NodeType) => setFormData(prev => ({
+            ...prev,
+            nodeType: value
+          }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Select IBIS node type" />
               </SelectTrigger>
@@ -398,52 +354,42 @@ export const IbisSubmissionModal = ({
 
           <div>
             <Label htmlFor="title">Title</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              placeholder="Enter a concise title for this IBIS node"
-              required
-            />
+            <Input id="title" value={formData.title} onChange={e => setFormData(prev => ({
+            ...prev,
+            title: e.target.value
+          }))} placeholder="Enter a concise title for this IBIS node" required />
           </div>
 
           <div>
             <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Detailed description (optional)"
-              rows={3}
-            />
+            <Textarea id="description" value={formData.description} onChange={e => setFormData(prev => ({
+            ...prev,
+            description: e.target.value
+          }))} placeholder="Detailed description (optional)" rows={3} />
           </div>
 
-          {existingNodes.length > 0 && (
-            <div>
-              <Label htmlFor="parentNode">Link to Parent Node (Optional)</Label>
-              <Select 
-                value={formData.parentNodeId} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, parentNodeId: value }))}
-              >
+          {existingNodes.length > 0 && <div>
+              <Label htmlFor="parentNode">Make a Link (Optional)</Label>
+              <Select value={formData.parentNodeId} onValueChange={value => setFormData(prev => ({
+            ...prev,
+            parentNodeId: value
+          }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a parent node to link to" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No parent (root node)</SelectItem>
-                  {existingNodes.map((node) => (
-                    <SelectItem key={node.id} value={node.id}>
+                  {existingNodes.map(node => <SelectItem key={node.id} value={node.id}>
                       <div>
                         <div className="font-medium">{node.title}</div>
                         <div className="text-xs text-muted-foreground capitalize">
                           {node.node_type}
                         </div>
                       </div>
-                    </SelectItem>
-                  ))}
+                    </SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-          )}
+            </div>}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
@@ -455,6 +401,5 @@ export const IbisSubmissionModal = ({
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
-  );
+    </Dialog>;
 };
