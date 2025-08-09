@@ -55,6 +55,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
   const [atBottom, setAtBottom] = useState(true);
   const [unreadIndex, setUnreadIndex] = useState<number | null>(null);
   const prevCountRef = useRef(0);
+  const didAutoScrollRef = useRef(false);
 
   useEffect(() => {
     if (!atBottom && messages.length > prevCountRef.current) {
@@ -62,6 +63,17 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
     }
     prevCountRef.current = messages.length;
   }, [messages.length, atBottom]);
+
+  // Auto-scroll to bottom on initial load
+  useEffect(() => {
+    if (!didAutoScrollRef.current && messages.length > 0) {
+      requestAnimationFrame(() => {
+        virtuosoRef.current?.scrollToIndex({ index: messages.length - 1, align: 'end', behavior: 'auto' });
+        setAtBottom(true);
+        didAutoScrollRef.current = true;
+      });
+    }
+  }, [messages.length]);
 
   if (isLoading) {
     return (
