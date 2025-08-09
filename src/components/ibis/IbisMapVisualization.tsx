@@ -110,6 +110,8 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
   const { toast } = useToast();
   const { user } = useBackendAuth();
   
+  const [isGuideCollapsed, setIsGuideCollapsed] = useState(false);
+  
   // Check if user is admin
   const isAdmin = user?.role === 'admin';
 
@@ -1057,59 +1059,71 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
       <Panel position="bottom-right">
         <Card className="w-64">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-1">
-              <GitBranch className="h-4 w-4" />
-              Visualization Guide
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-1">
+                <GitBranch className="h-4 w-4" />
+                Visualization Guide
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsGuideCollapsed((v) => !v)}
+                aria-label={isGuideCollapsed ? "Show guide" : "Hide guide"}
+              >
+                {isGuideCollapsed ? 'Show' : 'Hide'}
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-3 pt-0">
-            <div>
-              <h4 className="text-xs font-semibold mb-2">Node Types</h4>
-              {Object.entries(nodeTypeConfig).map(([type, config]) => (
-                <div key={type} className="flex items-center gap-2 text-xs mb-1">
-                  <div 
-                    className="w-3 h-3 border border-white"
-                    style={{ 
-                      backgroundColor: config.color,
-                      borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px',
-                    }}
-                  />
-                  <span>{config.label}</span>
-                </div>
-              ))}
-            </div>
-            
-            <div>
-              <h4 className="text-xs font-semibold mb-2">Relationships</h4>
-              {Object.entries(relationshipConfig).map(([type, config]) => (
-                <div key={type} className="flex items-center gap-2 text-xs mb-1">
-                  <div 
-                    className="w-4 h-0.5"
-                    style={{ 
-                      backgroundColor: config.color,
-                      borderStyle: config.style === 'dashed' ? 'dashed' : 'solid',
-                      borderTopWidth: config.style === 'dotted' ? '1px' : '0',
-                    }}
-                  />
-                  <span>{config.label}</span>
-                </div>
-              ))}
-            </div>
-            
-            <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
-              <div>• Similar issues are clustered</div>
-              {isAdmin ? (
-                <div>• Drag nodes to reposition (Admin)</div>
-              ) : (
-                <div>• Add new nodes and connections</div>
-              )}
-              <div>• Use Connect mode to link nodes</div>
-              <div>• Click nodes for details</div>
-              {!isAdmin && (
-                <div className="text-amber-600">• Editing restricted to admins</div>
-              )}
-            </div>
-          </CardContent>
+          {!isGuideCollapsed && (
+            <CardContent className="space-y-3 pt-0">
+              <div>
+                <h4 className="text-xs font-semibold mb-2">Node Types</h4>
+                {Object.entries(nodeTypeConfig).map(([type, config]) => (
+                  <div key={type} className="flex items-center gap-2 text-xs mb-1">
+                    <div 
+                      className="w-3 h-3 border border-white"
+                      style={{ 
+                        backgroundColor: config.color,
+                        borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px',
+                      }}
+                    />
+                    <span>{config.label}</span>
+                  </div>
+                ))}
+              </div>
+              
+              <div>
+                <h4 className="text-xs font-semibold mb-2">Relationships</h4>
+                {Object.entries(relationshipConfig).map(([type, config]) => (
+                  <div key={type} className="flex items-center gap-2 text-xs mb-1">
+                    <div 
+                      className="w-4 h-0.5"
+                      style={{ 
+                        backgroundColor: config.color,
+                        borderStyle: config.style === 'dashed' ? 'dashed' : 'solid',
+                        borderTopWidth: config.style === 'dotted' ? '1px' : '0',
+                      }}
+                    />
+                    <span>{config.label}</span>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
+                <div>• Similar issues are clustered</div>
+                {isAdmin ? (
+                  <div>• Drag nodes to reposition (Admin)</div>
+                ) : (
+                  <div>• Add new nodes and connections</div>
+                )}
+                <div>• Use Connect mode to link nodes</div>
+                <div>• Click nodes for details</div>
+                {!isAdmin && (
+                  <div className="text-amber-600">• Editing restricted to admins</div>
+                )}
+              </div>
+            </CardContent>
+          )}
         </Card>
       </Panel>
     </div>
