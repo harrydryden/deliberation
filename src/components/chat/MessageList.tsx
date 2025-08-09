@@ -92,7 +92,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
           ref={virtuosoRef}
           className="h-full"
           data={messages}
-          followOutput={atBottom ? "smooth" : false}
+          followOutput={"smooth"}
           atBottomStateChange={setAtBottom}
           itemContent={(index, message) => {
             const isUser = message.message_type === 'user';
