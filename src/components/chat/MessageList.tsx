@@ -80,7 +80,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
   }
 
   return (
-    <div className="relative flex-1 overflow-hidden p-4">
+    <div className="relative h-full overflow-hidden p-4">
       {messages.length === 0 && !isTyping ? (
         <div className="text-center text-muted-foreground py-12">
           <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
