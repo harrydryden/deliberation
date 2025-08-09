@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ViewModeSelector } from "@/components/chat/ViewModeSelector";
 import { Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import VoiceInterface from "@/components/chat/VoiceInterface";
@@ -206,7 +207,14 @@ const DeliberationChat = () => {
                       </div>
                     </div>
                   {deliberation.description && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-6">{deliberation.description}</p>
+                    <HoverCard>
+                      <HoverCardTrigger asChild>
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-6 cursor-help">{deliberation.description}</p>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="max-w-xl p-4">
+                        <div className="text-sm text-foreground whitespace-pre-wrap break-words">{deliberation.description}</div>
+                      </HoverCardContent>
+                    </HoverCard>
                   )}
                     <div className="mt-1">
                       {!isParticipant && (
