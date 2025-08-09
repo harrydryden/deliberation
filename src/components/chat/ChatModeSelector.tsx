@@ -15,8 +15,8 @@ export const ChatModeSelector = ({
     onModeChange(checked ? 'learn' : 'chat');
   };
   const containerCls = variant === 'boxed' ? 'flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/50 border' : 'flex items-center gap-3';
-  const chatLabelCls = 'flex items-center gap-2 text-sm transition-colors ' + (mode === 'chat' ? 'text-foreground font-medium' : 'text-muted-foreground');
-  const learnLabelCls = 'flex items-center gap-2 text-sm transition-colors ' + (mode === 'learn' ? 'text-foreground font-medium' : 'text-muted-foreground');
+  const chatLabelCls = 'flex items-center gap-2 text-sm transition-colors w-28 justify-end ' + (mode === 'chat' ? 'text-foreground font-medium' : 'text-muted-foreground');
+  const learnLabelCls = 'flex items-center gap-2 text-sm transition-colors w-28 ' + (mode === 'learn' ? 'text-foreground font-medium' : 'text-muted-foreground');
   return <div className={containerCls}>
       {/* Chat Mode Label */}
       <div className={chatLabelCls}>
