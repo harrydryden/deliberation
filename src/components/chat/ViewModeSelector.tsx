@@ -14,8 +14,8 @@ export const ViewModeSelector = ({
     onModeChange(checked ? 'ibis' : 'chat');
   };
   const containerCls = 'flex items-center gap-3';
-  const chatLabelCls = 'flex items-center gap-2 text-sm transition-colors ' + (mode === 'chat' ? 'text-foreground font-medium' : 'text-muted-foreground');
-  const ibisLabelCls = 'flex items-center gap-2 text-sm transition-colors ' + (mode === 'ibis' ? 'text-foreground font-medium' : 'text-muted-foreground');
+  const chatLabelCls = 'flex items-center gap-2 text-sm transition-colors w-28 justify-end ' + (mode === 'chat' ? 'text-foreground font-medium' : 'text-muted-foreground');
+  const ibisLabelCls = 'flex items-center gap-2 text-sm transition-colors w-28 ' + (mode === 'ibis' ? 'text-foreground font-medium' : 'text-muted-foreground');
   return <div className={containerCls} aria-label="View mode">
       {/* Chat label */}
       <div className={chatLabelCls}>
