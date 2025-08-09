@@ -4,7 +4,7 @@ import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown, Type } from 'lucide-react';
+import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown, Type, AudioLines } from 'lucide-react';
 import { RealtimeRTC } from '@/utils/realtimeRtc';
 import { useBackendChat } from '@/hooks/useBackendChat';
 
@@ -375,11 +375,12 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
               onClick={() => { mode === 'ibis' ? void stop() : void startIbis(); }}
               variant={mode === 'ibis' ? 'default' : 'secondary'}
               size="sm"
-              aria-label="Hear IBIS summary"
+              aria-label="Deliberation Summary"
               aria-pressed={mode === 'ibis'}
               className="w-full"
             >
-              Hear IBIS Summary
+              <AudioLines className="h-4 w-4 mr-2" />
+              Deliberation Summary
               {mode === 'ibis' && speaking && <Waves className="h-4 w-4 ml-2" />}
             </Button>
 
