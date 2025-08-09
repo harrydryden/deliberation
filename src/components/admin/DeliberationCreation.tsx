@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useDeliberationService } from '@/hooks/useDeliberationService';
 import { supabase } from '@/integrations/supabase/client';
 
+const MAX_DESCRIPTION_LENGTH = 400;
+
 interface DeliberationCreationProps {
   onDeliberationCreated: () => void;
 }
@@ -152,10 +154,14 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
                 <Textarea
                   id="description"
                   value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Describe what this deliberation is about"
-                  rows={3}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value.slice(0, MAX_DESCRIPTION_LENGTH) }))}
+                  placeholder={`Describe what this deliberation is about (max ${MAX_DESCRIPTION_LENGTH} chars)`}
+                  rows={4}
+                  maxLength={MAX_DESCRIPTION_LENGTH}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formData.description.length}/{MAX_DESCRIPTION_LENGTH} characters
+                </p>
               </div>
               
               <div>

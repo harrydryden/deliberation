@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ViewModeSelector } from "@/components/chat/ViewModeSelector";
 import { Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import VoiceInterface from "@/components/chat/VoiceInterface";
@@ -61,6 +61,7 @@ const DeliberationChat = () => {
   });
   const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<'chat' | 'ibis'>('chat');
+  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const {
     messages,
     isLoading: chatLoading,
@@ -207,14 +208,24 @@ const DeliberationChat = () => {
                       </div>
                     </div>
                   {deliberation.description && (
-                    <HoverCard>
-                      <HoverCardTrigger asChild>
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-6 cursor-help">{deliberation.description}</p>
-                      </HoverCardTrigger>
-                      <HoverCardContent className="max-w-xl p-4">
-                        <div className="text-sm text-foreground whitespace-pre-wrap break-words">{deliberation.description}</div>
-                      </HoverCardContent>
-                    </HoverCard>
+                    <>
+                      <p
+                        className="text-sm text-muted-foreground mt-1 line-clamp-6 cursor-pointer"
+                        onClick={() => setIsDescriptionOpen(true)}
+                        title="Click to view full description"
+                      >
+                        {deliberation.description}
+                      </p>
+                      <Dialog open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen}>
+                        <DialogContent className="max-w-none w-screen h-screen p-6 sm:p-10 overflow-hidden">
+                          <div className="w-full h-full flex items-center justify-center">
+                            <article className="max-w-3xl text-center text-foreground whitespace-pre-wrap break-words">
+                              {deliberation.description}
+                            </article>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </>
                   )}
                     <div className="mt-1">
                       {!isParticipant && (
