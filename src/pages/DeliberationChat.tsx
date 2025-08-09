@@ -164,7 +164,7 @@ const DeliberationChat = () => {
         return 'bg-warning';
     }
   };
-  const ChatPanel = () => <div className="flex-1 flex flex-col">
+  const ChatPanel = () => <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-hidden">
         <MessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} />
       </div>
@@ -182,7 +182,7 @@ const DeliberationChat = () => {
   }
   if (!user || !deliberation) return null;
   return <Layout>
-      <div className="flex flex-col bg-background rounded-lg border min-h-[calc(100vh-120px)]">
+      <div className="flex flex-col bg-background rounded-lg border h-[calc(100vh-120px)] min-h-0">
         {/* Deliberation Header - Sticky below main header */}
         <div className="border-b p-4 bg-card backdrop-blur-sm" style={{
         position: 'sticky',
@@ -265,7 +265,7 @@ const DeliberationChat = () => {
         </div>
         
         {/* Main Content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           {viewMode === 'chat' ? (
             <ChatPanel />
           ) : (
