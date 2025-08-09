@@ -206,7 +206,7 @@ const DeliberationChat = () => {
                       </div>
                     </div>
                   {deliberation.description && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-3">{deliberation.description}</p>
+                    <p className="text-sm text-muted-foreground mt-1 line-clamp-6">{deliberation.description}</p>
                   )}
                     <div className="mt-1">
                       {!isParticipant && (
