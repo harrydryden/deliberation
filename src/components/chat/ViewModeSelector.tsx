@@ -13,7 +13,7 @@ export const ViewModeSelector = ({
   const handleSwitch = (checked: boolean) => {
     onModeChange(checked ? 'ibis' : 'chat');
   };
-  const containerCls = 'flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/50 border';
+  const containerCls = 'flex items-center gap-3';
   const chatLabelCls = 'flex items-center gap-2 text-sm transition-colors ' + (mode === 'chat' ? 'text-foreground font-medium' : 'text-muted-foreground');
   const ibisLabelCls = 'flex items-center gap-2 text-sm transition-colors ' + (mode === 'ibis' ? 'text-foreground font-medium' : 'text-muted-foreground');
   return <div className={containerCls} aria-label="View mode">
