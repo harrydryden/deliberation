@@ -24,7 +24,7 @@ export const ViewModeSelector = ({
       </div>
 
       {/* Switch */}
-      <Switch checked={mode === 'ibis'} onCheckedChange={handleSwitch} className="data-[state=checked]:bg-primary" aria-label="Toggle view mode between Chat and IBIS" />
+      <Switch checked={mode === 'ibis'} onCheckedChange={handleSwitch} className="self-center data-[state=checked]:bg-primary" aria-label="Toggle view mode between Chat and IBIS" />
 
       {/* IBIS label */}
       <div className={ibisLabelCls}>
