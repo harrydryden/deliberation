@@ -104,6 +104,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
           ref={virtuosoRef}
           className="h-full"
           data={messages}
+          initialTopMostItemIndex={Math.max(0, messages.length - 1)}
           followOutput={"smooth"}
           atBottomStateChange={setAtBottom}
           itemContent={(index, message) => {
