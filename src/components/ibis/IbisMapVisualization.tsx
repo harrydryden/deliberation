@@ -32,6 +32,7 @@ import { RefreshCw, Plus, Search, Filter, MessageSquare, GitBranch } from 'lucid
 import { useToast } from '@/hooks/use-toast';
 import { useBackendAuth } from '@/hooks/useBackendAuth';
 import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceDirectedLayout, getNodeDimensions } from './ibis-layout';
+import { logger } from '@/utils/logger';
 
 interface IbisNode {
   id: string;
@@ -155,7 +156,7 @@ const { user } = useBackendAuth();
             })
             .eq('id', change.id);
         } catch (error) {
-          console.error('Error updating node position:', error);
+          logger.error('Error updating node position', error as any);
         }
       }
     }
@@ -184,7 +185,7 @@ const { user } = useBackendAuth();
         .eq('deliberation_id', deliberationId)
         .order('created_at', { ascending: true });
 
-      if (relationshipsError) console.error('Relationships error:', relationshipsError);
+      if (relationshipsError) logger.warn('Relationships error', relationshipsError as any);
       
       // Fetch messages for traceability
       const { data: messagesData, error: messagesError } = await supabase
@@ -194,7 +195,7 @@ const { user } = useBackendAuth();
 
       if (messagesError) throw messagesError;
 
-      console.log('📊 IBIS Data loaded:', {
+      logger.info('IBIS data loaded', {
         totalNodes: nodesData?.length || 0,
         issues: nodesData?.filter(n => n.node_type === 'issue').length || 0,
         positions: nodesData?.filter(n => n.node_type === 'position').length || 0,
@@ -209,7 +210,7 @@ const { user } = useBackendAuth();
       // Conversion is triggered by effect on [filterType, ibisNodes, ibisRelationships]
 
     } catch (error) {
-      console.error('Error fetching data:', error);
+      logger.error('Error fetching IBIS data', error as any);
       toast({
         title: "Error",
         description: "Failed to load IBIS data",
@@ -232,7 +233,7 @@ const { user } = useBackendAuth();
       // Refetch to include fresh embeddings
       fetchData();
     } catch (err) {
-      console.error('Embedding backfill failed:', err);
+      logger.error('Embedding backfill failed', err as any);
     }
   }, [embeddingBackfillTriggered, ibisNodes, deliberationId, toast, fetchData]);
 
@@ -364,7 +365,7 @@ const { user } = useBackendAuth();
 
   // Convert IBIS nodes to React Flow nodes and edges with enhanced layout
   const convertToFlowNodes = (ibisNodesData: IbisNode[], relationshipsData: IbisRelationship[] = []) => {
-    console.log('🔄 Converting to flow nodes:', {
+    logger.info('Converting to flow nodes', {
       totalInput: ibisNodesData.length,
       beforeFilter: ibisNodesData.map(n => ({ id: n.id, type: n.node_type, title: n.title }))
     });
@@ -380,7 +381,7 @@ const { user } = useBackendAuth();
     if (lastConversionSigRef.current === sig) return;
     lastConversionSigRef.current = sig;
 
-    console.log('🔍 After filtering:', {
+    logger.info('After filtering flow nodes', {
       filteredCount: filteredNodes.length,
       filterType,
       filteredNodes: filteredNodes.map(n => ({ id: n.id, type: n.node_type, title: n.title }))
@@ -611,7 +612,7 @@ const { user } = useBackendAuth();
           filter: `deliberation_id=eq.${deliberationId}`,
         },
         (payload) => {
-          console.log('IBIS nodes changed:', payload);
+          logger.info('IBIS nodes changed', payload);
           fetchData(); // Refresh nodes on any change
         }
       )
