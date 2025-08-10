@@ -14,7 +14,7 @@ import {
   EdgeChange,
   MarkerType,
   ConnectionMode,
-  useReactFlow,
+  ReactFlowInstance,
   getBezierPath,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -110,7 +110,7 @@ const { user } = useBackendAuth();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const reactFlow = useReactFlow();
+  const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   const [computedPositions, setComputedPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [embeddingBackfillTriggered, setEmbeddingBackfillTriggered] = useState(false);
 
@@ -757,21 +757,21 @@ const { user } = useBackendAuth();
     if (targetNodeId) {
       const pos = computedPositions.get(targetNodeId);
       if (pos) {
-        reactFlow.setCenter(pos.x, pos.y, { zoom: 1, duration: 400 });
+        reactFlowRef.current?.setCenter(pos.x, pos.y, { zoom: 1, duration: 400 });
       } else {
         const flowNode = nodes.find((n) => n.id === targetNodeId);
         if (flowNode) {
-          reactFlow.setCenter(flowNode.position.x, flowNode.position.y, { zoom: 1, duration: 400 });
+          reactFlowRef.current?.setCenter(flowNode.position.x, flowNode.position.y, { zoom: 1, duration: 400 });
         } else {
-          reactFlow.fitView({ duration: 400, padding: 0.2 });
+          reactFlowRef.current?.fitView({ duration: 400, padding: 0.2 });
         }
       }
     } else {
-      reactFlow.fitView({ duration: 400, padding: 0.2 });
+      reactFlowRef.current?.fitView({ duration: 400, padding: 0.2 });
     }
 
     setIsOptimizingLayout(false);
-  }, [loading, nodes, user, messages, ibisNodes, computedPositions, reactFlow]);
+  }, [loading, nodes, user, messages, ibisNodes, computedPositions]);
 
   // Set up real-time subscription
   useEffect(() => {
@@ -824,7 +824,7 @@ onEdgesChange={onEdgesChange}
           fitView
           attributionPosition="bottom-left"
           className="bg-background"
-          nodesDraggable={false}
+          onInit={(instance: ReactFlowInstance<Node, Edge>) => { reactFlowRef.current = instance; }}
           nodesConnectable={false}
           elementsSelectable={true}
           connectionMode={ConnectionMode.Loose}
