@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ReactFlow,
   Node,
@@ -14,6 +14,7 @@ import {
   EdgeChange,
   MarkerType,
   ConnectionMode,
+  useReactFlow,
   getBezierPath,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -101,12 +102,15 @@ const { toast } = useToast();
 const { user } = useBackendAuth();
   
   const [isGuideCollapsed, setIsGuideCollapsed] = useState(true);
+  const [isOptimizingLayout, setIsOptimizingLayout] = useState(true);
+  const hasFocusedOnLoad = useRef(false);
   
   // Check if user is admin
   const isAdmin = user?.role === 'admin';
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const reactFlow = useReactFlow();
   const [computedPositions, setComputedPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [embeddingBackfillTriggered, setEmbeddingBackfillTriggered] = useState(false);
 
@@ -160,6 +164,7 @@ const { user } = useBackendAuth();
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      setIsOptimizingLayout(true);
       
       // Fetch IBIS nodes
       const { data: nodesData, error: nodesError } = await supabase
@@ -729,6 +734,45 @@ const { user } = useBackendAuth();
     }
   }, [filterType, ibisNodes, ibisRelationships]);
 
+  // Focus viewport on last user entry (if any) or center
+  useEffect(() => {
+    if (loading) return;
+    if (nodes.length === 0) return;
+    if (hasFocusedOnLoad.current) return;
+
+    hasFocusedOnLoad.current = true;
+
+    let targetNodeId: string | null = null;
+    if (user?.id) {
+      const userMsgIds = new Set(messages.filter((m) => m.user_id === user.id).map((m) => m.id));
+      if (userMsgIds.size > 0) {
+        const userNodes = ibisNodes.filter((n) => n.message_id && userMsgIds.has(n.message_id!));
+        if (userNodes.length > 0) {
+          userNodes.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          targetNodeId = userNodes[0].id;
+        }
+      }
+    }
+
+    if (targetNodeId) {
+      const pos = computedPositions.get(targetNodeId);
+      if (pos) {
+        reactFlow.setCenter(pos.x, pos.y, { zoom: 1, duration: 400 });
+      } else {
+        const flowNode = nodes.find((n) => n.id === targetNodeId);
+        if (flowNode) {
+          reactFlow.setCenter(flowNode.position.x, flowNode.position.y, { zoom: 1, duration: 400 });
+        } else {
+          reactFlow.fitView({ duration: 400, padding: 0.2 });
+        }
+      }
+    } else {
+      reactFlow.fitView({ duration: 400, padding: 0.2 });
+    }
+
+    setIsOptimizingLayout(false);
+  }, [loading, nodes, user, messages, ibisNodes, computedPositions, reactFlow]);
+
   // Set up real-time subscription
   useEffect(() => {
     fetchData();
@@ -785,6 +829,11 @@ onEdgesChange={onEdgesChange}
           elementsSelectable={true}
           connectionMode={ConnectionMode.Loose}
         >
+          {isOptimizingLayout && (
+            <Panel position="top-left">
+              <Badge variant="secondary">Optimizing layout…</Badge>
+            </Panel>
+          )}
           <Background color="#e2e8f0" gap={20} />
           <Controls />
           
