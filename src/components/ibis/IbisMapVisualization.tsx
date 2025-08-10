@@ -107,6 +107,8 @@ const { user } = useBackendAuth();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [computedPositions, setComputedPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [embeddingBackfillTriggered, setEmbeddingBackfillTriggered] = useState(false);
 
   // Handle node position changes and persist to database (admin only)
   const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
@@ -209,6 +211,22 @@ const { user } = useBackendAuth();
       setLoading(false);
     }
   }, [deliberationId, toast]);
+
+  // Ensure embeddings exist for Issues to improve clustering
+  const ensureEmbeddings = useCallback(async () => {
+    if (embeddingBackfillTriggered) return;
+    const missing = ibisNodes.filter((n: any) => n.node_type === 'issue' && !n.embedding);
+    if (missing.length === 0) return;
+    try {
+      setEmbeddingBackfillTriggered(true);
+      await supabase.functions.invoke('compute-ibis-embeddings', { body: { deliberationId } });
+      toast({ title: 'Optimizing layout', description: 'Computing issue embeddings for better clustering.' });
+      // Refetch to include fresh embeddings
+      fetchData();
+    } catch (err) {
+      console.error('Embedding backfill failed:', err);
+    }
+  }, [embeddingBackfillTriggered, ibisNodes, deliberationId, toast, fetchData]);
 
   // Calculate semantic similarity between nodes
   const calculateSemanticSimilarity = (node1: IbisNode, node2: IbisNode): number => {
@@ -475,12 +493,14 @@ const { user } = useBackendAuth();
       }
     }
 
-    const R1 = 320; // issues ring
-    const R2 = 520; // positions ring
-    const R3 = 700; // arguments ring
-
     // Place Issues on R1 evenly
     const nI = ordered.length;
+    const baseR1 = 260 + Math.min(240, Math.max(0, nI - 8) * 6);
+    const R1 = baseR1; // issues ring (scaled)
+    const R2 = R1 + 180 + Math.min(300, positionsNodes.length * 0.5); // positions ring
+    const R3 = R2 + 180 + Math.min(300, argumentsNodes.length * 0.3); // arguments ring
+
+    // Place Issues on R1 evenly
     ordered.forEach((iss, i) => {
       const angle = (i / Math.max(1, nI)) * 2 * Math.PI - Math.PI / 2;
       positions.set(iss.id, { x: cx + Math.cos(angle) * R1, y: cy + Math.sin(angle) * R1 });
@@ -542,14 +562,14 @@ const { user } = useBackendAuth();
       filteredNodes: filteredNodes.map(n => ({ id: n.id, type: n.node_type, title: n.title }))
     });
 
-    // Compute center-out positions
-    const optimizedPositions = computeMindMapLayout(filteredNodes);
+    // Use precomputed center-out positions
+    const positionsMap = computedPositions;
     const flowNodes: Node[] = [];
     const flowEdges: Edge[] = [];
 
-    // Create nodes with optimized positions and enhanced styling
+    // Create nodes with precomputed positions and enhanced styling
     filteredNodes.forEach(node => {
-      const position = optimizedPositions.get(node.id) || { x: 100, y: 100 };
+      const position = positionsMap.get(node.id) || { x: 100, y: 100 };
       const importance = calculateNodeImportance(node.id, relationshipsData);
       const flowNode = createEnhancedFlowNode(node, position, importance);
       flowNodes.push(flowNode);
@@ -687,6 +707,21 @@ const { user } = useBackendAuth();
     }
   }, [ibisNodes, messages]);
 
+
+  // Precompute positions for the full dataset to keep layout stable across filters
+  useEffect(() => {
+    if (ibisNodes.length > 0) {
+      const pos = computeMindMapLayout(ibisNodes);
+      setComputedPositions(pos);
+    } else {
+      setComputedPositions(new Map());
+    }
+  }, [ibisNodes]);
+
+  // Trigger one-off embedding backfill if needed
+  useEffect(() => {
+    ensureEmbeddings();
+  }, [ensureEmbeddings]);
 
   useEffect(() => {
     if (ibisNodes.length > 0) {

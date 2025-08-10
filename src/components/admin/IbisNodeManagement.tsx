@@ -106,6 +106,18 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
 
       if (error) throw error;
 
+      // If Issue title changed, recompute embedding for better clustering
+      const titleChanged = editingNode.title !== editForm.title;
+      if (editForm.node_type === 'issue' && titleChanged) {
+        try {
+          await supabase.functions.invoke('compute-ibis-embeddings', {
+            body: { nodeId: editingNode.id, force: true },
+          });
+        } catch (e) {
+          console.warn('Embedding refresh failed', e);
+        }
+      }
+
       toast({
         title: "Success",
         description: "IBIS node updated successfully",
