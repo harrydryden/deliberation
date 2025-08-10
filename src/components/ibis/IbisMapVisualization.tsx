@@ -114,6 +114,7 @@ const { user } = useBackendAuth();
   const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   const [computedPositions, setComputedPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [embeddingBackfillTriggered, setEmbeddingBackfillTriggered] = useState(false);
+  const lastConversionSigRef = useRef<string | null>(null);
 
   // Handle node position changes and persist to database (admin only)
   const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
@@ -205,11 +206,8 @@ const { user } = useBackendAuth();
       setIbisNodes(nodesData || []);
       setIbisRelationships(relationshipsData || []);
       setMessages(messagesData || []);
-      if ('requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(() => convertToFlowNodes(nodesData || [], relationshipsData || []));
-      } else {
-        setTimeout(() => convertToFlowNodes(nodesData || [], relationshipsData || []), 0);
-      }
+      // Conversion is triggered by effect on [filterType, ibisNodes, ibisRelationships]
+
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -376,6 +374,11 @@ const { user } = useBackendAuth();
       const matchesType = filterType === 'all' || node.node_type === filterType;
       return matchesType;
     });
+
+    // Memoization guard to skip redundant conversions
+    const sig = `${filterType}|${filteredNodes.map(n => n.id).join(',')}|${relationshipsData.map(r => r.id).join(',')}|${Array.from(computedPositions.keys()).join(',')}`;
+    if (lastConversionSigRef.current === sig) return;
+    lastConversionSigRef.current = sig;
 
     console.log('🔍 After filtering:', {
       filteredCount: filteredNodes.length,

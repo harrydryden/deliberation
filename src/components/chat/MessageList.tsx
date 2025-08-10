@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Bot, User, Users, Workflow, FileText, Plus, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatToUKTime } from "@/utils/timeUtils";
-import { MarkdownMessage } from "@/components/common/MarkdownMessage";
+const LazyMarkdownMessage = lazy(() => import("@/components/common/MarkdownMessage").then(m => ({ default: m.MarkdownMessage })));
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import type { ChatMessage } from "@/types/chat";
 
@@ -96,10 +96,12 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
 
             <Card className={`p-3 ${isUser ? 'bg-democratic-blue text-white' : 'bg-muted'}`}>
               <div className="text-sm leading-relaxed">
-                <MarkdownMessage 
-                  content={message.content} 
-                  className={isUser ? 'prose-invert' : ''}
-                />
+                <Suspense fallback={<div className="h-4 w-20 bg-muted rounded animate-pulse" />}> 
+                  <LazyMarkdownMessage 
+                    content={message.content} 
+                    className={isUser ? 'prose-invert' : ''}
+                  />
+                </Suspense>
               </div>
 
               {!isUser && message.agent_context?.isProactive && (
