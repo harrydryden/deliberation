@@ -204,7 +204,11 @@ const { user } = useBackendAuth();
       setIbisNodes(nodesData || []);
       setIbisRelationships(relationshipsData || []);
       setMessages(messagesData || []);
-      convertToFlowNodes(nodesData || [], relationshipsData || []);
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => convertToFlowNodes(nodesData || [], relationshipsData || []));
+      } else {
+        setTimeout(() => convertToFlowNodes(nodesData || [], relationshipsData || []), 0);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -730,7 +734,11 @@ const { user } = useBackendAuth();
 
   useEffect(() => {
     if (ibisNodes.length > 0) {
-      convertToFlowNodes(ibisNodes, ibisRelationships);
+      if ('requestIdleCallback' in window) {
+        (window as any).requestIdleCallback(() => convertToFlowNodes(ibisNodes, ibisRelationships));
+      } else {
+        setTimeout(() => convertToFlowNodes(ibisNodes, ibisRelationships), 0);
+      }
     }
   }, [filterType, ibisNodes, ibisRelationships]);
 

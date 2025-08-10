@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,111 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
   const prevCountRef = useRef(0);
   const didAutoScrollRef = useRef(false);
 
+  const renderItem = useCallback((index: number, message: ChatMessage) => {
+    const isUser = message.message_type === 'user';
+    const agentInfo = isUser ? null : getAgentInfo(message.message_type);
+    const AgentIcon = agentInfo?.icon || Bot;
+
+    return (
+      <div>
+        {unreadIndex !== null && index === unreadIndex && (
+          <div className="my-3 flex items-center gap-2">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">Unread</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+        )}
+
+        <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+          <Avatar className="h-8 w-8 flex-shrink-0">
+            <AvatarFallback className={isUser ? 'bg-democratic-blue' : agentInfo?.color}>
+              {isUser ? <User className="h-4 w-4 text-white" /> : <AgentIcon className="h-4 w-4 text-white" />}
+            </AvatarFallback>
+          </Avatar>
+
+          <div className={`flex-1 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-medium">
+                {isUser ? 'You' : agentInfo?.name}
+              </span>
+              {!isUser && agentInfo?.description && (
+                <span className="text-xs text-muted-foreground">
+                  {agentInfo.description}
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground">
+                {formatToUKTime(message.created_at)}
+              </span>
+            </div>
+
+            <Card className={`p-3 ${isUser ? 'bg-democratic-blue text-white' : 'bg-muted'}`}>
+              <div className="text-sm leading-relaxed">
+                <MarkdownMessage 
+                  content={message.content} 
+                  className={isUser ? 'prose-invert' : ''}
+                />
+              </div>
+
+              {!isUser && message.agent_context?.isProactive && (
+                <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Workflow className="h-3 w-3" />
+                    <span>Proactive facilitation</span>
+                  </div>
+                </div>
+              )}
+
+              {onAddToIbis && isUser && !message.submitted_to_ibis && (
+                <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onAddToIbis(message.id, message.content)}
+                    className="h-6 px-2 text-xs text-white hover:bg-white/20"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Submit
+                  </Button>
+                </div>
+              )}
+
+              {isUser && message.submitted_to_ibis && (
+                <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                  <div className="flex items-center gap-2 text-xs text-white/80">
+                    <FileText className="h-3 w-3" />
+                    <span>Submitted to IBIS</span>
+                  </div>
+                </div>
+              )}
+
+              {isUser && message.status === 'pending' && (
+                <div className="mt-2 flex items-center justify-end gap-2 text-xs text-white/90">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>Sending…</span>
+                </div>
+              )}
+
+              {isUser && message.status === 'failed' && (
+                <div className="mt-2 flex items-center justify-end gap-2 text-xs">
+                  <span className="text-destructive">Failed</span>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => onRetry?.(message.id, message.content)}
+                  >
+                    Retry
+                  </Button>
+                </div>
+              )}
+
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }, [unreadIndex, onAddToIbis, onRetry]);
+
   useEffect(() => {
     if (!atBottom && messages.length > prevCountRef.current) {
       setUnreadIndex(prevCountRef.current);
@@ -107,110 +212,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
           initialTopMostItemIndex={Math.max(0, messages.length - 1)}
           followOutput={"smooth"}
           atBottomStateChange={setAtBottom}
-          itemContent={(index, message) => {
-            const isUser = message.message_type === 'user';
-            const agentInfo = isUser ? null : getAgentInfo(message.message_type);
-            const AgentIcon = agentInfo?.icon || Bot;
-
-            return (
-              <div>
-                {unreadIndex !== null && index === unreadIndex && (
-                  <div className="my-3 flex items-center gap-2">
-                    <div className="h-px flex-1 bg-border" />
-                    <span className="text-xs text-muted-foreground">Unread</span>
-                    <div className="h-px flex-1 bg-border" />
-                  </div>
-                )}
-
-                <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
-                  <Avatar className="h-8 w-8 flex-shrink-0">
-                    <AvatarFallback className={isUser ? 'bg-democratic-blue' : agentInfo?.color}>
-                      {isUser ? <User className="h-4 w-4 text-white" /> : <AgentIcon className="h-4 w-4 text-white" />}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div className={`flex-1 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium">
-                        {isUser ? 'You' : agentInfo?.name}
-                      </span>
-                      {!isUser && agentInfo?.description && (
-                        <span className="text-xs text-muted-foreground">
-                          {agentInfo.description}
-                        </span>
-                      )}
-                      <span className="text-xs text-muted-foreground">
-                        {formatToUKTime(message.created_at)}
-                      </span>
-                    </div>
-
-                    <Card className={`p-3 ${isUser ? 'bg-democratic-blue text-white' : 'bg-muted'}`}>
-                      <div className="text-sm leading-relaxed">
-                        <MarkdownMessage 
-                          content={message.content} 
-                          className={isUser ? 'prose-invert' : ''}
-                        />
-                      </div>
-
-                      {!isUser && message.agent_context?.isProactive && (
-                        <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Workflow className="h-3 w-3" />
-                            <span>Proactive facilitation</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {onAddToIbis && isUser && !message.submitted_to_ibis && (
-                        <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onAddToIbis(message.id, message.content)}
-                            className="h-6 px-2 text-xs text-white hover:bg-white/20"
-                          >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Submit
-                          </Button>
-                        </div>
-                      )}
-
-                      {isUser && message.submitted_to_ibis && (
-                        <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                          <div className="flex items-center gap-2 text-xs text-white/80">
-                            <FileText className="h-3 w-3" />
-                            <span>Submitted to IBIS</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {isUser && message.status === 'pending' && (
-                        <div className="mt-2 flex items-center justify-end gap-2 text-xs text-white/90">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          <span>Sending…</span>
-                        </div>
-                      )}
-
-                      {isUser && message.status === 'failed' && (
-                        <div className="mt-2 flex items-center justify-end gap-2 text-xs">
-                          <span className="text-destructive">Failed</span>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            className="h-6 px-2 text-xs"
-                            onClick={() => onRetry?.(message.id, message.content)}
-                          >
-                            Retry
-                          </Button>
-                        </div>
-                      )}
-
-                    </Card>
-                  </div>
-                </div>
-              </div>
-            );
-          }}
+          itemContent={renderItem}
           components={{
             Footer: () => (
               isTyping ? (

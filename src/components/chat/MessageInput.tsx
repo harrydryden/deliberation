@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
@@ -8,25 +8,29 @@ interface MessageInputProps {
   disabled?: boolean;
 }
 
-export const MessageInput = ({ onSendMessage, disabled }: MessageInputProps) => {
+export const MessageInput = memo(({ onSendMessage, disabled }: MessageInputProps) => {
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
       onSendMessage(message);
       setMessage("");
       textareaRef.current?.focus();
     }
-  };
+  }, [message, disabled, onSendMessage]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      if (message.trim() && !disabled) {
+        onSendMessage(message);
+        setMessage("");
+        textareaRef.current?.focus();
+      }
     }
-  };
+  }, [message, disabled, onSendMessage]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -62,4 +66,4 @@ export const MessageInput = ({ onSendMessage, disabled }: MessageInputProps) => 
       </form>
     </div>
   );
-};
+});
