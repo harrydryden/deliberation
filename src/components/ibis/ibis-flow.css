@@ -2,14 +2,9 @@
 
 .react-flow__node {
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
-.react-flow__node:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-}
-
+/* Keep selected state visible without animations */
 .react-flow__node.selected {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
 }
