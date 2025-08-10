@@ -479,6 +479,7 @@ export type Database = {
           created_by: string | null
           deliberation_id: string | null
           description: string | null
+          embedding: string | null
           id: string
           message_id: string | null
           node_type: Database["public"]["Enums"]["ibis_node_type"]
@@ -493,6 +494,7 @@ export type Database = {
           created_by?: string | null
           deliberation_id?: string | null
           description?: string | null
+          embedding?: string | null
           id?: string
           message_id?: string | null
           node_type: Database["public"]["Enums"]["ibis_node_type"]
@@ -507,6 +509,7 @@ export type Database = {
           created_by?: string | null
           deliberation_id?: string | null
           description?: string | null
+          embedding?: string | null
           id?: string
           message_id?: string | null
           node_type?: Database["public"]["Enums"]["ibis_node_type"]
