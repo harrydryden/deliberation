@@ -18,7 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import VoiceInterface from "@/components/chat/VoiceInterface";
+const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface"));
+import { logger } from "@/utils/logger";
 interface Deliberation {
   id: string;
   title: string;
@@ -105,14 +106,14 @@ const DeliberationChat = () => {
   }, [user, isLoading, deliberationId, navigate]);
   const loadDeliberation = async () => {
     if (!deliberationId) {
-      console.log('❌ No deliberationId provided');
+      logger.warn('No deliberationId provided');
       return;
     }
     try {
-      console.log('🔍 Loading deliberation details:', deliberationId);
+      logger.info('Loading deliberation details', { deliberationId });
       setLoading(true);
       const data = await deliberationService.getDeliberation(deliberationId);
-      console.log('✅ Deliberation details loaded successfully:', data);
+      logger.info('Deliberation details loaded successfully', data);
       setDeliberation(data);
 
       // Check if current user is a participant
@@ -128,7 +129,7 @@ const DeliberationChat = () => {
       // Don't automatically redirect - let user see the error and try again
     } finally {
       setLoading(false);
-      console.log('🏁 Deliberation details loading completed');
+      logger.info('Deliberation details loading completed');
     }
   };
   const handleJoinDeliberation = async () => {
@@ -144,7 +145,7 @@ const DeliberationChat = () => {
       // Reload deliberation to get updated participant list
       loadDeliberation();
     } catch (error) {
-      console.error('Failed to join deliberation:', error);
+      logger.error('Failed to join deliberation', error as any);
       toast({
         title: "Error",
         description: "Failed to join deliberation",
@@ -255,8 +256,9 @@ const DeliberationChat = () => {
                     </div>
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-3 h-full">
-                    <div className="text-xs font-medium text-muted-foreground mb-2">Voice Mode</div>
-                    <VoiceInterface deliberationId={deliberation.id} variant="panel" />
+                    <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
+                      <VoiceInterfaceLazy deliberationId={deliberation.id} variant="panel" />
+                    </Suspense>
                   </div>
                 </div>
               </div>

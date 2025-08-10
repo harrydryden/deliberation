@@ -1,5 +1,6 @@
 import { useBackendAuth } from '@/hooks/useBackendAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 interface DeliberationService {
   getDeliberations(): Promise<any[]>;
@@ -11,7 +12,7 @@ interface DeliberationService {
 
 class SupabaseDeliberationService implements DeliberationService {
   async getDeliberations(): Promise<any[]> {
-    console.log('🔍 Starting getDeliberations...');
+    logger.info('Starting getDeliberations');
     
     // First get deliberations
     const { data: deliberations, error: deliberationsError } = await supabase
@@ -20,33 +21,33 @@ class SupabaseDeliberationService implements DeliberationService {
       .eq('is_public', true)
       .order('created_at', { ascending: false });
 
-    console.log('📊 Deliberations query result:', { deliberations, deliberationsError });
+    logger.info('Deliberations query result', { count: deliberations?.length || 0, hasError: Boolean(deliberationsError) });
 
     if (deliberationsError) {
-      console.error('❌ Error fetching deliberations:', deliberationsError);
+      logger.error('Error fetching deliberations', deliberationsError as any);
       throw deliberationsError;
     }
     if (!deliberations) {
-      console.log('📭 No deliberations found');
+      logger.info('No deliberations found');
       return [];
     }
 
-    console.log(`📋 Found ${deliberations.length} deliberations`);
+    logger.info('Found deliberations', { count: deliberations.length });
 
     // Then get participant counts for each deliberation
     const deliberationsWithCounts = await Promise.all(
       deliberations.map(async (deliberation) => {
-        console.log(`🔢 Getting participant count for deliberation ${deliberation.id}`);
+        logger.info('Getting participant count', { deliberationId: deliberation.id });
         const { count, error: countError } = await supabase
           .from('participants')
           .select('*', { count: 'exact', head: true })
           .eq('deliberation_id', deliberation.id);
 
         if (countError) {
-          console.error(`❌ Error getting participant count for ${deliberation.id}:`, countError);
+          logger.warn(`Error getting participant count for ${deliberation.id}`, countError as any);
         }
 
-        console.log(`👥 Participant count for ${deliberation.id}: ${count}`);
+        logger.info('Participant count', { deliberationId: deliberation.id, count });
 
         return {
           ...deliberation,
@@ -55,7 +56,7 @@ class SupabaseDeliberationService implements DeliberationService {
       })
     );
 
-    console.log('✅ Final deliberations with counts:', deliberationsWithCounts);
+    logger.info('Final deliberations with counts', { count: deliberationsWithCounts.length });
     return deliberationsWithCounts;
   }
 
@@ -94,18 +95,18 @@ class SupabaseDeliberationService implements DeliberationService {
   }
 
   async joinDeliberation(deliberationId: string): Promise<void> {
-    console.log(`🚀 Starting joinDeliberation for ID: ${deliberationId}`);
+    logger.info('Starting joinDeliberation', { deliberationId });
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      console.error('❌ User not authenticated');
+      logger.error('User not authenticated');
       throw new Error('User not authenticated');
     }
 
-    console.log(`👤 User authenticated: ${user.id}`);
+    logger.info('User authenticated', { userId: user.id });
 
     // Check if already a participant
-    console.log('🔍 Checking if user is already a participant...');
+    logger.info('Checking if user is already a participant...');
     const { data: existing, error: checkError } = await supabase
       .from('participants')
       .select('id')
@@ -113,20 +114,20 @@ class SupabaseDeliberationService implements DeliberationService {
       .eq('user_id', user.id)
       .maybeSingle();
 
-    console.log('📊 Existing participant check result:', { existing, checkError });
+    logger.info('Existing participant check result', { exists: Boolean(existing), hasError: Boolean(checkError) });
 
     if (checkError) {
-      console.error('❌ Error checking existing participant:', checkError);
+      logger.error('Error checking existing participant', checkError as any);
       throw checkError;
     }
 
     if (existing) {
-      console.log('✅ User is already a participant, skipping join');
+      logger.info('User is already a participant, skipping join');
       return; // Already a participant
     }
 
     // Add as participant
-    console.log('➕ Adding user as participant...');
+    logger.info('Adding user as participant...');
     const { error } = await supabase
       .from('participants')
       .insert({
@@ -136,15 +137,15 @@ class SupabaseDeliberationService implements DeliberationService {
       });
 
     if (error) {
-      console.error('❌ Error adding participant:', error);
+      logger.error('Error adding participant', error as any);
       throw error;
     }
 
-    console.log('✅ Successfully joined deliberation');
+    logger.info('Successfully joined deliberation');
   }
 
   async getDeliberation(deliberationId: string): Promise<any> {
-    console.log(`🔍 Getting deliberation details for ID: ${deliberationId}`);
+    logger.info('Getting deliberation details', { deliberationId });
     
     const { data, error } = await supabase
       .from('deliberations')
@@ -159,21 +160,21 @@ class SupabaseDeliberationService implements DeliberationService {
       .eq('id', deliberationId)
       .maybeSingle();
 
-    console.log('📊 Get deliberation result:', { data, error });
+    logger.info('Get deliberation result', { hasError: Boolean(error), hasData: Boolean(data) });
 
     if (error) {
-      console.error('❌ Error getting deliberation:', error);
+      logger.error('Error getting deliberation', error as any);
       throw error;
     }
     if (!data) {
-      console.error('❌ Deliberation not found');
+      logger.error('Deliberation not found');
       throw new Error('Deliberation not found');
     }
     
     // Add participant count as a fallback
     data.participant_count = data.participants?.length || 0;
     
-    console.log('✅ Deliberation details retrieved successfully');
+    logger.info('Deliberation details retrieved successfully');
     return data;
   }
 
