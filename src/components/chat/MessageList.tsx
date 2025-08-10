@@ -17,38 +17,32 @@ interface MessageListProps {
   onRetry?: (id: string, content: string) => void;
 }
 
-const getAgentInfo = (messageType: string) => {
-  switch (messageType) {
-    case 'bill_agent':
-      return {
-        name: 'Bill',
-        icon: FileText,
-        color: 'bg-blue-500',
-        description: 'Policy & Legislative Analysis'
-      };
-    case 'flow_agent':
-      return {
-        name: 'Flo',
-        icon: Workflow,
-        color: 'bg-green-500',
-        description: 'Conversation Flow Management'
-      };
-    case 'peer_agent':
-      return {
-        name: 'Pia',
-        icon: Users,
-        color: 'bg-purple-500',
-        description: 'Peer Review & Analysis'
-      };
-    default:
-      return {
-        name: 'AI Assistant',
-        icon: Bot,
-        color: 'bg-gray-500',
-        description: 'General Assistant'
-      };
+const AGENTS = {
+  bill_agent: {
+    name: 'Bill',
+    icon: FileText,
+    color: 'bg-blue-500',
+    description: 'Policy & Legislative Analysis'
+  },
+  flow_agent: {
+    name: 'Flo',
+    icon: Workflow,
+    color: 'bg-green-500',
+    description: 'Conversation Flow Management'
+  },
+  peer_agent: {
+    name: 'Pia',
+    icon: Users,
+    color: 'bg-purple-500',
+    description: 'Peer Review & Analysis'
+  },
+  default: {
+    name: 'AI Assistant',
+    icon: Bot,
+    color: 'bg-gray-500',
+    description: 'General Assistant'
   }
-};
+} as const;
 
 export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetry }: MessageListProps) => {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -59,8 +53,8 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
 
   const renderItem = useCallback((index: number, message: ChatMessage) => {
     const isUser = message.message_type === 'user';
-    const agentInfo = isUser ? null : getAgentInfo(message.message_type);
-    const AgentIcon = agentInfo?.icon || Bot;
+    const agentInfo = isUser ? null : ((AGENTS as any)[message.message_type] ?? AGENTS.default);
+    const AgentIcon = (agentInfo?.icon as any) || Bot;
 
     return (
       <div>

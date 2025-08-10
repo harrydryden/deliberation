@@ -69,27 +69,27 @@ interface IbisMapVisualizationProps {
 
 const nodeTypeConfig = {
   issue: {
-    color: '#ef4444',
+    color: 'hsl(var(--ibis-issue))',
     shape: 'circle',
     label: 'Issue'
   },
   position: {
-    color: '#3b82f6',
+    color: 'hsl(var(--ibis-position))',
     shape: 'rectangle',
     label: 'Position'
   },
   argument: {
-    color: '#22c55e',
+    color: 'hsl(var(--ibis-argument))',
     shape: 'diamond',
     label: 'Argument'
   }
 };
 
 const relationshipConfig = {
-  supports: { color: '#22c55e', style: 'solid', label: 'Supports' },
-  opposes: { color: '#ef4444', style: 'dashed', label: 'Opposes' },
-  relates_to: { color: '#8b5cf6', style: 'dotted', label: 'Relates to' },
-  responds_to: { color: '#f59e0b', style: 'solid', label: 'Responds to' },
+  supports: { color: 'hsl(var(--ibis-rel-supports))', style: 'solid', label: 'Supports' },
+  opposes: { color: 'hsl(var(--ibis-rel-opposes))', style: 'dashed', label: 'Opposes' },
+  relates_to: { color: 'hsl(var(--ibis-rel-relates))', style: 'dotted', label: 'Relates to' },
+  responds_to: { color: 'hsl(var(--ibis-rel-responds))', style: 'solid', label: 'Responds to' },
 };
 
 export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationProps) => {
@@ -410,8 +410,8 @@ const { user } = useBackendAuth();
           target: node.id,
           type: 'smoothstep',
           animated: false,
-          style: { stroke: '#94a3b8', strokeWidth: 2, strokeDasharray: '5,5' },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
+          style: { stroke: 'hsl(var(--ibis-edge-hierarchy))', strokeWidth: 2, strokeDasharray: '5,5' },
+          markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--ibis-edge-hierarchy))' },
           data: { type: 'hierarchy' },
         });
       }
@@ -482,43 +482,6 @@ const { user } = useBackendAuth();
     };
   };
 
-  // Helper function to create flow nodes (legacy - keeping for compatibility)
-  const createFlowNode = (node: IbisNode, position: { x: number; y: number }): Node => {
-    const config = nodeTypeConfig[node.node_type];
-    
-    return {
-      id: node.id,
-      type: 'default',
-      position,
-      data: {
-        label: (
-          <div className="text-center p-2 node-content">
-            <div className={`font-semibold text-sm ${node.node_type === 'issue' ? 'text-white' : 'text-gray-800'}`}>
-              {node.title}
-            </div>
-            <Badge variant="secondary" className="mt-1 text-xs">
-              {config.label}
-            </Badge>
-            {node.message_id && (
-              <MessageSquare className="h-3 w-3 mt-1 mx-auto opacity-60" />
-            )}
-          </div>
-        ),
-      },
-      className: `ibis-node-${node.node_type}`,
-      style: {
-        backgroundColor: config.color,
-        borderRadius: node.node_type === 'issue' ? '50%' : 
-                      node.node_type === 'argument' ? '0' : '8px',
-        border: '2px solid #fff',
-        minWidth: node.node_type === 'issue' ? 120 : 140,
-        minHeight: node.node_type === 'issue' ? 120 : 80,
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-      },
-      // Only allow dragging for admins
-      draggable: isAdmin,
-    };
-  };
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     const ibisNode = ibisNodes.find(n => n.id === node.id);
     setSelectedNode(ibisNode || null);
@@ -658,7 +621,7 @@ onEdgesChange={onEdgesChange}
               <Badge variant="secondary">Optimizing layout…</Badge>
             </Panel>
           )}
-          <Background color="#e2e8f0" gap={20} />
+          <Background color="hsl(var(--ibis-grid))" gap={20} />
           <Controls />
           
           {/* Type Filter Panel */}
