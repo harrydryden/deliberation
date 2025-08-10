@@ -1,12 +1,13 @@
 import { useBackendAuth } from "@/hooks/useBackendAuth";
 import { Header } from "./Header";
 import { Loader2 } from "lucide-react";
+import { memo } from "react";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
-export const Layout = ({ children }: LayoutProps) => {
+export const Layout = memo(({ children }: LayoutProps) => {
   const { isLoading } = useBackendAuth();
 
   if (isLoading) {
@@ -28,4 +29,4 @@ export const Layout = ({ children }: LayoutProps) => {
       </main>
     </div>
   );
-};
+});

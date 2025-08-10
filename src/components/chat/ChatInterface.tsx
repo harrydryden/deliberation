@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
@@ -18,10 +18,10 @@ export const ChatInterface = () => {
   
   useMemoryLeakDetection('ChatInterface');
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = useCallback(async (content: string) => {
     logger.component.update('ChatInterface', { mode: chatMode, contentLength: content.length });
     await originalSendMessage(content, chatMode);
-  };
+  }, [chatMode, originalSendMessage]);
   return <Layout>
       <div className="h-[calc(100vh-120px)] flex flex-col bg-background rounded-lg border">
         <div className="sticky top-16 z-40 border-b p-4 bg-card/95 backdrop-blur-sm">
