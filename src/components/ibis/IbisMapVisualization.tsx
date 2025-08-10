@@ -100,7 +100,7 @@ const [filterType, setFilterType] = useState<'all' | 'issue' | 'position' | 'arg
 const { toast } = useToast();
 const { user } = useBackendAuth();
   
-  const [isGuideCollapsed, setIsGuideCollapsed] = useState(false);
+  const [isGuideCollapsed, setIsGuideCollapsed] = useState(true);
   
   // Check if user is admin
   const isAdmin = user?.role === 'admin';
