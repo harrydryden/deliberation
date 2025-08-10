@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useBackendAuth } from "@/hooks/useBackendAuth";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
@@ -7,7 +7,7 @@ import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
-import { IbisMapVisualization } from "@/components/ibis/IbisMapVisualization";
+const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({ default: m.IbisMapVisualization })));
 import { useBackendChat } from "@/hooks/useBackendChat";
 
 import { Badge } from "@/components/ui/badge";
@@ -269,7 +269,9 @@ const DeliberationChat = () => {
           {viewMode === 'chat' ? (
             <ChatPanel />
           ) : (
-            <IbisMapVisualization deliberationId={deliberation.id} />
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading map…</div></div>}>
+              <IbisMapVisualizationLazy deliberationId={deliberation.id} />
+            </Suspense>
           )}
         </div>
         

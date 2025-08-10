@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ interface ResponseCardProps {
   onShare?: (messageId: string) => void;
 }
 
-export const ResponseCard = ({ message, onFeedback, onShare }: ResponseCardProps) => {
+const ResponseCardComponent = ({ message, onFeedback, onShare }: ResponseCardProps) => {
   const isUser = message.message_type === 'user';
   const agentInfo = isUser ? null : getAgentInfo(message.message_type as AgentType);
   
@@ -143,3 +144,15 @@ export const ResponseCard = ({ message, onFeedback, onShare }: ResponseCardProps
     </div>
   );
 };
+
+export const ResponseCard = memo(ResponseCardComponent, (prev, next) => {
+  const pm = prev.message, nm = next.message;
+  return (
+    pm.id === nm.id &&
+    pm.content === nm.content &&
+    pm.status === nm.status &&
+    (pm as any).submitted_to_ibis === (nm as any).submitted_to_ibis &&
+    prev.onFeedback === next.onFeedback &&
+    prev.onShare === next.onShare
+  );
+});
