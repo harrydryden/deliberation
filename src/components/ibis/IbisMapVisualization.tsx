@@ -438,6 +438,8 @@ const { user } = useBackendAuth();
         boxShadow: '0 8px 25px rgba(0, 0, 0, 0.2), 0 4px 15px rgba(0, 0, 0, 0.15)',
       },
       draggable: false,
+      connectable: false,
+      selectable: true,
     };
     flowNodes.push(deliberationNode);
 
@@ -504,10 +506,9 @@ const { user } = useBackendAuth();
             </div>
             <Badge 
               variant="secondary" 
-              className={`text-xs ${importance > 1.2 ? 'bg-yellow-100 text-yellow-800' : ''}`}
+              className="text-xs"
             >
               {config.label}
-              {importance > 1.2 && " ⭐"}
             </Badge>
             {node.message_id && (
               <MessageSquare className="h-3 w-3 mt-1 mx-auto opacity-70" />
@@ -526,6 +527,8 @@ const { user } = useBackendAuth();
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
       },
       draggable: false,
+      connectable: false,
+      selectable: true,
     };
   };
 
