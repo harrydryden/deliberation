@@ -276,6 +276,7 @@ const { user } = useBackendAuth();
   // Compute center-out mind map layout with semantic clustering of Issues
   const computeMindMapLayout = (
     nodes: IbisNode[],
+    relationships: IbisRelationship[] = [],
     canvas: { width: number; height: number } = { width: 1600, height: 1000 }
   ) => {
     const cx = canvas.width / 2;
@@ -348,31 +349,115 @@ const { user } = useBackendAuth();
       issueAngle.set(iss.id, angle);
     });
 
+    // Helper to find connections in relationships
+    const getConnectedNodes = (nodeId: string, targetType: string) => {
+      return relationships
+        .filter(rel => rel.source_node_id === nodeId || rel.target_node_id === nodeId)
+        .map(rel => rel.source_node_id === nodeId ? rel.target_node_id : rel.source_node_id)
+        .map(id => allById.get(id))
+        .filter(n => n && n.node_type === targetType) as IbisNode[];
+    };
+
     const byParent = (list: IbisNode[], pid: string) => list.filter(n => getParentId(n) === pid);
 
-    ordered.forEach((iss) => {
-      const angleCenter = issueAngle.get(iss.id)!;
-      const children = byParent(positionsNodes, iss.id);
-      const count = children.length;
-      const sector = Math.min(Math.PI / 3, Math.max(Math.PI / 12, count * 0.08));
-      for (let i = 0; i < count; i++) {
-        const t = count > 1 ? (i / (count - 1)) - 0.5 : 0;
-        const a = angleCenter + t * sector;
-        positions.set(children[i].id, { x: cx + Math.cos(a) * R2, y: cy + Math.sin(a) * R2 });
+    // Position positions near their connected issues or their parent issues
+    positionsNodes.forEach((position) => {
+      const connectedIssues = getConnectedNodes(position.id, 'issue');
+      const parentIssues = getParentId(position) ? [allById.get(getParentId(position)!)].filter(Boolean) as IbisNode[] : [];
+      const relevantIssues = connectedIssues.length > 0 ? connectedIssues : parentIssues;
+      
+      if (relevantIssues.length > 0) {
+        // Position near the centroid of connected/parent issues
+        let sumX = 0, sumY = 0;
+        
+        relevantIssues.forEach(issue => {
+          const issuePos = positions.get(issue.id);
+          if (issuePos) {
+            sumX += issuePos.x;
+            sumY += issuePos.y;
+          }
+        });
+        
+        const centroidX = sumX / relevantIssues.length;
+        const centroidY = sumY / relevantIssues.length;
+        const avgAngle = Math.atan2(centroidY - cy, centroidX - cx);
+        
+        // Add slight offset based on position index to avoid overlap
+        const positionIndex = positionsNodes.indexOf(position);
+        const offsetAngle = (positionIndex % 3 - 1) * 0.2;
+        const finalAngle = avgAngle + offsetAngle;
+        
+        positions.set(position.id, {
+          x: cx + Math.cos(finalAngle) * R2,
+          y: cy + Math.sin(finalAngle) * R2
+        });
+      } else {
+        // Fallback: use parent-based positioning for hierarchical layout
+        ordered.forEach((iss) => {
+          const angleCenter = issueAngle.get(iss.id)!;
+          const children = byParent(positionsNodes, iss.id);
+          const count = children.length;
+          const sector = Math.min(Math.PI / 3, Math.max(Math.PI / 12, count * 0.08));
+          for (let i = 0; i < count; i++) {
+            const t = count > 1 ? (i / (count - 1)) - 0.5 : 0;
+            const a = angleCenter + t * sector;
+            if (children[i].id === position.id) {
+              positions.set(position.id, { x: cx + Math.cos(a) * R2, y: cy + Math.sin(a) * R2 });
+            }
+          }
+        });
       }
+    });
 
-      // Arguments for each position
-      children.forEach((posNode) => {
-        const posAngle = Math.atan2((positions.get(posNode.id)!.y - cy), (positions.get(posNode.id)!.x - cx));
-        const args = byParent(argumentsNodes, posNode.id);
-        const ac = args.length;
-        const aSector = Math.min(Math.PI / 6, Math.max(Math.PI / 24, ac * 0.06));
-        for (let j = 0; j < ac; j++) {
-          const t = ac > 1 ? (j / (ac - 1)) - 0.5 : 0;
-          const a = posAngle + t * aSector;
-          positions.set(args[j].id, { x: cx + Math.cos(a) * R3, y: cy + Math.sin(a) * R3 });
-        }
-      });
+    // Position arguments near their connected positions or their parent positions  
+    argumentsNodes.forEach((argument) => {
+      const connectedPositions = getConnectedNodes(argument.id, 'position');
+      const parentPositions = getParentId(argument) ? [allById.get(getParentId(argument)!)].filter(Boolean) as IbisNode[] : [];
+      const relevantPositions = connectedPositions.length > 0 ? connectedPositions : parentPositions;
+      
+      if (relevantPositions.length > 0) {
+        // Position near the centroid of connected/parent positions
+        let sumX = 0, sumY = 0;
+        
+        relevantPositions.forEach(pos => {
+          const posPos = positions.get(pos.id);
+          if (posPos) {
+            sumX += posPos.x;
+            sumY += posPos.y;
+          }
+        });
+        
+        const centroidX = sumX / relevantPositions.length;
+        const centroidY = sumY / relevantPositions.length;
+        const avgAngle = Math.atan2(centroidY - cy, centroidX - cx);
+        
+        // Add slight offset based on argument index to avoid overlap
+        const argumentIndex = argumentsNodes.indexOf(argument);
+        const offsetAngle = (argumentIndex % 3 - 1) * 0.15;
+        const finalAngle = avgAngle + offsetAngle;
+        
+        positions.set(argument.id, {
+          x: cx + Math.cos(finalAngle) * R3,
+          y: cy + Math.sin(finalAngle) * R3
+        });
+      } else {
+        // Fallback: use parent-based positioning for hierarchical layout
+        positionsNodes.forEach((posNode) => {
+          if (positions.has(posNode.id)) {
+            const posAngle = Math.atan2((positions.get(posNode.id)!.y - cy), (positions.get(posNode.id)!.x - cx));
+            const args = byParent(argumentsNodes, posNode.id);
+            const ac = args.length;
+            const aSector = Math.min(Math.PI / 6, Math.max(Math.PI / 24, ac * 0.06));
+            for (let j = 0; j < ac; j++) {
+              const t = ac > 1 ? (j / (ac - 1)) - 0.5 : 0;
+              const a = posAngle + t * aSector;
+              if (args[j].id === argument.id) {
+                positions.set(argument.id, { x: cx + Math.cos(a) * R3, y: cy + Math.sin(a) * R3 });
+              }
+            }
+          }
+        });
+      }
     });
 
     return positions;
@@ -549,12 +634,12 @@ const { user } = useBackendAuth();
   // Precompute positions for the full dataset to keep layout stable across filters
   useEffect(() => {
     if (ibisNodes.length > 0) {
-      const pos = computeMindMapLayout(ibisNodes);
+      const pos = computeMindMapLayout(ibisNodes, ibisRelationships);
       setComputedPositions(pos);
     } else {
       setComputedPositions(new Map());
     }
-  }, [ibisNodes]);
+  }, [ibisNodes, ibisRelationships]);
 
   // Trigger one-off embedding backfill if needed
   useEffect(() => {
