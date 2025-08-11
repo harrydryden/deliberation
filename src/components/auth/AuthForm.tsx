@@ -138,7 +138,7 @@ export const AuthForm = () => {
           <div className="flex items-center justify-center mb-2">
             <Shield className="h-6 w-6 text-democratic-blue mr-2" />
             <CardTitle className="text-2xl font-bold text-democratic-blue">
-              Secure Access
+              Deliberation
             </CardTitle>
           </div>
           <CardDescription>
