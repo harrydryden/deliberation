@@ -429,7 +429,7 @@ const { user } = useBackendAuth();
       },
       className: 'ibis-node-deliberation',
       style: {
-        backgroundColor: 'hsl(var(--primary))',
+        backgroundColor: '#000000',
         borderRadius: '50%',
         border: '3px solid #fff',
         minWidth: 160,
