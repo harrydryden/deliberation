@@ -87,8 +87,8 @@ const nodeTypeConfig = {
 
 const relationshipConfig = {
   supports: { color: 'hsl(var(--ibis-rel-supports))', style: 'solid', label: 'Supports' },
-  opposes: { color: 'hsl(var(--ibis-rel-opposes))', style: 'dashed', label: 'Opposes' },
-  relates_to: { color: 'hsl(var(--ibis-rel-relates))', style: 'dotted', label: 'Relates to' },
+  opposes: { color: 'hsl(var(--ibis-rel-opposes))', style: 'solid', label: 'Opposes' },
+  relates_to: { color: 'hsl(var(--ibis-rel-relates))', style: 'solid', label: 'Relates to' },
   responds_to: { color: 'hsl(var(--ibis-rel-responds))', style: 'solid', label: 'Responds to' },
 };
 
@@ -449,7 +449,7 @@ const { user } = useBackendAuth();
       flowNodes.push(flowNode);
     });
 
-    // Create hierarchical edges (parent-child relationships)
+    // Create hierarchical edges (parent-child relationships) - clean solid lines
     filteredNodes.forEach(node => {
       const parentId = (node as any).parent_node_id || (node as any).parent_id;
       if (parentId && filteredNodes.some(n => n.id === parentId)) {
@@ -459,8 +459,8 @@ const { user } = useBackendAuth();
           target: node.id,
           type: 'smoothstep',
           animated: false,
-          style: { stroke: 'hsl(var(--ibis-edge-hierarchy))', strokeWidth: 2, strokeDasharray: '5,5' },
-          markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--ibis-edge-hierarchy))' },
+          style: { stroke: 'hsl(var(--muted-foreground))', strokeWidth: 1.5 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--muted-foreground))' },
           data: { type: 'hierarchy' },
         });
       }
@@ -520,12 +520,10 @@ const { user } = useBackendAuth();
         backgroundColor: config.color,
         borderRadius: node.node_type === 'issue' ? '50%' : 
                       node.node_type === 'argument' ? '0' : '12px',
-        border: `${importance > 1.2 ? '3' : '2'}px solid ${importance > 1.2 ? '#fbbf24' : '#fff'}`,
+        border: `2px solid hsl(var(--background))`,
         minWidth: scaledWidth,
         minHeight: scaledHeight,
-        boxShadow: importance > 1.2 
-          ? '0 8px 25px rgba(251, 191, 36, 0.3), 0 4px 15px rgba(0, 0, 0, 0.15)'
-          : '0 4px 15px rgba(0, 0, 0, 0.15)',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
       },
       draggable: false,
     };
