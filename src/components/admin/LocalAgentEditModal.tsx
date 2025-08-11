@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Edit, X, Plus } from 'lucide-react';
-import { Agent } from '@/types/api';
+import { Agent, FacilitatorConfig } from '@/types/api';
 
 interface LocalAgentEditModalProps {
   agent: Agent;
@@ -16,12 +16,34 @@ interface LocalAgentEditModalProps {
 
 export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgentEditModalProps) => {
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
+
+  type LocalAgentForm = {
+    name: string;
+    description: string;
+    system_prompt: string;
+    response_style: string;
+    goals: string[];
+    facilitator_config: FacilitatorConfig;
+  };
+
+  const [formData, setFormData] = useState<LocalAgentForm>({
     name: agent.name,
     description: agent.description || '',
     system_prompt: agent.system_prompt || '',
     response_style: agent.response_style || '',
     goals: agent.goals || [],
+    facilitator_config: agent.facilitator_config || {
+      prompting_enabled: false,
+      prompting_interval_minutes: 3,
+      max_prompts_per_session: 5,
+      prompting_questions: [],
+      ibis_facilitation: {
+        enabled: true,
+        elicit_issue_prompt: 'To build a coherent IBIS map, could you share 1–2 concise issues we should consider?',
+        elicit_position_prompt: 'What is your position on this issue (one sentence, actionable)?',
+        elicit_argument_prompt: 'Please provide 1–2 arguments supporting your position, with any evidence or sources.'
+      }
+    }
   });
   const [goalInput, setGoalInput] = useState('');
 
@@ -34,6 +56,18 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
         system_prompt: agent.system_prompt || '',
         response_style: agent.response_style || '',
         goals: agent.goals || [],
+        facilitator_config: agent.facilitator_config || {
+          prompting_enabled: false,
+          prompting_interval_minutes: 3,
+          max_prompts_per_session: 5,
+          prompting_questions: [],
+          ibis_facilitation: {
+            enabled: true,
+            elicit_issue_prompt: 'To build a coherent IBIS map, could you share 1–2 concise issues we should consider?',
+            elicit_position_prompt: 'What is your position on this issue (one sentence, actionable)?',
+            elicit_argument_prompt: 'Please provide 1–2 arguments supporting your position, with any evidence or sources.'
+          }
+        }
       });
       setGoalInput('');
     }
@@ -42,13 +76,14 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    onUpdateAgent(agent.id, {
-      name: formData.name,
-      description: formData.description,
-      system_prompt: formData.system_prompt,
-      response_style: formData.response_style,
-      goals: formData.goals,
-    });
+  onUpdateAgent(agent.id, {
+    name: formData.name,
+    description: formData.description,
+    system_prompt: formData.system_prompt,
+    response_style: formData.response_style,
+    goals: formData.goals,
+    facilitator_config: formData.facilitator_config,
+  });
     
     setOpen(false);
   };
@@ -159,6 +194,95 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
               </div>
             )}
           </div>
+
+          {/* IBIS Facilitation Prompts (Peer Agent) */}
+          {agent.agent_type === 'peer_agent' && (
+            <div className="space-y-2 border-t pt-4">
+              <Label className="text-base font-semibold">IBIS Facilitation Prompts</Label>
+              <div className="flex items-center space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setFormData(prev => ({
+                    ...prev,
+                    facilitator_config: {
+                      ...prev.facilitator_config,
+                      ibis_facilitation: {
+                        enabled: !prev.facilitator_config.ibis_facilitation?.enabled,
+                        elicit_issue_prompt: prev.facilitator_config.ibis_facilitation?.elicit_issue_prompt || 'To build a coherent IBIS map, could you share 1–2 concise issues we should consider?',
+                        elicit_position_prompt: prev.facilitator_config.ibis_facilitation?.elicit_position_prompt || 'What is your position on this issue (one sentence, actionable)?',
+                        elicit_argument_prompt: prev.facilitator_config.ibis_facilitation?.elicit_argument_prompt || 'Please provide 1–2 arguments supporting your position, with any evidence or sources.'
+                      }
+                    }
+                  }))}
+                  size="sm"
+                >
+                  {formData.facilitator_config.ibis_facilitation?.enabled ? 'Disable' : 'Enable'} IBIS Facilitation
+                </Button>
+              </div>
+              {formData.facilitator_config.ibis_facilitation?.enabled && (
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="ibis-issue">Issue Elicitation Prompt</Label>
+                    <Textarea
+                      id="ibis-issue"
+                      rows={2}
+                      value={formData.facilitator_config.ibis_facilitation?.elicit_issue_prompt || ''}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        facilitator_config: {
+                          ...prev.facilitator_config,
+                          ibis_facilitation: {
+                            ...(prev.facilitator_config.ibis_facilitation || { enabled: true, elicit_issue_prompt: '', elicit_position_prompt: '', elicit_argument_prompt: '' }),
+                            elicit_issue_prompt: e.target.value
+                          }
+                        }
+                      }))}
+                      placeholder="Prompt to ask participants for issues first"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="ibis-position">Position Elicitation Prompt</Label>
+                    <Textarea
+                      id="ibis-position"
+                      rows={2}
+                      value={formData.facilitator_config.ibis_facilitation?.elicit_position_prompt || ''}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        facilitator_config: {
+                          ...prev.facilitator_config,
+                          ibis_facilitation: {
+                            ...(prev.facilitator_config.ibis_facilitation || { enabled: true, elicit_issue_prompt: '', elicit_position_prompt: '', elicit_argument_prompt: '' }),
+                            elicit_position_prompt: e.target.value
+                          }
+                        }
+                      }))}
+                      placeholder="Prompt to ask for positions on a selected issue"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="ibis-argument">Argument Elicitation Prompt</Label>
+                    <Textarea
+                      id="ibis-argument"
+                      rows={2}
+                      value={formData.facilitator_config.ibis_facilitation?.elicit_argument_prompt || ''}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        facilitator_config: {
+                          ...prev.facilitator_config,
+                          ibis_facilitation: {
+                            ...(prev.facilitator_config.ibis_facilitation || { enabled: true, elicit_issue_prompt: '', elicit_position_prompt: '', elicit_argument_prompt: '' }),
+                            elicit_argument_prompt: e.target.value
+                          }
+                        }
+                      }))}
+                      placeholder="Prompt to elicit 1–2 supporting arguments with evidence"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

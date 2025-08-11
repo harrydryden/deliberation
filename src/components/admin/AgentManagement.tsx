@@ -35,12 +35,18 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate, onCreate }:
     goals: [] as string[],
     agent_type: '',
     is_default: false,
-    facilitator_config: {
-      prompting_enabled: false,
-      prompting_interval_minutes: 3,
-      max_prompts_per_session: 5,
-      prompting_questions: [] as FacilitatorQuestion[]
-    } as FacilitatorConfig
+      facilitator_config: {
+        prompting_enabled: false,
+        prompting_interval_minutes: 3,
+        max_prompts_per_session: 5,
+        prompting_questions: [] as FacilitatorQuestion[],
+        ibis_facilitation: {
+          enabled: true,
+          elicit_issue_prompt: "To build a coherent IBIS map, could you share 1–2 concise issues we should consider?",
+          elicit_position_prompt: "What is your position on this issue (one sentence, actionable)?",
+          elicit_argument_prompt: "Please provide 1–2 arguments supporting your position, with any evidence or sources."
+        }
+      } as FacilitatorConfig
   });
 
   useEffect(() => {
@@ -64,7 +70,13 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate, onCreate }:
         prompting_enabled: false,
         prompting_interval_minutes: 3,
         max_prompts_per_session: 5,
-        prompting_questions: []
+        prompting_questions: [],
+        ibis_facilitation: {
+          enabled: true,
+          elicit_issue_prompt: "To build a coherent IBIS map, could you share 1–2 concise issues we should consider?",
+          elicit_position_prompt: "What is your position on this issue (one sentence, actionable)?",
+          elicit_argument_prompt: "Please provide 1–2 arguments supporting your position, with any evidence or sources."
+        }
       }
     });
   };
@@ -115,7 +127,13 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate, onCreate }:
         prompting_enabled: false,
         prompting_interval_minutes: 3,
         max_prompts_per_session: 5,
-        prompting_questions: []
+        prompting_questions: [],
+        ibis_facilitation: {
+          enabled: true,
+          elicit_issue_prompt: "To build a coherent IBIS map, could you share 1–2 concise issues we should consider?",
+          elicit_position_prompt: "What is your position on this issue (one sentence, actionable)?",
+          elicit_argument_prompt: "Please provide 1–2 arguments supporting your position, with any evidence or sources."
+        }
       }
     });
   };
@@ -568,6 +586,94 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate, onCreate }:
                                         </div>
                                       </div>
                                     </>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* IBIS Facilitation Prompts (Peer Agent) */}
+                            {editForm.agent_type === 'peer_agent' && (
+                              <div className="border-t pt-4">
+                                <Label className="text-base font-semibold">IBIS Facilitation Prompts</Label>
+                                <div className="space-y-4 mt-4">
+                                  <div className="flex items-center space-x-2">
+                                    <Switch
+                                      checked={!!editForm.facilitator_config.ibis_facilitation?.enabled}
+                                      onCheckedChange={(checked) => setEditForm(prev => ({
+                                        ...prev,
+                                        facilitator_config: {
+                                          ...prev.facilitator_config,
+                                          ibis_facilitation: {
+                                            enabled: checked,
+                                            elicit_issue_prompt: prev.facilitator_config.ibis_facilitation?.elicit_issue_prompt || "To build a coherent IBIS map, could you share 1–2 concise issues we should consider?",
+                                            elicit_position_prompt: prev.facilitator_config.ibis_facilitation?.elicit_position_prompt || "What is your position on this issue (one sentence, actionable)?",
+                                            elicit_argument_prompt: prev.facilitator_config.ibis_facilitation?.elicit_argument_prompt || "Please provide 1–2 arguments supporting your position, with any evidence or sources."
+                                          }
+                                        }
+                                      }))}
+                                    />
+                                    <Label>Enable IBIS Facilitation</Label>
+                                  </div>
+                                  {editForm.facilitator_config.ibis_facilitation?.enabled && (
+                                    <div className="space-y-3">
+                                      <div>
+                                        <Label htmlFor="ibis-issue">Issue Elicitation Prompt</Label>
+                                        <Textarea
+                                          id="ibis-issue"
+                                          rows={2}
+                                          value={editForm.facilitator_config.ibis_facilitation?.elicit_issue_prompt || ''}
+                                          onChange={(e) => setEditForm(prev => ({
+                                            ...prev,
+                                            facilitator_config: {
+                                              ...prev.facilitator_config,
+                                              ibis_facilitation: {
+                                                ...(prev.facilitator_config.ibis_facilitation || { enabled: true, elicit_issue_prompt: '', elicit_position_prompt: '', elicit_argument_prompt: '' }),
+                                                elicit_issue_prompt: e.target.value
+                                              }
+                                            }
+                                          }))}
+                                          placeholder="Prompt to ask participants for issues first"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label htmlFor="ibis-position">Position Elicitation Prompt</Label>
+                                        <Textarea
+                                          id="ibis-position"
+                                          rows={2}
+                                          value={editForm.facilitator_config.ibis_facilitation?.elicit_position_prompt || ''}
+                                          onChange={(e) => setEditForm(prev => ({
+                                            ...prev,
+                                            facilitator_config: {
+                                              ...prev.facilitator_config,
+                                              ibis_facilitation: {
+                                                ...(prev.facilitator_config.ibis_facilitation || { enabled: true, elicit_issue_prompt: '', elicit_position_prompt: '', elicit_argument_prompt: '' }),
+                                                elicit_position_prompt: e.target.value
+                                              }
+                                            }
+                                          }))}
+                                          placeholder="Prompt to ask for positions on a selected issue"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label htmlFor="ibis-argument">Argument Elicitation Prompt</Label>
+                                        <Textarea
+                                          id="ibis-argument"
+                                          rows={2}
+                                          value={editForm.facilitator_config.ibis_facilitation?.elicit_argument_prompt || ''}
+                                          onChange={(e) => setEditForm(prev => ({
+                                            ...prev,
+                                            facilitator_config: {
+                                              ...prev.facilitator_config,
+                                              ibis_facilitation: {
+                                                ...(prev.facilitator_config.ibis_facilitation || { enabled: true, elicit_issue_prompt: '', elicit_position_prompt: '', elicit_argument_prompt: '' }),
+                                                elicit_argument_prompt: e.target.value
+                                              }
+                                            }
+                                          }))}
+                                          placeholder="Prompt to elicit 1–2 supporting arguments with evidence"
+                                        />
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
                               </div>

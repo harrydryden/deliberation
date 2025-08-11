@@ -313,13 +313,14 @@ export class SupabaseAdminService implements IAdminService {
     const updateData: any = {};
     
     if (config.name) updateData.name = config.name;
-    if (config.description) updateData.description = config.description;
+    if (config.description !== undefined) updateData.description = config.description;
     if (config.isActive !== undefined) updateData.is_active = config.isActive;
     if (config.agent_type) updateData.agent_type = config.agent_type;
-    if (config.system_prompt) updateData.system_prompt = config.system_prompt;
+    if (config.system_prompt !== undefined) updateData.system_prompt = config.system_prompt;
     if (config.goals) updateData.goals = config.goals;
-    if (config.response_style) updateData.response_style = config.response_style;
+    if (config.response_style !== undefined) updateData.response_style = config.response_style;
     if (config.is_default !== undefined) updateData.is_default = config.is_default;
+    if (config.facilitator_config !== undefined) updateData.facilitator_config = config.facilitator_config;
 
     const { data, error } = await supabase
       .from('agent_configurations')
@@ -338,6 +339,7 @@ export class SupabaseAdminService implements IAdminService {
       response_style: data.response_style,
       goals: data.goals || [],
       agent_type: data.agent_type,
+      facilitator_config: data.facilitator_config || {},
       is_default: data.is_default || false,
       isActive: data.is_active,
       createdAt: data.created_at,

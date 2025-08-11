@@ -64,6 +64,7 @@ export interface FacilitatorConfig {
   prompting_interval_minutes: number;
   max_prompts_per_session: number;
   prompting_questions: FacilitatorQuestion[];
+  ibis_facilitation?: IbisFacilitationConfig;
 }
 
 export interface FacilitatorQuestion {
@@ -71,6 +72,13 @@ export interface FacilitatorQuestion {
   text: string;
   category: 'exploration' | 'perspective' | 'clarification' | 'synthesis' | 'action';
   weight: number;
+}
+
+export interface IbisFacilitationConfig {
+  enabled: boolean;
+  elicit_issue_prompt: string;
+  elicit_position_prompt: string;
+  elicit_argument_prompt: string;
 }
 
 export interface Deliberation {
