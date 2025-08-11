@@ -375,7 +375,7 @@ export const IbisSubmissionModal = ({
             parentNodeId: value
           }))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Connect your contribution to other points" />
+                  <SelectValue placeholder="Connect your contribution to other points" className="text-muted-foreground" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No parent (root node)</SelectItem>
