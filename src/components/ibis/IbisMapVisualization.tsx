@@ -635,7 +635,7 @@ const { user } = useBackendAuth();
   }, [deliberationId, fetchData]);
 
 
-  if (loading) {
+  if (loading || isOptimizingLayout) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="animate-pulse text-center">
