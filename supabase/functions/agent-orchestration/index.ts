@@ -282,7 +282,7 @@ Provide analysis in the following JSON format:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           { role: 'system', content: 'You are a semantic analyzer for a multi-agent deliberation system. Analyze the message and respond with ONLY valid JSON.' },
           { role: 'user', content: prompt }
@@ -774,7 +774,7 @@ You MUST mention these similar contributions in your response using this exact f
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14',
         messages,
         max_tokens: 1000,
         temperature: 0.7,
@@ -944,8 +944,7 @@ async function findSimilarIbisNodes(
         title,
         description,
         node_type,
-        created_by,
-        profiles!created_by(display_name)
+        created_by
       `)
       .eq('deliberation_id', deliberationId)
       .order('created_at', { ascending: false })
@@ -978,7 +977,7 @@ Respond with only a number between 0.0 and 1.0:`;
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              model: 'gpt-4o-mini',
+              model: 'gpt-4.1-2025-04-14',
               messages: [
                 { role: 'system', content: 'You are a semantic similarity analyzer. Respond only with a decimal number between 0.0 and 1.0.' },
                 { role: 'user', content: relevancePrompt }
@@ -1030,7 +1029,7 @@ Respond with just one word: "supportive" or "contradictory"`;
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              model: 'gpt-4o-mini',
+              model: 'gpt-4.1-2025-04-14',
               messages: [
                 { role: 'system', content: 'You are analyzing argument relationships. Respond with only "supportive" or "contradictory".' },
                 { role: 'user', content: relationshipPrompt }
@@ -1052,7 +1051,7 @@ Respond with just one word: "supportive" or "contradictory"`;
             similarity: node.similarity,
             relationship,
             createdBy: {
-              displayName: node.profiles?.display_name || 'Anonymous'
+              displayName: 'Participant'
             }
           };
         } catch (error) {
@@ -1065,7 +1064,7 @@ Respond with just one word: "supportive" or "contradictory"`;
             similarity: node.similarity,
             relationship: 'supportive' as const,
             createdBy: {
-              displayName: node.profiles?.display_name || 'Anonymous'
+              displayName: 'Participant'
             }
           };
         }
@@ -1100,7 +1099,7 @@ function determineAgentsToExecute(selectedAgent: string, similarNodes: SimilarNo
   return agents;
 }
 
-// Execute multiple agents in sequence
+// Execute multiple agents in parallel (preserves order)
 async function executeAgentResponses(
   agents: string[],
   context: OrchestrationContext,
@@ -1110,18 +1109,17 @@ async function executeAgentResponses(
 ): Promise<string[]> {
   console.log(`🤖 Executing ${agents.length} agents:`, agents);
   
-  const responses: string[] = [];
-  
-  for (const agentType of agents) {
-    try {
-      const response = await executeAgentResponse(agentType, context, supabase, openAIApiKey, analysis);
-      responses.push(response);
-      console.log(`✅ ${agentType} completed`);
-    } catch (error) {
-      console.error(`❌ ${agentType} failed:`, error);
-      responses.push(''); // Add empty response to maintain order
-    }
-  }
-  
-  return responses;
+  const promises = agents.map(agentType => 
+    executeAgentResponse(agentType, context, supabase, openAIApiKey, analysis)
+      .then(resp => {
+        console.log(`✅ ${agentType} completed`);
+        return resp;
+      })
+      .catch(error => {
+        console.error(`❌ ${agentType} failed:`, error);
+        return '';
+      })
+  );
+
+  return Promise.all(promises);
 }
