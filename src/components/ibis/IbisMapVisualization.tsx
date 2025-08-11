@@ -229,6 +229,7 @@ const { user } = useBackendAuth();
       });
     } finally {
       setLoading(false);
+      setIsOptimizingLayout(false);
     }
   }, [deliberationId, toast]);
 
