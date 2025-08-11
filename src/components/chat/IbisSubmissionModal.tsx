@@ -396,7 +396,7 @@ export const IbisSubmissionModal = ({
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Submitting...' : 'Submit to IBIS'}
+              {isSubmitting ? 'Sharing...' : 'Share'}
             </Button>
           </DialogFooter>
         </form>
