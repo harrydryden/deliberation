@@ -116,7 +116,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
                     className="h-6 px-2 text-xs text-white hover:bg-white/20"
                   >
                     <Plus className="h-3 w-3 mr-1" />
-                    Submit
+                    Share
                   </Button>
                 </div>
               )}
