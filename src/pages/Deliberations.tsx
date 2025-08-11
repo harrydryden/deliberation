@@ -24,6 +24,7 @@ interface Deliberation {
   end_time?: string;
   created_at: string;
   participant_count?: number;
+  is_user_participant?: boolean;
 }
 
 const Deliberations = () => {
@@ -177,7 +178,7 @@ const Deliberations = () => {
                       className="flex-1 bg-democratic-blue hover:bg-democratic-blue/90"
                       onClick={() => handleJoinDeliberation(deliberation.id)}
                     >
-                      Join Discussion
+                      {deliberation.is_user_participant ? "Rejoin Discussion" : "Join Discussion"}
                     </Button>
                     <Button 
                       variant="outline" 

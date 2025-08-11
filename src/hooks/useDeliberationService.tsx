@@ -14,6 +14,9 @@ class SupabaseDeliberationService implements DeliberationService {
   async getDeliberations(): Promise<any[]> {
     logger.info('Starting getDeliberations');
     
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+    
     // First get deliberations
     const { data: deliberations, error: deliberationsError } = await supabase
       .from('deliberations')
@@ -34,10 +37,12 @@ class SupabaseDeliberationService implements DeliberationService {
 
     logger.info('Found deliberations', { count: deliberations.length });
 
-    // Then get participant counts for each deliberation
+    // Then get participant counts and check user participation for each deliberation
     const deliberationsWithCounts = await Promise.all(
       deliberations.map(async (deliberation) => {
         logger.info('Getting participant count', { deliberationId: deliberation.id });
+        
+        // Get total participant count
         const { count, error: countError } = await supabase
           .from('participants')
           .select('*', { count: 'exact', head: true })
@@ -47,11 +52,28 @@ class SupabaseDeliberationService implements DeliberationService {
           logger.warn(`Error getting participant count for ${deliberation.id}`, countError as any);
         }
 
-        logger.info('Participant count', { deliberationId: deliberation.id, count });
+        // Check if current user is a participant
+        const { data: userParticipation, error: participationError } = await supabase
+          .from('participants')
+          .select('id')
+          .eq('deliberation_id', deliberation.id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (participationError) {
+          logger.warn(`Error checking user participation for ${deliberation.id}`, participationError as any);
+        }
+
+        logger.info('Participant count and user participation', { 
+          deliberationId: deliberation.id, 
+          count, 
+          isParticipant: !!userParticipation 
+        });
 
         return {
           ...deliberation,
-          participant_count: count || 0
+          participant_count: count || 0,
+          is_user_participant: !!userParticipation
         };
       })
     );
