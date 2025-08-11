@@ -646,7 +646,7 @@ onEdgesChange={onEdgesChange}
         </ReactFlow>
       </div>
 
-      {/* Node Details Panel */}
+      {/* Details Panel */}
       {selectedNode && (
         <div className="w-80 h-full border-l border-border bg-card">
           <Card className="h-full border-0 rounded-none flex flex-col min-h-0">
@@ -657,7 +657,7 @@ onEdgesChange={onEdgesChange}
                     className="w-4 h-4 rounded"
                     style={{ backgroundColor: nodeTypeConfig[selectedNode.node_type].color }}
                   />
-                  Node Details
+                  Details
                 </CardTitle>
                 <Button
                   variant="ghost"
