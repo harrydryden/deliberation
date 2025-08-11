@@ -117,6 +117,7 @@ const { user } = useBackendAuth();
   const [computedPositions, setComputedPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [embeddingBackfillTriggered, setEmbeddingBackfillTriggered] = useState(false);
   const lastConversionSigRef = useRef<string | null>(null);
+  const linkingTriggeredRef = useRef(false);
 
   // Handle node position changes and persist to database (admin only)
   const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
@@ -233,21 +234,24 @@ const { user } = useBackendAuth();
     }
   }, [deliberationId, toast]);
 
-  // Ensure embeddings exist for Issues to improve clustering
+  // Ensure embeddings exist and link similar issues (run once)
   const ensureEmbeddings = useCallback(async () => {
-    if (embeddingBackfillTriggered) return;
-    const missing = ibisNodes.filter((n: any) => n.node_type === 'issue' && !n.embedding);
-    if (missing.length === 0) return;
+    if (linkingTriggeredRef.current) return;
     try {
-      setEmbeddingBackfillTriggered(true);
-      await supabase.functions.invoke('compute-ibis-embeddings', { body: { deliberationId } });
-      // toast({ title: 'Optimizing layout', description: 'Computing issue embeddings for better clustering.' });
-      // Refetch to include fresh embeddings
+      const missing = ibisNodes.filter((n: any) => n.node_type === 'issue' && !n.embedding);
+      if (!embeddingBackfillTriggered && missing.length > 0) {
+        setEmbeddingBackfillTriggered(true);
+        await supabase.functions.invoke('compute-ibis-embeddings', { body: { deliberationId } });
+      }
+      // Create supportive edges between semantically similar issues
+      await supabase.functions.invoke('link-similar-ibis-issues', { body: { deliberationId } });
+      linkingTriggeredRef.current = true;
+      // Refetch to include fresh embeddings and relationships
       fetchData();
     } catch (err) {
-      logger.error('Embedding backfill failed', err as any);
+      logger.error('Embedding/linking optimization failed', err as any);
     }
-  }, [embeddingBackfillTriggered, ibisNodes, deliberationId, toast, fetchData]);
+  }, [embeddingBackfillTriggered, ibisNodes, deliberationId, fetchData]);
 
 // moved to utils: calculateSemanticSimilarity
 

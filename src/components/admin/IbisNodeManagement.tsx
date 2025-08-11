@@ -106,15 +106,21 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
 
       if (error) throw error;
 
-      // If Issue title changed, recompute embedding for better clustering
+      // If Issue title changed, recompute embedding and link similar issues
       const titleChanged = editingNode.title !== editForm.title;
-      if (editForm.node_type === 'issue' && titleChanged) {
+      if (editForm.node_type === 'issue') {
         try {
-          await supabase.functions.invoke('compute-ibis-embeddings', {
-            body: { nodeId: editingNode.id, force: true },
+          if (titleChanged) {
+            await supabase.functions.invoke('compute-ibis-embeddings', {
+              body: { nodeId: editingNode.id, force: true },
+            });
+          }
+          // Link this issue with similar ones in the same deliberation
+          await supabase.functions.invoke('link-similar-ibis-issues', {
+            body: { nodeId: editingNode.id, deliberationId },
           });
         } catch (e) {
-          console.warn('Embedding refresh failed', e);
+          console.warn('Embedding/linking refresh failed', e);
         }
       }
 
