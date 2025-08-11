@@ -73,12 +73,20 @@ const Deliberations = () => {
   const handleJoinDeliberation = async (deliberationId: string) => {
     try {
       logger.info('Attempting to join deliberation', { deliberationId });
+      const deliberation = deliberations.find(d => d.id === deliberationId);
+      const isRejoining = deliberation?.is_user_participant;
+      
       await deliberationService.joinDeliberation(deliberationId);
       logger.info('Join deliberation successful');
-      toast({
-        title: "Success",
-        description: "Joined deliberation successfully"
-      });
+      
+      // Only show success toast if user is joining for the first time
+      if (!isRejoining) {
+        toast({
+          title: "Success",
+          description: "Joined deliberation successfully"
+        });
+      }
+      
       logger.info('Navigating to deliberation', { deliberationId });
       navigate(`/deliberations/${deliberationId}`);
     } catch (error) {
