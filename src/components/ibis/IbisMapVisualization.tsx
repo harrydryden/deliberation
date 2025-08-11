@@ -234,17 +234,28 @@ const { user } = useBackendAuth();
     }
   }, [deliberationId, toast]);
 
-  // Ensure embeddings exist and link similar issues (run once)
+  // Ensure embeddings exist and link similar issues/positions/arguments (run once)
   const ensureEmbeddings = useCallback(async () => {
     if (linkingTriggeredRef.current) return;
     try {
-      const missing = ibisNodes.filter((n: any) => n.node_type === 'issue' && !n.embedding);
-      if (!embeddingBackfillTriggered && missing.length > 0) {
+      const types: Array<'issue' | 'position' | 'argument'> = ['issue', 'position', 'argument'];
+      const missingTypes = types.filter(t => ibisNodes.some((n: any) => n.node_type === t && !n.embedding));
+
+      // Compute embeddings for any missing types in parallel
+      if (!embeddingBackfillTriggered && missingTypes.length > 0) {
         setEmbeddingBackfillTriggered(true);
-        await supabase.functions.invoke('compute-ibis-embeddings', { body: { deliberationId } });
+        await Promise.all(
+          missingTypes.map(t =>
+            supabase.functions.invoke('compute-ibis-embeddings', { body: { deliberationId, nodeType: t } })
+          )
+        );
       }
-      // Create supportive edges between semantically similar issues
-      await supabase.functions.invoke('link-similar-ibis-issues', { body: { deliberationId } });
+
+      // Link similar nodes for each type in parallel
+      await Promise.all(
+        types.map(t => supabase.functions.invoke('link-similar-ibis-issues', { body: { deliberationId, nodeType: t } }))
+      );
+
       linkingTriggeredRef.current = true;
       // Refetch to include fresh embeddings and relationships
       fetchData();

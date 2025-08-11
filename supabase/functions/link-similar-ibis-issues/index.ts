@@ -13,6 +13,7 @@ interface RequestBody {
   deliberationId?: string;
   nodeId?: string;
   threshold?: number; // cosine similarity threshold (0..1)
+  nodeType?: 'issue' | 'position' | 'argument';
 }
 
 // Cosine similarity for numeric arrays
@@ -43,7 +44,7 @@ serve(async (req) => {
 
   try {
     const body = (await req.json()) as RequestBody;
-    const { deliberationId, nodeId, threshold = 0.83 } = body || {};
+    const { deliberationId, nodeId, threshold = 0.83, nodeType } = body || {};
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -54,11 +55,12 @@ serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Fetch target Issue nodes with embeddings
+    // Fetch target nodes with embeddings of the requested type
+    const TYPE = nodeType || 'issue';
     let query = supabase
       .from("ibis_nodes")
       .select("id, deliberation_id, node_type, embedding, created_by")
-      .eq("node_type", "issue");
+      .eq("node_type", TYPE);
 
     if (deliberationId) query = query.eq("deliberation_id", deliberationId);
     if (nodeId) query = query.eq("id", nodeId);
@@ -78,7 +80,7 @@ serve(async (req) => {
       const { data: others, error: othersErr } = await supabase
         .from("ibis_nodes")
         .select("id, deliberation_id, node_type, embedding, created_by")
-        .eq("node_type", "issue")
+        .eq("node_type", TYPE)
         .eq("deliberation_id", deliberation)
         .neq("id", nodeId);
       if (othersErr) throw othersErr;

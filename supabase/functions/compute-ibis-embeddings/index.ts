@@ -13,6 +13,7 @@ interface RequestBody {
   deliberationId?: string;
   nodeId?: string;
   force?: boolean;
+  nodeType?: 'issue' | 'position' | 'argument';
 }
 
 serve(async (req) => {
@@ -30,7 +31,7 @@ serve(async (req) => {
 
   try {
     const body = (await req.json()) as RequestBody;
-    const { deliberationId, nodeId, force = false } = body || {};
+    const { deliberationId, nodeId, force = false, nodeType } = body || {};
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -42,12 +43,13 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-
-    // Build query to select target Issue nodes
+    
+    // Build query to select target nodes of a given type
+    const TYPE = nodeType || 'issue';
     let query = supabase
       .from("ibis_nodes")
       .select("id, title, description, node_type, embedding")
-      .eq("node_type", "issue");
+      .eq("node_type", TYPE);
 
     if (deliberationId) query = query.eq("deliberation_id", deliberationId);
     if (nodeId) query = query.eq("id", nodeId);
