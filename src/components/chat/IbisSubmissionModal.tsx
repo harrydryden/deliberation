@@ -215,21 +215,21 @@ export const IbisSubmissionModal = ({
         if (targetType === 'position' && inserted.node_type === 'argument') return 'supports';
         return 'relates_to';
       };
-      if (linkIssueId) rels.push({
+      if (linkIssueId && linkIssueId !== 'none') rels.push({
         source_node_id: inserted.id,
         target_node_id: linkIssueId,
         relationship_type: mapRelType('issue'),
         created_by: user.id,
         deliberation_id: deliberationId
       });
-      if (linkPositionId) rels.push({
+      if (linkPositionId && linkPositionId !== 'none') rels.push({
         source_node_id: inserted.id,
         target_node_id: linkPositionId,
         relationship_type: mapRelType('position'),
         created_by: user.id,
         deliberation_id: deliberationId
       });
-      if (linkArgumentId) rels.push({
+      if (linkArgumentId && linkArgumentId !== 'none') rels.push({
         source_node_id: inserted.id,
         target_node_id: linkArgumentId,
         relationship_type: mapRelType('argument'),
@@ -461,7 +461,7 @@ export const IbisSubmissionModal = ({
                     <SelectValue placeholder="Select an Issue to link" className="text-muted-foreground" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No link</SelectItem>
+                    <SelectItem value="none">No link</SelectItem>
                     {existingNodes.filter(n => n.node_type === 'issue').map(node => (
                       <SelectItem key={node.id} value={node.id}>
                         <div>
@@ -491,7 +491,7 @@ export const IbisSubmissionModal = ({
                     <SelectValue placeholder="Select a Position to link" className="text-muted-foreground" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No link</SelectItem>
+                    <SelectItem value="none">No link</SelectItem>
                     {existingNodes.filter(n => n.node_type === 'position').map(node => (
                       <SelectItem key={node.id} value={node.id}>
                         <div>
@@ -521,7 +521,7 @@ export const IbisSubmissionModal = ({
                     <SelectValue placeholder="Select an Argument to link" className="text-muted-foreground" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No link</SelectItem>
+                    <SelectItem value="none">No link</SelectItem>
                     {existingNodes.filter(n => n.node_type === 'argument').map(node => (
                       <SelectItem key={node.id} value={node.id}>
                         <div>
