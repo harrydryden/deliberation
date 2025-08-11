@@ -87,6 +87,11 @@
   }
 }
 
+/* Hide connection handles completely */
+.react-flow__handle {
+  display: none !important;
+}
+
 .react-flow__node.new-node {
   animation: nodeAppear 0.3s ease-out;
 }
