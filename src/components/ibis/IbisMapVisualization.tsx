@@ -96,6 +96,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
   const [ibisNodes, setIbisNodes] = useState<IbisNode[]>([]);
   const [ibisRelationships, setIbisRelationships] = useState<IbisRelationship[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [deliberationTitle, setDeliberationTitle] = useState<string>('');
   const [selectedNode, setSelectedNode] = useState<IbisNode | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState(true);
@@ -168,6 +169,16 @@ const { user } = useBackendAuth();
     try {
       setLoading(true);
       setIsOptimizingLayout(true);
+      
+      // Fetch deliberation title
+      const { data: deliberationData, error: deliberationError } = await supabase
+        .from('deliberations')
+        .select('title')
+        .eq('id', deliberationId)
+        .single();
+
+      if (deliberationError) throw deliberationError;
+      setDeliberationTitle(deliberationData?.title || '');
       
       // Fetch IBIS nodes
       const { data: nodesData, error: nodesError } = await supabase
@@ -269,6 +280,9 @@ const { user } = useBackendAuth();
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
     const positions = new Map<string, { x: number; y: number }>();
+
+    // Add central deliberation node position
+    positions.set('deliberation-center', { x: cx, y: cy });
 
     const allById = new Map(nodes.map(n => [n.id, n] as const));
 
@@ -392,12 +406,61 @@ const { user } = useBackendAuth();
     const flowNodes: Node[] = [];
     const flowEdges: Edge[] = [];
 
+    // Add central deliberation node
+    const centralPosition = positionsMap.get('deliberation-center') || { x: 800, y: 500 };
+    const deliberationNode: Node = {
+      id: 'deliberation-center',
+      type: 'default',
+      position: centralPosition,
+      data: {
+        label: (
+          <div className="text-center p-4 node-content">
+            <div className="font-bold text-white text-lg leading-tight mb-2">
+              {deliberationTitle || 'Discussion Topic'}
+            </div>
+            <Badge 
+              variant="secondary" 
+              className="text-xs bg-white/20 text-white border-white/30"
+            >
+              Topic
+            </Badge>
+          </div>
+        ),
+      },
+      className: 'ibis-node-deliberation',
+      style: {
+        backgroundColor: 'hsl(var(--primary))',
+        borderRadius: '50%',
+        border: '3px solid #fff',
+        minWidth: 160,
+        minHeight: 160,
+        boxShadow: '0 8px 25px rgba(0, 0, 0, 0.2), 0 4px 15px rgba(0, 0, 0, 0.15)',
+      },
+      draggable: false,
+    };
+    flowNodes.push(deliberationNode);
+
     // Create nodes with precomputed positions and enhanced styling
     filteredNodes.forEach(node => {
       const position = positionsMap.get(node.id) || { x: 100, y: 100 };
       const importance = calculateNodeImportance(node.id, relationshipsData);
       const flowNode = createEnhancedFlowNode(node, position, importance);
       flowNodes.push(flowNode);
+    });
+
+    // Add edges connecting all issues to the central deliberation node
+    const issueNodes = filteredNodes.filter(node => node.node_type === 'issue');
+    issueNodes.forEach(issue => {
+      flowEdges.push({
+        id: `deliberation-${issue.id}`,
+        source: 'deliberation-center',
+        target: issue.id,
+        type: 'smoothstep',
+        animated: false,
+        style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--primary))' },
+        data: { type: 'deliberation-issue' },
+      });
     });
 
     // Create hierarchical edges (parent-child relationships)

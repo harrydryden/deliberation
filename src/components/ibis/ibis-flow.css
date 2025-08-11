@@ -61,6 +61,20 @@
   transform: rotate(-45deg);
 }
 
+/* Central deliberation node styling */
+.ibis-node-deliberation {
+  border-radius: 50% !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2), 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+}
+
+.ibis-node-deliberation .node-content {
+  text-align: center;
+  color: white;
+}
+
 /* Animation for new nodes */
 @keyframes nodeAppear {
   from {
