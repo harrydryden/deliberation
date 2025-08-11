@@ -5,6 +5,7 @@ import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Users, Clock, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatToUKDate } from "@/utils/timeUtils";
@@ -33,6 +34,7 @@ const Deliberations = () => {
   
   const [deliberations, setDeliberations] = useState<Deliberation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDescription, setSelectedDescription] = useState<{ title: string; description: string } | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -149,7 +151,10 @@ const Deliberations = () => {
                     </Badge>
                   </div>
                   {deliberation.description && (
-                    <CardDescription className="line-clamp-3">
+                    <CardDescription 
+                      className="line-clamp-3 cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => setSelectedDescription({ title: deliberation.title, description: deliberation.description! })}
+                    >
                       {deliberation.description}
                     </CardDescription>
                   )}
@@ -187,6 +192,18 @@ const Deliberations = () => {
             ))}
           </div>
         )}
+
+        {/* Description Preview Dialog */}
+        <Dialog open={!!selectedDescription} onOpenChange={() => setSelectedDescription(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{selectedDescription?.title}</DialogTitle>
+            </DialogHeader>
+            <div className="mt-4 text-muted-foreground whitespace-pre-wrap">
+              {selectedDescription?.description}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
