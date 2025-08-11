@@ -43,6 +43,19 @@ interface OrchestrationContext {
   content: string;
   conversationState: ConversationState;
   mode: 'chat' | 'learn';
+  similarNodes?: SimilarNode[];
+}
+
+interface SimilarNode {
+  id: string;
+  title: string;
+  description: string;
+  nodeType: string;
+  similarity: number;
+  relationship: 'supportive' | 'contradictory';
+  createdBy: {
+    displayName: string;
+  };
 }
 
 interface FacilitatorQuestion {
@@ -181,20 +194,29 @@ serve(async (req) => {
     const analysis = await analyzeMessage(context.content, context.conversationState, openAIApiKey);
     console.log('🔬 Semantic analysis:', analysis);
 
+    // Check for similar IBIS nodes
+    const similarNodes = await findSimilarIbisNodes(context.content, context.deliberationId, supabase, openAIApiKey);
+    context.similarNodes = similarNodes;
+    console.log(`🔍 Found ${similarNodes.length} similar IBIS nodes`);
+
     // Select appropriate agent using sophisticated algorithm
     const selectedAgent = selectAgent(analysis, context.conversationState, mode);
     console.log('🤖 Selected agent:', selectedAgent);
 
+    // Determine if we need multi-agent response
+    const agents = determineAgentsToExecute(selectedAgent, similarNodes);
+    console.log('🤖 Agents to execute:', agents);
+
     // Update conversation state
     updateConversationState(context.conversationState, analysis, selectedAgent);
 
-    // Execute selected agent response
-    const agentResponse = await executeAgentResponse(selectedAgent, context, supabase, openAIApiKey, analysis);
+    // Execute agent responses (potentially multiple)
+    const agentResponses = await executeAgentResponses(agents, context, supabase, openAIApiKey, analysis);
 
     console.log('✅ Agent response completed');
 
     // Handle proactive engagement for Flow Agent
-    if (selectedAgent === 'flow_agent') {
+    if (agents.includes('flow_agent')) {
       await handleProactiveEngagement(context, supabase, openAIApiKey);
     }
 
@@ -203,7 +225,8 @@ serve(async (req) => {
         success: true, 
         selectedAgent,
         confidence: calculateConfidence(selectedAgent, analysis, context.conversationState),
-        agentResponse: agentResponse ? agentResponse.substring(0, 100) + '...' : 'No response'
+        agentResponses: agentResponses || [],
+        similarNodes: similarNodes || []
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -706,8 +729,24 @@ async function executeAgentResponse(
         ).join('\n');
     }
 
+    // Build similar nodes context for peer agent
+    let similarNodesContext = '';
+    if (agentType === 'peer_agent' && context.similarNodes && context.similarNodes.length > 0) {
+      const contextParts = context.similarNodes.map(node => {
+        const relationshipText = node.relationship === 'supportive' ? 'in support' : 'in contradiction';
+        return `Another participant (${node.createdBy.displayName}) has shared a ${node.nodeType} that relates to this ${relationshipText}:
+"${node.title}${node.description ? ': ' + node.description : ''}"`;
+      });
+
+      similarNodesContext = `\n\nIMPORTANT - SIMILAR CONTRIBUTIONS FOUND:
+${contextParts.join('\n\n')}
+
+You MUST mention these similar contributions in your response using this exact format:
+"Another participant has shared a view that relates to this [in support/in contradiction]" and then reference the specific contribution. Make this the main focus of your response.`;
+    }
+
     // Prepare messages for OpenAI
-    const systemPrompt = agent.system_prompt + deliberationContext + conversationContext + knowledgeContext;
+    const systemPrompt = agent.system_prompt + deliberationContext + conversationContext + knowledgeContext + similarNodesContext;
     
     // Add source citation instruction for bill_agent
     const finalSystemPrompt = agentType === 'bill_agent' && sources.length > 0 
@@ -768,7 +807,8 @@ async function executeAgentResponse(
             complexity: analysis.complexity,
             intent: analysis.intent,
             requiresExpertise: analysis.requiresExpertise
-          }
+          },
+          similar_nodes: agentType === 'peer_agent' ? context.similarNodes : undefined
         }
       });
 
@@ -884,4 +924,204 @@ function selectProactiveQuestion(context: OrchestrationContext): FacilitatorQues
 
   // Fallback to any available question
   return availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+}
+
+// Find similar IBIS nodes using semantic similarity
+async function findSimilarIbisNodes(
+  content: string, 
+  deliberationId: string, 
+  supabase: any, 
+  openAIApiKey: string
+): Promise<SimilarNode[]> {
+  console.log('🔍 Finding similar IBIS nodes...');
+  
+  try {
+    // Fetch all IBIS nodes in this deliberation except from current user
+    const { data: allNodes } = await supabase
+      .from('ibis_nodes')
+      .select(`
+        id,
+        title,
+        description,
+        node_type,
+        created_by,
+        profiles!created_by(display_name)
+      `)
+      .eq('deliberation_id', deliberationId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (!allNodes?.length) return [];
+
+    // Calculate semantic similarity for each node using OpenAI
+    const similarities = await Promise.all(
+      allNodes.map(async (node) => {
+        const relevancePrompt = `
+Rate the semantic similarity between these two statements on a scale of 0.0 to 1.0:
+
+Statement A: "${content}"
+Statement B: "${node.title}: ${node.description || ''}"
+
+Consider:
+- Topic overlap
+- Conceptual relationship
+- Argumentative stance
+- Thematic connection
+
+Respond with only a number between 0.0 and 1.0:`;
+
+        try {
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openAIApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: 'You are a semantic similarity analyzer. Respond only with a decimal number between 0.0 and 1.0.' },
+                { role: 'user', content: relevancePrompt }
+              ],
+              temperature: 0.1,
+              max_tokens: 10
+            })
+          });
+
+          const data = await response.json();
+          const similarityText = data.choices[0].message.content.trim();
+          const similarity = parseFloat(similarityText) || 0;
+          
+          return { ...node, similarity };
+        } catch (error) {
+          console.warn('Error calculating similarity for node:', node.id, error);
+          return { ...node, similarity: 0 };
+        }
+      })
+    );
+
+    // Filter high similarity nodes and determine relationships
+    const similarNodes = similarities
+      .filter(node => node.similarity > 0.75)
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 3);
+
+    if (!similarNodes.length) return [];
+
+    // Determine relationship (supportive/contradictory) for each similar node
+    const nodesWithRelationship = await Promise.all(
+      similarNodes.map(async (node) => {
+        const relationshipPrompt = `Analyze the relationship between these two statements:
+          
+Statement A: "${content}"
+Statement B: "${node.title}: ${node.description || ''}"
+
+Determine if Statement B is:
+1. "supportive" - agrees with, builds upon, or supports Statement A
+2. "contradictory" - disagrees with, opposes, or contradicts Statement A
+
+Respond with just one word: "supportive" or "contradictory"`;
+
+        try {
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openAIApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: 'You are analyzing argument relationships. Respond with only "supportive" or "contradictory".' },
+                { role: 'user', content: relationshipPrompt }
+              ],
+              temperature: 0.1,
+              max_tokens: 5
+            })
+          });
+
+          const data = await response.json();
+          const relationshipText = data.choices[0].message.content.trim().toLowerCase();
+          const relationship = relationshipText.includes('supportive') ? 'supportive' : 'contradictory';
+          
+          return {
+            id: node.id,
+            title: node.title,
+            description: node.description || '',
+            nodeType: node.node_type,
+            similarity: node.similarity,
+            relationship,
+            createdBy: {
+              displayName: node.profiles?.display_name || 'Anonymous'
+            }
+          };
+        } catch (error) {
+          console.warn('Error determining relationship for node:', node.id, error);
+          return {
+            id: node.id,
+            title: node.title,
+            description: node.description || '',
+            nodeType: node.node_type,
+            similarity: node.similarity,
+            relationship: 'supportive' as const,
+            createdBy: {
+              displayName: node.profiles?.display_name || 'Anonymous'
+            }
+          };
+        }
+      })
+    );
+
+    console.log(`✅ Found ${nodesWithRelationship.length} similar IBIS nodes`);
+    return nodesWithRelationship;
+  } catch (error) {
+    console.error('❌ Error finding similar IBIS nodes:', error);
+    return [];
+  }
+}
+
+// Determine which agents should execute based on selection and similarities
+function determineAgentsToExecute(selectedAgent: string, similarNodes: SimilarNode[]): string[] {
+  const agents: string[] = [];
+  
+  // If similarities found, always include peer agent
+  if (similarNodes.length > 0) {
+    agents.push('peer_agent');
+    
+    // If another agent was selected, include it too
+    if (selectedAgent !== 'peer_agent') {
+      agents.push(selectedAgent);
+    }
+  } else {
+    // No similarities, just use selected agent
+    agents.push(selectedAgent);
+  }
+  
+  return agents;
+}
+
+// Execute multiple agents in sequence
+async function executeAgentResponses(
+  agents: string[],
+  context: OrchestrationContext,
+  supabase: any,
+  openAIApiKey: string,
+  analysis: SemanticAnalysis
+): Promise<string[]> {
+  console.log(`🤖 Executing ${agents.length} agents:`, agents);
+  
+  const responses: string[] = [];
+  
+  for (const agentType of agents) {
+    try {
+      const response = await executeAgentResponse(agentType, context, supabase, openAIApiKey, analysis);
+      responses.push(response);
+      console.log(`✅ ${agentType} completed`);
+    } catch (error) {
+      console.error(`❌ ${agentType} failed:`, error);
+      responses.push(''); // Add empty response to maintain order
+    }
+  }
+  
+  return responses;
 }

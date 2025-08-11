@@ -155,10 +155,10 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
 
             </Card>
 
-            {/* Show similar IBIS nodes for peer agent messages */}
-            {!isUser && message.message_type === 'peer_agent' && message.agent_context?.similarIbisNodes && (
+            {/* Show similar IBIS nodes for any agent message that has them */}
+            {!isUser && message.agent_context?.similar_nodes && (
               <SimilarIbisNodes
-                nodes={message.agent_context.similarIbisNodes}
+                nodes={message.agent_context.similar_nodes}
                 messageId={message.id}
                 deliberationId={deliberationId}
               />
