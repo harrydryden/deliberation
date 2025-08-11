@@ -240,7 +240,7 @@ const { user } = useBackendAuth();
     try {
       setEmbeddingBackfillTriggered(true);
       await supabase.functions.invoke('compute-ibis-embeddings', { body: { deliberationId } });
-      toast({ title: 'Optimizing layout', description: 'Computing issue embeddings for better clustering.' });
+      // toast({ title: 'Optimizing layout', description: 'Computing issue embeddings for better clustering.' });
       // Refetch to include fresh embeddings
       fetchData();
     } catch (err) {
@@ -664,11 +664,6 @@ onEdgesChange={onEdgesChange}
           elementsSelectable={true}
           connectionMode={ConnectionMode.Loose}
         >
-          {isOptimizingLayout && (
-            <Panel position="top-left">
-              <Badge variant="secondary">Optimizing layout…</Badge>
-            </Panel>
-          )}
           <Background color="hsl(var(--ibis-grid))" gap={20} />
           <Controls />
           
