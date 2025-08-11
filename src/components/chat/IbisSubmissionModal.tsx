@@ -378,7 +378,7 @@ export const IbisSubmissionModal = ({
                   <SelectValue placeholder="Connect your contribution to other points" className="text-muted-foreground" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No parent (root node)</SelectItem>
+                  <SelectItem value="none">No link</SelectItem>
                   {existingNodes.map(node => <SelectItem key={node.id} value={node.id}>
                       <div>
                         <div className="font-medium">{node.title}</div>
