@@ -16,11 +16,14 @@ import { useAdminService } from '@/hooks/useAdminService';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 import { logger } from '@/utils/logger';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 export const AdminDashboard = () => {
   const [currentBackend, setCurrentBackend] = useState(BACKEND_CONFIG.type);
   const adminService = useAdminService();
   const { handleAsyncError } = useErrorHandler();
+  const navigate = useNavigate();
   
   useMemoryLeakDetection('AdminDashboard');
 
@@ -78,6 +81,10 @@ export const AdminDashboard = () => {
                 Node.js
               </Badge>
             </div>
+            
+            <Button variant="outline" onClick={() => navigate('/backend')}>
+              Backend Config
+            </Button>
           </div>
         </div>
       </div>
