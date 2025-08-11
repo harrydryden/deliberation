@@ -30,7 +30,7 @@ export class AuthLoadingBoundary extends Component<Props, State> {
       return (
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center space-y-4">
-            <p className="text-destructive">Authentication Error</p>
+            <p className="text-destructive">{/auth|unauthor|token/i.test(this.state.error?.message || '') ? 'Authentication error' : 'Something went wrong'}</p>
             <button 
               onClick={() => {
                 this.setState({ hasError: false });
