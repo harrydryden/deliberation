@@ -5,7 +5,9 @@ import { AuthForm } from "@/components/auth/AuthForm";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 
 const Auth = () => {
+  console.log('🔍 Auth page component rendering');
   const { user, isLoading } = useBackendAuth();
+  console.log('🔍 Auth state:', { user: !!user, isLoading });
   const navigate = useNavigate();
   const deliberationService = useDeliberationService();
   const [deliberations, setDeliberations] = useState<any[]>([]);

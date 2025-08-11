@@ -14,6 +14,7 @@ import { validateInput, criticalOpRateLimit } from "@/utils/securityValidation";
 import { logger } from '@/utils/logger';
 
 export const AuthForm = () => {
+  console.log('🔍 AuthForm component rendering');
   const [isLoading, setIsLoading] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   const [validationError, setValidationError] = useState<string>("");
@@ -131,6 +132,9 @@ export const AuthForm = () => {
       setIsLoading(false);
     }
   };
+  
+  console.log('🔍 AuthForm about to render JSX, accessCode:', accessCode);
+  console.log('🔍 AuthForm validation state:', { validationError, isLoading, remainingTime });
   return (
     <div className="min-h-screen flex items-center justify-center bg-deliberation-bg p-4">
       <Card className="w-full max-w-md">
