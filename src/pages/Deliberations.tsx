@@ -124,7 +124,7 @@ const Deliberations = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-democratic-blue">Available Deliberations</h1>
-            <p className="text-muted-foreground">Join active discussions created by administrators</p>
+            <p className="text-muted-foreground">Join these active deliberations and to share your views and learn from others</p>
           </div>
         </div>
 
