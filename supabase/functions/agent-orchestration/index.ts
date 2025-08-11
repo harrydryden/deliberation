@@ -746,7 +746,29 @@ You MUST mention these similar contributions in your response using this exact f
     }
 
     // Prepare messages for OpenAI
-    const systemPrompt = agent.system_prompt + deliberationContext + conversationContext + knowledgeContext + similarNodesContext;
+    // IBIS facilitation (peer_agent)
+    let ibisFacilitationBlock = '';
+    let ibisMeta: any = undefined;
+    if (agentType === 'peer_agent') {
+      try {
+        const config = agent.facilitator_config?.ibis_facilitation;
+        if (config && config.enabled) {
+          const coverage = await getIbisCoverage(supabase, context.deliberationId, context.userId);
+          const selection = chooseIbisStage(coverage);
+          const stagePrompt = selection.stage === 'issue'
+            ? config.elicit_issue_prompt
+            : selection.stage === 'position'
+              ? config.elicit_position_prompt
+              : config.elicit_argument_prompt;
+          ibisFacilitationBlock = `\n\n[IBIS FACILITATION]\nStage: ${selection.stage}\nTarget: ${selection.targetTitle || 'n/a'}\nUser-facing goal: ${stagePrompt}\nInstruction: Ask ONE concise question to elicit the above. Do not provide content for the user. Keep under 2 sentences.`;
+          ibisMeta = { enabled: true, stage: selection.stage, targetTitle: selection.targetTitle };
+        }
+      } catch (_e) {
+        // ignore facilitation errors
+      }
+    }
+
+    const systemPrompt = agent.system_prompt + deliberationContext + conversationContext + knowledgeContext + similarNodesContext + ibisFacilitationBlock;
     
     // Add source citation instruction for bill_agent
     const finalSystemPrompt = agentType === 'bill_agent' && sources.length > 0 
@@ -808,7 +830,8 @@ You MUST mention these similar contributions in your response using this exact f
             intent: analysis.intent,
             requiresExpertise: analysis.requiresExpertise
           },
-          similar_nodes: agentType === 'peer_agent' ? context.similarNodes : undefined
+          similar_nodes: agentType === 'peer_agent' ? context.similarNodes : undefined,
+          ibis_facilitation: agentType === 'peer_agent' ? ibisMeta : undefined
         }
       });
 
@@ -1122,4 +1145,46 @@ async function executeAgentResponses(
   );
 
   return Promise.all(promises);
+}
+
+// IBIS coverage helpers
+interface IbisCoverage {
+  issues: { id: string; title: string; created_at: string }[];
+  positions: { id: string; title: string; created_at: string }[];
+  arguments: { id: string; title: string; created_at: string }[];
+  latestIssue?: { id: string; title: string } | null;
+  latestPosition?: { id: string; title: string } | null;
+}
+
+async function getIbisCoverage(
+  supabase: any,
+  deliberationId: string,
+  userId: string
+): Promise<IbisCoverage> {
+  const { data: nodes } = await supabase
+    .from('ibis_nodes')
+    .select('id, title, node_type, created_at')
+    .eq('deliberation_id', deliberationId)
+    .eq('created_by', userId)
+    .order('created_at', { ascending: false });
+
+  const issues = (nodes || []).filter((n: any) => n.node_type === 'issue');
+  const positions = (nodes || []).filter((n: any) => n.node_type === 'position');
+  const args = (nodes || []).filter((n: any) => n.node_type === 'argument');
+
+  return {
+    issues,
+    positions,
+    arguments: args,
+    latestIssue: issues[0] ? { id: issues[0].id, title: issues[0].title } : null,
+    latestPosition: positions[0] ? { id: positions[0].id, title: positions[0].title } : null,
+  };
+}
+
+function chooseIbisStage(coverage: IbisCoverage): { stage: 'issue' | 'position' | 'argument'; targetTitle: string | null } {
+  if (!coverage.issues.length) return { stage: 'issue', targetTitle: null };
+  if (!coverage.positions.length) return { stage: 'position', targetTitle: coverage.latestIssue?.title || null };
+  if (!coverage.arguments.length) return { stage: 'argument', targetTitle: coverage.latestPosition?.title || null };
+  // Default to deepening arguments
+  return { stage: 'argument', targetTitle: coverage.latestPosition?.title || coverage.latestIssue?.title || null };
 }
