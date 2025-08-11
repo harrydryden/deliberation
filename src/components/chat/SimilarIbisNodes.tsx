@@ -1,0 +1,154 @@
+import React, { useState } from 'react';
+import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+interface SimilarNode {
+  id: string;
+  title: string;
+  description?: string;
+  nodeType: 'issue' | 'position' | 'argument';
+  relationship: 'supportive' | 'contradictory';
+  similarity: number;
+  createdBy?: string;
+}
+
+interface SimilarIbisNodesProps {
+  nodes: SimilarNode[];
+  messageId: string;
+  deliberationId?: string;
+}
+
+const SimilarIbisNodes: React.FC<SimilarIbisNodesProps> = ({ 
+  nodes, 
+  messageId, 
+  deliberationId 
+}) => {
+  const [ratings, setRatings] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const { toast } = useToast();
+
+  const handleRate = async (nodeId: string, rating: 1 | -1) => {
+    if (!deliberationId) return;
+    
+    setLoading(prev => ({ ...prev, [nodeId]: true }));
+    
+    try {
+      const { error } = await supabase
+        .from('ibis_node_ratings')
+        .upsert({
+          ibis_node_id: nodeId,
+          message_id: messageId,
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          rating,
+          deliberation_id: deliberationId,
+        }, {
+          onConflict: 'ibis_node_id,message_id,user_id'
+        });
+
+      if (error) throw error;
+
+      setRatings(prev => ({ ...prev, [nodeId]: rating }));
+      
+      toast({
+        title: "Rating submitted",
+        description: rating === 1 ? "Marked as helpful" : "Marked as unhelpful",
+      });
+    } catch (error) {
+      console.error('Error rating IBIS node:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit rating",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(prev => ({ ...prev, [nodeId]: false }));
+    }
+  };
+
+  const getNodeTypeIcon = (nodeType: string) => {
+    switch (nodeType) {
+      case 'issue': return '❓';
+      case 'position': return '💭';
+      case 'argument': return '📝';
+      default: return '📄';
+    }
+  };
+
+  const getRelationshipColor = (relationship: string) => {
+    return relationship === 'supportive' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+  };
+
+  if (!nodes.length) return null;
+
+  return (
+    <div className="mt-4 space-y-3">
+      <div className="text-sm font-medium text-muted-foreground">
+        Related contributions from other participants:
+      </div>
+      
+      {nodes.map((node) => (
+        <Card key={node.id} className="border-l-4 border-l-primary/20">
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{getNodeTypeIcon(node.nodeType)}</span>
+                  <Badge variant="outline" className="capitalize">
+                    {node.nodeType}
+                  </Badge>
+                  <Badge 
+                    variant="secondary" 
+                    className={getRelationshipColor(node.relationship)}
+                  >
+                    {node.relationship === 'supportive' ? 'In support' : 'In contradiction'}
+                  </Badge>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-sm">{node.title}</h4>
+                  {node.description && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {node.description}
+                    </p>
+                  )}
+                </div>
+                
+                <div className="text-xs text-muted-foreground">
+                  Similarity: {Math.round(node.similarity * 100)}%
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-1">
+                <Button
+                  variant={ratings[node.id] === 1 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleRate(node.id, 1)}
+                  disabled={loading[node.id]}
+                  className="h-8 w-8 p-0"
+                >
+                  <ThumbsUp className="h-3 w-3" />
+                </Button>
+                
+                <Button
+                  variant={ratings[node.id] === -1 ? "destructive" : "outline"}
+                  size="sm"
+                  onClick={() => handleRate(node.id, -1)}
+                  disabled={loading[node.id]}
+                  className="h-8 w-8 p-0"
+                >
+                  <ThumbsDown className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+};
+
+export default SimilarIbisNodes;

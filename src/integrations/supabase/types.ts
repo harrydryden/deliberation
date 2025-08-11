@@ -473,6 +473,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ibis_node_ratings: {
+        Row: {
+          created_at: string
+          deliberation_id: string | null
+          ibis_node_id: string
+          id: string
+          message_id: string
+          rating: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deliberation_id?: string | null
+          ibis_node_id: string
+          id?: string
+          message_id: string
+          rating: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deliberation_id?: string | null
+          ibis_node_id?: string
+          id?: string
+          message_id?: string
+          rating?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ibis_nodes: {
         Row: {
           created_at: string | null

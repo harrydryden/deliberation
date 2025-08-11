@@ -8,6 +8,7 @@ import { formatToUKTime } from "@/utils/timeUtils";
 const LazyMarkdownMessage = lazy(() => import("@/components/common/MarkdownMessage").then(m => ({ default: m.MarkdownMessage })));
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import type { ChatMessage } from "@/types/chat";
+import SimilarIbisNodes from "@/components/chat/SimilarIbisNodes";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -15,6 +16,7 @@ interface MessageListProps {
   isTyping: boolean;
   onAddToIbis?: (messageId: string, content: string) => void;
   onRetry?: (id: string, content: string) => void;
+  deliberationId?: string;
 }
 
 const AGENTS = {
@@ -44,7 +46,7 @@ const AGENTS = {
   }
 } as const;
 
-export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetry }: MessageListProps) => {
+export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetry, deliberationId }: MessageListProps) => {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [unreadIndex, setUnreadIndex] = useState<number | null>(null);
@@ -152,6 +154,15 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
               )}
 
             </Card>
+
+            {/* Show similar IBIS nodes for peer agent messages */}
+            {!isUser && message.message_type === 'peer_agent' && message.agent_context?.similarIbisNodes && (
+              <SimilarIbisNodes
+                nodes={message.agent_context.similarIbisNodes}
+                messageId={message.id}
+                deliberationId={deliberationId}
+              />
+            )}
           </div>
         </div>
       </div>

@@ -88,10 +88,13 @@ export class PeerAgentService {
       const peerStatements = await this.getPeerStatements(userId);
       const relevantPeerPerspectives = await this.findRelevantPeerPerspectives(content, peerStatements, traceId);
 
-      // Get IBIS knowledge context
+      // Get IBIS knowledge context and similar nodes
       const ibisNodes = await this.getIbisNodes(userId);
       const ibisContext = this.buildIbisContext(ibisNodes);
       const peerContext = this.buildPeerContext(relevantPeerPerspectives);
+      
+      // Find similar IBIS nodes from other participants
+      const similarNodes = await this.findSimilarIbisNodes(content, deliberationId);
 
       // Build system prompt
       const defaultSystemPrompt = `You are the Peer Agent, representing diverse perspectives and alternative viewpoints in democratic deliberation.
@@ -122,15 +125,22 @@ YOUR ROLE:
         sessionState,
       });
 
+      // Include similar nodes in the prompt if found
+      let enhancedPrompt = peerAgentPrompt;
+      if (similarNodes.length > 0) {
+        const similarNodesContext = this.buildSimilarNodesContext(similarNodes);
+        enhancedPrompt = peerAgentPrompt + similarNodesContext;
+      }
+
       // Generate AI response
       const aiResponse = await this.aiService.generateResponse(
-        peerAgentPrompt,
+        enhancedPrompt,
         undefined,
         { traceId }
       );
 
-      // Store the response
-      await this.prisma.message.create({
+      // Store the response with similar nodes metadata
+      const messageId = await this.prisma.message.create({
         data: {
           content: aiResponse.content,
           messageType: 'peer_agent',
@@ -140,7 +150,15 @@ YOUR ROLE:
             processingTime: Date.now() - startTime,
             peerPerspectivesUsed: relevantPeerPerspectives.length,
             ibisNodesUsed: ibisNodes.length,
+            similarIbisNodes: similarNodes.map(node => ({
+              id: node.id,
+              title: node.title,
+              nodeType: node.nodeType,
+              relationship: node.relationship,
+              similarity: node.similarity
+            })),
           },
+          deliberationId,
         },
       });
 
@@ -148,6 +166,8 @@ YOUR ROLE:
         content: aiResponse.content,
         processingTime: Date.now() - startTime,
         sources: relevantPeerPerspectives.map(p => p.content.substring(0, 100) + '...'),
+        messageId: messageId.id,
+        similarNodes,
       };
     } catch (error) {
       logger.error({ error, userId, traceId }, 'Peer Agent error');
@@ -213,6 +233,81 @@ YOUR ROLE:
     return nodes;
   }
 
+  private async findSimilarIbisNodes(content: string, deliberationId?: string): Promise<any[]> {
+    if (!deliberationId) return [];
+
+    try {
+      // Get all IBIS nodes from the deliberation
+      const allNodes = await this.prisma.ibisNode.findMany({
+        where: {
+          deliberationId,
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          nodeType: true,
+          createdBy: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+
+      if (!allNodes.length) return [];
+
+      // Calculate semantic similarity for each node
+      const similarities = await Promise.all(
+        allNodes.map(async (node) => {
+          const relevance = await this.aiService.calculateRelevance(
+            content, 
+            `${node.title}: ${node.description || ''}`,
+            `similarity-${node.id}`
+          );
+          return { ...node, similarity: relevance };
+        })
+      );
+
+      // Return nodes with high similarity (>0.75) and determine relationship
+      const similarNodes = similarities
+        .filter(node => node.similarity > 0.75)
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, 3);
+
+      // For each similar node, determine if it's supportive or contradictory
+      const nodesWithRelationship = await Promise.all(
+        similarNodes.map(async (node) => {
+          const relationshipPrompt = `Analyze the relationship between these two statements:
+            
+Statement A: "${content}"
+Statement B: "${node.title}: ${node.description || ''}"
+
+Determine if Statement B is:
+1. "supportive" - agrees with, builds upon, or supports Statement A
+2. "contradictory" - disagrees with, opposes, or contradicts Statement A
+
+Respond with just one word: "supportive" or "contradictory"`;
+
+          const relationship = await this.aiService.generateResponse(
+            relationshipPrompt,
+            undefined,
+            { traceId: `relationship-${node.id}` }
+          );
+
+          return {
+            ...node,
+            relationship: relationship.content.toLowerCase().includes('supportive') ? 'supportive' : 'contradictory'
+          };
+        })
+      );
+
+      return nodesWithRelationship;
+    } catch (error) {
+      logger.error({ error, content, deliberationId }, 'Error finding similar IBIS nodes');
+      return [];
+    }
+  }
+
   private buildIbisContext(ibisNodes: any[]): string {
     if (!ibisNodes.length) return '';
 
@@ -229,6 +324,22 @@ ${ibisNodes.map(node => `[${node.nodeType.toUpperCase()}] ${node.title}: ${node.
 ${relevantPeerPerspectives.map((p, i) => `Perspective ${i + 1}: ${p.content}`).join('\n\n')}
 
 `;
+  }
+
+  private buildSimilarNodesContext(similarNodes: any[]): string {
+    if (!similarNodes.length) return '';
+
+    const contextParts = similarNodes.map(node => {
+      const relationshipText = node.relationship === 'supportive' ? 'in support' : 'in contradiction';
+      return `Another participant has shared a ${node.nodeType} that relates to this ${relationshipText}:
+"${node.title}${node.description ? ': ' + node.description : ''}"`;
+    });
+
+    return `\n\nIMPORTANT - SIMILAR CONTRIBUTIONS FOUND:
+${contextParts.join('\n\n')}
+
+You MUST mention these similar contributions in your response using this exact format:
+"Another participant has shared a view that relates to this [in support/in contradiction]" and then reference the specific contribution. Make this the main focus of your response.`;
   }
 
   private buildSystemPrompt(
@@ -298,7 +409,6 @@ STATEMENT HANDLING:
     if (this.deliberationContext.notion) context.push(`NOTION: ${this.deliberationContext.notion}`);
     return context.length > 1 ? `\n${context.join(' | ')}\n` : '';
   }
-}
 
   private buildPrompt(params: {
     systemPrompt: string;
@@ -413,6 +523,9 @@ Respond as the Peer Agent:`;
       const ibisNodes = await this.getIbisNodes(userId);
       const ibisContext = this.buildIbisContext(ibisNodes);
       const peerContext = this.buildPeerContext(relevantPeerPerspectives);
+      
+      // Find similar IBIS nodes from other participants
+      const similarNodes = await this.findSimilarIbisNodes(content, deliberationId);
 
       const systemPrompt = this.buildSystemPrompt(
         agentConfig?.systemPrompt || '',
@@ -420,12 +533,18 @@ Respond as the Peer Agent:`;
         sessionState
       );
 
+      // Include similar nodes in the prompt if found
+      let knowledgeContext = ibisContext + peerContext;
+      if (similarNodes.length > 0) {
+        knowledgeContext += this.buildSimilarNodesContext(similarNodes);
+      }
+
       const prompt = this.buildPrompt({
         systemPrompt,
         goals: agentConfig?.goals,
         responseStyle: agentConfig?.responseStyle,
         conversationContext,
-        knowledgeContext: ibisContext + peerContext,
+        knowledgeContext,
         deliberationContext,
         content,
         inputType,
@@ -438,7 +557,7 @@ Respond as the Peer Agent:`;
         fullContent += chunk.content;
         
         if (chunk.done) {
-          // Store the complete response
+          // Store the complete response with similar nodes metadata
           await this.prisma.message.create({
             data: {
               content: fullContent,
@@ -449,7 +568,15 @@ Respond as the Peer Agent:`;
                 streamed: true,
                 peerPerspectivesUsed: relevantPeerPerspectives.length,
                 ibisNodesUsed: ibisNodes.length,
+                similarIbisNodes: similarNodes.map(node => ({
+                  id: node.id,
+                  title: node.title,
+                  nodeType: node.nodeType,
+                  relationship: node.relationship,
+                  similarity: node.similarity
+                })),
               },
+              deliberationId,
             },
           });
 

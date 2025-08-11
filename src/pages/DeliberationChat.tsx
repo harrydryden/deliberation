@@ -167,7 +167,14 @@ const DeliberationChat = () => {
   };
   const ChatPanel = () => <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-hidden min-h-0">
-        <MessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} />
+        <MessageList 
+          messages={messages} 
+          isLoading={chatLoading} 
+          isTyping={isTyping} 
+          onAddToIbis={handleAddToIbis} 
+          onRetry={retryMessage} 
+          deliberationId={deliberationId}
+        />
       </div>
       <MessageInput onSendMessage={sendMessage} disabled={chatLoading} />
     </div>;
