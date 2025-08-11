@@ -448,21 +448,6 @@ const { user } = useBackendAuth();
       flowNodes.push(flowNode);
     });
 
-    // Add edges connecting all issues to the central deliberation node
-    const issueNodes = filteredNodes.filter(node => node.node_type === 'issue');
-    issueNodes.forEach(issue => {
-      flowEdges.push({
-        id: `deliberation-${issue.id}`,
-        source: 'deliberation-center',
-        target: issue.id,
-        type: 'smoothstep',
-        animated: false,
-        style: { stroke: 'hsl(var(--primary))', strokeWidth: 2 },
-        markerEnd: { type: MarkerType.ArrowClosed, color: 'hsl(var(--primary))' },
-        data: { type: 'deliberation-issue' },
-      });
-    });
-
     // Create hierarchical edges (parent-child relationships)
     filteredNodes.forEach(node => {
       const parentId = (node as any).parent_node_id || (node as any).parent_id;
