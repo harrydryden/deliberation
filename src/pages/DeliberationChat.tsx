@@ -16,6 +16,7 @@ import { ViewModeSelector } from "@/components/chat/ViewModeSelector";
 import { Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface"));
@@ -63,6 +64,14 @@ const DeliberationChat = () => {
   const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<'chat' | 'ibis'>('chat');
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  
+  // Scoring state - these would be tracked from actual user activity
+  const [userScores, setUserScores] = useState({
+    engagement: 0, // Count of messages sent in current session
+    shares: 0,     // Count of IBIS submissions
+    sessions: 1    // Count of login sessions (4+ hours apart)
+  });
+
   const {
     messages,
     isLoading: chatLoading,
@@ -73,6 +82,8 @@ const DeliberationChat = () => {
   } = useBackendChat(deliberationId);
   const sendMessage = async (content: string) => {
     await originalSendMessage(content, chatMode);
+    // Update engagement score when message is sent
+    setUserScores(prev => ({ ...prev, engagement: prev.engagement + 1 }));
   };
   const handleAddToIbis = (messageId: string, messageContent: string) => {
     setIbisModal({
@@ -91,6 +102,8 @@ const DeliberationChat = () => {
   const handleIbisSuccess = () => {
     // Reload chat messages to reflect the updated submitted_to_ibis status
     loadChatHistory();
+    // Update shares score when IBIS submission is successful
+    setUserScores(prev => ({ ...prev, shares: prev.shares + 1 }));
   };
   useEffect(() => {
     setViewMode('chat');
@@ -268,6 +281,15 @@ const DeliberationChat = () => {
                     </Suspense>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <ParticipantScoring 
+                  engagement={userScores.engagement}
+                  shares={userScores.shares}
+                  sessions={userScores.sessions}
+                  target={10}
+                />
               </div>
             </div>
           </div>
