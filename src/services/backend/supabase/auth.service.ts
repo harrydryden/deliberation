@@ -21,21 +21,24 @@ export class SupabaseAuthService implements IAuthService {
   async authenticate(accessCode: string): Promise<{ user: User; token: string }> {
     console.log('🔐 Starting authentication with access code:', accessCode);
     
-    // Check if access code is valid
-    const { data: accessCodeData, error: accessCodeError } = await supabase
-      .from('access_codes')
-      .select('*')
-      .eq('code', accessCode)
-      .single();
+    // Use secure validation function instead of direct table access
+    const { data: validationResult, error: validationError } = await supabase.rpc(
+      'validate_access_code_secure', 
+      { input_code: accessCode }
+    );
 
-    console.log('📋 Access code check result:', { accessCodeData, accessCodeError });
+    console.log('📋 Access code validation result:', { validationResult, validationError });
 
-    if (accessCodeError || !accessCodeData) {
-      console.error('❌ Access code validation failed:', accessCodeError);
-      throw new AuthenticationError('Invalid access code');
+    if (validationError || !validationResult?.valid) {
+      console.error('❌ Access code validation failed:', validationError || validationResult);
+      const reason = validationResult?.reason || 'invalid_code';
+      throw new AuthenticationError(`Invalid access code: ${reason}`);
     }
 
     console.log('✅ Access code is valid, proceeding with auth...');
+
+    // Extract code type from validation result
+    const codeType = validationResult.code_type;
 
     // Use access code as both email (hidden from user) and password  
     const email = `${accessCode}@deliberation.local`;
@@ -46,8 +49,8 @@ export class SupabaseAuthService implements IAuthService {
       options: {
         data: {
           access_code: accessCode,
-          code_type: accessCodeData.code_type,
-          user_role: accessCodeData.code_type === 'admin' ? 'admin' : 'user'
+          code_type: codeType,
+          user_role: codeType === 'admin' ? 'admin' : 'user'
         }
       }
     });
@@ -84,7 +87,7 @@ export class SupabaseAuthService implements IAuthService {
         .single();
       
       return {
-        user: this.mapSupabaseUser(signInData.user, accessCode, accessCodeData.code_type, profile),
+        user: this.mapSupabaseUser(signInData.user, accessCode, codeType, profile),
         token: signInData.session.access_token,
       };
     }
@@ -106,7 +109,7 @@ export class SupabaseAuthService implements IAuthService {
       .single();
     
     return {
-      user: this.mapSupabaseUser(authData.user, accessCode, accessCodeData.code_type, profile),
+      user: this.mapSupabaseUser(authData.user, accessCode, codeType, profile),
       token: authData.session.access_token,
     };
   }

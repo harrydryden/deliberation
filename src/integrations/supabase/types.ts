@@ -1306,6 +1306,10 @@ export type Database = {
         Args: { "": unknown[] }
         Returns: number
       }
+      use_access_code_secure: {
+        Args: { input_code: string }
+        Returns: Json
+      }
       validate_access_code: {
         Args: { input_code: string }
         Returns: {
@@ -1317,6 +1321,10 @@ export type Database = {
       }
       validate_access_code_enhanced: {
         Args: { input_code: string; user_ip?: unknown }
+        Returns: Json
+      }
+      validate_access_code_secure: {
+        Args: { input_code: string }
         Returns: Json
       }
       validate_access_code_security: {
