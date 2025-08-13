@@ -44,7 +44,7 @@ export const ParticipantScoring = ({
   ];
 
   return (
-    <div className="rounded-lg border bg-muted/40 p-3">
+    <div className="rounded-lg border bg-muted/40 p-3 h-full">
       <div className="flex flex-col gap-2">
         {scores.map((score) => (
           <div key={score.label} className="flex items-center justify-between">
