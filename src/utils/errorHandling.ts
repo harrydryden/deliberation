@@ -1,12 +1,12 @@
 // Centralized error handling utilities
 import { logger } from './logger';
-import { TypedError } from '@/types/common';
+import { TypedError, ErrorDetails } from '@/types/common';
 
 export class AppError extends Error {
   constructor(
     message: string,
     public code?: string,
-    public context?: Record<string, unknown>,
+    public context?: ErrorDetails,
     public original?: Error
   ) {
     super(message);
@@ -25,28 +25,28 @@ export class AppError extends Error {
 }
 
 export class NetworkError extends AppError {
-  constructor(message: string, public status?: number, context?: Record<string, unknown>) {
+  constructor(message: string, public status?: number, context?: ErrorDetails) {
     super(message, 'NETWORK_ERROR', { ...context, status });
     this.name = 'NetworkError';
   }
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string, public field?: string, context?: Record<string, unknown>) {
+  constructor(message: string, public field?: string, context?: ErrorDetails) {
     super(message, 'VALIDATION_ERROR', { ...context, field });
     this.name = 'ValidationError';
   }
 }
 
 export class AuthenticationError extends AppError {
-  constructor(message: string, context?: Record<string, unknown>) {
+  constructor(message: string, context?: ErrorDetails) {
     super(message, 'AUTH_ERROR', context);
     this.name = 'AuthenticationError';
   }
 }
 
 export class AuthorizationError extends AppError {
-  constructor(message: string, context?: Record<string, unknown>) {
+  constructor(message: string, context?: ErrorDetails) {
     super(message, 'AUTHORIZATION_ERROR', context);
     this.name = 'AuthorizationError';
   }
@@ -98,7 +98,7 @@ export class ErrorReporter {
     return ErrorReporter.instance;
   }
 
-  report(error: unknown, context?: Record<string, unknown>): void {
+  report(error: unknown, context?: ErrorDetails): void {
     const typedError = classifyError(error);
     
     // Add context

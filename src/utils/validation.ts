@@ -49,9 +49,7 @@ export const deliberationDescriptionSchema = z.string()
   .optional();
 
 // Admin role validation
-export const userRoleSchema = z.enum(['admin', 'moderator', 'user'], {
-  errorMap: () => ({ message: 'Invalid user role' })
-});
+export const userRoleSchema = z.enum(['admin', 'moderator', 'user']);
 
 // Email validation for security
 export const emailSchema = z.string()

@@ -23,10 +23,18 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
 }
 
 // Error types
+export interface ErrorDetails {
+  field?: string;
+  value?: string | number;
+  constraint?: string;
+  context?: string;
+  [key: string]: unknown;
+}
+
 export interface TypedError {
   message: string;
   code?: string;
-  details?: Record<string, unknown>;
+  details?: ErrorDetails;
   stack?: string;
 }
 
@@ -91,12 +99,21 @@ export interface DataState<T> {
 }
 
 // Generic CRUD operations
+export interface ListParams {
+  page?: number;
+  limit?: number;
+  sort?: string;
+  order?: 'asc' | 'desc';
+  filter?: Record<string, string | number | boolean>;
+  search?: string;
+}
+
 export interface CrudOperations<T, TCreate = Partial<T>, TUpdate = Partial<T>> {
   create: (data: TCreate) => Promise<T>;
   read: (id: string) => Promise<T>;
   update: (id: string, data: TUpdate) => Promise<T>;
   delete: (id: string) => Promise<void>;
-  list: (params?: Record<string, unknown>) => Promise<T[]>;
+  list: (params?: ListParams) => Promise<T[]>;
 }
 
 // Validation types
