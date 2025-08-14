@@ -4,6 +4,121 @@ import { logger } from './logger';
 
 let redisClient: Redis | null = null;
 
+// Circuit breaker states
+enum CircuitState {
+  CLOSED = 'CLOSED',
+  OPEN = 'OPEN', 
+  HALF_OPEN = 'HALF_OPEN'
+}
+
+// Circuit breaker for Redis operations
+class RedisCircuitBreaker {
+  private state: CircuitState = CircuitState.CLOSED;
+  private failureCount = 0;
+  private lastFailureTime = 0;
+  private successCount = 0;
+
+  // Circuit breaker configuration
+  private readonly failureThreshold = 5;
+  private readonly recoveryTimeout = 30000; // 30 seconds
+  private readonly successThreshold = 3;
+
+  shouldAllowRequest(): boolean {
+    const now = Date.now();
+    
+    switch (this.state) {
+      case CircuitState.CLOSED:
+        return true;
+        
+      case CircuitState.OPEN:
+        if (now - this.lastFailureTime >= this.recoveryTimeout) {
+          this.state = CircuitState.HALF_OPEN;
+          this.successCount = 0;
+          logger.info('Circuit breaker transitioning to HALF_OPEN');
+          return true;
+        }
+        return false;
+        
+      case CircuitState.HALF_OPEN:
+        return true;
+        
+      default:
+        return false;
+    }
+  }
+
+  onSuccess(): void {
+    if (this.state === CircuitState.HALF_OPEN) {
+      this.successCount++;
+      if (this.successCount >= this.successThreshold) {
+        this.state = CircuitState.CLOSED;
+        this.failureCount = 0;
+        logger.info('Circuit breaker transitioning to CLOSED');
+      }
+    } else if (this.state === CircuitState.CLOSED) {
+      this.failureCount = 0;
+    }
+  }
+
+  onFailure(): void {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+    
+    if (this.state === CircuitState.HALF_OPEN) {
+      this.state = CircuitState.OPEN;
+      logger.warn('Circuit breaker transitioning to OPEN from HALF_OPEN');
+    } else if (this.state === CircuitState.CLOSED && this.failureCount >= this.failureThreshold) {
+      this.state = CircuitState.OPEN;
+      logger.warn('Circuit breaker transitioning to OPEN due to failure threshold');
+    }
+  }
+
+  getState(): CircuitState {
+    return this.state;
+  }
+}
+
+// Retry utility with exponential backoff
+class RetryHandler {
+  static async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    maxAttempts: number = 3,
+    baseDelay: number = 1000,
+    maxDelay: number = 10000
+  ): Promise<T> {
+    let lastError: Error;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error as Error;
+        
+        if (attempt === maxAttempts) {
+          throw lastError;
+        }
+        
+        // Calculate exponential backoff with jitter
+        const delay = Math.min(
+          baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000,
+          maxDelay
+        );
+        
+        logger.warn(
+          { attempt, delay, error: error.message },
+          'Redis operation failed, retrying'
+        );
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    throw lastError!;
+  }
+}
+
+const circuitBreaker = new RedisCircuitBreaker();
+
 export function createRedisClient(): Redis {
   if (redisClient) {
     return redisClient;
@@ -62,53 +177,86 @@ export class TokenBucket {
   }
 
   async consume(tokens: number = 1): Promise<{ allowed: boolean; tokensRemaining: number; retryAfter?: number }> {
-    const now = Date.now();
-    const script = `
-      local bucket = KEYS[1]
-      local capacity = tonumber(ARGV[1])
-      local refillRate = tonumber(ARGV[2])
-      local refillInterval = tonumber(ARGV[3])
-      local tokens = tonumber(ARGV[4])
-      local now = tonumber(ARGV[5])
-      
-      local bucket_data = redis.call('HMGET', bucket, 'tokens', 'lastRefill')
-      local currentTokens = tonumber(bucket_data[1]) or capacity
-      local lastRefill = tonumber(bucket_data[2]) or now
-      
-      -- Calculate tokens to add based on time elapsed
-      local timePassed = now - lastRefill
-      local tokensToAdd = math.floor(timePassed / refillInterval) * refillRate
-      currentTokens = math.min(capacity, currentTokens + tokensToAdd)
-      
-      -- Check if request can be satisfied
-      if currentTokens >= tokens then
-        currentTokens = currentTokens - tokens
-        redis.call('HMSET', bucket, 'tokens', currentTokens, 'lastRefill', now)
-        redis.call('EXPIRE', bucket, 3600) -- 1 hour TTL
-        return {1, currentTokens, 0} -- allowed, remaining, retryAfter
-      else
-        redis.call('HMSET', bucket, 'tokens', currentTokens, 'lastRefill', now)
-        redis.call('EXPIRE', bucket, 3600)
-        local retryAfter = math.ceil((tokens - currentTokens) / refillRate) * refillInterval
-        return {0, currentTokens, retryAfter} -- not allowed, remaining, retryAfter
-      end
-    `;
+    // Check circuit breaker first
+    if (!circuitBreaker.shouldAllowRequest()) {
+      logger.warn('Redis circuit breaker is OPEN, falling back to permissive rate limiting');
+      return this.fallbackRateLimit(tokens);
+    }
 
-    const result = await this.redis.eval(
-      script,
-      1,
-      this.bucket,
-      this.capacity.toString(),
-      this.refillRate.toString(),
-      this.refillInterval.toString(),
-      tokens.toString(),
-      now.toString()
-    ) as [number, number, number];
+    try {
+      const result = await RetryHandler.executeWithRetry(async () => {
+        const now = Date.now();
+        const script = `
+          local bucket = KEYS[1]
+          local capacity = tonumber(ARGV[1])
+          local refillRate = tonumber(ARGV[2])
+          local refillInterval = tonumber(ARGV[3])
+          local tokens = tonumber(ARGV[4])
+          local now = tonumber(ARGV[5])
+          
+          local bucket_data = redis.call('HMGET', bucket, 'tokens', 'lastRefill')
+          local currentTokens = tonumber(bucket_data[1]) or capacity
+          local lastRefill = tonumber(bucket_data[2]) or now
+          
+          -- Calculate tokens to add based on time elapsed
+          local timePassed = now - lastRefill
+          local tokensToAdd = math.floor(timePassed / refillInterval) * refillRate
+          currentTokens = math.min(capacity, currentTokens + tokensToAdd)
+          
+          -- Check if request can be satisfied
+          if currentTokens >= tokens then
+            currentTokens = currentTokens - tokens
+            redis.call('HMSET', bucket, 'tokens', currentTokens, 'lastRefill', now)
+            redis.call('EXPIRE', bucket, 3600) -- 1 hour TTL
+            return {1, currentTokens, 0} -- allowed, remaining, retryAfter
+          else
+            redis.call('HMSET', bucket, 'tokens', currentTokens, 'lastRefill', now)
+            redis.call('EXPIRE', bucket, 3600)
+            local retryAfter = math.ceil((tokens - currentTokens) / refillRate) * refillInterval
+            return {0, currentTokens, retryAfter} -- not allowed, remaining, retryAfter
+          end
+        `;
 
+        return await this.redis.eval(
+          script,
+          1,
+          this.bucket,
+          this.capacity.toString(),
+          this.refillRate.toString(),
+          this.refillInterval.toString(),
+          tokens.toString(),
+          now.toString()
+        ) as [number, number, number];
+      });
+
+      circuitBreaker.onSuccess();
+
+      return {
+        allowed: result[0] === 1,
+        tokensRemaining: result[1],
+        retryAfter: result[2] > 0 ? result[2] : undefined,
+      };
+    } catch (error) {
+      circuitBreaker.onFailure();
+      logger.error({ error, bucket: this.bucket }, 'Token bucket operation failed, using fallback');
+      return this.fallbackRateLimit(tokens);
+    }
+  }
+
+  // Fallback rate limiting when Redis is unavailable
+  private fallbackRateLimit(tokens: number): { allowed: boolean; tokensRemaining: number; retryAfter?: number } {
+    // Simple in-memory fallback with conservative limits
+    const fallbackCapacity = Math.min(this.capacity, 10); // More restrictive when Redis is down
+    
+    logger.info(
+      { bucket: this.bucket, fallbackCapacity, requestedTokens: tokens },
+      'Using fallback rate limiting'
+    );
+    
     return {
-      allowed: result[0] === 1,
-      tokensRemaining: result[1],
-      retryAfter: result[2] > 0 ? result[2] : undefined,
+      allowed: tokens <= fallbackCapacity,
+      tokensRemaining: Math.max(0, fallbackCapacity - tokens),
+      retryAfter: tokens > fallbackCapacity ? 60000 : undefined, // 1 minute retry for fallback
     };
   }
 }
@@ -116,26 +264,112 @@ export class TokenBucket {
 // Cache utilities
 export class CacheManager {
   private redis: Redis;
+  private memoryCache: Map<string, { value: any; expiry: number }> = new Map();
 
   constructor() {
     this.redis = createRedisClient();
+    
+    // Clean up expired memory cache entries periodically
+    setInterval(() => this.cleanupMemoryCache(), 60000); // Every minute
+  }
+
+  private cleanupMemoryCache(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.memoryCache.entries()) {
+      if (entry.expiry <= now) {
+        this.memoryCache.delete(key);
+      }
+    }
   }
 
   async set(key: string, value: any, ttlSeconds: number): Promise<void> {
-    await this.redis.setex(key, ttlSeconds, JSON.stringify(value));
+    // Always update memory cache for fallback
+    const expiry = Date.now() + (ttlSeconds * 1000);
+    this.memoryCache.set(key, { value, expiry });
+
+    if (!circuitBreaker.shouldAllowRequest()) {
+      logger.warn({ key }, 'Redis circuit breaker is OPEN, using memory cache only');
+      return;
+    }
+
+    try {
+      await RetryHandler.executeWithRetry(async () => {
+        await this.redis.setex(key, ttlSeconds, JSON.stringify(value));
+      });
+      circuitBreaker.onSuccess();
+    } catch (error) {
+      circuitBreaker.onFailure();
+      logger.warn({ error, key }, 'Redis set failed, value stored in memory cache only');
+    }
   }
 
   async get<T>(key: string): Promise<T | null> {
-    const value = await this.redis.get(key);
-    return value ? JSON.parse(value) : null;
+    // Try Redis first if circuit breaker allows
+    if (circuitBreaker.shouldAllowRequest()) {
+      try {
+        const result = await RetryHandler.executeWithRetry(async () => {
+          const value = await this.redis.get(key);
+          return value ? JSON.parse(value) : null;
+        });
+        circuitBreaker.onSuccess();
+        
+        if (result !== null) {
+          return result;
+        }
+      } catch (error) {
+        circuitBreaker.onFailure();
+        logger.warn({ error, key }, 'Redis get failed, trying memory cache fallback');
+      }
+    }
+
+    // Fallback to memory cache
+    const memoryEntry = this.memoryCache.get(key);
+    if (memoryEntry && memoryEntry.expiry > Date.now()) {
+      logger.debug({ key }, 'Cache hit from memory fallback');
+      return memoryEntry.value;
+    }
+
+    return null;
   }
 
   async del(key: string): Promise<void> {
-    await this.redis.del(key);
+    // Remove from memory cache immediately
+    this.memoryCache.delete(key);
+
+    if (!circuitBreaker.shouldAllowRequest()) {
+      logger.warn({ key }, 'Redis circuit breaker is OPEN, deleted from memory cache only');
+      return;
+    }
+
+    try {
+      await RetryHandler.executeWithRetry(async () => {
+        await this.redis.del(key);
+      });
+      circuitBreaker.onSuccess();
+    } catch (error) {
+      circuitBreaker.onFailure();
+      logger.warn({ error, key }, 'Redis delete failed, removed from memory cache only');
+    }
   }
 
   async exists(key: string): Promise<boolean> {
-    return (await this.redis.exists(key)) === 1;
+    // Try Redis first if circuit breaker allows
+    if (circuitBreaker.shouldAllowRequest()) {
+      try {
+        const result = await RetryHandler.executeWithRetry(async () => {
+          return (await this.redis.exists(key)) === 1;
+        });
+        circuitBreaker.onSuccess();
+        return result;
+      } catch (error) {
+        circuitBreaker.onFailure();
+        logger.warn({ error, key }, 'Redis exists failed, checking memory cache fallback');
+      }
+    }
+
+    // Fallback to memory cache
+    const memoryEntry = this.memoryCache.get(key);
+    return memoryEntry !== undefined && memoryEntry.expiry > Date.now();
   }
 
   // Cache classification results
