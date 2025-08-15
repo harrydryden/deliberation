@@ -268,18 +268,6 @@ export const AdminDeliberationView = () => {
                               Submitted to IBIS
                             </Badge>
                           )}
-                          {hasAgentResponses && (
-                            <div className="flex items-center gap-1 ml-auto">
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                              )}
-                              <span className="text-xs text-muted-foreground">
-                                {group.agentResponses.length} response{group.agentResponses.length !== 1 ? 's' : ''}
-                              </span>
-                            </div>
-                          )}
                         </div>
 
                         <Card className={`p-3 ${
@@ -291,6 +279,19 @@ export const AdminDeliberationView = () => {
                             <MarkdownMessage content={group.userMessage.content} />
                           </div>
                         </Card>
+
+                        {hasAgentResponses && (
+                          <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                            <span>
+                              {group.agentResponses.length} response{group.agentResponses.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     
