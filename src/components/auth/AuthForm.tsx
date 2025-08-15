@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Network, Shield } from "lucide-react";
+import { Loader2, Network } from "lucide-react";
 import { getErrorMessage, ValidationError } from "@/utils/errors";
 import { accessCodeSchema, sanitizeInput, validateAndSanitize } from "@/utils/validation";
 import { SecureAuthService } from "@/services/secureAuth.service";
@@ -141,7 +141,7 @@ export const AuthForm = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center mb-2">
-            <Shield className="h-6 w-6 text-democratic-blue mr-2" />
+            <Network className="h-6 w-6 text-democratic-blue mr-2" />
             <CardTitle className="text-2xl font-bold text-democratic-blue">
               Deliberation
             </CardTitle>
