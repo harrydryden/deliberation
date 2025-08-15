@@ -23,6 +23,7 @@ interface DeliberationOverviewProps {
 }
 
 export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateStatus }: DeliberationOverviewProps) => {
+  console.log('🔍 DeliberationOverview - Component rendered with deliberations:', deliberations.length);
   const [updating, setUpdating] = useState<string | null>(null);
   const [selectedDeliberation, setSelectedDeliberation] = useState<Deliberation | null>(null);
   const [editMode, setEditMode] = useState<'nodes' | 'map' | null>(null);
@@ -61,8 +62,10 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
   };
 
   const handleEditNodes = (deliberation: Deliberation) => {
+    console.log('🔍 DeliberationOverview - Edit Nodes clicked for deliberation:', deliberation.id, deliberation.title);
     setSelectedDeliberation(deliberation);
     setEditMode('nodes');
+    console.log('🔍 DeliberationOverview - State set, editMode should now be "nodes"');
   };
 
   const handleEditMap = (deliberation: Deliberation) => {
