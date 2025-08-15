@@ -32,6 +32,7 @@ interface IbisNodeManagementProps {
 }
 
 export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }: IbisNodeManagementProps) => {
+  console.log('🔍 IbisNodeManagement - Component initialized with props:', { deliberationId, deliberationTitle });
   const [nodes, setNodes] = useState<IbisNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingNode, setEditingNode] = useState<IbisNode | null>(null);

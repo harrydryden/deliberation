@@ -129,13 +129,18 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
 
   if (selectedDeliberation && editMode === 'nodes') {
     console.log('🔍 DeliberationOverview - Rendering IbisNodeManagement');
-    return (
-      <IbisNodeManagement
-        deliberationId={selectedDeliberation.id}
-        deliberationTitle={selectedDeliberation.title}
-        onBack={handleBackFromEdit}
-      />
-    );
+    try {
+      return (
+        <IbisNodeManagement
+          deliberationId={selectedDeliberation.id}
+          deliberationTitle={selectedDeliberation.title}
+          onBack={handleBackFromEdit}
+        />
+      );
+    } catch (error) {
+      console.error('🚨 Error rendering IbisNodeManagement:', error);
+      return <div>Error loading node management</div>;
+    }
   }
 
   if (selectedDeliberation && editMode === 'map') {
