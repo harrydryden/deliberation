@@ -172,13 +172,40 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         throw nodesError;
       }
       
-      // Fetch relationships
+      // Fetch IBIS relationships with similar fallback approach
       console.log('🔍 Fetching IBIS relationships for deliberation:', deliberationId);
-      const { data: relationshipsData, error: relationshipsError } = await supabase
-        .from('ibis_relationships')
-        .select('*')
-        .eq('deliberation_id', deliberationId)
-        .order('created_at', { ascending: true });
+      
+      let relationshipsData, relationshipsError;
+      
+      try {
+        const result = await supabase
+          .from('ibis_relationships')
+          .select('*')
+          .eq('deliberation_id', deliberationId)
+          .order('created_at', { ascending: true });
+          
+        relationshipsData = result.data;
+        relationshipsError = result.error;
+        
+        // If we get empty results but no error, use the admin RPC
+        if (!relationshipsError && (!relationshipsData || relationshipsData.length === 0)) {
+          console.log('🔍 Empty relationships from RLS query, trying direct query...');
+          
+          const directResult = await supabase.rpc('admin_get_ibis_relationships', {
+            target_deliberation_id: deliberationId
+          });
+          
+          if (directResult.error) {
+            console.log('🔍 Direct RPC call for relationships failed, continuing with empty result');
+          } else {
+            console.log('🔍 Found relationships via direct query:', directResult.data?.length || 0);
+            relationshipsData = directResult.data || [];
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error in IBIS relationships query:', error);
+        relationshipsError = error;
+      }
 
       console.log('🔍 IBIS relationships query result:', { relationshipsData, relationshipsError });
 

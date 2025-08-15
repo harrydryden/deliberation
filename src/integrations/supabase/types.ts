@@ -1172,6 +1172,36 @@ export type Database = {
       }
     }
     Functions: {
+      admin_get_ibis_nodes: {
+        Args: { target_deliberation_id: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          deliberation_id: string
+          description: string
+          embedding: string
+          id: string
+          message_id: string
+          node_type: string
+          parent_node_id: string
+          position_x: number
+          position_y: number
+          title: string
+          updated_at: string
+        }[]
+      }
+      admin_get_ibis_relationships: {
+        Args: { target_deliberation_id: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          deliberation_id: string
+          id: string
+          relationship_type: string
+          source_node_id: string
+          target_node_id: string
+        }[]
+      }
       assign_access_codes_to_users: {
         Args: Record<PropertyKey, never>
         Returns: undefined
