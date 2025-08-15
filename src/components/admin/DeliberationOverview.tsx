@@ -120,7 +120,15 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
     }
   };
 
+  console.log('🔍 DeliberationOverview - Render check:', {
+    selectedDeliberation: selectedDeliberation?.id,
+    editMode,
+    shouldRenderNodes: selectedDeliberation && editMode === 'nodes',
+    shouldRenderMap: selectedDeliberation && editMode === 'map'
+  });
+
   if (selectedDeliberation && editMode === 'nodes') {
+    console.log('🔍 DeliberationOverview - Rendering IbisNodeManagement');
     return (
       <IbisNodeManagement
         deliberationId={selectedDeliberation.id}
