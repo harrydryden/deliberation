@@ -133,10 +133,10 @@ export const useAdminData = () => {
   const fetchAgents = async () => {
     setLoadingAgents(true);
     try {
-      const data = await services.agentService.getAgents();
+      const data = await services.agentService.getGlobalAgents();
       setAgents(data);
     } catch (error) {
-      handleError(error, 'fetch agents');
+      handleError(error, 'fetch global agents');
     } finally {
       setLoadingAgents(false);
     }
