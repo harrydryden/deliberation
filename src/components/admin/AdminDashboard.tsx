@@ -81,8 +81,8 @@ export const AdminDashboard = () => {
             loadingAccessCodes={adminData.loadingAccessCodes}
             onLoadUsers={adminData.fetchUsers}
             onLoadAccessCodes={adminData.fetchAccessCodes}
-            onUpdateRole={async () => {}} // TODO: implement
-            onDeleteUser={async () => {}} // TODO: implement
+            onUpdateRole={adminData.updateUserRole}
+            onDeleteUser={adminData.deleteUser}
             onCreateAccessCode={adminData.createAccessCode}
             onDeleteAccessCode={adminData.deleteAccessCode}
           />

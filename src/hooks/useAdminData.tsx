@@ -58,6 +58,26 @@ export const useAdminData = () => {
     }
   };
 
+  const updateUserRole = async (userId: string, role: string) => {
+    try {
+      await services.userService.updateUserRole(userId, role);
+      toast.success('User role updated successfully');
+      await fetchUsers();
+    } catch (error) {
+      handleError(error, 'update user role');
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    try {
+      await services.userService.deleteUser(userId);
+      toast.success('User deleted successfully');
+      await fetchUsers();
+    } catch (error) {
+      handleError(error, 'delete user');
+    }
+  };
+
   // Access Code operations
   const fetchAccessCodes = async () => {
     setLoadingAccessCodes(true);
@@ -162,6 +182,8 @@ export const useAdminData = () => {
 
     // Operations
     fetchUsers,
+    updateUserRole,
+    deleteUser,
     fetchAccessCodes,
     createAccessCode,
     deleteAccessCode,
