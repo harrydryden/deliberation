@@ -111,7 +111,21 @@ export class AgentRepository extends BaseRepository<Agent> implements IAgentRepo
         throw error;
       }
 
-      return data as Agent[];
+      // Map database format to API format
+      return data.map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        system_prompt: item.system_prompt,
+        response_style: item.response_style,
+        goals: item.goals,
+        agent_type: item.agent_type,
+        facilitator_config: item.facilitator_config,
+        is_default: item.is_default,
+        isActive: item.is_active,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      })) as Agent[];
     } catch (error) {
       logger.error({ error, filter }, 'Agent repository findAll failed');
       throw error;

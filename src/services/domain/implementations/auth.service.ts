@@ -95,9 +95,14 @@ export class AuthService implements IAuthService {
       return {
         user: {
           id: data.user.id,
-          display_name: email.split('@')[0],
+          accessCode: '',
           role: 'user',
-          user_role: 'user',
+          profile: {
+            displayName: email.split('@')[0],
+            avatarUrl: '',
+            bio: '',
+            expertiseAreas: [],
+          },
         } as User,
         session: data.session,
       };

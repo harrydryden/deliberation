@@ -11,28 +11,35 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
 
   async findByEmail(email: string): Promise<User | null> {
     try {
-      // First get the user from auth.users table using the email
-      const { data: authUser, error: authError } = await supabase.auth.admin.getUserByEmail(email);
-      
-      if (authError || !authUser.user) {
+      // Search for user by email in profiles table (assuming email is stored there)
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        logger.error('User repository findByEmail error', error, { email });
+        throw error;
+      }
+
+      if (!profile) {
         return null;
       }
 
-      // Then get the profile data
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.user.id)
-        .single();
-
-      if (profileError && profileError.code !== 'PGRST116') {
-        logger.error({ error: profileError, email }, 'User repository findByEmail error');
-        throw profileError;
-      }
-
-      return profile as User | null;
+      return {
+        id: profile.id,
+        accessCode: '', // Will be populated from context
+        role: profile.user_role || 'user',
+        profile: {
+          displayName: profile.display_name || '',
+          avatarUrl: profile.avatar_url || '',
+          bio: profile.bio || '',
+          expertiseAreas: profile.expertise_areas || [],
+        },
+      } as User;
     } catch (error) {
-      logger.error({ error, email }, 'User repository findByEmail failed');
+      logger.error('User repository findByEmail failed', error, { email });
       throw error;
     }
   }
@@ -45,13 +52,13 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
         .eq('id', userId);
 
       if (error) {
-        logger.error({ error, userId, role }, 'User repository updateRole error');
+        logger.error('User repository updateRole error', error, { userId, role });
         throw error;
       }
 
-      logger.info({ userId, role }, 'User role updated successfully');
+      logger.info('User role updated successfully', { userId, role });
     } catch (error) {
-      logger.error({ error, userId, role }, 'User repository updateRole failed');
+      logger.error('User repository updateRole failed', error, { userId, role });
       throw error;
     }
   }
@@ -82,13 +89,24 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
       const { data, error } = await query;
       
       if (error) {
-        logger.error({ error, filter }, 'User repository findAll error');
+        logger.error('User repository findAll error', error, { filter });
         throw error;
       }
       
-      return data as User[];
+      // Map database format to API format
+      return data.map(item => ({
+        id: item.id,
+        accessCode: '', // Will be populated from context if needed
+        role: item.user_role || item.role || 'user',
+        profile: {
+          displayName: item.display_name || '',
+          avatarUrl: item.avatar_url || '',
+          bio: item.bio || '',
+          expertiseAreas: item.expertise_areas || [],
+        },
+      })) as User[];
     } catch (error) {
-      logger.error({ error, filter }, 'User repository findAll failed');
+      logger.error('User repository findAll failed', error, { filter });
       throw error;
     }
   }

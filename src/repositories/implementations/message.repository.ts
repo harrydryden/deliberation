@@ -18,13 +18,13 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
         .order('created_at', { ascending: true });
 
       if (error) {
-        logger.error({ error, deliberationId }, 'Message repository findByDeliberation error');
+        logger.error('Message repository findByDeliberation error', error, { deliberationId });
         throw error;
       }
 
       return data as Message[];
     } catch (error) {
-      logger.error({ error, deliberationId }, 'Message repository findByDeliberation failed');
+      logger.error('Message repository findByDeliberation failed', error, { deliberationId });
       throw error;
     }
   }
@@ -38,40 +38,57 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
         .order('created_at', { ascending: false });
 
       if (error) {
-        logger.error({ error, userId }, 'Message repository findByUser error');
+        logger.error('Message repository findByUser error', error, { userId });
         throw error;
       }
 
       return data as Message[];
     } catch (error) {
-      logger.error({ error, userId }, 'Message repository findByUser failed');
+      logger.error('Message repository findByUser failed', error, { userId });
       throw error;
     }
   }
 
   // Enhanced create method for messages with agent response triggering
-  async create(data: Omit<Message, 'id' | 'created_at' | 'updated_at'>): Promise<Message> {
+  async create(data: Omit<Message, 'id' | 'createdAt' | 'updatedAt'>): Promise<Message> {
     try {
+      // Map the data to database column names
+      const dbData = {
+        content: data.content,
+        message_type: data.messageType,
+        user_id: data.userId,
+        deliberation_id: (data as any).deliberationId,
+      };
+
       const { data: result, error } = await supabase
         .from('messages')
-        .insert(data)
+        .insert(dbData)
         .select()
         .single();
 
       if (error) {
-        logger.error({ error, data }, 'Message repository create error');
+        logger.error('Message repository create error', error, { data });
         throw error;
       }
 
       // Trigger agent responses for user messages in deliberations
-      if (data.message_type === 'user' && data.deliberation_id) {
-        this.triggerAgentResponses(result.id, data.deliberation_id);
+      if (data.messageType === 'user' && (data as any).deliberationId) {
+        this.triggerAgentResponses(result.id, (data as any).deliberationId);
       }
 
-      logger.info({ messageId: result.id, type: data.message_type }, 'Message created successfully');
-      return result as Message;
+      logger.info('Message created successfully', { messageId: result.id, type: data.messageType });
+      
+      // Map back to API format
+      return {
+        id: result.id,
+        content: result.content,
+        messageType: result.message_type,
+        userId: result.user_id,
+        createdAt: result.created_at,
+        updatedAt: result.updated_at,
+      } as Message;
     } catch (error) {
-      logger.error({ error, data }, 'Message repository create failed');
+      logger.error('Message repository create failed', error, { data });
       throw error;
     }
   }
@@ -88,12 +105,12 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
       });
 
       if (error) {
-        logger.warn({ error, messageId, deliberationId }, 'Agent response trigger failed');
+        logger.warn('Agent response trigger failed', { error, messageId, deliberationId });
       } else {
-        logger.info({ messageId, deliberationId }, 'Agent responses triggered');
+        logger.info('Agent responses triggered', { messageId, deliberationId });
       }
     } catch (error) {
-      logger.warn({ error, messageId, deliberationId }, 'Agent response trigger error');
+      logger.warn('Agent response trigger error', { error, messageId, deliberationId });
     }
   }
 }

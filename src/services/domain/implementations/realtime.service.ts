@@ -43,16 +43,32 @@ export class RealtimeService implements IRealtimeService {
             schema: 'public',
             table: 'deliberations',
           },
-          (payload) => {
+           (payload) => {
+            const { new: new_record, old: old_record, eventType } = payload;
+            
             logger.info('Deliberation change received via realtime', { 
-              deliberationId: payload.new?.id || payload.old?.id,
-              event: payload.eventType 
+              deliberationId: (new_record as any)?.id || (old_record as any)?.id,
+              event: eventType 
             });
             
-            if (payload.eventType === 'DELETE') {
-              callback({ ...payload.old, deleted: true } as Deliberation);
-            } else {
-              callback(payload.new as Deliberation);
+            if (eventType === 'DELETE') {
+              callback({
+                id: (old_record as any)?.id || '',
+                title: '',
+                description: '',
+                status: 'deleted',
+                createdAt: '',
+                updatedAt: '',
+              } as Deliberation);
+            } else if (new_record && (new_record as any).id) {
+              callback({
+                id: (new_record as any).id,
+                title: (new_record as any).title || '',
+                description: (new_record as any).description || '',
+                status: (new_record as any).status || '',
+                createdAt: (new_record as any).created_at || '',
+                updatedAt: (new_record as any).updated_at || '',
+              } as Deliberation);
             }
           }
         )

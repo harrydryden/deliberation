@@ -104,7 +104,16 @@ export class DeliberationRepository extends BaseRepository<Deliberation> impleme
         throw error;
       }
 
-      return data as Deliberation[];
+      // Map database format to API format
+      return data.map(item => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        notion: item.notion,
+        status: item.status,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      })) as Deliberation[];
     } catch (error) {
       logger.error({ error, filter }, 'Deliberation repository findAll failed');
       throw error;

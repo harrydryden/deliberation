@@ -26,28 +26,44 @@ class Logger {
     return context ? `${prefix} ${message} ${JSON.stringify(context)}` : `${prefix} ${message}`;
   }
 
-  debug(message: string, context?: any): void {
+  debug(message: string | any, context?: any): void {
     if (this.shouldLog(LogLevel.DEBUG)) {
-      console.log(this.formatMessage('DEBUG', message, context));
+      if (typeof message === 'object') {
+        console.log(this.formatMessage('DEBUG', 'Debug info', message));
+      } else {
+        console.log(this.formatMessage('DEBUG', message, context));
+      }
     }
   }
 
-  info(message: string, context?: any): void {
+  info(message: string | any, context?: any): void {
     if (this.shouldLog(LogLevel.INFO)) {
-      console.info(this.formatMessage('INFO', message, context));
+      if (typeof message === 'object') {
+        console.info(this.formatMessage('INFO', 'Info', message));
+      } else {
+        console.info(this.formatMessage('INFO', message, context));
+      }
     }
   }
 
-  warn(message: string, context?: any): void {
+  warn(message: string | any, context?: any): void {
     if (this.shouldLog(LogLevel.WARN)) {
-      console.warn(this.formatMessage('WARN', message, context));
+      if (typeof message === 'object') {
+        console.warn(this.formatMessage('WARN', 'Warning', message));
+      } else {
+        console.warn(this.formatMessage('WARN', message, context));
+      }
     }
   }
 
-  error(message: string, error?: Error | any, context?: any): void {
+  error(message: string | any, error?: Error | any, context?: any): void {
     if (this.shouldLog(LogLevel.ERROR)) {
-      const errorInfo = error instanceof Error ? { message: error.message, stack: error.stack } : error;
-      console.error(this.formatMessage('ERROR', message, { error: errorInfo, ...context }));
+      if (typeof message === 'object') {
+        console.error(this.formatMessage('ERROR', 'Error occurred', message));
+      } else {
+        const errorInfo = error instanceof Error ? { message: error.message, stack: error.stack } : error;
+        console.error(this.formatMessage('ERROR', message, { error: errorInfo, ...context }));
+      }
     }
   }
 
