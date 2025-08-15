@@ -147,7 +147,7 @@ export const AuthForm = () => {
             </CardTitle>
           </div>
           <CardDescription>
-            Enter your access code to join the deliberation
+            welcome to the conversation
           </CardDescription>
           {remainingTime > 0 && (
             <div className="text-sm text-red-600 mt-2">
