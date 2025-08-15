@@ -1,4 +1,4 @@
-import { useAuthService } from '@/hooks/useServices';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 

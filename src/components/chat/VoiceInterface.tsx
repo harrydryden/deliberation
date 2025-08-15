@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown, Type, AudioLines } from 'lucide-react';
 import { RealtimeRTC } from '@/utils/realtimeRtc';
-import { useBackendChat } from '@/hooks/useBackendChat';
+import { useChat } from '@/hooks/useChat';
 
 interface VoiceInterfaceProps {
   deliberationId: string;
@@ -31,7 +31,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   const [sttBusy, setSttBusy] = useState(false);
   
   // Chat sender for deliberation messages
-  const { sendMessage: sendChatMessage } = useBackendChat(deliberationId);
+  const { sendMessage: sendChatMessage } = useChat(deliberationId);
   const selectPreferred = async (next: 'bill' | 'ibis' | 'stt') => {
     setPreferred(next);
     if (mode !== 'idle') {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useAuthService } from "@/hooks/useServices";
+import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { MessageSquare, Users, Vote, Brain, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 const Index = () => {
-  const authService = useAuthService();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const deliberationService = useDeliberationService();
   const [deliberations, setDeliberations] = useState<any[]>([]);

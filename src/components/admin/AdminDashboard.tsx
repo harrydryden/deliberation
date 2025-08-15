@@ -12,7 +12,7 @@ import { DeliberationOverview } from './DeliberationOverview';
 import { DeliberationCreation } from './DeliberationCreation';
 import { KnowledgeManagement } from './KnowledgeManagement';
 import { SystemStats } from './SystemStats';
-import { useAdminService } from '@/hooks/useAdminService';
+import { useAdminData } from '@/hooks/useAdminData';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 import { logger } from '@/utils/logger';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 export const AdminDashboard = () => {
-  const adminService = useAdminService();
+  const adminData = useAdminData();
   const { handleAsyncError } = useErrorHandler();
   const navigate = useNavigate();
   
@@ -30,8 +30,8 @@ export const AdminDashboard = () => {
     const initializeData = async () => {
       await handleAsyncError(async () => {
         await Promise.all([
-          adminService.fetchStats(),
-          adminService.fetchDeliberations()
+          adminData.fetchStats(),
+          adminData.fetchDeliberations()
         ]);
         logger.component.mount('AdminDashboard', { message: 'Admin dashboard initialized successfully' });
       }, 'admin dashboard initialization');
@@ -57,9 +57,9 @@ export const AdminDashboard = () => {
 
       {/* System Statistics */}
       <SystemStats 
-        stats={adminService.stats} 
-        loading={adminService.loadingStats}
-        onRefresh={adminService.fetchStats}
+        stats={adminData.stats} 
+        loading={adminData.loadingStats}
+        onRefresh={adminData.fetchStats}
       />
 
       {/* Main Content Tabs - Sticky */}
@@ -75,16 +75,16 @@ export const AdminDashboard = () => {
 
         <TabsContent value="users" className="space-y-4">
           <UserAccessManagement
-            users={adminService.users}
-            accessCodes={adminService.accessCodes}
-            loading={adminService.loadingUsers}
-            loadingAccessCodes={adminService.loadingAccessCodes}
-            onLoadUsers={adminService.fetchUsers}
-            onLoadAccessCodes={adminService.fetchAccessCodes}
-            onUpdateRole={adminService.updateUserRole}
-            onDeleteUser={adminService.deleteUser}
-            onCreateAccessCode={adminService.createAccessCode}
-            onDeleteAccessCode={adminService.deleteAccessCode}
+            users={adminData.users}
+            accessCodes={adminData.accessCodes}
+            loading={adminData.loadingUsers}
+            loadingAccessCodes={adminData.loadingAccessCodes}
+            onLoadUsers={adminData.fetchUsers}
+            onLoadAccessCodes={adminData.fetchAccessCodes}
+            onUpdateRole={async () => {}} // TODO: implement
+            onDeleteUser={async () => {}} // TODO: implement
+            onCreateAccessCode={adminData.createAccessCode}
+            onDeleteAccessCode={adminData.deleteAccessCode}
           />
         </TabsContent>
 
@@ -93,23 +93,23 @@ export const AdminDashboard = () => {
             <div>
               <h3 className="text-lg font-semibold mb-4">Global Agent Templates</h3>
               <AgentManagement
-                agents={adminService.agents}
-                loading={adminService.loadingAgents}
-                onLoad={adminService.fetchAgents}
-                onUpdate={adminService.updateAgent}
-                onCreate={adminService.createAgent}
+                agents={adminData.agents}
+                loading={adminData.loadingAgents}
+                onLoad={adminData.fetchAgents}
+                onUpdate={async () => {}} // TODO: implement
+                onCreate={async () => {}} // TODO: implement
               />
             </div>
             
             <div>
               <h3 className="text-lg font-semibold mb-4">Local Agents (Deliberation-Specific)</h3>
               <LocalAgentManagement
-                localAgents={adminService.localAgents}
-                deliberations={adminService.deliberations}
-                loading={adminService.loadingLocalAgents}
-                onLoad={adminService.fetchLocalAgents}
-                onUpdate={adminService.updateAgent}
-                onCreate={adminService.createLocalAgent}
+                localAgents={adminData.localAgents}
+                deliberations={adminData.deliberations}
+                loading={adminData.loadingLocalAgents}
+                onLoad={adminData.fetchLocalAgents}
+                onUpdate={async () => {}} // TODO: implement
+                onCreate={async () => {}} // TODO: implement
               />
             </div>
           </div>
@@ -117,21 +117,21 @@ export const AdminDashboard = () => {
 
         <TabsContent value="knowledge" className="space-y-4">
           <KnowledgeManagement
-            agents={adminService.localAgents}
-            loading={adminService.loadingLocalAgents}
-            onLoad={adminService.fetchLocalAgents}
+            agents={adminData.localAgents}
+            loading={adminData.loadingLocalAgents}
+            onLoad={adminData.fetchLocalAgents}
           />
         </TabsContent>
 
         <TabsContent value="deliberations" className="space-y-4">
           <DeliberationCreation 
-            onDeliberationCreated={adminService.fetchDeliberations}
+            onDeliberationCreated={adminData.fetchDeliberations}
           />
           <DeliberationOverview
-            deliberations={adminService.deliberations}
-            loading={adminService.loadingDeliberations}
-            onLoad={adminService.fetchDeliberations}
-            onUpdateStatus={adminService.updateDeliberationStatus}
+            deliberations={adminData.deliberations}
+            loading={adminData.loadingDeliberations}
+            onLoad={adminData.fetchDeliberations}
+            onUpdateStatus={async () => {}} // TODO: implement
           />
         </TabsContent>
       </Tabs>

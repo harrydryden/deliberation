@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthService } from "@/hooks/useServices";
+import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/layout/Layout";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 
 const Admin = () => {
-  const authService = useAuthService();
+  const { user, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {

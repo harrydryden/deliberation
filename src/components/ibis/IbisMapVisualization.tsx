@@ -30,7 +30,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RefreshCw, Plus, Search, Filter, MessageSquare, GitBranch } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuthService } from '@/hooks/useServices';
+import { useAuth } from '@/hooks/useAuth';
 import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceDirectedLayout, getNodeDimensions } from './ibis-layout';
 import { logger } from '@/utils/logger';
 
@@ -102,7 +102,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
   const [loading, setLoading] = useState(true);
 const [filterType, setFilterType] = useState<'all' | 'issue' | 'position' | 'argument'>('all');
 const { toast } = useToast();
-const authService = useAuthService();
+const { user } = useAuth();
   
   const [isGuideCollapsed, setIsGuideCollapsed] = useState(true);
   const [isOptimizingLayout, setIsOptimizingLayout] = useState(true);

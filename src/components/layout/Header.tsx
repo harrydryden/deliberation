@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { useAuthService } from "@/hooks/useServices";
+import { useAuth } from "@/hooks/useAuth";
 import { LogOut, User, MessageSquare, Settings, Brain } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 
 export const Header = () => {
-  const authService = useAuthService();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
   return (

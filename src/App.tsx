@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ServiceProvider } from "@/hooks/useServices";
+import { AuthProvider } from "@/hooks/useAuth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthLoadingBoundary } from "@/components/auth/AuthLoadingBoundary";
 import { useServices } from "@/hooks/useServices";
@@ -21,6 +22,7 @@ const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <ServiceProvider>
+        <AuthProvider>
         <AuthLoadingBoundary>
           <TooltipProvider>
             <Toaster />
@@ -41,6 +43,7 @@ const App = () => (
             </BrowserRouter>
           </TooltipProvider>
         </AuthLoadingBoundary>
+        </AuthProvider>
       </ServiceProvider>
     </QueryClientProvider>
   </ErrorBoundary>

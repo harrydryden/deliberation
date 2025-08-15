@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthService } from "@/hooks/useServices";
+import { useAuth } from "@/hooks/useAuth";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 
 const Auth = () => {
   console.log('🔍 Auth page component rendering');
-  const authService = useAuthService();
+  const { user, isLoading } = useAuth();
   console.log('🔍 Auth state:', { user: !!user, isLoading });
   const navigate = useNavigate();
   const deliberationService = useDeliberationService();

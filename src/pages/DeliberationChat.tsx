@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuthService } from "@/hooks/useServices";
+import { useAuth } from "@/hooks/useAuth";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 import { Layout } from "@/components/layout/Layout";
 import { MessageList } from "@/components/chat/MessageList";
@@ -8,7 +8,7 @@ import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
 const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({ default: m.IbisMapVisualization })));
-import { useBackendChat } from "@/hooks/useBackendChat";
+import { useChat } from "@/hooks/useChat";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ const DeliberationChat = () => {
   } = useParams<{
     deliberationId: string;
   }>();
-  const authService = useAuthService();
+  const { user, isLoading } = useAuth();
   const navigate = useNavigate();
   const {
     toast
@@ -76,7 +76,7 @@ const DeliberationChat = () => {
     sendMessage: originalSendMessage,
     loadChatHistory,
     retryMessage
-  } = useBackendChat(deliberationId);
+  } = useChat(deliberationId);
   const sendMessage = async (content: string) => {
     await originalSendMessage(content, chatMode);
     // Update engagement score when message is sent
