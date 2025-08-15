@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MessageList } from '@/components/chat/MessageList';
-import { useAdminService } from '@/hooks/useAdminService';
-import { useChat } from '@/hooks/useChat';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { Calendar, Users, Eye } from 'lucide-react';
-import { formatToUKDate } from '@/utils/timeUtils';
+import { Calendar, Users, Eye, Bot, User, FileText, Workflow } from 'lucide-react';
+import { formatToUKDate, formatToUKTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
+import { MarkdownMessage } from '@/components/common/MarkdownMessage';
+import type { ChatMessage } from '@/types/chat';
 
 interface Deliberation {
   id: string;
@@ -24,50 +24,84 @@ interface Deliberation {
   updated_at: string;
 }
 
+const AGENTS = {
+  bill_agent: { name: 'Bill', icon: FileText, color: 'bg-blue-500' },
+  flow_agent: { name: 'Flo', icon: Workflow, color: 'bg-green-500' },
+  peer_agent: { name: 'Pia', icon: Users, color: 'bg-purple-500' },
+  default: { name: 'AI Assistant', icon: Bot, color: 'bg-gray-500' }
+} as const;
+
 export const AdminDeliberationView = () => {
   const { deliberationId } = useParams<{ deliberationId: string }>();
-  const adminService = useAdminService();
-  const { messages, isLoading: messagesLoading } = useChat(deliberationId);
   
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadDeliberation = async () => {
+    const loadData = async () => {
       if (!deliberationId) return;
       
       try {
         setLoading(true);
-        // Use direct Supabase call for admin access
-        const { data, error: supabaseError } = await supabase
-          .from('deliberations')
-          .select(`
-            *,
-            participants(user_id, role, joined_at)
-          `)
-          .eq('id', deliberationId)
-          .single();
+        setMessagesLoading(true);
+        
+        // Load deliberation and messages in parallel
+        const [deliberationResult, messagesResult] = await Promise.all([
+          supabase
+            .from('deliberations')
+            .select(`
+              *,
+              participants(user_id, role, joined_at)
+            `)
+            .eq('id', deliberationId)
+            .single(),
+          supabase
+            .from('messages')
+            .select('*')
+            .eq('deliberation_id', deliberationId)
+            .order('created_at', { ascending: true })
+        ]);
 
-        if (supabaseError) {
-          throw supabaseError;
+        if (deliberationResult.error) {
+          throw deliberationResult.error;
         }
 
-        if (data) {
+        if (messagesResult.error) {
+          throw messagesResult.error;
+        }
+
+        if (deliberationResult.data) {
           setDeliberation({
-            ...data,
-            participant_count: data.participants?.length || 0
+            ...deliberationResult.data,
+            participant_count: deliberationResult.data.participants?.length || 0
           });
         }
+
+        // Convert messages to ChatMessage format
+        const chatMessages: ChatMessage[] = messagesResult.data.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          message_type: msg.message_type,
+          created_at: msg.created_at,
+          user_id: msg.user_id,
+          submitted_to_ibis: msg.submitted_to_ibis || false,
+          agent_context: msg.agent_context
+        }));
+
+        setMessages(chatMessages);
       } catch (err) {
-        console.error('Failed to load deliberation:', err);
+        console.error('Failed to load data:', err);
         setError('Failed to load deliberation');
       } finally {
         setLoading(false);
+        setMessagesLoading(false);
       }
     };
 
-    loadDeliberation();
+    loadData();
   }, [deliberationId]);
 
   if (loading) {
@@ -159,14 +193,50 @@ export const AdminDeliberationView = () => {
               No messages in this deliberation yet.
             </div>
           ) : (
-            <div className="max-h-[600px] overflow-y-auto">
-              <MessageList 
-                messages={messages}
-                isLoading={false}
-                isTyping={false}
-                onAddToIbis={undefined} // Disable IBIS submission for admin view
-                deliberationId={deliberationId}
-              />
+            <div className="max-h-[600px] overflow-y-auto space-y-4">
+              {messages.map((message, index) => {
+                const isUser = message.message_type === 'user';
+                const agentInfo = isUser ? null : ((AGENTS as any)[message.message_type] ?? AGENTS.default);
+                const AgentIcon = (agentInfo?.icon as any) || Bot;
+
+                return (
+                  <div key={message.id} className="flex gap-3">
+                    <Avatar className="h-8 w-8 flex-shrink-0">
+                      <AvatarFallback className={isUser ? 'bg-primary' : agentInfo?.color}>
+                        {isUser ? <User className="h-4 w-4 text-white" /> : <AgentIcon className="h-4 w-4 text-white" />}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium">
+                          {isUser ? 'User' : agentInfo?.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatToUKTime(message.created_at)}
+                        </span>
+                        {message.submitted_to_ibis && (
+                          <Badge variant="default" className="text-xs bg-blue-500 hover:bg-blue-600">
+                            Submitted to IBIS
+                          </Badge>
+                        )}
+                      </div>
+
+                      <Card className={`p-3 ${
+                        message.submitted_to_ibis 
+                          ? 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800' 
+                          : isUser 
+                            ? 'bg-muted' 
+                            : 'bg-card'
+                      }`}>
+                        <div className="text-sm leading-relaxed">
+                          <MarkdownMessage content={message.content} />
+                        </div>
+                      </Card>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
