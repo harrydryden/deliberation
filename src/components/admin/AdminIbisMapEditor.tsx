@@ -116,23 +116,59 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     try {
       setLoading(true);
       
+      console.log('🔍 IBIS Map Editor - Starting data fetch for deliberation:', deliberationId);
+      
+      // First, let's verify the current user and their admin status
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('🔍 Current user from auth:', user);
+      
+      if (userError) {
+        console.error('❌ Auth error:', userError);
+        throw userError;
+      }
+
+      // Check if user is admin by querying profiles
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('role, user_role')
+        .eq('id', user?.id)
+        .single();
+        
+      console.log('🔍 User profile data:', profileData);
+      
+      if (profileError) {
+        console.error('❌ Profile error:', profileError);
+      }
+      
       // Fetch IBIS nodes
+      console.log('🔍 Fetching IBIS nodes for deliberation:', deliberationId);
       const { data: nodesData, error: nodesError } = await supabase
         .from('ibis_nodes')
         .select('*')
         .eq('deliberation_id', deliberationId)
         .order('created_at', { ascending: true });
 
-      if (nodesError) throw nodesError;
+      console.log('🔍 IBIS nodes query result:', { nodesData, nodesError });
+
+      if (nodesError) {
+        console.error('❌ Nodes error:', nodesError);
+        throw nodesError;
+      }
       
       // Fetch relationships
+      console.log('🔍 Fetching IBIS relationships for deliberation:', deliberationId);
       const { data: relationshipsData, error: relationshipsError } = await supabase
         .from('ibis_relationships')
         .select('*')
         .eq('deliberation_id', deliberationId)
         .order('created_at', { ascending: true });
 
-      if (relationshipsError) logger.warn('Relationships error', relationshipsError as any);
+      console.log('🔍 IBIS relationships query result:', { relationshipsData, relationshipsError });
+
+      if (relationshipsError) {
+        console.error('❌ Relationships error:', relationshipsError);
+        logger.warn('Relationships error', relationshipsError as any);
+      }
 
       console.log('🔍 IBIS Map Editor - Data loaded:', {
         totalNodes: nodesData?.length || 0,
