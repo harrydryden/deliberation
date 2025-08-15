@@ -66,19 +66,10 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
   // Override to handle profiles table specifics
   async findAll(filter?: Record<string, any>): Promise<User[]> {
     try {
+      // Use the user_profiles_with_codes view to get users with their access codes
       let query = supabase
-        .from('profiles')
-        .select(`
-          id,
-          display_name,
-          bio,
-          avatar_url,
-          role,
-          user_role,
-          expertise_areas,
-          created_at,
-          updated_at
-        `);
+        .from('user_profiles_with_codes')
+        .select('*');
       
       if (filter) {
         Object.entries(filter).forEach(([key, value]) => {
@@ -96,8 +87,8 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
       // Map database format to API format
       return data.map(item => ({
         id: item.id,
-        accessCode: '', // Will be populated from context if needed
-        role: item.user_role || item.role || 'user',
+        accessCode: item.access_code || '',
+        role: item.user_role || 'user',
         profile: {
           displayName: item.display_name || '',
           avatarUrl: item.avatar_url || '',
