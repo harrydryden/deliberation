@@ -108,8 +108,8 @@ export const AuthForm = () => {
         await authenticateWithAccessCode(result.user.accessCode, result.user.role);
         
         toast({
-          title: "Welcome!",
-          description: "Successfully authenticated with enhanced security"
+          title: "Welcome - login successful",
+          description: ""
         });
         
         // Navigation will be handled by Auth.tsx since we now have a user in context
