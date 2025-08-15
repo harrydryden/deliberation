@@ -1,5 +1,6 @@
 import React, { ReactElement } from 'react';
 import { render, RenderOptions } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from 'next-themes';
@@ -39,6 +40,7 @@ const customRender = (
 
 export * from '@testing-library/react';
 export { customRender as render };
+export { screen, waitFor };
 
 // Mock user for testing
 export const mockUser = {
