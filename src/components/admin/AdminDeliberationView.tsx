@@ -196,7 +196,7 @@ export const AdminDeliberationView = () => {
   return (
     <div className="container mx-auto px-4 py-6 max-w-4xl">
       {/* Header */}
-      <Card className="mb-6">
+      <Card className="mb-4">
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">
