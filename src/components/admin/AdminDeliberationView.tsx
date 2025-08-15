@@ -288,7 +288,7 @@ export const AdminDeliberationView = () => {
                               <ChevronRight className="h-4 w-4" />
                             )}
                             <span>
-                              {group.agentResponses.length} response{group.agentResponses.length !== 1 ? 's' : ''}
+                              {group.agentResponses.length} agent response{group.agentResponses.length !== 1 ? 's' : ''}
                             </span>
                           </div>
                         )}
