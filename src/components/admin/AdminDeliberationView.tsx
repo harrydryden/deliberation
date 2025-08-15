@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Calendar, Users, Eye, Bot, User, FileText, Workflow, ChevronDown, ChevronRight } from 'lucide-react';
 import { formatToUKDate, formatToUKTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +38,7 @@ export const AdminDeliberationView = () => {
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -207,11 +209,28 @@ export const AdminDeliberationView = () => {
         
         {deliberation.description && (
           <CardContent>
-            <div className="prose prose-sm max-w-none">
-              <p className="text-muted-foreground whitespace-pre-wrap">
-                {deliberation.description}
-              </p>
-            </div>
+            <Collapsible open={descriptionExpanded} onOpenChange={setDescriptionExpanded}>
+              <CollapsibleTrigger className="flex items-center gap-2 w-full text-left hover:text-primary transition-colors">
+                {descriptionExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+                <span className="text-sm font-medium">Description</span>
+                {!descriptionExpanded && (
+                  <span className="text-xs text-muted-foreground truncate flex-1">
+                    {deliberation.description.slice(0, 100)}...
+                  </span>
+                )}
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3">
+                <div className="prose prose-sm max-w-none">
+                  <p className="text-muted-foreground whitespace-pre-wrap">
+                    {deliberation.description}
+                  </p>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </CardContent>
         )}
       </Card>
