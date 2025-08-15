@@ -118,29 +118,10 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       
       console.log('🔍 IBIS Map Editor - Starting data fetch for deliberation:', deliberationId);
       
-      // First, let's verify the current user and their admin status
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      console.log('🔍 Current user from auth:', user);
+      // Skip the explicit auth check - let RLS handle it
+      // If we're in the admin component, we should already be authenticated
       
-      if (userError) {
-        console.error('❌ Auth error:', userError);
-        throw userError;
-      }
-
-      // Check if user is admin by querying profiles
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('role, user_role')
-        .eq('id', user?.id)
-        .single();
-        
-      console.log('🔍 User profile data:', profileData);
-      
-      if (profileError) {
-        console.error('❌ Profile error:', profileError);
-      }
-      
-      // Fetch IBIS nodes
+      // Fetch IBIS nodes directly
       console.log('🔍 Fetching IBIS nodes for deliberation:', deliberationId);
       const { data: nodesData, error: nodesError } = await supabase
         .from('ibis_nodes')
@@ -192,10 +173,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       setIbisRelationships(relationshipsData || []);
 
     } catch (error) {
+      console.error('🚨 DETAILED ERROR in IBIS data fetch:', error);
+      console.error('🚨 Error name:', error?.name);
+      console.error('🚨 Error message:', error?.message);
+      console.error('🚨 Error stack:', error?.stack);
+      console.error('🚨 Full error object:', JSON.stringify(error, null, 2));
+      
       logger.error('Error fetching IBIS data', error as any);
       toast({
         title: "Error",
-        description: "Failed to load IBIS data",
+        description: `Failed to load IBIS data: ${error?.message || 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
