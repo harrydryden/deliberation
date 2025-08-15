@@ -5,9 +5,39 @@ import { User } from '@/types/api';
 import { logger } from '@/utils/logger';
 import { AuthenticationError } from '@/utils/errors';
 
+/**
+ * Authentication service implementation using Supabase Auth
+ * 
+ * Provides secure user authentication, session management, and user profile
+ * integration. Handles sign-in, sign-up, sign-out, and session management
+ * with proper error handling and logging.
+ * 
+ * @example
+ * ```typescript
+ * const authService = new AuthService(userRepository);
+ * const { user, session } = await authService.signIn('user@example.com', 'password');
+ * ```
+ */
 export class AuthService implements IAuthService {
+  /**
+   * Creates an instance of AuthService
+   * @param userRepository - Repository for user data operations
+   */
   constructor(private userRepository: IUserRepository) {}
 
+  /**
+   * Authenticates a user with email and password
+   * 
+   * @param email - User's email address
+   * @param password - User's password
+   * @returns Promise resolving to user and session data
+   * @throws {AuthenticationError} When authentication fails
+   * 
+   * @example
+   * ```typescript
+   * const { user, session } = await authService.signIn('user@example.com', 'password');
+   * ```
+   */
   async signIn(email: string, password: string): Promise<{ user: User; session: any }> {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -43,6 +73,19 @@ export class AuthService implements IAuthService {
     }
   }
 
+  /**
+   * Registers a new user with email and password
+   * 
+   * @param email - User's email address
+   * @param password - User's password
+   * @returns Promise resolving to user and session data
+   * @throws {AuthenticationError} When registration fails
+   * 
+   * @example
+   * ```typescript
+   * const { user, session } = await authService.signUp('user@example.com', 'password');
+   * ```
+   */
   async signUp(email: string, password: string): Promise<{ user: User; session: any }> {
     try {
       const redirectUrl = `${window.location.origin}/`;
