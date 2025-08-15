@@ -51,26 +51,29 @@ export const AdminDeliberationView = () => {
         setLoading(true);
         setMessagesLoading(true);
         
-        // Load deliberation and messages in parallel
-        const [deliberationResult, messagesResult] = await Promise.all([
+        // Load deliberation and participants separately for better control
+        const [deliberationResult, participantsResult] = await Promise.all([
           supabase
             .from('deliberations')
-            .select(`
-              *,
-              participants(user_id, role, joined_at)
-            `)
+            .select('*')
             .eq('id', deliberationId)
             .single(),
           supabase
-            .from('messages')
-            .select('*')
+            .from('participants')
+            .select('user_id, role, joined_at')
             .eq('deliberation_id', deliberationId)
-            .order('created_at', { ascending: true })
         ]);
 
         if (deliberationResult.error) {
           throw deliberationResult.error;
         }
+
+        // Get messages
+        const messagesResult = await supabase
+          .from('messages')
+          .select('*')
+          .eq('deliberation_id', deliberationId)
+          .order('created_at', { ascending: true });
 
         if (messagesResult.error) {
           throw messagesResult.error;
@@ -79,7 +82,8 @@ export const AdminDeliberationView = () => {
         if (deliberationResult.data) {
           setDeliberation({
             ...deliberationResult.data,
-            participant_count: deliberationResult.data.participants?.length || 0
+            participants: participantsResult.data || [],
+            participant_count: participantsResult.data?.length || 0
           });
         }
 
