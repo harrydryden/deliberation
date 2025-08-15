@@ -1,0 +1,659 @@
+import { useEffect, useState, useCallback, useRef } from 'react';
+import {
+  ReactFlow,
+  Node,
+  Edge,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Connection,
+  Controls,
+  Background,
+  Panel,
+  NodeChange,
+  EdgeChange,
+  MarkerType,
+  ConnectionMode,
+  ReactFlowInstance,
+  OnConnectStartParams,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import '../ibis/ibis-flow.css';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowLeft, Save, X, Plus, Trash2, Edit3, Move, Link, Unlink } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceDirectedLayout, getNodeDimensions } from '../ibis/ibis-layout';
+import { logger } from '@/utils/logger';
+
+interface IbisNode {
+  id: string;
+  title: string;
+  description?: string;
+  node_type: 'issue' | 'position' | 'argument';
+  parent_id?: string;
+  position_x?: number;
+  position_y?: number;
+  message_id?: string;
+  created_at: string;
+  updated_at: string;
+  embedding?: number[];
+}
+
+interface IbisRelationship {
+  id: string;
+  source_node_id: string;
+  target_node_id: string;
+  relationship_type: 'supports' | 'opposes' | 'relates_to' | 'responds_to';
+  created_at: string;
+  created_by: string;
+}
+
+interface AdminIbisMapEditorProps {
+  deliberationId: string;
+  deliberationTitle: string;
+  onBack: () => void;
+}
+
+const nodeTypeConfig = {
+  issue: {
+    color: 'hsl(var(--ibis-issue))',
+    shape: 'circle',
+    label: 'Issue'
+  },
+  position: {
+    color: 'hsl(var(--ibis-position))',
+    shape: 'rectangle',
+    label: 'Position'
+  },
+  argument: {
+    color: 'hsl(var(--ibis-argument))',
+    shape: 'diamond',
+    label: 'Argument'
+  }
+};
+
+const relationshipConfig = {
+  supports: { color: 'hsl(var(--ibis-rel-supports))', style: 'solid', label: 'Supports' },
+  opposes: { color: 'hsl(var(--ibis-rel-opposes))', style: 'solid', label: 'Opposes' },
+  relates_to: { color: 'hsl(var(--ibis-rel-relates))', style: 'solid', label: 'Relates to' },
+  responds_to: { color: 'hsl(var(--ibis-rel-responds))', style: 'solid', label: 'Responds to' },
+};
+
+export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }: AdminIbisMapEditorProps) => {
+  const [ibisNodes, setIbisNodes] = useState<IbisNode[]>([]);
+  const [ibisRelationships, setIbisRelationships] = useState<IbisRelationship[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [editingNode, setEditingNode] = useState<IbisNode | null>(null);
+  const [creatingRelationship, setCreatingRelationship] = useState<boolean>(false);
+  const [pendingConnection, setPendingConnection] = useState<OnConnectStartParams | null>(null);
+  
+  const { toast } = useToast();
+  
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
+
+  // Node editing form state
+  const [nodeForm, setNodeForm] = useState({
+    title: '',
+    description: '',
+    node_type: 'issue' as 'issue' | 'position' | 'argument'
+  });
+
+  // Fetch data from Supabase
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch IBIS nodes
+      const { data: nodesData, error: nodesError } = await supabase
+        .from('ibis_nodes')
+        .select('*')
+        .eq('deliberation_id', deliberationId)
+        .order('created_at', { ascending: true });
+
+      if (nodesError) throw nodesError;
+      
+      // Fetch relationships
+      const { data: relationshipsData, error: relationshipsError } = await supabase
+        .from('ibis_relationships')
+        .select('*')
+        .eq('deliberation_id', deliberationId)
+        .order('created_at', { ascending: true });
+
+      if (relationshipsError) logger.warn('Relationships error', relationshipsError as any);
+
+      logger.info('IBIS data loaded for editing', {
+        totalNodes: nodesData?.length || 0,
+        issues: nodesData?.filter(n => n.node_type === 'issue').length || 0,
+        positions: nodesData?.filter(n => n.node_type === 'position').length || 0,
+        arguments: nodesData?.filter(n => n.node_type === 'argument').length || 0,
+        relationships: relationshipsData?.length || 0,
+      });
+
+      setIbisNodes(nodesData || []);
+      setIbisRelationships(relationshipsData || []);
+
+    } catch (error) {
+      logger.error('Error fetching IBIS data', error as any);
+      toast({
+        title: "Error",
+        description: "Failed to load IBIS data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [deliberationId, toast]);
+
+  // Convert IBIS data to React Flow format
+  const convertToFlowNodes = useCallback(() => {
+    const canvas = { width: 1600, height: 1000 };
+    
+    // Use existing positions or compute layout
+    const positionsMap = new Map<string, { x: number; y: number }>();
+    
+    // First, add existing positions
+    ibisNodes.forEach(node => {
+      if (node.position_x !== undefined && node.position_y !== undefined) {
+        positionsMap.set(node.id, { x: node.position_x, y: node.position_y });
+      }
+    });
+    
+    // For nodes without positions, use layout algorithm
+    const nodesWithoutPositions = ibisNodes.filter(node => 
+      node.position_x === undefined || node.position_y === undefined
+    );
+    
+    if (nodesWithoutPositions.length > 0) {
+      const layoutPositions = applyForceDirectedLayout(ibisNodes, ibisRelationships, canvas);
+      nodesWithoutPositions.forEach(node => {
+        const pos = layoutPositions.get(node.id);
+        if (pos) {
+          positionsMap.set(node.id, pos);
+        }
+      });
+    }
+
+    // Convert to React Flow nodes
+    const flowNodes: Node[] = ibisNodes.map((node) => {
+      const position = positionsMap.get(node.id) || { x: 0, y: 0 };
+      const config = nodeTypeConfig[node.node_type];
+      const importance = calculateNodeImportance(node.id, ibisRelationships);
+      const scaleFactor = 1 + importance * 0.2;
+
+      return {
+        id: node.id,
+        type: 'default',
+        position,
+        data: {
+          label: (
+            <div className={`ibis-node-${node.node_type} node-content`} style={{ transform: `scale(${scaleFactor})` }}>
+              <div className="font-semibold text-xs mb-1 text-white">
+                {node.title.length > 30 ? `${node.title.substring(0, 30)}...` : node.title}
+              </div>
+              <div className="text-xs opacity-75 text-white">
+                {config.label}
+              </div>
+            </div>
+          ),
+          originalNode: node,
+        },
+        style: {
+          backgroundColor: config.color,
+          color: 'white',
+          border: '2px solid white',
+          borderRadius: node.node_type === 'issue' ? '50%' : 
+                      node.node_type === 'argument' ? '0' : '8px',
+          width: 120 * scaleFactor,
+          height: node.node_type === 'argument' ? 120 * scaleFactor : 80 * scaleFactor,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '8px',
+          fontSize: '11px',
+          textAlign: 'center',
+          cursor: 'pointer',
+          transform: node.node_type === 'argument' ? 'rotate(45deg)' : 'none',
+        },
+        draggable: true,
+        selectable: true,
+      };
+    });
+
+    // Convert relationships to React Flow edges
+    const flowEdges: Edge[] = ibisRelationships.map((rel) => {
+      const config = relationshipConfig[rel.relationship_type] || relationshipConfig.relates_to;
+      
+      return {
+        id: rel.id,
+        source: rel.source_node_id,
+        target: rel.target_node_id,
+        type: 'default',
+        style: {
+          stroke: config.color,
+          strokeWidth: 2,
+          strokeDasharray: config.style === 'dashed' ? '5,5' : undefined,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: config.color,
+        },
+        data: {
+          relationship: rel,
+          label: config.label,
+        },
+        animated: false,
+      };
+    });
+
+    setNodes(flowNodes);
+    setEdges(flowEdges);
+  }, [ibisNodes, ibisRelationships, setNodes, setEdges]);
+
+  const calculateNodeImportance = (nodeId: string, relationships: IbisRelationship[]): number => {
+    const connections = relationships.filter(
+      rel => rel.source_node_id === nodeId || rel.target_node_id === nodeId
+    );
+    
+    let importance = connections.length;
+    connections.forEach(rel => {
+      if (rel.relationship_type === 'supports' || rel.relationship_type === 'opposes') {
+        importance += 0.5;
+      }
+    });
+    
+    return Math.min(importance / 5, 2);
+  };
+
+  // Handle node position changes
+  const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
+    onNodesChange(changes);
+    
+    const positionChanges = changes.filter(change => 
+      change.type === 'position' && change.dragging === false
+    );
+    
+    if (positionChanges.length > 0) {
+      setHasUnsavedChanges(true);
+    }
+  }, [onNodesChange]);
+
+  // Handle edge changes
+  const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+    onEdgesChange(changes);
+    
+    // Check if any edges were removed
+    const removedEdges = changes.filter(change => change.type === 'remove');
+    if (removedEdges.length > 0) {
+      setHasUnsavedChanges(true);
+    }
+  }, [onEdgesChange]);
+
+  // Handle new connections
+  const handleConnect = useCallback(async (connection: Connection) => {
+    if (!connection.source || !connection.target) return;
+
+    try {
+      const newRelationship = {
+        source_node_id: connection.source,
+        target_node_id: connection.target,
+        relationship_type: 'relates_to' as const,
+        deliberation_id: deliberationId,
+        created_by: 'admin', // This should be the actual admin user ID
+      };
+
+      const { data, error } = await supabase
+        .from('ibis_relationships')
+        .insert([newRelationship])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add to local state
+      const fullRelationship: IbisRelationship = {
+        id: data.id,
+        ...newRelationship,
+        created_at: data.created_at,
+      };
+
+      setIbisRelationships(prev => [...prev, fullRelationship]);
+      setHasUnsavedChanges(true);
+
+      toast({
+        title: "Connection Created",
+        description: "New relationship added between nodes",
+      });
+
+    } catch (error) {
+      logger.error('Error creating relationship', error as any);
+      toast({
+        title: "Error",
+        description: "Failed to create relationship",
+        variant: "destructive",
+      });
+    }
+  }, [deliberationId, toast]);
+
+  // Handle node editing
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    const ibisNode = node.data.originalNode as IbisNode;
+    setEditingNode(ibisNode);
+    setNodeForm({
+      title: ibisNode.title,
+      description: ibisNode.description || '',
+      node_type: ibisNode.node_type,
+    });
+  }, []);
+
+  // Save node changes
+  const handleSaveNode = async () => {
+    if (!editingNode) return;
+
+    try {
+      setSaving(true);
+      
+      const { error } = await supabase
+        .from('ibis_nodes')
+        .update({
+          title: nodeForm.title,
+          description: nodeForm.description,
+          node_type: nodeForm.node_type,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingNode.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setIbisNodes(prev => prev.map(node => 
+        node.id === editingNode.id 
+          ? { ...node, ...nodeForm, updated_at: new Date().toISOString() }
+          : node
+      ));
+
+      setEditingNode(null);
+      setHasUnsavedChanges(true);
+
+      toast({
+        title: "Node Updated",
+        description: "Node changes saved successfully",
+      });
+
+    } catch (error) {
+      logger.error('Error updating node', error as any);
+      toast({
+        title: "Error",
+        description: "Failed to update node",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Save all position changes
+  const handleSaveChanges = async () => {
+    try {
+      setSaving(true);
+      
+      // Save all node positions
+      const positionUpdates = nodes.map(node => {
+        const ibisNode = node.data.originalNode as IbisNode;
+        return supabase
+          .from('ibis_nodes')
+          .update({
+            position_x: node.position.x,
+            position_y: node.position.y,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', ibisNode.id);
+      });
+
+      await Promise.all(positionUpdates);
+
+      setHasUnsavedChanges(false);
+
+      toast({
+        title: "Changes Saved",
+        description: "All changes have been saved successfully",
+      });
+
+    } catch (error) {
+      logger.error('Error saving changes', error as any);
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Handle edge deletion
+  const handleDeleteEdge = async (edgeId: string) => {
+    try {
+      const { error } = await supabase
+        .from('ibis_relationships')
+        .delete()
+        .eq('id', edgeId);
+
+      if (error) throw error;
+
+      setIbisRelationships(prev => prev.filter(rel => rel.id !== edgeId));
+      setHasUnsavedChanges(true);
+
+      toast({
+        title: "Relationship Deleted",
+        description: "Connection removed successfully",
+      });
+
+    } catch (error) {
+      logger.error('Error deleting relationship', error as any);
+      toast({
+        title: "Error",
+        description: "Failed to delete relationship",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Load data on mount
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Convert data when it changes
+  useEffect(() => {
+    if (ibisNodes.length > 0) {
+      convertToFlowNodes();
+    }
+  }, [ibisNodes, ibisRelationships, convertToFlowNodes]);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            Loading IBIS Map Editor...
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-96">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="h-screen flex flex-col">
+      {/* Header */}
+      <Card className="rounded-b-none border-b-0">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={onBack}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              Edit IBIS Map: {deliberationTitle}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {hasUnsavedChanges && (
+                <Badge variant="secondary" className="text-orange-600">
+                  Unsaved Changes
+                </Badge>
+              )}
+              <Button 
+                onClick={handleSaveChanges} 
+                disabled={!hasUnsavedChanges || saving}
+                size="sm"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* Map Editor */}
+      <div className="flex-1 relative">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+          onConnect={handleConnect}
+          onNodeClick={handleNodeClick}
+          connectionMode={ConnectionMode.Loose}
+          fitView
+          fitViewOptions={{ padding: 0.1 }}
+          style={{ background: 'hsl(var(--background))' }}
+        >
+          <Background />
+          <Controls />
+          
+          {/* Control Panel */}
+          <Panel position="top-left" className="space-y-2">
+            <Card className="p-4">
+              <h3 className="font-semibold mb-2">Map Editor Controls</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <Move className="h-4 w-4" />
+                  <span>Drag nodes to reposition</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Edit3 className="h-4 w-4" />
+                  <span>Click nodes to edit content</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link className="h-4 w-4" />
+                  <span>Drag from node edges to connect</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Unlink className="h-4 w-4" />
+                  <span>Select edges and press Delete</span>
+                </div>
+              </div>
+            </Card>
+          </Panel>
+
+          {/* Legend */}
+          <Panel position="top-right" className="space-y-2">
+            <Card className="p-4">
+              <h3 className="font-semibold mb-2">Node Types</h3>
+              <div className="space-y-2">
+                {Object.entries(nodeTypeConfig).map(([type, config]) => (
+                  <div key={type} className="flex items-center gap-2 text-sm">
+                    <div 
+                      className="w-4 h-4 border border-gray-300"
+                      style={{ 
+                        backgroundColor: config.color,
+                        borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px'
+                      }}
+                    />
+                    <span>{config.label}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </Panel>
+        </ReactFlow>
+      </div>
+
+      {/* Node Edit Dialog */}
+      <Dialog open={!!editingNode} onOpenChange={() => setEditingNode(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit {editingNode?.node_type} Node</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={nodeForm.title}
+                onChange={(e) => setNodeForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter node title"
+              />
+            </div>
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={nodeForm.description}
+                onChange={(e) => setNodeForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Enter node description"
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label htmlFor="node_type">Node Type</Label>
+              <Select
+                value={nodeForm.node_type}
+                onValueChange={(value: 'issue' | 'position' | 'argument') => 
+                  setNodeForm(prev => ({ ...prev, node_type: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="issue">Issue</SelectItem>
+                  <SelectItem value="position">Position</SelectItem>
+                  <SelectItem value="argument">Argument</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingNode(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveNode} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};

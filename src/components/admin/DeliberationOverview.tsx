@@ -5,12 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { RefreshCw, MessageSquare, Eye, GitBranch, Trash2, Database } from 'lucide-react';
+import { RefreshCw, MessageSquare, Eye, GitBranch, Trash2, Database, Map } from 'lucide-react';
 import { formatToUKDateTime } from '@/utils/timeUtils';
 import { Deliberation } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useNavigate } from 'react-router-dom';
 import { IbisNodeManagement } from './IbisNodeManagement';
+import { AdminIbisMapEditor } from './AdminIbisMapEditor';
 import { useAdminService } from '@/hooks/useServices';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,6 +25,7 @@ interface DeliberationOverviewProps {
 export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateStatus }: DeliberationOverviewProps) => {
   const [updating, setUpdating] = useState<string | null>(null);
   const [selectedDeliberation, setSelectedDeliberation] = useState<Deliberation | null>(null);
+  const [editMode, setEditMode] = useState<'nodes' | 'map' | null>(null);
   const [clearing, setClearing] = useState<{ [key: string]: 'messages' | 'ibis' | null }>({});
   const navigate = useNavigate();
   const adminService = useAdminService();
@@ -60,10 +62,17 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
 
   const handleEditNodes = (deliberation: Deliberation) => {
     setSelectedDeliberation(deliberation);
+    setEditMode('nodes');
   };
 
-  const handleBackFromNodes = () => {
+  const handleEditMap = (deliberation: Deliberation) => {
+    setSelectedDeliberation(deliberation);
+    setEditMode('map');
+  };
+
+  const handleBackFromEdit = () => {
     setSelectedDeliberation(null);
+    setEditMode(null);
   };
 
   const handleClearMessages = async (deliberationId: string, deliberationTitle: string) => {
@@ -106,12 +115,22 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
     }
   };
 
-  if (selectedDeliberation) {
+  if (selectedDeliberation && editMode === 'nodes') {
     return (
       <IbisNodeManagement
         deliberationId={selectedDeliberation.id}
         deliberationTitle={selectedDeliberation.title}
-        onBack={handleBackFromNodes}
+        onBack={handleBackFromEdit}
+      />
+    );
+  }
+
+  if (selectedDeliberation && editMode === 'map') {
+    return (
+      <AdminIbisMapEditor
+        deliberationId={selectedDeliberation.id}
+        deliberationTitle={selectedDeliberation.title}
+        onBack={handleBackFromEdit}
       />
     );
   }
@@ -226,6 +245,14 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
                         >
                           <GitBranch className="h-4 w-4 mr-2" />
                           Edit Nodes
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditMap(deliberation)}
+                        >
+                          <Map className="h-4 w-4 mr-2" />
+                          Edit Map
                         </Button>
                         
                         <AlertDialog>
