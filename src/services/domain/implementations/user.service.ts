@@ -62,10 +62,26 @@ export class UserService implements IUserService {
 
   async deleteUser(id: string): Promise<void> {
     try {
+      console.log('UserService: Starting deletion for user:', id);
+      
+      // First check if user exists
+      const existingUser = await this.userRepository.findById(id);
+      console.log('UserService: User found before deletion:', existingUser);
+      
+      if (!existingUser) {
+        console.log('UserService: User not found, cannot delete');
+        throw new Error('User not found');
+      }
+      
       await this.userRepository.delete(id);
+      
+      // Verify deletion
+      const deletedUser = await this.userRepository.findById(id);
+      console.log('UserService: User after deletion attempt:', deletedUser);
       
       logger.info('User deleted successfully', { userId: id });
     } catch (error) {
+      console.error('UserService: Delete user failed:', error);
       logger.error('User service deleteUser failed', { error, userId: id });
       throw error;
     }
