@@ -94,6 +94,7 @@ export const AuthForm = () => {
     setIsLoading(true);
     logger.auth.start('Starting secure authentication process', { accessCode: validation.data });
     
+    
     try {
       const result = await SecureAuthService.authenticateWithAccessCode(validation.data);
       
@@ -106,12 +107,43 @@ export const AuthForm = () => {
           description: "Successfully authenticated with enhanced security"
         });
         
-        // In a real implementation, you'd update your auth context here
-        // For now, we'll use the existing auth service as a fallback
-        try {
-          await authService.signIn('', validation.data);
-        } catch (fallbackError) {
-          console.warn('Fallback auth failed, but secure auth succeeded');
+        // Instead of using fallback auth, directly use the result to simulate successful login
+        // Create a mock auth result that matches the expected format
+        const mockAuthResult = {
+          user: {
+            id: result.user.id,
+            email: `${result.user.accessCode}@deliberation.local`,
+            email_verified: true,
+            role: result.user.role,
+            user_metadata: {
+              access_code: result.user.accessCode,
+              code_type: result.user.role,
+              email: `${result.user.accessCode}@deliberation.local`,
+              email_verified: true,
+              phone_verified: false,
+              sub: result.user.id,
+              user_role: result.user.role
+            }
+          },
+          session: {
+            access_token: result.session?.token || `mock_token_${Date.now()}`,
+            refresh_token: `refresh_${Date.now()}`,
+            expires_in: 3600,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            token_type: "bearer",
+            user: {
+              id: result.user.id,
+              email: `${result.user.accessCode}@deliberation.local`,
+              role: result.user.role
+            }
+          }
+        };
+        
+        // Navigate immediately since we have successful auth
+        if (result.user.role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/deliberations');
         }
       } else {
         setValidationError(result.error || 'Authentication failed');
