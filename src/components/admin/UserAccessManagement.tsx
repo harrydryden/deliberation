@@ -7,8 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { RefreshCw, Plus, Trash2, UserCog, Key, Copy } from 'lucide-react';
 import { formatToUKDate } from '@/utils/timeUtils';
-import { AccessCode } from '@/services/backend/base.service';
 import { User } from '@/types/api';
+import { AccessCode } from '@/repositories/implementations/access-code.repository';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { toast } from 'sonner';
 

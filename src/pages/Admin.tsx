@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useBackendAuth } from "@/hooks/useBackendAuth";
+import { useAuthService } from "@/hooks/useServices";
 import { Layout } from "@/components/layout/Layout";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 
 const Admin = () => {
-  const { user, isLoading } = useBackendAuth();
+  const authService = useAuthService();
   const navigate = useNavigate();
 
   useEffect(() => {

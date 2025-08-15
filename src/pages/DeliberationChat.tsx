@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useBackendAuth } from "@/hooks/useBackendAuth";
+import { useAuthService } from "@/hooks/useServices";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 import { Layout } from "@/components/layout/Layout";
 import { MessageList } from "@/components/chat/MessageList";
@@ -38,10 +38,7 @@ const DeliberationChat = () => {
   } = useParams<{
     deliberationId: string;
   }>();
-  const {
-    user,
-    isLoading
-  } = useBackendAuth();
+  const authService = useAuthService();
   const navigate = useNavigate();
   const {
     toast

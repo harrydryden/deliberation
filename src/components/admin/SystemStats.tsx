@@ -1,11 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Users, MessageSquare, Settings, Key } from 'lucide-react';
-import { AdminStats } from '@/services/backend/base.service';
+import { IAdminService } from '@/services/domain/interfaces';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 interface SystemStatsProps {
-  stats: AdminStats | null;
+  stats: Awaited<ReturnType<IAdminService['getSystemStats']>> | null;
   loading: boolean;
   onRefresh: () => void;
 }

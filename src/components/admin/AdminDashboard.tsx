@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { BACKEND_CONFIG } from '@/config/backend';
+
 import { UserAccessManagement } from './UserAccessManagement';
 import { AgentManagement } from './AgentManagement';
 import { LocalAgentManagement } from './LocalAgentManagement';
@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 export const AdminDashboard = () => {
-  const [currentBackend, setCurrentBackend] = useState(BACKEND_CONFIG.type);
   const adminService = useAdminService();
   const { handleAsyncError } = useErrorHandler();
   const navigate = useNavigate();
@@ -41,22 +40,10 @@ export const AdminDashboard = () => {
     initializeData();
   }, [handleAsyncError]);
 
-  const handleBackendToggle = (checked: boolean) => {
-    const newBackend = checked ? 'nodejs' : 'supabase';
-    setCurrentBackend(newBackend);
-    
-    logger.component.update('AdminDashboard', { oldBackend: currentBackend, newBackend });
-    
-    // In a real implementation, you'd need to:
-    // 1. Update environment variables
-    // 2. Reload the page or reinitialize services
-    // For now, just show a message
-    alert(`To switch to ${newBackend}, please update your environment variables:\n\nVITE_BACKEND_TYPE=${newBackend}\n\nThen reload the page.`);
-  };
 
   return (
     <div className="space-y-6">
-      {/* Header with Backend Toggle - Sticky */}
+      {/* Header */}
       <div className="sticky top-16 z-40 bg-deliberation-bg/95 backdrop-blur-sm py-4 -mx-6 px-6 mb-6">
         <div className="flex justify-between items-center">
           <div>
@@ -64,27 +51,6 @@ export const AdminDashboard = () => {
             <p className="text-muted-foreground">
               Manage users, access codes, agents, and deliberations
             </p>
-          </div>
-          
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Label htmlFor="backend-toggle">Backend:</Label>
-              <Badge variant={currentBackend === 'supabase' ? 'default' : 'secondary'}>
-                Supabase
-              </Badge>
-              <Switch
-                id="backend-toggle"
-                checked={currentBackend === 'nodejs'}
-                onCheckedChange={handleBackendToggle}
-              />
-              <Badge variant={currentBackend === 'nodejs' ? 'default' : 'secondary'}>
-                Node.js
-              </Badge>
-            </div>
-            
-            <Button variant="outline" onClick={() => navigate('/backend')}>
-              Backend Config
-            </Button>
           </div>
         </div>
       </div>

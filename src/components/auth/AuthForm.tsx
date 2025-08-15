@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useBackendAuth } from "@/hooks/useBackendAuth";
+import { useServices } from "@/hooks/useServices";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,7 @@ export const AuthForm = () => {
   const [accessCode, setAccessCode] = useState("");
   const [validationError, setValidationError] = useState<string>("");
   const [remainingTime, setRemainingTime] = useState(0);
-  const { authenticate } = useBackendAuth();
+  const { authService } = useServices();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -98,7 +98,7 @@ export const AuthForm = () => {
     logger.auth.start('Starting authentication process', { accessCode: validation.data });
     
     try {
-      await authenticate(validation.data);
+      const { user, session } = await authService.signIn('', validation.data); // Using access code as password
       logger.auth.success('Authentication successful, letting Auth page handle redirect');
       authRateLimit.reset(clientId); // Reset on success
       criticalOpRateLimit.reset(clientId); // Reset critical rate limit too

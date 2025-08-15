@@ -2,10 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { BackendAuthProvider } from "@/hooks/useBackendAuth";
+import { ServiceProvider } from "@/hooks/useServices";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthLoadingBoundary } from "@/components/auth/AuthLoadingBoundary";
-import { BackendSelector } from "@/components/auth/BackendSelector";
+import { useServices } from "@/hooks/useServices";
 import { Suspense, lazy } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -20,7 +20,7 @@ const DeliberationChat = lazy(() => import("./pages/DeliberationChat"));
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <BackendAuthProvider>
+      <ServiceProvider>
         <AuthLoadingBoundary>
           <TooltipProvider>
             <Toaster />
@@ -32,7 +32,7 @@ const App = () => (
                   <Route path="/auth" element={<Auth />} />
                   {/* chat deprecated */}
                   <Route path="/admin" element={<Admin />} />
-                  <Route path="/backend" element={<BackendSelector />} />
+                  <Route path="/backend" element={<div>Backend configuration removed</div>} />
                   <Route path="/deliberations" element={<Deliberations />} />
                   <Route path="/deliberations/:deliberationId" element={<DeliberationChat />} />
                   <Route path="*" element={<NotFound />} />
@@ -41,7 +41,7 @@ const App = () => (
             </BrowserRouter>
           </TooltipProvider>
         </AuthLoadingBoundary>
-      </BackendAuthProvider>
+      </ServiceProvider>
     </QueryClientProvider>
   </ErrorBoundary>
 );

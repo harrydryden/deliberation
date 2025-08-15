@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { useBackendAuth } from "@/hooks/useBackendAuth";
+import { useAuthService } from "@/hooks/useServices";
 import { LogOut, User, MessageSquare, Settings, Brain } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 
 export const Header = () => {
-  const { user, signOut } = useBackendAuth();
+  const authService = useAuthService();
   const navigate = useNavigate();
 
   return (
