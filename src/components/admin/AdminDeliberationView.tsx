@@ -3,11 +3,12 @@ import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MessageList } from '@/components/chat/MessageList';
-import { useDeliberationService } from '@/hooks/useDeliberationService';
+import { useAdminService } from '@/hooks/useAdminService';
 import { useChat } from '@/hooks/useChat';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Calendar, Users, Eye } from 'lucide-react';
 import { formatToUKDate } from '@/utils/timeUtils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Deliberation {
   id: string;
@@ -25,7 +26,7 @@ interface Deliberation {
 
 export const AdminDeliberationView = () => {
   const { deliberationId } = useParams<{ deliberationId: string }>();
-  const deliberationService = useDeliberationService();
+  const adminService = useAdminService();
   const { messages, isLoading: messagesLoading } = useChat(deliberationId);
   
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
@@ -38,8 +39,26 @@ export const AdminDeliberationView = () => {
       
       try {
         setLoading(true);
-        const data = await deliberationService.getDeliberation(deliberationId);
-        setDeliberation(data);
+        // Use direct Supabase call for admin access
+        const { data, error: supabaseError } = await supabase
+          .from('deliberations')
+          .select(`
+            *,
+            participants(user_id, role, joined_at)
+          `)
+          .eq('id', deliberationId)
+          .single();
+
+        if (supabaseError) {
+          throw supabaseError;
+        }
+
+        if (data) {
+          setDeliberation({
+            ...data,
+            participant_count: data.participants?.length || 0
+          });
+        }
       } catch (err) {
         console.error('Failed to load deliberation:', err);
         setError('Failed to load deliberation');
@@ -49,7 +68,7 @@ export const AdminDeliberationView = () => {
     };
 
     loadDeliberation();
-  }, [deliberationId, deliberationService]);
+  }, [deliberationId]);
 
   if (loading) {
     return (
