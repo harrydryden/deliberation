@@ -118,17 +118,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       
       console.log('🔍 IBIS Map Editor - Starting data fetch for deliberation:', deliberationId);
       
-      // Get the current user to verify admin status
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      console.log('🔍 Current user from auth:', user);
-      
-      if (userError || !user) {
-        console.error('❌ Auth error:', userError);
-        throw new Error('Authentication required');
-      }
-
-      // For admin IBIS access, we'll use a direct query approach
-      // Since we're in the admin panel, bypass RLS by using a more permissive query
+      // Directly use the admin RPC functions for reliable data access
       console.log('🔍 Fetching IBIS nodes for deliberation:', deliberationId);
       
       // First try with RLS, then fallback to admin access if needed
