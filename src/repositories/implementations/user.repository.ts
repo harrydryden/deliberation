@@ -101,4 +101,32 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
       throw error;
     }
   }
+
+  async delete(id: string): Promise<void> {
+    try {
+      console.log('UserRepository: Attempting to delete user:', id);
+      
+      // First check current auth status
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('UserRepository: Current session:', session?.user?.id);
+      
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('UserRepository: Delete error:', error);
+        logger.error('User repository delete error', error, { userId: id });
+        throw error;
+      }
+      
+      console.log('UserRepository: Delete operation completed');
+      logger.info('User deleted successfully from repository', { userId: id });
+    } catch (error) {
+      console.error('UserRepository: Delete failed:', error);
+      logger.error('User repository delete failed', error, { userId: id });
+      throw error;
+    }
+  }
 }
