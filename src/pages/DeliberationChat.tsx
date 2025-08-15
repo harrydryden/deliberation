@@ -9,6 +9,7 @@ import { MessageInput } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
 const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({ default: m.IbisMapVisualization })));
 import { useChat } from "@/hooks/useChat";
+import { AdminDeliberationView } from "@/components/admin/AdminDeliberationView";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ const DeliberationChat = () => {
     deliberationId: string;
   }>();
   const { user, isLoading } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const navigate = useNavigate();
   const {
     toast
@@ -199,6 +201,15 @@ const DeliberationChat = () => {
       </Layout>;
   }
   if (!user || !deliberation) return null;
+  
+  // Show simplified admin view for admin users
+  if (isAdmin) {
+    return (
+      <Layout>
+        <AdminDeliberationView />
+      </Layout>
+    );
+  }
   return <Layout>
       <div className="flex flex-col bg-background rounded-lg border h-[calc(100vh-120px)] min-h-0">
         {/* Deliberation Header - Sticky below main header */}
