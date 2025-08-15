@@ -20,7 +20,7 @@ export const AuthForm = () => {
   const [accessCode, setAccessCode] = useState("");
   const [validationError, setValidationError] = useState<string>("");
   const [remainingTime, setRemainingTime] = useState(0);
-  const { authService } = useServices();
+  
   const { authenticateWithAccessCode } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();

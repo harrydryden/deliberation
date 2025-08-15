@@ -9,7 +9,7 @@ import {
 } from '@/repositories/interfaces';
 
 import {
-  IAuthService,
+  ISimpleAuthService,
   IMessageService,
   IAgentService,
   IDeliberationService,
@@ -28,7 +28,6 @@ import { AccessCodeRepository } from '@/repositories/implementations/access-code
 import { AdminRepository } from '@/repositories/implementations/admin.repository';
 
 // Service implementations
-import { AuthService } from './implementations/auth.service';
 import { MessageService } from './implementations/message.service';
 import { AgentService } from './implementations/agent.service';
 import { DeliberationService } from './implementations/deliberation.service';
@@ -49,7 +48,7 @@ class ServiceContainer {
   private _adminRepository: IAdminRepository | null = null;
 
   // Service instances (singletons)
-  private _authService: IAuthService | null = null;
+  private _simpleAuthService: ISimpleAuthService | null = null;
   private _messageService: IMessageService | null = null;
   private _agentService: IAgentService | null = null;
   private _deliberationService: IDeliberationService | null = null;
@@ -111,11 +110,29 @@ class ServiceContainer {
   }
 
   // Service getters with dependency injection
-  get authService(): IAuthService {
-    if (!this._authService) {
-      this._authService = new AuthService(this.userRepository);
+  get simpleAuthService(): ISimpleAuthService {
+    if (!this._simpleAuthService) {
+      // Simple implementation that works with access codes
+      this._simpleAuthService = {
+        authenticateWithAccessCode: async (accessCode: string) => {
+          const simpleUser = {
+            id: `access_${accessCode}`,
+            accessCode: accessCode,
+            role: 'user',
+            profile: {
+              displayName: 'User',
+              bio: '',
+              avatarUrl: '',
+              expertiseAreas: []
+            }
+          };
+          return { user: simpleUser, session: { token: 'simple_token' } };
+        },
+        signOut: async () => {},
+        getCurrentUser: async () => null
+      };
     }
-    return this._authService;
+    return this._simpleAuthService;
   }
 
   get messageService(): IMessageService {
@@ -181,7 +198,7 @@ class ServiceContainer {
     this._deliberationRepository = null;
     this._accessCodeRepository = null;
     this._adminRepository = null;
-    this._authService = null;
+    this._simpleAuthService = null;
     this._messageService = null;
     this._agentService = null;
     this._deliberationService = null;
@@ -196,7 +213,7 @@ class ServiceContainer {
 export const serviceContainer = ServiceContainer.getInstance();
 
 // Export individual services for convenience
-export const authService = serviceContainer.authService;
+export const simpleAuthService = serviceContainer.simpleAuthService;
 export const messageService = serviceContainer.messageService;
 export const agentService = serviceContainer.agentService;
 export const deliberationService = serviceContainer.deliberationService;

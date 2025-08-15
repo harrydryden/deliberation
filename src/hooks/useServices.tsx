@@ -20,7 +20,7 @@ export const useServices = () => {
 };
 
 // Individual service hooks for convenience
-export const useAuthService = () => useServices().authService;
+export const useSimpleAuthService = () => useServices().simpleAuthService;
 export const useMessageService = () => useServices().messageService;
 export const useAgentService = () => useServices().agentService;
 export const useDeliberationService = () => useServices().deliberationService;

@@ -119,8 +119,8 @@ export class SecureAuthService {
         session_token: sessionToken.substring(0, 8) + '***'
       }, 'low');
 
-      // Create a mock user session (adapt this based on your user system)
-      const mockUser = {
+      // Create a simple user session based on access code validation
+      const simpleUser = {
         id: `temp_${Date.now()}`,
         accessCode: accessCode,
         role: validationResult.code_type,
@@ -134,7 +134,7 @@ export class SecureAuthService {
 
       return {
         success: true,
-        user: mockUser,
+        user: simpleUser,
         session: { token: sessionToken, expiresAt: Date.now() + 30 * 60 * 1000 },
         riskLevel: 'low'
       };

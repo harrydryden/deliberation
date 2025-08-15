@@ -2,13 +2,11 @@
 import { User, Message, Agent, Deliberation } from '@/types/api';
 import { AccessCode } from '@/repositories/implementations/access-code.repository';
 
-export interface IAuthService {
-  signIn(email: string, password: string): Promise<{ user: User; session: any }>;
-  signUp(email: string, password: string): Promise<{ user: User; session: any }>;
+// Simple access code authentication service
+export interface ISimpleAuthService {
+  authenticateWithAccessCode(accessCode: string): Promise<{ user: User; session: any }>;
   signOut(): Promise<void>;
   getCurrentUser(): Promise<User | null>;
-  getCurrentSession(): Promise<any>;
-  onAuthStateChange(callback: (event: string, session: any) => void): () => void;
 }
 
 export interface IMessageService {
