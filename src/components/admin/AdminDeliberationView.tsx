@@ -201,7 +201,7 @@ export const AdminDeliberationView = () => {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <CardTitle className="text-2xl mb-2">{deliberation.title}</CardTitle>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                 <div className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
                   Created {formatToUKDate(deliberation.created_at)}
