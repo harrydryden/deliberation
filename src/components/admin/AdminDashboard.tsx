@@ -64,7 +64,7 @@ export const AdminDashboard = () => {
 
       {/* Main Content Tabs - Sticky */}
       <Tabs defaultValue="users" className="w-full">
-        <div className="sticky top-32 z-30 bg-deliberation-bg/95 backdrop-blur-sm py-2 -mx-6 px-6">
+        <div className="sticky top-28 z-30 bg-deliberation-bg/95 backdrop-blur-sm py-2 -mx-6 px-6 border-b border-border/50">
           <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users">Users & Access</TabsTrigger>
           <TabsTrigger value="agents">Agents</TabsTrigger>
