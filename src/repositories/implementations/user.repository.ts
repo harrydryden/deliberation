@@ -63,13 +63,14 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
     }
   }
 
-  // Override to handle profiles table specifics
+  // Override to handle profiles table specifics - excludes archived users
   async findAll(filter?: Record<string, any>): Promise<User[]> {
     try {
       // Use the user_profiles_with_codes view to get users with their access codes
       let query = supabase
         .from('user_profiles_with_codes')
-        .select('*');
+        .select('*')
+        .or('is_archived.is.null,is_archived.eq.false'); // Exclude archived users
       
       if (filter) {
         Object.entries(filter).forEach(([key, value]) => {
@@ -102,31 +103,118 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
     }
   }
 
-  async delete(id: string): Promise<void> {
+  async archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void> {
     try {
-      console.log('UserRepository: Attempting to delete user:', id);
-      
-      // First check current auth status
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('UserRepository: Current session:', session?.user?.id);
+      console.log('UserRepository: Attempting to archive user:', userId);
       
       const { error } = await supabase
         .from('profiles')
-        .delete()
-        .eq('id', id);
+        .update({
+          is_archived: true,
+          archived_at: new Date().toISOString(),
+          archived_by: archivedBy,
+          archive_reason: reason,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
       
       if (error) {
-        console.error('UserRepository: Delete error:', error);
-        logger.error('User repository delete error', error, { userId: id });
+        console.error('UserRepository: Archive error:', error);
+        logger.error('User repository archive error', error, { userId, archivedBy });
         throw error;
       }
       
-      console.log('UserRepository: Delete operation completed');
-      logger.info('User deleted successfully from repository', { userId: id });
+      // Also deactivate their access code
+      await supabase
+        .from('access_codes')
+        .update({ is_active: false })
+        .eq('used_by', userId);
+      
+      console.log('UserRepository: Archive operation completed');
+      logger.info('User archived successfully from repository', { userId, archivedBy });
     } catch (error) {
-      console.error('UserRepository: Delete failed:', error);
-      logger.error('User repository delete failed', error, { userId: id });
+      console.error('UserRepository: Archive failed:', error);
+      logger.error('User repository archive failed', error, { userId, archivedBy });
       throw error;
     }
+  }
+
+  async unarchiveUser(userId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          is_archived: false,
+          archived_at: null,
+          archived_by: null,
+          archive_reason: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+      
+      if (error) {
+        logger.error('User repository unarchive error', error, { userId });
+        throw error;
+      }
+      
+      // Reactivate their access code
+      await supabase
+        .from('access_codes')
+        .update({ is_active: true })
+        .eq('used_by', userId);
+      
+      logger.info('User unarchived successfully from repository', { userId });
+    } catch (error) {
+      logger.error('User repository unarchive failed', error, { userId });
+      throw error;
+    }
+  }
+
+  async findAllIncludingArchived(filter?: Record<string, any>): Promise<User[]> {
+    try {
+      // Use the user_profiles_with_codes view to get ALL users including archived
+      let query = supabase
+        .from('user_profiles_with_codes')
+        .select('*');
+      
+      if (filter) {
+        Object.entries(filter).forEach(([key, value]) => {
+          query = query.eq(key, value);
+        });
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        logger.error('User repository findAllIncludingArchived error', error, { filter });
+        throw error;
+      }
+      
+      // Map database format to API format
+      return data.map(item => ({
+        id: item.id,
+        accessCode: item.access_code || '',
+        role: item.user_role || 'user',
+        profile: {
+          displayName: item.display_name || '',
+          avatarUrl: item.avatar_url || '',
+          bio: item.bio || '',
+          expertiseAreas: item.expertise_areas || [],
+        },
+        isArchived: item.is_archived || false,
+        archivedAt: item.archived_at,
+        archivedBy: item.archived_by,
+        archiveReason: item.archive_reason,
+      })) as User[];
+    } catch (error) {
+      logger.error('User repository findAllIncludingArchived failed', error, { filter });
+      throw error;
+    }
+  }
+
+  async delete(id: string): Promise<void> {
+    // Keep delete method but make it clear it's deprecated
+    console.warn('UserRepository.delete() is deprecated. Use archiveUser() instead.');
+    throw new Error('Direct user deletion is not allowed. Use archiveUser() instead.');
   }
 }

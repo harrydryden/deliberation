@@ -12,6 +12,9 @@ export interface IRepository<T> {
 export interface IUserRepository extends IRepository<User> {
   findByEmail(email: string): Promise<User | null>;
   updateRole(userId: string, role: string): Promise<void>;
+  archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void>;
+  unarchiveUser(userId: string): Promise<void>;
+  findAllIncludingArchived(filter?: Record<string, any>): Promise<User[]>;
 }
 
 export interface IMessageRepository extends IRepository<Message> {

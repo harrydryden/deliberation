@@ -20,7 +20,8 @@ interface UserAccessManagementProps {
   onLoadUsers: () => void;
   onLoadAccessCodes: () => void;
   onUpdateRole: (userId: string, role: string) => void;
-  onDeleteUser: (userId: string) => void;
+  onArchiveUser: (userId: string, reason?: string) => void;
+  onUnarchiveUser: (userId: string) => void;
   onCreateAccessCode: (codeType: string) => void;
   onDeleteAccessCode: (id: string) => void;
 }
@@ -33,12 +34,13 @@ export const UserAccessManagement = ({
   onLoadUsers, 
   onLoadAccessCodes,
   onUpdateRole, 
-  onDeleteUser, 
+  onArchiveUser,
+  onUnarchiveUser, 
   onCreateAccessCode, 
   onDeleteAccessCode 
 }: UserAccessManagementProps) => {
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
-  const [deletingUser, setDeletingUser] = useState<string | null>(null);
+  const [archivingUser, setArchivingUser] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [newCodeType, setNewCodeType] = useState('user');
   const [deletingCode, setDeletingCode] = useState<string | null>(null);
@@ -61,12 +63,12 @@ export const UserAccessManagement = ({
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    setDeletingUser(userId);
+  const handleArchiveUser = async (userId: string) => {
+    setArchivingUser(userId);
     try {
-      await onDeleteUser(userId);
+      await onArchiveUser(userId, 'Archived by admin');
     } finally {
-      setDeletingUser(null);
+      setArchivingUser(null);
     }
   };
 
@@ -267,27 +269,27 @@ export const UserAccessManagement = ({
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button 
-                                variant="outline" 
+                                variant="destructive" 
                                 size="sm"
-                                disabled={deletingUser === user.id}
+                                disabled={archivingUser === user.id}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                <AlertDialogTitle>Archive User</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to delete this user? This action cannot be undone.
+                                  This will archive the user and revoke their access. Their data will be preserved but they cannot log in.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction 
-                                  onClick={() => handleDeleteUser(user.id)}
+                                  onClick={() => handleArchiveUser(user.id)}
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
-                                  Delete
+                                  Archive
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>

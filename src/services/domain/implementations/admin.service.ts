@@ -38,6 +38,35 @@ export class AdminService implements IAdminService {
     }
   }
 
+  async getAllUsersIncludingArchived(): Promise<User[]> {
+    try {
+      return await this.userService.getAllUsersIncludingArchived();
+    } catch (error) {
+      logger.error('Admin service getAllUsersIncludingArchived failed', { error });
+      throw error;
+    }
+  }
+
+  async archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void> {
+    try {
+      await this.userService.archiveUser(userId, archivedBy, reason);
+      logger.info('Admin archived user successfully', { userId, archivedBy, reason });
+    } catch (error) {
+      logger.error('Admin service archiveUser failed', { error, userId, archivedBy });
+      throw error;
+    }
+  }
+
+  async unarchiveUser(userId: string): Promise<void> {
+    try {
+      await this.userService.unarchiveUser(userId);
+      logger.info('Admin unarchived user successfully', { userId });
+    } catch (error) {
+      logger.error('Admin service unarchiveUser failed', { error, userId });
+      throw error;
+    }
+  }
+
   async getAllAgents(): Promise<Agent[]> {
     try {
       return await this.agentService.getAgents();

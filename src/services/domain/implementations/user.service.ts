@@ -61,28 +61,69 @@ export class UserService implements IUserService {
   }
 
   async deleteUser(id: string): Promise<void> {
+    // Deprecated method - redirect to archiving
+    console.warn('UserService.deleteUser() is deprecated. Use archiveUser() instead.');
+    throw new Error('Direct user deletion is not allowed. Use archiveUser() instead.');
+  }
+
+  async archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void> {
     try {
-      console.log('UserService: Starting deletion for user:', id);
+      console.log('UserService: Starting archiving for user:', userId);
       
       // First check if user exists
-      const existingUser = await this.userRepository.findById(id);
-      console.log('UserService: User found before deletion:', existingUser);
+      const existingUser = await this.userRepository.findById(userId);
+      console.log('UserService: User found before archiving:', existingUser);
       
       if (!existingUser) {
-        console.log('UserService: User not found, cannot delete');
+        console.log('UserService: User not found, cannot archive');
         throw new Error('User not found');
       }
       
-      await this.userRepository.delete(id);
+      if (existingUser.isArchived) {
+        throw new Error('User is already archived');
+      }
       
-      // Verify deletion
-      const deletedUser = await this.userRepository.findById(id);
-      console.log('UserService: User after deletion attempt:', deletedUser);
+      await this.userRepository.archiveUser(userId, archivedBy, reason);
       
-      logger.info('User deleted successfully', { userId: id });
+      logger.info('User archived successfully', { userId, archivedBy, reason });
     } catch (error) {
-      console.error('UserService: Delete user failed:', error);
-      logger.error('User service deleteUser failed', { error, userId: id });
+      console.error('UserService: Archive user failed:', error);
+      logger.error('User service archiveUser failed', { error, userId, archivedBy });
+      throw error;
+    }
+  }
+
+  async unarchiveUser(userId: string): Promise<void> {
+    try {
+      console.log('UserService: Starting unarchiving for user:', userId);
+      
+      // Check if user exists and is archived
+      const existingUser = await this.userRepository.findAllIncludingArchived({ id: userId });
+      const user = existingUser.find(u => u.id === userId);
+      
+      if (!user) {
+        throw new Error('User not found');
+      }
+      
+      if (!user.isArchived) {
+        throw new Error('User is not archived');
+      }
+      
+      await this.userRepository.unarchiveUser(userId);
+      
+      logger.info('User unarchived successfully', { userId });
+    } catch (error) {
+      console.error('UserService: Unarchive user failed:', error);
+      logger.error('User service unarchiveUser failed', { error, userId });
+      throw error;
+    }
+  }
+
+  async getAllUsersIncludingArchived(filter?: Record<string, any>): Promise<User[]> {
+    try {
+      return await this.userRepository.findAllIncludingArchived(filter);
+    } catch (error) {
+      logger.error('User service getAllUsersIncludingArchived failed', { error, filter });
       throw error;
     }
   }

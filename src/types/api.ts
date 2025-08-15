@@ -15,6 +15,10 @@ export interface User {
   profile: UserProfile | null;
   role?: string;
   deliberations?: UserDeliberation[];
+  isArchived?: boolean;
+  archivedAt?: string;
+  archivedBy?: string;
+  archiveReason?: string;
 }
 
 export interface UserDeliberation {

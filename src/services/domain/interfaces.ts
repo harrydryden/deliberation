@@ -40,7 +40,10 @@ export interface IUserService {
   getUserByEmail(email: string): Promise<User | null>;
   updateUser(id: string, user: Partial<User>): Promise<User>;
   updateUserRole(userId: string, role: string): Promise<void>;
-  deleteUser(id: string): Promise<void>;
+  deleteUser(id: string): Promise<void>; // Deprecated - use archiveUser instead
+  archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void>;
+  unarchiveUser(userId: string): Promise<void>;
+  getAllUsersIncludingArchived(filter?: Record<string, any>): Promise<User[]>;
 }
 
 export interface IAccessCodeService {
@@ -62,9 +65,13 @@ export interface IAdminService {
   }>;
   // Aggregate all admin operations
   getAllUsers(): Promise<User[]>;
+  getAllUsersIncludingArchived(): Promise<User[]>;
   getAllAgents(): Promise<Agent[]>;
   getAllDeliberations(): Promise<Deliberation[]>;
   getAllAccessCodes(): Promise<AccessCode[]>;
+  // User management
+  archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void>;
+  unarchiveUser(userId: string): Promise<void>;
   // Deliberation management
   clearDeliberationMessages(deliberationId: string): Promise<void>;
   clearDeliberationIbis(deliberationId: string): Promise<void>;

@@ -68,14 +68,32 @@ export const useAdminData = () => {
     }
   };
 
-  const deleteUser = async (userId: string) => {
+  const archiveUser = async (userId: string, reason?: string) => {
     try {
-      await services.userService.deleteUser(userId);
-      toast.success('User deleted successfully');
+      // Get current user for archivedBy field - this would need to be passed from context
+      const currentUserId = 'admin'; // TODO: Get from auth context when implemented
+      await services.adminService.archiveUser(userId, currentUserId, reason);
+      toast.success('User archived successfully');
       await fetchUsers();
     } catch (error) {
-      handleError(error, 'delete user');
+      handleError(error, 'archive user');
     }
+  };
+
+  const unarchiveUser = async (userId: string) => {
+    try {
+      await services.adminService.unarchiveUser(userId);
+      toast.success('User unarchived successfully');
+      await fetchUsers();
+    } catch (error) {
+      handleError(error, 'unarchive user');
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    // Deprecated - redirect to archiving
+    console.warn('deleteUser is deprecated. Use archiveUser instead.');
+    await archiveUser(userId, 'User deletion requested - converted to archive');
   };
 
   // Access Code operations
@@ -183,7 +201,9 @@ export const useAdminData = () => {
     // Operations
     fetchUsers,
     updateUserRole,
-    deleteUser,
+    deleteUser, // Deprecated
+    archiveUser,
+    unarchiveUser,
     fetchAccessCodes,
     createAccessCode,
     deleteAccessCode,
