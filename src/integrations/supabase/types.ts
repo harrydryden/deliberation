@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
@@ -1139,10 +1139,10 @@ export type Database = {
       }
       audit_sensitive_operation: {
         Args: {
-          operation_type: string
-          table_name: string
-          record_id?: string
           details?: Json
+          operation_type: string
+          record_id?: string
+          table_name: string
         }
         Returns: undefined
       }
@@ -1151,28 +1151,36 @@ export type Database = {
         Returns: unknown
       }
       can_user_change_role: {
-        Args: { target_user_id: string; new_role: string }
+        Args: { new_role: string; target_user_id: string }
         Returns: boolean
       }
       cleanup_expired_access_codes: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      create_secure_user_session: {
+        Args: {
+          p_ip_address?: unknown
+          p_user_agent?: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       detect_suspicious_activity: {
         Args: {
-          p_user_id?: string
           p_ip_address?: unknown
           p_time_window?: unknown
+          p_user_id?: string
         }
         Returns: Json
       }
       enhanced_audit_log: {
         Args: {
-          operation_type: string
-          table_name?: string
-          record_id?: string
           details?: Json
+          operation_type: string
+          record_id?: string
           risk_level?: string
+          table_name?: string
         }
         Returns: undefined
       }
@@ -1263,31 +1271,40 @@ export type Database = {
       log_admin_action: {
         Args: {
           p_action: string
-          p_table_name?: string
-          p_record_id?: string
-          p_old_values?: Json
           p_new_values?: Json
+          p_old_values?: Json
+          p_record_id?: string
+          p_table_name?: string
+        }
+        Returns: undefined
+      }
+      log_security_violation: {
+        Args: {
+          p_details?: Json
+          p_risk_level?: string
+          p_user_id?: string
+          p_violation_type: string
         }
         Returns: undefined
       }
       match_agent_knowledge: {
         Args: {
           input_agent_id: string
-          query_embedding: string
-          match_threshold: number
           match_count: number
+          match_threshold: number
+          query_embedding: string
         }
         Returns: {
-          id: string
           agent_id: string
-          title: string
+          chunk_index: number
           content: string
           content_type: string
+          created_at: string
           file_name: string
-          chunk_index: number
+          id: string
           metadata: Json
           similarity: number
-          created_at: string
+          title: string
         }[]
       }
       secure_increment_access_code_usage: {
@@ -1313,10 +1330,10 @@ export type Database = {
       validate_access_code: {
         Args: { input_code: string }
         Returns: {
-          valid: boolean
           code_type: string
           expired: boolean
           max_uses_reached: boolean
+          valid: boolean
         }[]
       }
       validate_access_code_enhanced: {
@@ -1331,15 +1348,19 @@ export type Database = {
         Args: { code_to_check: string; user_ip?: unknown }
         Returns: Json
       }
+      validate_access_code_with_security: {
+        Args: { input_code: string; user_ip?: unknown }
+        Returns: Json
+      }
       validate_password_strength: {
         Args: { password: string }
         Returns: Json
       }
       validate_role_change: {
         Args: {
-          target_user_id: string
-          new_role: string
           current_user_role?: string
+          new_role: string
+          target_user_id: string
         }
         Returns: boolean
       }
