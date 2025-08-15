@@ -60,4 +60,66 @@ export class AdminRepository implements IAdminRepository {
       throw error;
     }
   }
+
+  async clearDeliberationMessages(deliberationId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('deliberation_id', deliberationId);
+
+      if (error) {
+        logger.error({ error, deliberationId }, 'Admin repository clearDeliberationMessages error');
+        throw error;
+      }
+
+      logger.info({ deliberationId }, 'Deliberation messages cleared successfully');
+    } catch (error) {
+      logger.error({ error, deliberationId }, 'Admin repository clearDeliberationMessages failed');
+      throw error;
+    }
+  }
+
+  async clearDeliberationIbis(deliberationId: string): Promise<void> {
+    try {
+      // Delete in the correct order to handle foreign key constraints
+      // 1. Delete IBIS node ratings first
+      const { error: ratingsError } = await supabase
+        .from('ibis_node_ratings')
+        .delete()
+        .eq('deliberation_id', deliberationId);
+
+      if (ratingsError) {
+        logger.error({ error: ratingsError, deliberationId }, 'Error deleting IBIS node ratings');
+        throw ratingsError;
+      }
+
+      // 2. Delete IBIS relationships
+      const { error: relationshipsError } = await supabase
+        .from('ibis_relationships')
+        .delete()
+        .eq('deliberation_id', deliberationId);
+
+      if (relationshipsError) {
+        logger.error({ error: relationshipsError, deliberationId }, 'Error deleting IBIS relationships');
+        throw relationshipsError;
+      }
+
+      // 3. Delete IBIS nodes last
+      const { error: nodesError } = await supabase
+        .from('ibis_nodes')
+        .delete()
+        .eq('deliberation_id', deliberationId);
+
+      if (nodesError) {
+        logger.error({ error: nodesError, deliberationId }, 'Error deleting IBIS nodes');
+        throw nodesError;
+      }
+
+      logger.info({ deliberationId }, 'Deliberation IBIS data cleared successfully');
+    } catch (error) {
+      logger.error({ error, deliberationId }, 'Admin repository clearDeliberationIbis failed');
+      throw error;
+    }
+  }
 }

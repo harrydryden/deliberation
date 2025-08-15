@@ -49,4 +49,6 @@ export interface IAdminRepository {
     totalAccessCodes: number;
     usedAccessCodes: number;
   }>;
+  clearDeliberationMessages(deliberationId: string): Promise<void>;
+  clearDeliberationIbis(deliberationId: string): Promise<void>;
 }

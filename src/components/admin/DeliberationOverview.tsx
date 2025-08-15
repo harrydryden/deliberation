@@ -4,12 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, MessageSquare, Eye, GitBranch } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { RefreshCw, MessageSquare, Eye, GitBranch, Trash2, Database } from 'lucide-react';
 import { formatToUKDateTime } from '@/utils/timeUtils';
 import { Deliberation } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useNavigate } from 'react-router-dom';
 import { IbisNodeManagement } from './IbisNodeManagement';
+import { useAdminService } from '@/hooks/useServices';
+import { useToast } from '@/hooks/use-toast';
 
 interface DeliberationOverviewProps {
   deliberations: Deliberation[];
@@ -21,7 +24,10 @@ interface DeliberationOverviewProps {
 export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateStatus }: DeliberationOverviewProps) => {
   const [updating, setUpdating] = useState<string | null>(null);
   const [selectedDeliberation, setSelectedDeliberation] = useState<Deliberation | null>(null);
+  const [clearing, setClearing] = useState<{ [key: string]: 'messages' | 'ibis' | null }>({});
   const navigate = useNavigate();
+  const adminService = useAdminService();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (deliberations.length === 0 && !loading) {
@@ -58,6 +64,46 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
 
   const handleBackFromNodes = () => {
     setSelectedDeliberation(null);
+  };
+
+  const handleClearMessages = async (deliberationId: string, deliberationTitle: string) => {
+    setClearing(prev => ({ ...prev, [deliberationId]: 'messages' }));
+    try {
+      await adminService.clearDeliberationMessages(deliberationId);
+      toast({
+        title: "Success",
+        description: `All messages cleared from "${deliberationTitle}"`
+      });
+    } catch (error) {
+      console.error('Failed to clear messages:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear messages. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setClearing(prev => ({ ...prev, [deliberationId]: null }));
+    }
+  };
+
+  const handleClearIbis = async (deliberationId: string, deliberationTitle: string) => {
+    setClearing(prev => ({ ...prev, [deliberationId]: 'ibis' }));
+    try {
+      await adminService.clearDeliberationIbis(deliberationId);
+      toast({
+        title: "Success",
+        description: `All IBIS data cleared from "${deliberationTitle}"`
+      });
+    } catch (error) {
+      console.error('Failed to clear IBIS data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear IBIS data. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setClearing(prev => ({ ...prev, [deliberationId]: null }));
+    }
   };
 
   if (selectedDeliberation) {
@@ -164,7 +210,7 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
                       {formatDate(deliberation.updatedAt)}
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Button
                           variant="outline"
                           size="sm"
@@ -181,6 +227,68 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
                           <GitBranch className="h-4 w-4 mr-2" />
                           Edit Nodes
                         </Button>
+                        
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={clearing[deliberation.id] === 'messages'}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              {clearing[deliberation.id] === 'messages' ? 'Clearing...' : 'Clear Messages'}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Clear All Messages</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete all messages from all users in "{deliberation.title}". 
+                                This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleClearMessages(deliberation.id, deliberation.title)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Clear All Messages
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={clearing[deliberation.id] === 'ibis'}
+                            >
+                              <Database className="h-4 w-4 mr-2" />
+                              {clearing[deliberation.id] === 'ibis' ? 'Clearing...' : 'Clear IBIS'}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Clear All IBIS Data</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete all IBIS nodes, relationships, and ratings from "{deliberation.title}". 
+                                This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleClearIbis(deliberation.id, deliberation.title)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Clear All IBIS Data
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>

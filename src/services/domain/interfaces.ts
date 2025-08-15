@@ -67,6 +67,9 @@ export interface IAdminService {
   getAllAgents(): Promise<Agent[]>;
   getAllDeliberations(): Promise<Deliberation[]>;
   getAllAccessCodes(): Promise<AccessCode[]>;
+  // Deliberation management
+  clearDeliberationMessages(deliberationId: string): Promise<void>;
+  clearDeliberationIbis(deliberationId: string): Promise<void>;
 }
 
 export interface IRealtimeService {

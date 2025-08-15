@@ -64,4 +64,24 @@ export class AdminService implements IAdminService {
       throw error;
     }
   }
+
+  async clearDeliberationMessages(deliberationId: string): Promise<void> {
+    try {
+      await this.adminRepository.clearDeliberationMessages(deliberationId);
+      logger.info('Cleared deliberation messages', { deliberationId });
+    } catch (error) {
+      logger.error('Admin service clearDeliberationMessages failed', { error, deliberationId });
+      throw error;
+    }
+  }
+
+  async clearDeliberationIbis(deliberationId: string): Promise<void> {
+    try {
+      await this.adminRepository.clearDeliberationIbis(deliberationId);
+      logger.info('Cleared deliberation IBIS data', { deliberationId });
+    } catch (error) {
+      logger.error('Admin service clearDeliberationIbis failed', { error, deliberationId });
+      throw error;
+    }
+  }
 }
