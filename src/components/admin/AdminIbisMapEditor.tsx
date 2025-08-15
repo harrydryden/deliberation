@@ -134,6 +134,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
       if (relationshipsError) logger.warn('Relationships error', relationshipsError as any);
 
+      console.log('🔍 IBIS Map Editor - Data loaded:', {
+        totalNodes: nodesData?.length || 0,
+        issues: nodesData?.filter(n => n.node_type === 'issue').length || 0,
+        positions: nodesData?.filter(n => n.node_type === 'position').length || 0,
+        arguments: nodesData?.filter(n => n.node_type === 'argument').length || 0,
+        relationships: relationshipsData?.length || 0,
+        deliberationId,
+        sampleNode: nodesData?.[0]
+      });
+
       logger.info('IBIS data loaded for editing', {
         totalNodes: nodesData?.length || 0,
         issues: nodesData?.filter(n => n.node_type === 'issue').length || 0,
@@ -159,6 +169,11 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
   // Convert IBIS data to React Flow format
   const convertToFlowNodes = useCallback(() => {
+    console.log('🔍 IBIS Map Editor - Converting nodes:', { 
+      ibisNodesCount: ibisNodes.length, 
+      ibisRelationshipsCount: ibisRelationships.length,
+      sampleNode: ibisNodes[0]
+    });
     const canvas = { width: 1600, height: 1000 };
     
     // Use existing positions or compute layout
@@ -256,6 +271,12 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         },
         animated: false,
       };
+    });
+
+    console.log('🔍 IBIS Map Editor - Converted flow data:', {
+      flowNodesCount: flowNodes.length,
+      flowEdgesCount: flowEdges.length,
+      sampleFlowNode: flowNodes[0]
     });
 
     setNodes(flowNodes);
@@ -503,6 +524,52 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     );
   }
 
+  // Handle creating a new node
+  const handleCreateNode = async (nodeType: 'issue' | 'position' | 'argument') => {
+    try {
+      const newNode = {
+        title: `New ${nodeType}`,
+        description: `This is a new ${nodeType} node`,
+        node_type: nodeType,
+        deliberation_id: deliberationId,
+        created_by: 'admin', // Should be actual admin user ID
+        position_x: Math.random() * 800 + 100, // Random position
+        position_y: Math.random() * 600 + 100,
+      };
+
+      const { data, error } = await supabase
+        .from('ibis_nodes')
+        .insert([newNode])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const fullNode: IbisNode = {
+        id: data.id,
+        ...newNode,
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+      };
+
+      setIbisNodes(prev => [...prev, fullNode]);
+      setHasUnsavedChanges(true);
+
+      toast({
+        title: "Node Created",
+        description: `New ${nodeType} node added to the map`,
+      });
+
+    } catch (error) {
+      logger.error('Error creating node', error as any);
+      toast({
+        title: "Error",
+        description: "Failed to create node",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
@@ -534,69 +601,138 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         </CardHeader>
       </Card>
 
-      {/* Map Editor */}
+      {/* Map Editor or Empty State */}
       <div className="flex-1 relative">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={handleEdgesChange}
-          onConnect={handleConnect}
-          onNodeClick={handleNodeClick}
-          connectionMode={ConnectionMode.Loose}
-          fitView
-          fitViewOptions={{ padding: 0.1 }}
-          style={{ background: 'hsl(var(--background))' }}
-        >
-          <Background />
-          <Controls />
-          
-          {/* Control Panel */}
-          <Panel position="top-left" className="space-y-2">
-            <Card className="p-4">
-              <h3 className="font-semibold mb-2">Map Editor Controls</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <Move className="h-4 w-4" />
-                  <span>Drag nodes to reposition</span>
+        {ibisNodes.length === 0 ? (
+          // Empty State
+          <div className="h-full flex items-center justify-center">
+            <Card className="max-w-md text-center">
+              <CardHeader>
+                <CardTitle>No IBIS Nodes Found</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-muted-foreground">
+                  This deliberation doesn't have any IBIS nodes yet. Create some nodes to start building the argument map.
+                </p>
+                <div className="space-y-2">
+                  <Button 
+                    onClick={() => handleCreateNode('issue')} 
+                    className="w-full"
+                    style={{ backgroundColor: 'hsl(var(--ibis-issue))' }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Issue Node
+                  </Button>
+                  <Button 
+                    onClick={() => handleCreateNode('position')} 
+                    className="w-full"
+                    style={{ backgroundColor: 'hsl(var(--ibis-position))' }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Position Node
+                  </Button>
+                  <Button 
+                    onClick={() => handleCreateNode('argument')} 
+                    className="w-full"
+                    style={{ backgroundColor: 'hsl(var(--ibis-argument))' }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Argument Node
+                  </Button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Edit3 className="h-4 w-4" />
-                  <span>Click nodes to edit content</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link className="h-4 w-4" />
-                  <span>Drag from node edges to connect</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Unlink className="h-4 w-4" />
-                  <span>Select edges and press Delete</span>
-                </div>
-              </div>
+              </CardContent>
             </Card>
-          </Panel>
-
-          {/* Legend */}
-          <Panel position="top-right" className="space-y-2">
-            <Card className="p-4">
-              <h3 className="font-semibold mb-2">Node Types</h3>
-              <div className="space-y-2">
-                {Object.entries(nodeTypeConfig).map(([type, config]) => (
-                  <div key={type} className="flex items-center gap-2 text-sm">
-                    <div 
-                      className="w-4 h-4 border border-gray-300"
-                      style={{ 
-                        backgroundColor: config.color,
-                        borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px'
-                      }}
-                    />
-                    <span>{config.label}</span>
+          </div>
+        ) : (
+          // React Flow Map
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={handleEdgesChange}
+            onConnect={handleConnect}
+            onNodeClick={handleNodeClick}
+            connectionMode={ConnectionMode.Loose}
+            fitView
+            fitViewOptions={{ padding: 0.1 }}
+            style={{ background: 'hsl(var(--background))' }}
+          >
+            <Background />
+            <Controls />
+            
+            {/* Control Panel */}
+            <Panel position="top-left" className="space-y-2">
+              <Card className="p-4">
+                <h3 className="font-semibold mb-2">Map Editor Controls</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Move className="h-4 w-4" />
+                    <span>Drag nodes to reposition</span>
                   </div>
-                ))}
-              </div>
-            </Card>
-          </Panel>
-        </ReactFlow>
+                  <div className="flex items-center gap-2">
+                    <Edit3 className="h-4 w-4" />
+                    <span>Click nodes to edit content</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Link className="h-4 w-4" />
+                    <span>Drag from node edges to connect</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Unlink className="h-4 w-4" />
+                    <span>Select edges and press Delete</span>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <h4 className="font-medium text-sm">Add Nodes</h4>
+                  <div className="flex gap-1">
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleCreateNode('issue')}
+                      style={{ backgroundColor: 'hsl(var(--ibis-issue))', fontSize: '10px' }}
+                    >
+                      + Issue
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleCreateNode('position')}
+                      style={{ backgroundColor: 'hsl(var(--ibis-position))', fontSize: '10px' }}
+                    >
+                      + Position
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleCreateNode('argument')}
+                      style={{ backgroundColor: 'hsl(var(--ibis-argument))', fontSize: '10px' }}
+                    >
+                      + Argument
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </Panel>
+
+            {/* Legend */}
+            <Panel position="top-right" className="space-y-2">
+              <Card className="p-4">
+                <h3 className="font-semibold mb-2">Node Types</h3>
+                <div className="space-y-2">
+                  {Object.entries(nodeTypeConfig).map(([type, config]) => (
+                    <div key={type} className="flex items-center gap-2 text-sm">
+                      <div 
+                        className="w-4 h-4 border border-gray-300"
+                        style={{ 
+                          backgroundColor: config.color,
+                          borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px'
+                        }}
+                      />
+                      <span>{config.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </Panel>
+          </ReactFlow>
+        )}
       </div>
 
       {/* Node Edit Dialog */}
