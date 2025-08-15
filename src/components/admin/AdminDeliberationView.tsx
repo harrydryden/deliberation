@@ -282,52 +282,52 @@ export const AdminDeliberationView = () => {
                           )}
                         </div>
 
-                        <Card className={`p-3 ${
-                          group.userMessage.submitted_to_ibis 
-                            ? 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800' 
-                            : 'bg-muted'
-                        }`}>
-                          <div className="text-sm leading-relaxed">
-                            <MarkdownMessage content={group.userMessage.content} />
-                          </div>
-                        </Card>
-                      </div>
-                    </div>
+                         <Card className={`p-3 ${
+                           group.userMessage.submitted_to_ibis 
+                             ? 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800' 
+                             : 'bg-muted'
+                         }`}>
+                           <div className="text-sm leading-relaxed">
+                             <MarkdownMessage content={group.userMessage.content} />
+                           </div>
+                         </Card>
+                         
+                         {/* Agent Responses (expandable) */}
+                         {isExpanded && hasAgentResponses && (
+                           <div className="mt-3 space-y-3">
+                             {group.agentResponses.map((response) => {
+                               const agentInfo = (AGENTS as any)[response.message_type] ?? AGENTS.default;
+                               const AgentIcon = agentInfo.icon;
 
-                    {/* Agent Responses (expandable) */}
-                    {isExpanded && hasAgentResponses && (
-                      <div className="ml-11 space-y-2 border-l-2 border-muted pl-4">
-                        {group.agentResponses.map((response) => {
-                          const agentInfo = (AGENTS as any)[response.message_type] ?? AGENTS.default;
-                          const AgentIcon = agentInfo.icon;
+                               return (
+                                 <div key={response.id} className="flex gap-3">
+                                   <Avatar className="h-6 w-6 flex-shrink-0">
+                                     <AvatarFallback className={agentInfo.color}>
+                                       <AgentIcon className="h-3 w-3 text-white" />
+                                     </AvatarFallback>
+                                   </Avatar>
 
-                          return (
-                            <div key={response.id} className="flex gap-3">
-                              <Avatar className="h-6 w-6 flex-shrink-0">
-                                <AvatarFallback className={agentInfo.color}>
-                                  <AgentIcon className="h-3 w-3 text-white" />
-                                </AvatarFallback>
-                              </Avatar>
+                                   <div className="flex-1">
+                                     <div className="flex items-center gap-2 mb-1">
+                                       <span className="text-xs font-medium">{agentInfo.name}</span>
+                                       <span className="text-xs text-muted-foreground">
+                                         {formatToUKTime(response.created_at)}
+                                       </span>
+                                     </div>
 
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-xs font-medium">{agentInfo.name}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatToUKTime(response.created_at)}
-                                  </span>
-                                </div>
-
-                                <Card className="p-2 bg-card text-xs">
-                                  <div className="leading-relaxed">
-                                    <MarkdownMessage content={response.content} />
-                                  </div>
-                                </Card>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                                     <Card className="p-2 bg-card text-xs">
+                                       <div className="leading-relaxed">
+                                         <MarkdownMessage content={response.content} />
+                                       </div>
+                                     </Card>
+                                   </div>
+                                 </div>
+                               );
+                             })}
+                           </div>
+                         )}
+                       </div>
+                     </div>
                   </div>
                 );
               })}
