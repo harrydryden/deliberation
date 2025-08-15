@@ -1130,6 +1130,9 @@ export type Database = {
       user_profiles_with_codes: {
         Row: {
           access_code: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
           avatar_url: string | null
           bio: string | null
           code_type: string | null
@@ -1137,6 +1140,8 @@ export type Database = {
           display_name: string | null
           expertise_areas: string[] | null
           id: string | null
+          is_archived: boolean | null
+          role: string | null
           updated_at: string | null
           used_at: string | null
           user_role: string | null
