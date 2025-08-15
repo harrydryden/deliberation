@@ -74,9 +74,9 @@ export class SecureAuthService {
     }
 
     try {
-      // Use the enhanced database function for access code validation
+      // Use the simple database function for access code validation
       const { data: validationResult, error: validationError } = await supabase
-        .rpc('validate_access_code_with_security', { 
+        .rpc('validate_access_code_simple', { 
           input_code: validation.sanitized || accessCode 
         });
 

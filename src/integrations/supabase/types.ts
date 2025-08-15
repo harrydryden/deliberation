@@ -1348,8 +1348,8 @@ export type Database = {
         Args: { code_to_check: string; user_ip?: unknown }
         Returns: Json
       }
-      validate_access_code_with_security: {
-        Args: { input_code: string; user_ip?: unknown }
+      validate_access_code_simple: {
+        Args: { input_code: string }
         Returns: Json
       }
       validate_password_strength: {
