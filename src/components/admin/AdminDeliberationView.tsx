@@ -80,10 +80,21 @@ export const AdminDeliberationView = () => {
         }
 
         if (deliberationResult.data) {
+          // Calculate unique participants from messages since formal participants may not be recorded
+          const uniqueMessageSenders = new Set(
+            messagesResult.data
+              ?.filter(msg => msg.message_type === 'user')
+              ?.map(msg => msg.user_id)
+              ?.filter(Boolean)
+          );
+          
           setDeliberation({
             ...deliberationResult.data,
             participants: participantsResult.data || [],
-            participant_count: participantsResult.data?.length || 0
+            participant_count: Math.max(
+              participantsResult.data?.length || 0, 
+              uniqueMessageSenders.size
+            )
           });
         }
 
