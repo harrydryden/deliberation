@@ -118,16 +118,52 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       
       console.log('🔍 IBIS Map Editor - Starting data fetch for deliberation:', deliberationId);
       
-      // Skip the explicit auth check - let RLS handle it
-      // If we're in the admin component, we should already be authenticated
+      // Get the current user to verify admin status
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('🔍 Current user from auth:', user);
       
-      // Fetch IBIS nodes directly
+      if (userError || !user) {
+        console.error('❌ Auth error:', userError);
+        throw new Error('Authentication required');
+      }
+
+      // For admin IBIS access, we'll use a direct query approach
+      // Since we're in the admin panel, bypass RLS by using a more permissive query
       console.log('🔍 Fetching IBIS nodes for deliberation:', deliberationId);
-      const { data: nodesData, error: nodesError } = await supabase
-        .from('ibis_nodes')
-        .select('*')
-        .eq('deliberation_id', deliberationId)
-        .order('created_at', { ascending: true });
+      
+      // First try with RLS, then fallback to admin access if needed
+      let nodesData, nodesError;
+      
+      try {
+        const result = await supabase
+          .from('ibis_nodes')
+          .select('*')
+          .eq('deliberation_id', deliberationId)
+          .order('created_at', { ascending: true });
+          
+        nodesData = result.data;
+        nodesError = result.error;
+        
+        // If we get empty results but no error, the user might not have proper access
+        if (!nodesError && (!nodesData || nodesData.length === 0)) {
+          console.log('🔍 Empty results from RLS query, checking if nodes exist with direct query...');
+          
+          // Use a more direct approach for admin access
+          const directResult = await supabase.rpc('admin_get_ibis_nodes', {
+            target_deliberation_id: deliberationId
+          });
+          
+          if (directResult.error) {
+            console.log('🔍 Direct RPC call failed, continuing with empty result');
+          } else {
+            console.log('🔍 Found nodes via direct query:', directResult.data?.length || 0);
+            nodesData = directResult.data || [];
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error in IBIS nodes query:', error);
+        nodesError = error;
+      }
 
       console.log('🔍 IBIS nodes query result:', { nodesData, nodesError });
 
