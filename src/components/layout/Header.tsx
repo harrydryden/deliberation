@@ -23,10 +23,10 @@ export const Header = () => {
         </div>
         
         {user && <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/deliberations')} className="flex items-center space-x-1">
+            {user.role !== 'admin' && <Button variant="ghost" size="sm" onClick={() => navigate('/deliberations')} className="flex items-center space-x-1">
               <MessageSquare className="h-4 w-4" />
               <span>Deliberations</span>
-            </Button>
+            </Button>}
             {user.role === 'admin' && <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="flex items-center space-x-1">
                 <Settings className="h-4 w-4" />
                 <span>Admin</span>
