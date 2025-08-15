@@ -89,6 +89,7 @@ const relationshipConfig = {
 };
 
 export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }: AdminIbisMapEditorProps) => {
+  console.log('🔍 IBIS Map Editor - Component initialized with props:', { deliberationId, deliberationTitle });
   const [ibisNodes, setIbisNodes] = useState<IbisNode[]>([]);
   const [ibisRelationships, setIbisRelationships] = useState<IbisRelationship[]>([]);
   const [loading, setLoading] = useState(true);
@@ -570,8 +571,14 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
   // Load data on mount
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    console.log('🔍 IBIS Map Editor - useEffect mounted with deliberationId:', deliberationId);
+    if (deliberationId) {
+      console.log('🔍 IBIS Map Editor - About to call fetchData()');
+      fetchData();
+    } else {
+      console.log('🔍 IBIS Map Editor - No deliberation ID, skipping fetchData()');
+    }
+  }, [fetchData, deliberationId]);
 
   // Convert data when it changes
   useEffect(() => {
