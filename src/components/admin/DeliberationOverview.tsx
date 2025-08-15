@@ -66,8 +66,10 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
   };
 
   const handleEditMap = (deliberation: Deliberation) => {
+    console.log('🔍 DeliberationOverview - Edit Map clicked for deliberation:', deliberation.id, deliberation.title);
     setSelectedDeliberation(deliberation);
     setEditMode('map');
+    console.log('🔍 DeliberationOverview - State set, editMode should now be "map"');
   };
 
   const handleBackFromEdit = () => {
@@ -126,6 +128,11 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
   }
 
   if (selectedDeliberation && editMode === 'map') {
+    console.log('🔍 DeliberationOverview - Rendering AdminIbisMapEditor with:', {
+      deliberationId: selectedDeliberation.id,
+      deliberationTitle: selectedDeliberation.title,
+      editMode
+    });
     return (
       <AdminIbisMapEditor
         deliberationId={selectedDeliberation.id}
