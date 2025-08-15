@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
 
 export const Header = () => {
-  const { user, signOut } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -60,7 +60,7 @@ export const Header = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={signOut}
+              onClick={logout}
               className="flex items-center space-x-1"
             >
               <LogOut className="h-4 w-4" />
