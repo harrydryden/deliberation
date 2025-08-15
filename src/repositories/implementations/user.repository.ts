@@ -66,9 +66,9 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
   // Override to handle profiles table specifics - excludes archived users
   async findAll(filter?: Record<string, any>): Promise<User[]> {
     try {
-      // Use the user_profiles_with_codes view to get users with their access codes
+      // Use the new view that includes deliberations
       let query = supabase
-        .from('user_profiles_with_codes')
+        .from('user_profiles_with_deliberations')
         .select('*')
         .or('is_archived.is.null,is_archived.eq.false'); // Exclude archived users
       
@@ -96,6 +96,7 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
           bio: item.bio || '',
           expertiseAreas: item.expertise_areas || [],
         },
+        deliberations: Array.isArray(item.deliberations) ? item.deliberations : [],
       })) as User[];
     } catch (error) {
       logger.error('User repository findAll failed', error, { filter });
@@ -172,9 +173,9 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
 
   async findAllIncludingArchived(filter?: Record<string, any>): Promise<User[]> {
     try {
-      // Use the user_profiles_with_codes view to get ALL users including archived
+      // Use the new view that includes deliberations for ALL users including archived
       let query = supabase
-        .from('user_profiles_with_codes')
+        .from('user_profiles_with_deliberations')
         .select('*');
       
       if (filter) {
@@ -201,6 +202,7 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
           bio: item.bio || '',
           expertiseAreas: item.expertise_areas || [],
         },
+        deliberations: Array.isArray(item.deliberations) ? item.deliberations : [],
         isArchived: item.is_archived || false,
         archivedAt: item.archived_at,
         archivedBy: item.archived_by,
