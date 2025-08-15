@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { Calendar, Users, Eye, Bot, User, FileText, Workflow } from 'lucide-react';
+import { Calendar, Users, Eye, Bot, User, FileText, Workflow, ChevronDown, ChevronRight } from 'lucide-react';
 import { formatToUKDate, formatToUKTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { MarkdownMessage } from '@/components/common/MarkdownMessage';
@@ -36,6 +36,7 @@ export const AdminDeliberationView = () => {
   
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +104,51 @@ export const AdminDeliberationView = () => {
 
     loadData();
   }, [deliberationId]);
+
+  // Group messages by user messages and their following agent responses
+  const groupMessages = (messages: ChatMessage[]) => {
+    const groups: Array<{
+      userMessage: ChatMessage;
+      agentResponses: ChatMessage[];
+    }> = [];
+    
+    let currentGroup: { userMessage: ChatMessage; agentResponses: ChatMessage[] } | null = null;
+    
+    messages.forEach(message => {
+      if (message.message_type === 'user') {
+        // Start a new group
+        if (currentGroup) {
+          groups.push(currentGroup);
+        }
+        currentGroup = {
+          userMessage: message,
+          agentResponses: []
+        };
+      } else if (currentGroup) {
+        // Add agent response to current group
+        currentGroup.agentResponses.push(message);
+      }
+    });
+    
+    // Don't forget the last group
+    if (currentGroup) {
+      groups.push(currentGroup);
+    }
+    
+    return groups;
+  };
+
+  const toggleExpanded = (messageId: string) => {
+    const newExpanded = new Set(expandedMessages);
+    if (newExpanded.has(messageId)) {
+      newExpanded.delete(messageId);
+    } else {
+      newExpanded.add(messageId);
+    }
+    setExpandedMessages(newExpanded);
+  };
+
+  const messageGroups = groupMessages(messages);
 
   if (loading) {
     return (
@@ -194,46 +240,94 @@ export const AdminDeliberationView = () => {
             </div>
           ) : (
             <div className="max-h-[600px] overflow-y-auto space-y-4">
-              {messages.map((message, index) => {
-                const isUser = message.message_type === 'user';
-                const agentInfo = isUser ? null : ((AGENTS as any)[message.message_type] ?? AGENTS.default);
-                const AgentIcon = (agentInfo?.icon as any) || Bot;
+              {messageGroups.map((group, groupIndex) => {
+                const isExpanded = expandedMessages.has(group.userMessage.id);
+                const hasAgentResponses = group.agentResponses.length > 0;
 
                 return (
-                  <div key={message.id} className="flex gap-3">
-                    <Avatar className="h-8 w-8 flex-shrink-0">
-                      <AvatarFallback className={isUser ? 'bg-primary' : agentInfo?.color}>
-                        {isUser ? <User className="h-4 w-4 text-white" /> : <AgentIcon className="h-4 w-4 text-white" />}
-                      </AvatarFallback>
-                    </Avatar>
+                  <div key={group.userMessage.id} className="space-y-2">
+                    {/* User Message */}
+                    <div 
+                      className={`flex gap-3 ${hasAgentResponses ? 'cursor-pointer' : ''}`}
+                      onClick={() => hasAgentResponses && toggleExpanded(group.userMessage.id)}
+                    >
+                      <Avatar className="h-8 w-8 flex-shrink-0">
+                        <AvatarFallback className="bg-primary">
+                          <User className="h-4 w-4 text-white" />
+                        </AvatarFallback>
+                      </Avatar>
 
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium">
-                          {isUser ? 'User' : agentInfo?.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatToUKTime(message.created_at)}
-                        </span>
-                        {message.submitted_to_ibis && (
-                          <Badge variant="default" className="text-xs bg-blue-500 hover:bg-blue-600">
-                            Submitted to IBIS
-                          </Badge>
-                        )}
-                      </div>
-
-                      <Card className={`p-3 ${
-                        message.submitted_to_ibis 
-                          ? 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800' 
-                          : isUser 
-                            ? 'bg-muted' 
-                            : 'bg-card'
-                      }`}>
-                        <div className="text-sm leading-relaxed">
-                          <MarkdownMessage content={message.content} />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium">User</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatToUKTime(group.userMessage.created_at)}
+                          </span>
+                          {group.userMessage.submitted_to_ibis && (
+                            <Badge variant="default" className="text-xs bg-blue-500 hover:bg-blue-600">
+                              Submitted to IBIS
+                            </Badge>
+                          )}
+                          {hasAgentResponses && (
+                            <div className="flex items-center gap-1 ml-auto">
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {group.agentResponses.length} response{group.agentResponses.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      </Card>
+
+                        <Card className={`p-3 ${
+                          group.userMessage.submitted_to_ibis 
+                            ? 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800' 
+                            : 'bg-muted'
+                        }`}>
+                          <div className="text-sm leading-relaxed">
+                            <MarkdownMessage content={group.userMessage.content} />
+                          </div>
+                        </Card>
+                      </div>
                     </div>
+
+                    {/* Agent Responses (expandable) */}
+                    {isExpanded && hasAgentResponses && (
+                      <div className="ml-11 space-y-2 border-l-2 border-muted pl-4">
+                        {group.agentResponses.map((response) => {
+                          const agentInfo = (AGENTS as any)[response.message_type] ?? AGENTS.default;
+                          const AgentIcon = agentInfo.icon;
+
+                          return (
+                            <div key={response.id} className="flex gap-3">
+                              <Avatar className="h-6 w-6 flex-shrink-0">
+                                <AvatarFallback className={agentInfo.color}>
+                                  <AgentIcon className="h-3 w-3 text-white" />
+                                </AvatarFallback>
+                              </Avatar>
+
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-medium">{agentInfo.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatToUKTime(response.created_at)}
+                                  </span>
+                                </div>
+
+                                <Card className="p-2 bg-card text-xs">
+                                  <div className="leading-relaxed">
+                                    <MarkdownMessage content={response.content} />
+                                  </div>
+                                </Card>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
