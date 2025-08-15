@@ -15,6 +15,8 @@ export interface AuthContextType {
   isLoading: boolean;
   /** Login function that authenticates a user */
   login: (email: string, password: string) => Promise<{ user: User; session: any }>;
+  /** Access code authentication function */
+  authenticateWithAccessCode: (accessCode: string, userRole: string) => Promise<void>;
   /** Registration function that creates a new user account */
   register: (email: string, password: string, accessCode?: string) => Promise<{ user: User; session: any }>;
   /** Logout function that signs out the current user */
@@ -80,13 +82,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return result;
   };
 
+  const authenticateWithAccessCode = async (accessCode: string, userRole: string) => {
+    // Create a mock user for access code authentication
+    const mockUser: User = {
+      id: `access_${accessCode}`,
+      accessCode: accessCode,
+      role: userRole,
+      profile: {
+        displayName: `User_${accessCode.substring(0, 4)}`,
+        avatarUrl: '',
+        bio: '',
+        expertiseAreas: []
+      }
+    };
+    setUser(mockUser);
+  };
+
   const logout = async () => {
     await authService.signOut();
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, logout, authenticateWithAccessCode }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServices } from "@/hooks/useServices";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,7 @@ export const AuthForm = () => {
   const [validationError, setValidationError] = useState<string>("");
   const [remainingTime, setRemainingTime] = useState(0);
   const { authService } = useServices();
+  const { authenticateWithAccessCode } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -102,49 +104,15 @@ export const AuthForm = () => {
         logger.auth.success('Secure authentication successful');
         authRateLimit.reset(clientId);
         
+        // Set the user in the auth context
+        await authenticateWithAccessCode(result.user.accessCode, result.user.role);
+        
         toast({
           title: "Welcome!",
           description: "Successfully authenticated with enhanced security"
         });
         
-        // Instead of using fallback auth, directly use the result to simulate successful login
-        // Create a mock auth result that matches the expected format
-        const mockAuthResult = {
-          user: {
-            id: result.user.id,
-            email: `${result.user.accessCode}@deliberation.local`,
-            email_verified: true,
-            role: result.user.role,
-            user_metadata: {
-              access_code: result.user.accessCode,
-              code_type: result.user.role,
-              email: `${result.user.accessCode}@deliberation.local`,
-              email_verified: true,
-              phone_verified: false,
-              sub: result.user.id,
-              user_role: result.user.role
-            }
-          },
-          session: {
-            access_token: result.session?.token || `mock_token_${Date.now()}`,
-            refresh_token: `refresh_${Date.now()}`,
-            expires_in: 3600,
-            expires_at: Math.floor(Date.now() / 1000) + 3600,
-            token_type: "bearer",
-            user: {
-              id: result.user.id,
-              email: `${result.user.accessCode}@deliberation.local`,
-              role: result.user.role
-            }
-          }
-        };
-        
-        // Navigate immediately since we have successful auth
-        if (result.user.role === 'admin') {
-          navigate('/admin');
-        } else {
-          navigate('/deliberations');
-        }
+        // Navigation will be handled by Auth.tsx since we now have a user in context
       } else {
         setValidationError(result.error || 'Authentication failed');
         toast({
