@@ -1148,6 +1148,28 @@ export type Database = {
         }
         Relationships: []
       }
+      user_profiles_with_deliberations: {
+        Row: {
+          access_code: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          avatar_url: string | null
+          bio: string | null
+          code_type: string | null
+          created_at: string | null
+          deliberations: Json | null
+          display_name: string | null
+          expertise_areas: string[] | null
+          id: string | null
+          is_archived: boolean | null
+          role: string | null
+          updated_at: string | null
+          used_at: string | null
+          user_role: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       assign_access_codes_to_users: {
