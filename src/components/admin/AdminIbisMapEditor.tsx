@@ -678,45 +678,20 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       return;
     }
     
-    // Persist position changes for admins
-    const positionChanges = changes.filter(change => 
-      change.type === 'position' && 
-      change.dragging === false && 
-      change.position
-    );
-    
-    for (const change of positionChanges) {
-      if (change.type === 'position' && change.position) {
-        try {
-          const { error } = await supabase
-            .from('ibis_nodes')
-            .update({
-              position_x: Math.round(change.position.x),
-              position_y: Math.round(change.position.y),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', change.id);
-            
-          if (error) throw error;
-        } catch (error) {
-          logger.error('Error updating node position', error as any);
-          toast({
-            title: "Error",
-            description: "Failed to save node position",
-            variant: "destructive",
-          });
-        }
-      }
+    // Mark as having unsaved changes when positions change
+    const hasPositionChanges = changes.some(change => change.type === 'position');
+    if (hasPositionChanges) {
+      setHasUnsavedChanges(true);
     }
       
-      // Recalculate edge routing after position changes
-      setTimeout(() => {
-        setNodes(currentNodes => {
-          recalculateEdgeRouting(currentNodes);
-          return currentNodes;
-        });
-      }, 0);
-  }, [onNodesChange, user, toast]);
+    // Recalculate edge routing after position changes
+    setTimeout(() => {
+      setNodes(currentNodes => {
+        recalculateEdgeRouting(currentNodes);
+        return currentNodes;
+      });
+    }, 0);
+  }, [onNodesChange, user, toast, recalculateEdgeRouting]);
 
   // Handle edge changes
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -1292,7 +1267,10 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 const constrainedNode = constrainNodeToZone(node);
                 if (constrainedNode.position.x !== node.position.x || constrainedNode.position.y !== node.position.y) {
                   setNodes(nds => nds.map(n => n.id === node.id ? constrainedNode : n));
+                  console.log('🔍 Node position constrained to zone:', constrainedNode.position);
                 }
+                // Always mark as having unsaved changes when a node is moved
+                setHasUnsavedChanges(true);
               }}
               onConnectStart={(event, params) => {
                 console.log('🔍 Connection start:', params);
