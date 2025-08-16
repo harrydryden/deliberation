@@ -560,14 +560,29 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     try {
       setSaving(true);
       
+      console.log('🔍 DEBUG: About to call admin_update_ibis_relationship with params:', {
+        p_relationship_id: editingEdge.id,
+        p_relationship_type: edgeForm.relationship_type,
+        editingEdge: editingEdge,
+        edgeForm: edgeForm
+      });
+
       // Use the admin RPC function to bypass RLS issues
       const { data, error } = await supabase.rpc('admin_update_ibis_relationship', {
         p_relationship_id: editingEdge.id,
         p_relationship_type: edgeForm.relationship_type
       });
 
+      console.log('🔍 DEBUG: RPC response:', { data, error });
+
       if (error) {
-        console.error('Error updating relationship', { error });
+        console.error('🔍 DEBUG: Error details:', {
+          error,
+          errorCode: error.code,
+          errorMessage: error.message,
+          errorDetails: error.details,
+          errorHint: error.hint
+        });
         throw error;
       }
 
