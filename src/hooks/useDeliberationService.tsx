@@ -70,8 +70,30 @@ class SupabaseDeliberationService implements DeliberationService {
   }
 
   async createDeliberation(deliberationData: any): Promise<any> {
-    // For simplified authentication, we'll generate a simple user ID
-    const tempUserId = `admin_${Date.now()}`;
+    // Get the current authenticated user from localStorage
+    const storedUser = localStorage.getItem('simple_auth_user');
+    if (!storedUser) {
+      throw new Error('User not authenticated');
+    }
+    
+    const user = JSON.parse(storedUser);
+    
+    // Generate a deterministic UUID for the user
+    const crypto = window.crypto || (window as any).msCrypto;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(user.id);
+    const hashArray = await crypto.subtle.digest('SHA-256', data);
+    const hashHex = Array.from(new Uint8Array(hashArray))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    
+    const facilitatorId = [
+      hashHex.slice(0, 8),
+      hashHex.slice(8, 12),
+      hashHex.slice(12, 16),
+      hashHex.slice(16, 20),
+      hashHex.slice(20, 32)
+    ].join('-');
 
     // Create deliberation
     const { data: deliberation, error: deliberationError } = await supabase
@@ -81,7 +103,7 @@ class SupabaseDeliberationService implements DeliberationService {
         description: deliberationData.description,
         is_public: deliberationData.is_public,
         max_participants: deliberationData.max_participants,
-        facilitator_id: tempUserId,
+        facilitator_id: facilitatorId,
         status: 'draft'
       })
       .select()
@@ -89,37 +111,50 @@ class SupabaseDeliberationService implements DeliberationService {
 
     if (deliberationError) throw deliberationError;
 
-    // Add creator as participant and facilitator
-    const { error: participantError } = await supabase
-      .from('participants')
-      .insert({
-        deliberation_id: deliberation.id,
-        user_id: tempUserId,
-        role: 'facilitator'
-      });
-
-    if (participantError) throw participantError;
-
     return deliberation;
   }
 
   async joinDeliberation(deliberationId: string): Promise<void> {
     logger.info('Starting joinDeliberation with simplified auth', { deliberationId });
     
-    // Since we're using simplified access codes, we'll create a simple participant entry
-    // without complex user validation
+    // Get the current authenticated user from localStorage
+    const storedUser = localStorage.getItem('simple_auth_user');
+    if (!storedUser) {
+      throw new Error('User not authenticated');
+    }
     
-    // For now, use a simple approach - generate a participant ID based on deliberation
-    const tempUserId = `user_${Date.now()}`; // Simple user ID for this session
+    const user = JSON.parse(storedUser);
+    const userId = user.id; // This should be in format "access_ACCESSCODE"
     
-    logger.info('Adding participant', { deliberationId, tempUserId });
+    logger.info('Using authenticated user for join', { userId });
     
-    // Check if already a participant (simple check)
+    // Convert to a valid UUID format for database compatibility
+    // We'll use a deterministic UUID based on the access code
+    const crypto = window.crypto || (window as any).msCrypto;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(userId);
+    const hashArray = await crypto.subtle.digest('SHA-256', data);
+    const hashHex = Array.from(new Uint8Array(hashArray))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    
+    // Convert hash to UUID format (8-4-4-4-12)
+    const uuidFromHash = [
+      hashHex.slice(0, 8),
+      hashHex.slice(8, 12),
+      hashHex.slice(12, 16),
+      hashHex.slice(16, 20),
+      hashHex.slice(20, 32)
+    ].join('-');
+    
+    logger.info('Generated UUID for participant', { originalId: userId, uuid: uuidFromHash });
+    
+    // Check if already a participant
     const { data: existing } = await supabase
       .from('participants')
       .select('id')
       .eq('deliberation_id', deliberationId)
-      .eq('user_id', tempUserId)
+      .eq('user_id', uuidFromHash)
       .maybeSingle();
 
     if (existing) {
@@ -127,12 +162,12 @@ class SupabaseDeliberationService implements DeliberationService {
       return;
     }
 
-    // Add as participant (simplified)
+    // Add as participant
     const { error } = await supabase
       .from('participants')
       .insert({
         deliberation_id: deliberationId,
-        user_id: tempUserId,
+        user_id: uuidFromHash,
         role: 'participant'
       });
 
@@ -179,14 +214,36 @@ class SupabaseDeliberationService implements DeliberationService {
   }
 
   async leaveDeliberation(deliberationId: string): Promise<void> {
-    // For simplified authentication, generate a consistent user ID
-    const tempUserId = `user_${Date.now()}`;
+    // Get the current authenticated user from localStorage
+    const storedUser = localStorage.getItem('simple_auth_user');
+    if (!storedUser) {
+      throw new Error('User not authenticated');
+    }
+    
+    const user = JSON.parse(storedUser);
+    
+    // Generate the same deterministic UUID we used for joining
+    const crypto = window.crypto || (window as any).msCrypto;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(user.id);
+    const hashArray = await crypto.subtle.digest('SHA-256', data);
+    const hashHex = Array.from(new Uint8Array(hashArray))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    
+    const userId = [
+      hashHex.slice(0, 8),
+      hashHex.slice(8, 12),
+      hashHex.slice(12, 16),
+      hashHex.slice(16, 20),
+      hashHex.slice(20, 32)
+    ].join('-');
 
     const { error } = await supabase
       .from('participants')
       .delete()
       .eq('deliberation_id', deliberationId)
-      .eq('user_id', tempUserId);
+      .eq('user_id', userId);
 
     if (error) throw error;
   }
