@@ -303,6 +303,12 @@ const { user } = useAuth();
     relationships: IbisRelationship[] = [],
     canvas: { width: number; height: number } = { width: 1600, height: 1000 }
   ) => {
+    console.log('🎯 Starting concentric layout calculation...', {
+      nodesCount: nodes.length,
+      relationshipsCount: relationships.length,
+      canvas
+    });
+
     // Use the new concentric layout system
     const { positions: layoutPositions, zones: layoutZones } = applyConcentricLayout(
       nodes.map(n => ({
@@ -323,6 +329,15 @@ const { user } = useAuth();
       canvas
     );
     
+    console.log('🎯 Concentric layout completed:', {
+      positionsCount: layoutPositions.size,
+      zonesCalculated: !!layoutZones,
+      issueZone: layoutZones?.issue,
+      positionZone: layoutZones?.position,
+      argumentZone: layoutZones?.argument,
+      samplePositions: Array.from(layoutPositions.entries()).slice(0, 3)
+    });
+    
     // Convert layout positions to simple positions map
     const positions = new Map<string, { x: number; y: number }>();
     layoutPositions.forEach((pos, id) => {
@@ -332,13 +347,9 @@ const { user } = useAuth();
     // Store zones for rendering - set immediately for this layout
     setZones(layoutZones);
     
-    console.log('🎯 Concentric layout applied:', {
-      nodesCount: nodes.length,
-      zonesCalculated: !!layoutZones,
-      issueZone: layoutZones?.issue,
-      positionZone: layoutZones?.position,
-      argumentZone: layoutZones?.argument,
-      samplePosition: positions.entries().next().value
+    console.log('🎯 Zones set and positions converted:', {
+      positionsMapSize: positions.size,
+      zonesStored: !!layoutZones
     });
 
     // Return simplified result for compatibility
@@ -515,8 +526,17 @@ const { user } = useAuth();
 
   // Precompute positions for the full dataset to keep layout stable across filters
   useEffect(() => {
+    console.log('🎯 Layout effect triggered:', {
+      ibisNodesLength: ibisNodes.length,
+      ibisRelationshipsLength: ibisRelationships.length
+    });
+    
     if (ibisNodes.length > 0) {
       const pos = computeConcentricLayout(ibisNodes, ibisRelationships);
+      console.log('🎯 Layout computed, setting positions:', {
+        positionsSize: pos.size,
+        sampleEntry: pos.entries().next().value
+      });
       setComputedPositions(pos);
     } else {
       setComputedPositions(new Map());

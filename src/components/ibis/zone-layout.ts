@@ -102,7 +102,15 @@ export const applyConcentricLayout = (
     argument: nodes.filter(n => n.node_type === 'argument').length
   };
   
+  console.log('🎯 Zone layout - Starting calculation:', {
+    canvas,
+    center,
+    nodeTypeCounts,
+    totalNodes: nodes.length
+  });
+  
   const zones = calculateZoneBoundaries(canvas, nodeTypeCounts);
+  console.log('🎯 Zone boundaries calculated:', zones);
   const positions = new Map<string, { x: number; y: number; vx: number; vy: number }>();
   
   // Initial positioning within zones
@@ -250,6 +258,12 @@ export const applyConcentricLayout = (
       pos.y = constrainedPos.y;
     });
   }
+  
+  console.log('🎯 Zone layout - Final result:', {
+    positionsCount: positions.size,
+    zones,
+    samplePositions: Array.from(positions.entries()).slice(0, 2)
+  });
   
   return { positions, zones };
 };
