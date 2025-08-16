@@ -98,30 +98,11 @@ const relationshipConfig = {
   responds_to: { color: '#374151', style: 'solid', label: 'Responds to' },
 };
 
-// Transform state for world/viewport coordinate system
-interface Transform {
-  scale: number;
-  translateX: number;
-  translateY: number;
-}
-
-// Zone definitions in viewport pixels
-interface ZoneDefinition {
-  radius: number;
-  nodeTypes: string[];
-}
-
-interface ZonesConfig {
-  inner: ZoneDefinition;
-  middle: ZoneDefinition;
-  outer: ZoneDefinition;
-}
-
 export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }: AdminIbisMapEditorProps) => {
   console.log('🔍 IBIS Map Editor - Component initialized with props:', { deliberationId, deliberationTitle });
   
   // Optimized state management to reduce re-renders
-  const [ibisNodes, setIbisNodes] = useOptimizedArray<IbisNode>([], 300); // 300ms debounce for frequent updates
+  const [ibisNodes, setIbisNodes] = useOptimizedArray<IbisNode>([], 300);
   const [ibisRelationships, setIbisRelationships] = useOptimizedArray<IbisRelationship>([], 300);
   const [syncState, setSyncState] = useOptimizedState({ 
     initialValue: { 
@@ -149,533 +130,82 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   // ReactFlow instance ref
   const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   
-  // Zone definitions with center at (0,0) for proper ReactFlow positioning
-  const baseRadius = 200;
-  const zones = {
-    issue: { 
-      outerRadius: baseRadius,
-      centerX: 0, // Center at ReactFlow origin
-      centerY: 0  // Center at ReactFlow origin
-    },
-    position: { 
-      outerRadius: baseRadius * 1.8,
-      centerX: 0,
-      centerY: 0
-    },
-    argument: { 
-      outerRadius: baseRadius * 2.6,
-      centerX: 0,
-      centerY: 0
-    }
-  };
-
-  // Custom node types
   const nodeTypes = {
     custom: CustomIbisNode,
   };
-  
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Real-time synchronization setup
-  useEffect(() => {
-    console.log('🔄 Setting up real-time subscriptions for deliberation:', deliberationId);
+  // Enhanced edge deletion with proper temp ID handling
+  const handleEdgeDelete = useCallback(async (edgeId: string) => {
+    console.log('🗑️ Deleting edge:', edgeId);
     
-    // Subscribe to IBIS nodes changes
-    const nodesChannel = supabase
-      .channel(`ibis_nodes_${deliberationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ibis_nodes',
-          filter: `deliberation_id=eq.${deliberationId}`
-        },
-        (payload) => {
-          console.log('🔄 Real-time nodes update:', payload);
-          handleRealtimeNodeUpdate(payload);
-        }
-      )
-      .subscribe();
-
-    // Subscribe to IBIS relationships changes
-    const relationshipsChannel = supabase
-      .channel(`ibis_relationships_${deliberationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ibis_relationships',
-          filter: `deliberation_id=eq.${deliberationId}`
-        },
-        (payload) => {
-          console.log('🔄 Real-time relationships update:', payload);
-          handleRealtimeRelationshipUpdate(payload);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      console.log('🔄 Cleaning up real-time subscriptions');
-      supabase.removeChannel(nodesChannel);
-      supabase.removeChannel(relationshipsChannel);
-    };
-  }, [deliberationId]);
-
-  // Handle real-time node updates
-  const handleRealtimeNodeUpdate = useCallback((payload: any) => {
-    const { eventType, new: newRecord, old: oldRecord } = payload;
-    
-    try {
-      switch (eventType) {
-        case 'INSERT':
-          setIbisNodes(current => {
-            const exists = current.some(node => node.id === newRecord.id);
-            if (!exists) {
-              console.log('🔄 Adding new node from real-time:', newRecord.id);
-              return [...current, newRecord];
-            }
-            return current;
-          });
-          break;
-        case 'UPDATE':
-          setIbisNodes(current => 
-            current.map(node => 
-              node.id === newRecord.id ? { ...node, ...newRecord } : node
-            )
-          );
-          break;
-        case 'DELETE':
-          setIbisNodes(current => 
-            current.filter(node => node.id !== oldRecord.id)
-          );
-          break;
-      }
-      
-      // Update sync state
-      setSyncState(current => ({
-        ...current,
-        lastSync: Date.now()
-      }));
-    } catch (error) {
-      console.error('❌ Error handling real-time node update:', error);
-      setSyncState(current => ({
-        ...current,
-        hasValidationErrors: true
-      }));
-    }
-  }, [setIbisNodes, setSyncState]);
-
-  // Handle real-time relationship updates
-  const handleRealtimeRelationshipUpdate = useCallback((payload: any) => {
-    const { eventType, new: newRecord, old: oldRecord } = payload;
-    
-    try {
-      switch (eventType) {
-        case 'INSERT':
-          setIbisRelationships(current => {
-            const exists = current.some(rel => rel.id === newRecord.id);
-            if (!exists) {
-              console.log('🔄 Adding new relationship from real-time:', newRecord.id);
-              return [...current, newRecord];
-            }
-            return current;
-          });
-          break;
-        case 'UPDATE':
-          setIbisRelationships(current => 
-            current.map(rel => 
-              rel.id === newRecord.id ? { ...rel, ...newRecord } : rel
-            )
-          );
-          break;
-        case 'DELETE':
-          setIbisRelationships(current => 
-            current.filter(rel => rel.id !== oldRecord.id)
-          );
-          break;
-      }
-      
-      // Update sync state
-      setSyncState(current => ({
-        ...current,
-        lastSync: Date.now()
-      }));
-    } catch (error) {
-      console.error('❌ Error handling real-time relationship update:', error);
-      setSyncState(current => ({
-        ...current,
-        hasValidationErrors: true
-      }));
-    }
-  }, [setIbisRelationships, setSyncState]);
-
-  // State validation and cleanup
-  const validateAndCleanState = useCallback(() => {
-    console.log('🔍 Validating state consistency...');
-    
-    let hasErrors = false;
-    const validationErrors: string[] = [];
-    
-    // Check for orphaned relationships
-    ibisRelationships.forEach(rel => {
-      const sourceExists = ibisNodes.some(node => node.id === rel.source_node_id);
-      const targetExists = ibisNodes.some(node => node.id === rel.target_node_id);
-      
-      if (!sourceExists || !targetExists) {
-        hasErrors = true;
-        validationErrors.push(`Orphaned relationship: ${rel.id}`);
-      }
-    });
-    
-    // Check for duplicate nodes
-    const nodeIds = ibisNodes.map(node => node.id);
-    const uniqueIds = new Set(nodeIds);
-    if (nodeIds.length !== uniqueIds.size) {
-      hasErrors = true;
-      validationErrors.push('Duplicate nodes detected');
-    }
-    
-    if (hasErrors) {
-      console.warn('⚠️ State validation errors found:', validationErrors);
-      setSyncState(current => ({
-        ...current,
-        hasValidationErrors: true
-      }));
-      
-      // Clean up orphaned relationships
+    // Check if this is a temporary ID
+    if (edgeId.startsWith('temp_')) {
+      console.log('🗑️ Removing temporary edge from local state');
       setIbisRelationships(current => 
-        current.filter(rel => {
-          const sourceExists = ibisNodes.some(node => node.id === rel.source_node_id);
-          const targetExists = ibisNodes.some(node => node.id === rel.target_node_id);
-          return sourceExists && targetExists;
-        })
+        current.filter(rel => rel.id !== edgeId)
       );
-    } else {
-      setSyncState(current => ({
-        ...current,
-        hasValidationErrors: false
-      }));
-    }
-  }, [ibisNodes, ibisRelationships, setSyncState, setIbisRelationships]);
-
-  // Periodic state validation
-  useEffect(() => {
-    const validationInterval = setInterval(validateAndCleanState, 30000); // Every 30 seconds
-    return () => clearInterval(validationInterval);
-  }, [validateAndCleanState]);
-
-  // Enhanced collision detection function
-  const checkCollisionWithOtherNodes = useCallback((nodeId: string, position: {x: number, y: number}, nodeRadius: number = 40) => {
-    return nodes.some(otherNode => {
-      if (otherNode.id === nodeId) return false; // Don't check collision with self
-      
-      const dx = position.x - otherNode.position.x;
-      const dy = position.y - otherNode.position.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const minDistance = nodeRadius * 2 + 10; // Add some padding
-      
-      return distance < minDistance;
-    });
-  }, [nodes]);
-
-  // Enhanced node-zone constraint system with collision avoidance
-  const constrainNodeToZone = useCallback((node: Node) => {
-    const originalNode = node.data?.originalNode as IbisNode;
-    const nodeType = originalNode?.node_type;
-    
-    if (!nodeType) return node;
-    
-    // Find the zone for this node type
-    const zone = nodeType === 'issue' ? zones.issue : 
-                 nodeType === 'position' ? zones.position : zones.argument;
-    
-    // Calculate distance from zone center in world space
-    const dx = node.position.x - zone.centerX;
-    const dy = node.position.y - zone.centerY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const angle = Math.atan2(dy, dx);
-    
-    // Define zone boundaries
-    const innerRadius = nodeType === 'issue' ? 0 : 
-                       nodeType === 'position' ? zones.issue.outerRadius : zones.position.outerRadius;
-    const outerRadius = zone.outerRadius;
-    
-    // Node radius for padding (using the 50% smaller size)
-    const nodeRadius = originalNode?.node_type === 'argument' ? 30 : 20; // Half the width/height
-    
-    // Constrain to ring first
-    let constrainedRadius = distance;
-    if (distance < innerRadius + nodeRadius) {
-      constrainedRadius = innerRadius + nodeRadius;
-    } else if (distance > outerRadius - nodeRadius) {
-      constrainedRadius = outerRadius - nodeRadius;
-    }
-    
-    // Calculate initial constrained position
-    let constrainedPosition = {
-      x: zone.centerX + constrainedRadius * Math.cos(angle),
-      y: zone.centerY + constrainedRadius * Math.sin(angle)
-    };
-    
-    // Check for collisions and adjust if necessary
-    if (checkCollisionWithOtherNodes(node.id, constrainedPosition, nodeRadius)) {
-      // Try to find a non-colliding position within the zone
-      const angleStep = Math.PI / 8; // 22.5 degrees
-      let foundSafePosition = false;
-      
-      for (let radiusOffset = 0; radiusOffset <= 60 && !foundSafePosition; radiusOffset += 20) {
-        for (let angleOffset = 0; angleOffset < 2 * Math.PI && !foundSafePosition; angleOffset += angleStep) {
-          const testAngle = angle + angleOffset;
-          const testRadius = Math.max(innerRadius + nodeRadius, Math.min(outerRadius - nodeRadius, constrainedRadius + radiusOffset));
-          
-          const testPosition = {
-            x: zone.centerX + testRadius * Math.cos(testAngle),
-            y: zone.centerY + testRadius * Math.sin(testAngle)
-          };
-          
-          if (!checkCollisionWithOtherNodes(node.id, testPosition, nodeRadius)) {
-            constrainedPosition = testPosition;
-            foundSafePosition = true;
-          }
-        }
-      }
-    }
-    
-    // Apply constrained position if it changed significantly
-    const positionChanged = Math.abs(constrainedPosition.x - node.position.x) > 1 || 
-                           Math.abs(constrainedPosition.y - node.position.y) > 1;
-    
-    if (positionChanged) {
-      console.log('🔍 Node position constrained:', {
-        nodeId: node.id,
-        nodeType,
-        from: node.position,
-        to: constrainedPosition,
-        zone: zone
+      toast({
+        title: "Edge Removed",
+        description: "Temporary edge connection removed",
       });
-      
-      return {
-        ...node,
-        position: constrainedPosition
-      };
+      return;
     }
-    
-    return node;
-  }, [zones, checkCollisionWithOtherNodes]);
 
-  // Node editing form state
-  const [nodeForm, setNodeForm] = useState({
-    title: '',
-    description: '',
-    node_type: 'issue' as 'issue' | 'position' | 'argument'
-  });
-
-  // Edge editing form state
-  const [edgeForm, setEdgeForm] = useState({
-    relationship_type: 'relates_to' as 'supports' | 'opposes' | 'relates_to' | 'responds_to'
-  });
-
-  // Fetch data from Supabase with enhanced error recovery
-  const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
-      setSyncState(current => ({ ...current, isOnline: true }));
+      setSaving(true);
       
-      console.log('🔍 IBIS Map Editor - Starting data fetch for deliberation:', deliberationId);
-      
-      // Directly use the admin RPC functions for reliable data access
-      console.log('🔍 Fetching IBIS nodes for deliberation:', deliberationId);
-      
-      // First try with RLS, then fallback to admin access if needed
-      let nodesData, nodesError;
-      
-      try {
-        const result = await supabase
-          .from('ibis_nodes')
-          .select('*')
-          .eq('deliberation_id', deliberationId)
-          .order('created_at', { ascending: true });
-          
-        nodesData = result.data;
-        nodesError = result.error;
-        
-        // If we get empty results but no error, the user might not have proper access
-        if (!nodesError && (!nodesData || nodesData.length === 0)) {
-          console.log('🔍 Empty results from RLS query, checking if nodes exist with direct query...');
-          
-          // Use a more direct approach for admin access
-          const directResult = await supabase.rpc('admin_get_ibis_nodes', {
-            target_deliberation_id: deliberationId
-          });
-          
-          if (directResult.error) {
-            console.log('🔍 Direct RPC call failed, continuing with empty result');
-          } else {
-            console.log('🔍 Found nodes via direct query:', directResult.data?.length || 0);
-            nodesData = directResult.data || [];
-          }
-        }
-      } catch (error) {
-        console.error('❌ Error in IBIS nodes query:', error);
-        nodesError = error;
-      }
-
-      console.log('🔍 IBIS nodes query result:', { nodesData, nodesError });
-
-      if (nodesError) {
-        console.error('❌ Nodes error:', nodesError);
-        throw nodesError;
-      }
-      
-      // Fetch IBIS relationships with similar fallback approach
-      console.log('🔍 Fetching IBIS relationships for deliberation:', deliberationId);
-      
-      let relationshipsData, relationshipsError;
-      
-      try {
-        const result = await supabase
-          .from('ibis_relationships')
-          .select('*')
-          .eq('deliberation_id', deliberationId)
-          .order('created_at', { ascending: true });
-          
-        relationshipsData = result.data;
-        relationshipsError = result.error;
-        
-        // If we get empty results but no error, use the admin RPC
-        if (!relationshipsError && (!relationshipsData || relationshipsData.length === 0)) {
-          console.log('🔍 Empty relationships from RLS query, trying direct query...');
-          
-          const directResult = await supabase.rpc('admin_get_ibis_relationships', {
-            target_deliberation_id: deliberationId
-          });
-          
-          if (directResult.error) {
-            console.log('🔍 Direct RPC call for relationships failed, continuing with empty result');
-          } else {
-            console.log('🔍 Found relationships via direct query:', directResult.data?.length || 0);
-            relationshipsData = directResult.data || [];
-          }
-        }
-      } catch (error) {
-        console.error('❌ Error in IBIS relationships query:', error);
-        relationshipsError = error;
-      }
-
-      console.log('🔍 IBIS relationships query result:', { relationshipsData, relationshipsError });
-
-      if (relationshipsError) {
-        console.error('❌ Relationships error:', relationshipsError);
-        logger.warn('Relationships error', relationshipsError as any);
-      }
-
-      console.log('🔍 IBIS Map Editor - Data loaded:', {
-        totalNodes: nodesData?.length || 0,
-        issues: nodesData?.filter(n => n.node_type === 'issue').length || 0,
-        positions: nodesData?.filter(n => n.node_type === 'position').length || 0,
-        arguments: nodesData?.filter(n => n.node_type === 'argument').length || 0,
-        relationships: relationshipsData?.length || 0,
-        deliberationId,
-        sampleNode: nodesData?.[0]
+      const { data, error } = await supabase.rpc('admin_delete_ibis_relationship', {
+        p_relationship_id: edgeId
       });
 
-      logger.info('IBIS data loaded for editing', {
-        totalNodes: nodesData?.length || 0,
-        issues: nodesData?.filter(n => n.node_type === 'issue').length || 0,
-        positions: nodesData?.filter(n => n.node_type === 'position').length || 0,
-        arguments: nodesData?.filter(n => n.node_type === 'argument').length || 0,
-        relationships: relationshipsData?.length || 0,
-      });
+      if (error) throw error;
 
-      setIbisNodes(nodesData || []);
-      setIbisRelationships(relationshipsData || []);
-      
-      // Update sync state on successful fetch
-      setSyncState(current => ({
-        ...current,
-        lastSync: Date.now(),
-        isOnline: true,
-        hasValidationErrors: false
-      }));
+      // Remove from local state
+      setIbisRelationships(current => 
+        current.filter(rel => rel.id !== edgeId)
+      );
+
+      setHasUnsavedChanges(true);
+      toast({
+        title: "Edge Deleted",
+        description: "Relationship removed successfully",
+      });
 
     } catch (error) {
-      console.error('🚨 DETAILED ERROR in IBIS data fetch:', error);
-      console.error('🚨 Error name:', error?.name);
-      console.error('🚨 Error message:', error?.message);
-      console.error('🚨 Error stack:', error?.stack);
-      console.error('🚨 Full error object:', JSON.stringify(error, null, 2));
-      
-      logger.error('Error fetching IBIS data', error as any);
-      
-      // Update sync state on error
-      setSyncState(current => ({
-        ...current,
-        isOnline: false,
-        hasValidationErrors: true
-      }));
-      
+      console.error('❌ Error deleting edge:', error);
       toast({
         title: "Error",
-        description: `Failed to load IBIS data: ${error?.message || 'Unknown error'}`,
+        description: "Failed to delete relationship.",
         variant: "destructive",
       });
-      
-      // Attempt recovery by retrying after a delay
-      setTimeout(() => {
-        console.log('🔄 Attempting to recover from fetch error...');
-        fetchData();
-      }, 5000);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
-  }, [deliberationId, toast, setSyncState]);
+  }, [setIbisRelationships, toast]);
 
-  // Atomic state update function with rollback mechanism
-  const performAtomicUpdate = useCallback(async (
-    operation: () => Promise<any>,
-    localUpdater: () => void,
-    rollbackUpdater: () => void,
-    operationName: string
-  ): Promise<any | null> => {
-    try {
-      // Optimistically update local state
-      localUpdater();
-      
-      // Perform database operation
-      const result = await operation();
-      
-      // Update sync state on success
-      setSyncState(current => ({
-        ...current,
-        lastSync: Date.now(),
-        isOnline: true
-      }));
-      
-      return result;
-    } catch (error) {
-      console.error(`❌ ${operationName} failed, rolling back:`, error);
-      
-      // Rollback optimistic update
-      rollbackUpdater();
-      
-      // Update sync state on error
-      setSyncState(current => ({
-        ...current,
-        isOnline: false,
-        conflictCount: current.conflictCount + 1
-      }));
-      
-      throw error;
+  // Handle edge changes with proper deletion support
+  const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+    console.log('🔍 Edge changes:', changes);
+    
+    // Handle edge removal
+    const removedEdges = changes.filter(change => change.type === 'remove');
+    removedEdges.forEach(change => {
+      const edgeId = change.id;
+      console.log('🔍 Edge removed via change:', edgeId);
+      handleEdgeDelete(edgeId);
+    });
+    
+    // Apply other changes normally
+    onEdgesChange(changes);
+    
+    if (removedEdges.length > 0) {
+      setHasUnsavedChanges(true);
     }
-  }, [setSyncState]);
+  }, [onEdgesChange, handleEdgeDelete]);
 
-  // Handle new connections with atomic updates
+  // Handle new connections with proper ID management
   const handleConnect = useCallback(async (connection: Connection) => {
     console.log('🔍 Connection attempt:', connection);
-    console.log('🔍 Current user from auth:', user);
-    console.log('🔍 Selected edge type:', selectedEdgeType);
     
     if (!connection.source || !connection.target) return;
 
@@ -688,8 +218,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       return;
     }
 
-    // For admin users, use a fixed admin UUID that exists in the system
     const adminUserId = '1754a99d-2308-4b9c-ad02-bf943018237d';
+    const tempId = `temp_${Date.now()}`;
 
     const newRelationship = {
       source_node_id: connection.source,
@@ -699,51 +229,39 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       created_by: adminUserId,
     };
 
-    let tempRelationship: IbisRelationship | null = null;
-    let previousRelationships: IbisRelationship[] = [];
-
     try {
-      const result = await performAtomicUpdate(
-        async () => {
-          // Database operation
-          const { data, error } = await supabase.rpc('admin_create_ibis_relationship', {
-            p_source_node_id: newRelationship.source_node_id,
-            p_target_node_id: newRelationship.target_node_id,
-            p_relationship_type: newRelationship.relationship_type,
-            p_deliberation_id: newRelationship.deliberation_id,
-            p_created_by: newRelationship.created_by
-          });
+      // Optimistically add temporary relationship
+      const tempRelationship: IbisRelationship = {
+        id: tempId,
+        ...newRelationship,
+        created_at: new Date().toISOString(),
+      };
+      
+      setIbisRelationships(prev => [...prev, tempRelationship]);
 
-          if (error) throw error;
+      // Create real relationship in database
+      const { data, error } = await supabase.rpc('admin_create_ibis_relationship', {
+        p_source_node_id: newRelationship.source_node_id,
+        p_target_node_id: newRelationship.target_node_id,
+        p_relationship_type: newRelationship.relationship_type,
+        p_deliberation_id: newRelationship.deliberation_id,
+        p_created_by: newRelationship.created_by
+      });
 
-          const relationshipData = Array.isArray(data) ? data[0] : data;
-          return {
-            id: relationshipData.id,
-            ...newRelationship,
-            created_at: relationshipData.created_at,
-          };
-        },
-        () => {
-          // Optimistic local update
-          setIbisRelationships(prev => {
-            previousRelationships = [...prev]; // Store for rollback
-            const cleanPrev = prev.filter(rel => rel && rel.id && rel.source_node_id && rel.target_node_id);
-            
-            // Create temporary relationship for optimistic update
-            tempRelationship = {
-              id: `temp_${Date.now()}`,
-              ...newRelationship,
-              created_at: new Date().toISOString(),
-            };
-            
-            return [...cleanPrev, tempRelationship];
-          });
-        },
-        () => {
-          // Rollback function
-          setIbisRelationships(previousRelationships);
-        },
-        'Create relationship'
+      if (error) throw error;
+
+      const relationshipData = Array.isArray(data) ? data[0] : data;
+      const realRelationship = {
+        id: relationshipData.id,
+        ...newRelationship,
+        created_at: relationshipData.created_at,
+      };
+
+      // Replace temporary relationship with real one
+      setIbisRelationships(current => 
+        current.map(rel => 
+          rel.id === tempId ? realRelationship : rel
+        )
       );
 
       setHasUnsavedChanges(true);
@@ -754,723 +272,104 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       });
 
     } catch (error) {
+      // Remove temporary relationship on error
+      setIbisRelationships(current => 
+        current.filter(rel => rel.id !== tempId)
+      );
+      
       logger.error('Error creating relationship', error as any);
       toast({
         title: "Error",
-        description: "Failed to create relationship. Changes have been reverted.",
+        description: "Failed to create relationship.",
         variant: "destructive",
       });
     }
-  }, [deliberationId, selectedEdgeType, user, toast, performAtomicUpdate, setIbisRelationships]);
+  }, [deliberationId, selectedEdgeType, user, toast, setIbisRelationships]);
 
-  const calculateNodeImportance = useCallback((nodeId: string, relationships: IbisRelationship[]) => {
-    const connections = relationships.filter(rel => 
-      rel.source_node_id === nodeId || rel.target_node_id === nodeId
-    );
-    
-    // Base importance from connection count
-    let importance = Math.min(connections.length * 0.1, 1.0);
-    
-    // Boost importance for nodes with 'supports' relationships
-    const supportsCount = connections.filter(rel => rel.relationship_type === 'supports').length;
-    importance += supportsCount * 0.05;
-    
-    return Math.min(importance, 1.0);
-  }, []);
-
-  // Convert IBIS data to React Flow format with world coordinates - memoized to prevent excessive re-renders
-  const convertToFlowNodes = useCallback(() => {
-    console.log('🔍 IBIS Map Editor - Converting nodes with coordinate system');
-    
-    // Check if user is admin for node draggability - for now allow all authenticated users to drag for testing
-    const isAdmin = !!user?.id; // TODO: Replace with proper admin check
-    
-    // Use world coordinates for node positioning
-    const positionsMap = new Map<string, { x: number; y: number }>();
-    
-    // First, prefer saved positions if they exist
-    ibisNodes.forEach(node => {
-      if (node.position_x !== undefined && node.position_y !== undefined && 
-          node.position_x !== null && node.position_y !== null) {
-        // Existing positions are assumed to be in world coordinates
-        positionsMap.set(node.id, { x: node.position_x, y: node.position_y });
-      }
-    });
-    
-    // For nodes without positions, place them in their designated zones
-    const nodesWithoutPositions = ibisNodes.filter(node => 
-      node.position_x === undefined || node.position_y === undefined ||
-      node.position_x === null || node.position_y === null
-    );
-    
-    if (nodesWithoutPositions.length > 0) {
-      // Generate initial positions in world space for each zone with collision detection
-      const nodesByType = {
-        issue: nodesWithoutPositions.filter(n => n.node_type === 'issue'),
-        position: nodesWithoutPositions.filter(n => n.node_type === 'position'), 
-        argument: nodesWithoutPositions.filter(n => n.node_type === 'argument')
-      };
+  // Fetch data from Supabase
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
       
-      // Use center at (0,0) to match zone positioning
-      const centerX = 0; // Center at ReactFlow origin
-      const centerY = 0; // Center at ReactFlow origin
-      const baseRadius = 200; // Match zones
-      const R1 = baseRadius;
-      const R2 = baseRadius * 1.8;
-      const R3 = baseRadius * 2.6;
-      
-      const zoneRadii = {
-        issue: R1 * 0.6, // 60% into the zone for better spacing
-        position: R1 + (R2 - R1) * 0.5, // Middle of ring
-        argument: R2 + (R3 - R2) * 0.5 // Middle of outer ring
-      };
-      
-      // Apply improved collision detection and spacing for each node type
-      Object.entries(nodesByType).forEach(([nodeType, typeNodes]) => {
-        const targetRadius = zoneRadii[nodeType as keyof typeof zoneRadii];
-        const nodeRadius = nodeType === 'argument' ? 30 : 20; // 50% smaller nodes
-        const minDistance = nodeRadius * 2 + 20; // More spacing between nodes
-        
-        typeNodes.forEach((node, index) => {
-          let attempts = 0;
-          let position;
-          
-          do {
-            // Use spiral placement for better distribution
-            const spiralFactor = Math.floor(index / 8); // 8 nodes per spiral layer
-            const angleStep = (2 * Math.PI) / Math.max(8, typeNodes.length / (spiralFactor + 1));
-            const baseAngle = (index % Math.max(8, typeNodes.length / (spiralFactor + 1))) * angleStep;
-            
-            // Add spiral offset and some randomization for natural spacing
-            const spiralOffset = spiralFactor * 50; // Each spiral layer 50px further out
-            const radiusVariation = (Math.random() - 0.5) * 20;
-            const radius = targetRadius + spiralOffset + radiusVariation;
-            
-            // Ensure radius stays within zone boundaries
-            const zone = nodeType === 'issue' ? zones.issue : 
-                        nodeType === 'position' ? zones.position : zones.argument;
-            const innerRadius = nodeType === 'issue' ? 0 : 
-                               nodeType === 'position' ? zones.issue.outerRadius : zones.position.outerRadius;
-            const constrainedRadius = Math.max(
-              innerRadius + nodeRadius, 
-              Math.min(zone.outerRadius - nodeRadius, radius)
-            );
-            
-            position = {
-              x: centerX + constrainedRadius * Math.cos(baseAngle),
-              y: centerY + constrainedRadius * Math.sin(baseAngle)
-            };
-            
-            attempts++;
-          } while (
-            attempts < 50 && // More attempts for better placement
-            Array.from(positionsMap.values()).some(existingPos => {
-              const dx = position.x - existingPos.x;
-              const dy = position.y - existingPos.y;
-              return Math.sqrt(dx * dx + dy * dy) < minDistance;
-            })
-          );
-          
-          positionsMap.set(node.id, position);
-        });
+      // Fetch nodes
+      const { data: nodesData, error: nodesError } = await supabase.rpc('admin_get_ibis_nodes', {
+        target_deliberation_id: deliberationId
       });
+
+      if (nodesError) throw nodesError;
+
+      // Fetch relationships  
+      const { data: relationshipsData, error: relationshipsError } = await supabase.rpc('admin_get_ibis_relationships', {
+        target_deliberation_id: deliberationId
+      });
+
+      if (relationshipsError) throw relationshipsError;
+
+      setIbisNodes(nodesData || []);
+      setIbisRelationships(relationshipsData || []);
+
+    } catch (error) {
+      console.error('Error fetching IBIS data:', error);
+      toast({
+        title: "Error",
+        description: `Failed to load IBIS data: ${error?.message || 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
+  }, [deliberationId, toast, setIbisNodes, setIbisRelationships]);
 
-    // Enhanced node creation function with admin parameter
-    const createEnhancedFlowNode = (
-      node: IbisNode, 
-      position: { x: number; y: number }, 
-      importance: number,
-      isAdmin: boolean
-    ): Node => {
-      const config = nodeTypeConfig[node.node_type];
-      const scaleFactor = 1 + importance * 0.2;
+  // Load data on mount
+  useEffect(() => {
+    if (deliberationId) {
+      fetchData();
+    }
+  }, [deliberationId, fetchData]);
 
-      return {
-        id: node.id,
-        type: 'custom',
-        position,
-        data: {
-          label: node.title.length > 30 ? `${node.title.substring(0, 30)}...` : node.title,
-          originalNode: node,
-          config,
-          scaleFactor,
-        },
-        style: {
-          width: 60 * scaleFactor, // 50% smaller: 120 -> 60
-          height: node.node_type === 'argument' ? 60 * scaleFactor : 40 * scaleFactor, // 50% smaller: 120->60, 80->40
-        },
-        draggable: isAdmin, // Allow admins to drag
-        selectable: true,
-        connectable: true,
-      };
-    };
+  // Convert data to React Flow format
+  useEffect(() => {
+    const flowNodes: Node[] = ibisNodes.map(node => ({
+      id: node.id,
+      type: 'custom',
+      position: { x: node.position_x || 0, y: node.position_y || 0 },
+      data: { originalNode: node },
+      draggable: true,
+      selectable: true,
+      connectable: true,
+    }));
 
-    // Convert to React Flow nodes using saved or computed positions
-    const flowNodes: Node[] = [];
-    
-    ibisNodes.forEach(node => {
-      // Use saved position if it exists, otherwise use computed position
-      let position;
-      if (node.position_x !== undefined && node.position_y !== undefined && 
-          node.position_x !== null && node.position_y !== null) {
-        position = { x: node.position_x, y: node.position_y };
-      } else {
-        position = positionsMap.get(node.id) || { x: 100, y: 100 };
-      }
-      
-      const importance = calculateNodeImportance(node.id, ibisRelationships);
-      const flowNode = createEnhancedFlowNode(node, position, importance, isAdmin);
-      flowNodes.push(flowNode);
-    });
-
-    // Convert relationships to React Flow edges with optimal handle routing
-    const flowEdges: Edge[] = [];
-    
-    // Create IBIS relationship edges
-    ibisRelationships.forEach(rel => {
-      // Ensure the relationship has all required properties
-      if (!rel || !rel.id || !rel.source_node_id || !rel.target_node_id || !rel.relationship_type) {
-        console.warn('🔍 Filtering out invalid relationship:', rel);
-        return;
-      }
-      
-      // Only create edges if both nodes are in the filtered set
-      const sourceExists = flowNodes.some(node => node.id === rel.source_node_id);
-      const targetExists = flowNodes.some(node => node.id === rel.target_node_id);
-      
-      if (!sourceExists || !targetExists) {
-        console.warn('🔍 Filtering out relationship with missing nodes:', {
-          relationshipId: rel.id,
-          sourceExists,
-          targetExists,
-          sourceId: rel.source_node_id,
-          targetId: rel.target_node_id
-        });
-        return;
-      }
-      
-      console.log('🔍 Including valid relationship:', { id: rel.id, type: rel.relationship_type });
-      
-      const config = relationshipConfig[rel.relationship_type] || relationshipConfig.relates_to;
-      
-      // Find source and target nodes to calculate optimal handles
-      const sourceNode = flowNodes.find(n => n.id === rel.source_node_id);
-      const targetNode = flowNodes.find(n => n.id === rel.target_node_id);
-      
-      let sourceHandle: string | undefined;
-      let targetHandle: string | undefined;
-      
-      if (sourceNode && targetNode) {
-        const sourceDimensions: NodeDimensions = {
-          x: sourceNode.position.x,
-          y: sourceNode.position.y,
-          width: sourceNode.style?.width as number || 120,
-          height: sourceNode.style?.height as number || 80,
-        };
-        
-        const targetDimensions: NodeDimensions = {
-          x: targetNode.position.x,
-          y: targetNode.position.y,
-          width: targetNode.style?.width as number || 120,
-          height: targetNode.style?.height as number || 80,
-        };
-        
-        const handles = calculateOptimalHandles(sourceDimensions, targetDimensions);
-        sourceHandle = handles.sourceHandle;
-        targetHandle = handles.targetHandle;
-      }
-      
-      flowEdges.push({
-        id: rel.id,
-        source: rel.source_node_id,
-        target: rel.target_node_id,
-        sourceHandle,
-        targetHandle,
-        type: 'smoothstep',
-        animated: rel.relationship_type === 'supports',
-        style: { 
-          stroke: config.color, 
-          strokeWidth: 2,
-          strokeDasharray: rel.relationship_type === 'opposes' ? '5,5' : undefined
-        },
-        markerEnd: { 
-          type: MarkerType.ArrowClosed, 
-          color: config.color 
-        },
-        label: config.label,
-        labelStyle: { fontSize: 10, fill: config.color },
-        labelBgStyle: { fill: 'white', fillOpacity: 0.8 },
-        data: { 
-          type: rel.relationship_type,
-          relationshipId: rel.id,
-          relationshipType: rel.relationship_type,
-          label: config.label
-        },
-      });
-    });
+    const flowEdges: Edge[] = ibisRelationships.map(rel => ({
+      id: rel.id,
+      source: rel.source_node_id,
+      target: rel.target_node_id,
+      type: 'smoothstep',
+      style: { 
+        stroke: relationshipConfig[rel.relationship_type]?.color || '#374151',
+        strokeWidth: 2,
+      },
+      markerEnd: { type: MarkerType.ArrowClosed },
+      data: { relationshipType: rel.relationship_type },
+    }));
 
     setNodes(flowNodes);
     setEdges(flowEdges);
-  }, [ibisNodes, ibisRelationships, setNodes, setEdges, user, calculateNodeImportance]);
+  }, [ibisNodes, ibisRelationships, setNodes, setEdges]);
 
-  // Recalculate edge routing based on current node positions
-  const recalculateEdgeRouting = useCallback((currentNodes: Node[]) => {
-    setEdges(currentEdges => 
-      currentEdges.map(edge => {
-        const sourceNode = currentNodes.find(n => n.id === edge.source);
-        const targetNode = currentNodes.find(n => n.id === edge.target);
-        
-        if (sourceNode && targetNode) {
-          const sourceDimensions: NodeDimensions = {
-            x: sourceNode.position.x,
-            y: sourceNode.position.y,
-            width: sourceNode.style?.width as number || 120,
-            height: sourceNode.style?.height as number || 80,
-          };
-          
-          const targetDimensions: NodeDimensions = {
-            x: targetNode.position.x,
-            y: targetNode.position.y,
-            width: targetNode.style?.width as number || 120,
-            height: targetNode.style?.height as number || 80,
-          };
-          
-          const handles = calculateOptimalHandles(sourceDimensions, targetDimensions);
-          
-          return {
-            ...edge,
-            sourceHandle: handles.sourceHandle,
-            targetHandle: handles.targetHandle,
-          };
-        }
-        
-        return edge;
-      })
-    );
-  }, [setEdges]);
-
-  // Handle node position changes with admin access control and persistence
-  const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
-    // Apply visual changes for all users first
-    onNodesChange(changes);
-    
-    // Handle persistence for admins only
-    const userIsAdmin = !!user?.id; // TODO: Replace with proper admin check
-    
-    if (!userIsAdmin) {
-      const hasPositionChanges = changes.some(change => change.type === 'position');
-      if (hasPositionChanges) {
-        toast({
-          title: "Access Restricted",
-          description: "Only administrators can move nodes",
-          variant: "destructive",
-        });
-      }
-      return;
-    }
-    
-    // Mark as having unsaved changes when positions change
-    const hasPositionChanges = changes.some(change => change.type === 'position');
-    if (hasPositionChanges) {
-      setHasUnsavedChanges(true);
-    }
-      
-    // Recalculate edge routing after position changes
-    setTimeout(() => {
-      setNodes(currentNodes => {
-        recalculateEdgeRouting(currentNodes);
-        return currentNodes;
-      });
-    }, 0);
-  }, [onNodesChange, user, toast, recalculateEdgeRouting]);
-
-  // Handle edge changes
-  const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
-    onEdgesChange(changes);
-    
-    // Check if any edges were removed
-    const removedEdges = changes.filter(change => change.type === 'remove');
-    if (removedEdges.length > 0) {
-      setHasUnsavedChanges(true);
-    }
-  }, [onEdgesChange]);
-
-  // Handle node editing with proper click detection
-  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    // Only trigger edit if this was a click, not a drag
-    const wasClick = !event.defaultPrevented;
-    if (wasClick) {
-      console.log('🔍 Node clicked for editing:', node.id);
-      const ibisNode = node.data.originalNode as IbisNode;
-      setEditingNode(ibisNode);
-      setNodeForm({
-        title: ibisNode.title,
-        description: ibisNode.description || '',
-        node_type: ibisNode.node_type,
-      });
-    }
-  }, []);
-
-  // Handle edge editing
-  const handleEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
-    console.log('🔍 Edge clicked for editing:', { 
-      edgeId: edge.id, 
-      edgeData: edge.data,
-      relationshipId: edge.data?.relationshipId 
-    });
-    
-    // Find the relationship using the relationshipId from edge data, not the edge ID
-    const relationshipId = edge.data?.relationshipId || edge.id;
-    const ibisRelationship = ibisRelationships.find(rel => rel.id === relationshipId);
-    if (!ibisRelationship || !ibisRelationship.id) {
-      console.error('🔍 Invalid relationship data - relationshipId:', relationshipId, 'available relationships:', ibisRelationships.map(r => r.id));
-      toast({
-        title: "Error",
-        description: "Cannot edit relationship - relationship not found",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    console.log('🔍 Valid relationship found:', ibisRelationship);
-    setEditingEdge(ibisRelationship);
-    setEdgeForm({
-      relationship_type: ibisRelationship.relationship_type,
-    });
-  }, [toast, ibisRelationships]);
-
-  // Save node changes
-  const handleSaveNode = async () => {
-    if (!editingNode) return;
-
-    try {
-      setSaving(true);
-      
-      const { error } = await supabase
-        .from('ibis_nodes')
-        .update({
-          title: nodeForm.title,
-          description: nodeForm.description,
-          node_type: nodeForm.node_type,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editingNode.id);
-
-      if (error) throw error;
-
-      // Update local state
-      setIbisNodes(prev => prev.map(node => 
-        node.id === editingNode.id 
-          ? { ...node, ...nodeForm, updated_at: new Date().toISOString() }
-          : node
-      ));
-
-      setEditingNode(null);
-      setHasUnsavedChanges(true);
-
-      toast({
-        title: "Node Updated",
-        description: "Node changes saved successfully",
-      });
-
-    } catch (error) {
-      logger.error('Error updating node', error as any);
-      toast({
-        title: "Error",
-        description: "Failed to update node",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Save edge changes
-  const handleSaveEdge = async () => {
-    if (!editingEdge) return;
-
-    try {
-      setSaving(true);
-      
-      console.log('🔍 DEBUG: About to call admin_update_ibis_relationship with params:', {
-        p_relationship_id: editingEdge.id,
-        p_relationship_type: edgeForm.relationship_type,
-        editingEdgeType: typeof editingEdge.id,
-        editingEdgeId: editingEdge.id,
-        editingEdge: editingEdge,
-        edgeForm: edgeForm
-      });
-
-      // Ensure we have a valid relationship ID
-      if (!editingEdge.id || typeof editingEdge.id !== 'string') {
-        throw new Error(`Invalid relationship ID: ${editingEdge.id} (type: ${typeof editingEdge.id})`);
-      }
-
-      // Use the admin RPC function to bypass RLS issues
-      const { data, error } = await supabase.rpc('admin_update_ibis_relationship', {
-        p_relationship_id: editingEdge.id,
-        p_relationship_type: edgeForm.relationship_type
-      });
-
-      console.log('🔍 DEBUG: RPC response:', { data, error });
-
-      if (error) {
-        console.error('🔍 DEBUG: Error details:', {
-          error,
-          errorCode: error.code,
-          errorMessage: error.message,
-          errorDetails: error.details,
-          errorHint: error.hint,
-          fullError: JSON.stringify(error, null, 2)
-        });
-        throw error;
-      }
-
-      console.log('🔍 Relationship updated successfully:', data);
-
-      // Update local state
-      setIbisRelationships(prev => prev.map(rel => 
-        rel.id === editingEdge.id 
-          ? { ...rel, relationship_type: edgeForm.relationship_type }
-          : rel
-      ));
-
-      setEditingEdge(null);
-      setHasUnsavedChanges(true);
-
-      toast({
-        title: "Relationship Updated",
-        description: "Relationship type changed successfully",
-      });
-
-    } catch (error) {
-      logger.error('Error updating relationship', error as any);
-      toast({
-        title: "Error",
-        description: "Failed to update relationship",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Delete edge with immediate visual removal
-  const handleDeleteEdge = async () => {
-    if (!editingEdge) {
-      console.error('🔍 No editing edge available for deletion');
-      return;
-    }
-
-    if (!editingEdge.id || typeof editingEdge.id !== 'string') {
-      console.error('🔍 Invalid edge ID for deletion:', editingEdge.id);
-      toast({
-        title: "Error",
-        description: "Cannot delete - invalid edge data",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setSaving(true);
-      
-      console.log('🔍 Starting deletion process for relationship:', {
-        id: editingEdge.id,
-        type: editingEdge.relationship_type,
-        source: editingEdge.source_node_id,
-        target: editingEdge.target_node_id
-      });
-      
-      // Immediately remove from visual map for instant feedback
-      const relationshipToDelete = editingEdge;
-      console.log('🔍 About to remove relationship from state:', relationshipToDelete.id);
-      setIbisRelationships(prev => {
-        const filtered = prev.filter(rel => rel.id !== relationshipToDelete.id);
-        console.log('🔍 Immediate visual removal - relationships before:', prev.length, 'after:', filtered.length);
-        console.log('🔍 Filtered out relationship:', relationshipToDelete.id);
-        return filtered;
-      });
-      
-      // Close dialog immediately for better UX
-      setEditingEdge(null);
-      
-      // Try to delete from database using admin function first (more reliable)
-      console.log('🔍 Attempting admin deletion first...');
-      const { data: adminData, error: adminError } = await supabase.rpc('admin_delete_ibis_relationship', {
-        p_relationship_id: relationshipToDelete.id
-      });
-
-      if (adminError || !adminData) {
-        console.log('🔍 Admin deletion failed, trying direct deletion:', adminError);
-        
-        // Fallback to direct deletion
-        const { error: directError } = await supabase
-          .from('ibis_relationships')
-          .delete()
-          .eq('id', relationshipToDelete.id);
-
-        if (directError) {
-          console.error('🔍 Both admin and direct deletion failed:', { adminError, directError });
-          // Restore the relationship if both attempts failed
-          setIbisRelationships(prev => {
-            console.log('🔍 Restoring relationship due to deletion failure');
-            return [...prev, relationshipToDelete];
-          });
-          throw directError;
-        }
-        
-        console.log('🔍 Direct deletion successful');
-      } else {
-        console.log('🔍 Admin deletion successful');
-      }
-      
-      // Force a data refresh to ensure consistency
-      console.log('🔍 Forcing data refresh after deletion...');
-      
-      // Wait a bit longer to ensure database changes are propagated
-      setTimeout(async () => {
-        try {
-          console.log('🔍 Refreshing data after deletion...');
-          await fetchData(); // Use the existing fetchData function instead of separate refresh
-        } catch (refreshError) {
-          console.error('🔍 Error refreshing data:', refreshError);
-        }
-      }, 1000); // Increased delay to ensure database consistency
-      
-      // Only show success toast after confirmed database deletion
-      toast({
-        title: "Edge Deleted",
-        description: "Relationship successfully removed from database",
-      });
-
-    } catch (error) {
-      console.error('🔍 Deletion process failed:', error);
-      logger.error('Error deleting relationship', error as any);
-      toast({
-        title: "Deletion Failed", 
-        description: `Could not delete relationship: ${error.message || 'Unknown error'}`,
-        variant: "destructive",
-      });
-    } finally {
-      // Reset saving state regardless of success/failure
-      setSaving(false);
-    }
-  };
-
-  // Save all position changes
-  const handleSaveChanges = async () => {
-    try {
-      setSaving(true);
-      
-      // Save all node positions using admin RPC function
-      const positionUpdates = nodes.map(node => {
-        const ibisNode = node.data.originalNode as IbisNode;
-        return supabase.rpc('admin_update_ibis_node_position', {
-          p_node_id: ibisNode.id,
-          p_position_x: node.position.x,
-          p_position_y: node.position.y
-        });
-      });
-
-      const results = await Promise.all(positionUpdates);
-      
-      // Check for any errors
-      const errors = results.filter(result => result.error);
-      if (errors.length > 0) {
-        console.error('🔍 Errors updating node positions:', errors);
-        throw new Error('Failed to update some node positions');
-      }
-
-      console.log('🔍 Node positions updated successfully:', results.map(r => r.data));
-
-      setHasUnsavedChanges(false);
-
-      toast({
-        title: "Changes Saved",
-        description: "All changes have been saved successfully",
-      });
-
-    } catch (error) {
-      logger.error('Error saving changes', error as any);
-      toast({
-        title: "Error",
-        description: "Failed to save changes",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Load data on mount and when deliberationId changes
-  useEffect(() => {
-    console.log('🔍 IBIS Map Editor - useEffect triggered with deliberationId:', deliberationId);
-    if (deliberationId) {
-      console.log('🔍 IBIS Map Editor - About to call fetchData()');
-      fetchData();
-    } else {
-      console.log('🔍 IBIS Map Editor - No deliberation ID, skipping fetchData()');
-    }
-  }, [deliberationId]); // Remove fetchData from dependencies to prevent unnecessary refetches
-
-  // Convert data when it changes - memoize to prevent excessive re-renders
-  const convertToFlowNodesCallback = useCallback(() => {
-    if (ibisNodes.length > 0 || ibisRelationships.length > 0) {
-      convertToFlowNodes();
-    }
-  }, [ibisNodes, ibisRelationships]); // Remove convertToFlowNodes from dependencies
-
-  useEffect(() => {
-    convertToFlowNodesCallback();
-  }, [convertToFlowNodesCallback]);
-
-  // Enhanced initial viewport fit
-  useEffect(() => {
-    if (!loading && nodes.length > 0 && reactFlowRef.current) {
-      // Small delay to ensure React Flow is fully initialized
-      setTimeout(() => {
-        reactFlowRef.current?.fitView({ 
-          padding: 0.2,
-          includeHiddenNodes: false,
-          duration: 800 
-        });
-      }, 100);
-    }
-  }, [loading, nodes.length]);
-
-  // Debug helper to understand visualization state
-  useEffect(() => {
-    console.log('🔍 Visualization State Debug', {
-      nodesCount: nodes.length,
-      edgesCount: edges.length,
-      sampleNodes: nodes.slice(0, 3).map(n => ({
-        id: n.id,
-        position: n.position,
-        type: n.type,
-        draggable: n.draggable
-      })),
-      sampleEdges: edges.slice(0, 3).map(e => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        type: e.type,
-        animated: e.animated
-      }))
-    });
-  }, [nodes, edges]);
-
-  return loading ? (
-    <div className="h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
-        <p className="mt-4 text-muted-foreground">Loading IBIS map...</p>
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading IBIS map...</p>
+        </div>
       </div>
-    </div>
-  ) : (
+    );
+  }
+
+  return (
     <div className="h-screen flex flex-col">
-      {/* Header with sync status */}
+      {/* Header */}
       <Card className="rounded-b-none border-b-0">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
@@ -1481,11 +380,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               Edit IBIS Map: {deliberationTitle}
             </CardTitle>
             <div className="flex items-center gap-2">
-              {syncState.hasValidationErrors && (
-                <Badge variant="destructive" className="text-xs">
-                  Validation Issues
-                </Badge>
-              )}
               {!syncState.isOnline && (
                 <Badge variant="outline" className="text-xs">
                   Offline
@@ -1496,14 +390,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                   Unsaved Changes
                 </Badge>
               )}
-              <Button 
-                onClick={handleSaveChanges} 
-                disabled={!hasUnsavedChanges || saving}
-                size="sm"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {saving ? 'Saving...' : 'Save Changes'}
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -1530,82 +416,23 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               nodeTypes={nodeTypes}
               nodes={nodes}
               edges={edges}
-              onNodesChange={handleNodesChange}
+              onNodesChange={onNodesChange}
               onEdgesChange={handleEdgesChange}
-              onNodeClick={handleNodeClick}
-              onEdgeClick={handleEdgeClick}
+              onConnect={handleConnect}
               className="admin-editor"
-              onNodeDragStart={(event, node) => {
-                console.log('🔍 Node drag started:', node.id);
-              }}
-              onNodeDrag={(event, node) => {
-                // Real-time zone constraint during drag
-                const constrainedNode = constrainNodeToZone(node);
-                if (constrainedNode.position.x !== node.position.x || constrainedNode.position.y !== node.position.y) {
-                  // Update position in real-time to prevent dragging outside zones
-                  setNodes(nds => nds.map(n => n.id === node.id ? constrainedNode : n));
-                }
-              }}
-              onNodeDragStop={(event, node) => {
-                console.log('🔍 Node drag stopped:', node.id, node.position);
-                
-                // Final zone constraint and collision check after drag
-                const constrainedNode = constrainNodeToZone(node);
-                if (constrainedNode.position.x !== node.position.x || constrainedNode.position.y !== node.position.y) {
-                  setNodes(nds => nds.map(n => n.id === node.id ? constrainedNode : n));
-                  console.log('🔍 Node final position constrained:', constrainedNode.position);
-                }
-                
-                // Always mark as having unsaved changes when a node is moved
-                setHasUnsavedChanges(true);
-              }}
-              onConnectStart={(event, params) => {
-                console.log('🔍 Connection start:', params);
-                console.log('🔍 Connection start event:', event);
-              }}
-              onConnectEnd={(event) => {
-                console.log('🔍 Connection end:', event);
-              }}
-              onConnect={(connection) => {
-                console.log('🔍 onConnect triggered:', connection);
-                handleConnect(connection);
-              }}
-              onInit={(reactFlowInstance: ReactFlowInstance<Node, Edge>) => {
-                reactFlowRef.current = reactFlowInstance;
-              }}
               connectionMode={ConnectionMode.Loose}
               connectOnClick={false}
-              connectionRadius={20}
               fitView
-              fitViewOptions={{ padding: 0.2 }}
-              style={{ background: 'hsl(var(--background))' }}
-              nodesDraggable={true}
-              nodesConnectable={true}
-              elementsSelectable={true}
-              panOnDrag={true}
-              zoomOnScroll={true}
-              zoomOnPinch={true}
-              zoomOnDoubleClick={true}
-              selectionOnDrag={false}
-              selectNodesOnDrag={false}
-              defaultEdgeOptions={{
-                type: 'smoothstep',
-                animated: false,
-              }}
             >
-              <Background color="hsl(var(--ibis-grid))" gap={20} />
-              
-              {/* Zone visualization using proper ReactFlow coordinate system */}
-              <ZoneVisualization zones={zones} />
-              
               <Controls />
-            
-              {/* Control Panel */}
-              <Panel position="top-left" className="space-y-2">
-                <Card className="p-4" style={{ pointerEvents: 'auto' }}>
-                  <h4 className="font-medium text-sm mb-2">New Connection Type</h4>
+              <Background />
+              
+              {/* Connection Type Panel */}
+              <Panel position="top-left" className="bg-background border rounded-lg p-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Connection Type</Label>
                   <Select value={selectedEdgeType} onValueChange={(value: any) => setSelectedEdgeType(value)}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-[200px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1615,156 +442,43 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                       <SelectItem value="responds_to">Responds to</SelectItem>
                     </SelectContent>
                   </Select>
-                </Card>
+                </div>
               </Panel>
 
-              {/* Legend */}
-              <Panel position="top-right" className="space-y-2">
-                <Card className="p-4">
-                  <h3 className="font-semibold mb-2">Node Types</h3>
-                  <div className="space-y-2 mb-4">
+              {/* Legend Panel */}
+              <Panel position="bottom-right" className="bg-background border rounded-lg p-4">
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm">Node Types</h4>
+                  <div className="space-y-2">
                     {Object.entries(nodeTypeConfig).map(([type, config]) => (
-                      <div key={type} className="flex items-center gap-2 text-sm">
+                      <div key={type} className="flex items-center gap-2 text-xs">
                         <div 
-                          className="w-4 h-4 border border-gray-300"
-                          style={{ 
-                            backgroundColor: config.color,
-                            borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px'
-                          }}
+                          className="w-3 h-3 rounded-sm border"
+                          style={{ backgroundColor: config.color }}
+                        />
+                        <span className="capitalize">{config.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <h4 className="font-medium text-sm mt-4">Relationships</h4>
+                  <div className="space-y-2">
+                    {Object.entries(relationshipConfig).map(([type, config]) => (
+                      <div key={type} className="flex items-center gap-2 text-xs">
+                        <div 
+                          className="w-4 h-0.5"
+                          style={{ backgroundColor: config.color }}
                         />
                         <span>{config.label}</span>
                       </div>
                     ))}
                   </div>
-                  
-                  <h3 className="font-semibold mb-2">Edge Types</h3>
-                  <div className="space-y-2">
-                    {Object.entries(relationshipConfig).map(([type, config]) => (
-                      <div key={type} className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center">
-                          <div 
-                            className="w-6 h-0.5"
-                            style={{ backgroundColor: config.color }}
-                          />
-                          <div 
-                            className="w-0 h-0 border-l-4 border-t-2 border-b-2 border-transparent"
-                            style={{ borderLeftColor: config.color }}
-                          />
-                        </div>
-                        <span>{config.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
+                </div>
               </Panel>
             </ReactFlow>
           </div>
         )}
       </div>
-
-      {/* Node Edit Dialog */}
-      <Dialog open={!!editingNode} onOpenChange={() => setEditingNode(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit {editingNode?.node_type} Node</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                value={nodeForm.title}
-                onChange={(e) => setNodeForm(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Enter node title"
-              />
-            </div>
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={nodeForm.description}
-                onChange={(e) => setNodeForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Enter node description"
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label htmlFor="node_type">Node Type</Label>
-              <Select
-                value={nodeForm.node_type}
-                onValueChange={(value: 'issue' | 'position' | 'argument') => 
-                  setNodeForm(prev => ({ ...prev, node_type: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="issue">Issue</SelectItem>
-                  <SelectItem value="position">Position</SelectItem>
-                  <SelectItem value="argument">Argument</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingNode(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveNode} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edge Edit Dialog */}
-      <Dialog open={!!editingEdge} onOpenChange={() => setEditingEdge(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Relationship</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="relationship_type">Relationship Type</Label>
-              <Select
-                value={edgeForm.relationship_type}
-                onValueChange={(value: 'supports' | 'opposes' | 'relates_to' | 'responds_to') => 
-                  setEdgeForm(prev => ({ ...prev, relationship_type: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="supports">Supports</SelectItem>
-                  <SelectItem value="opposes">Opposes</SelectItem>
-                  <SelectItem value="relates_to">Relates to</SelectItem>
-                  <SelectItem value="responds_to">Responds to</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setEditingEdge(null)}>
-              Cancel
-            </Button>
-            <div className="flex-1" />
-            <Button onClick={handleSaveEdge} disabled={saving}>
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDeleteEdge} 
-              disabled={saving}
-              className="ml-2"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              {saving ? 'Deleting...' : 'Delete Edge'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
