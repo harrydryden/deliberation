@@ -1320,6 +1320,103 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               }}
             >
               <Background color="hsl(var(--ibis-grid))" gap={20} />
+              
+              {/* Zone visualization as custom background SVG */}
+              <svg
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                }}
+              >
+                {/* Issue zone (innermost circle) */}
+                <circle
+                  cx={zones.issue.centerX}
+                  cy={zones.issue.centerY}
+                  r={zones.issue.outerRadius}
+                  fill="hsl(var(--ibis-issue))"
+                  fillOpacity="0.08"
+                  stroke="hsl(var(--ibis-issue))"
+                  strokeWidth="3"
+                  strokeOpacity="0.6"
+                  strokeDasharray="none"
+                />
+                
+                {/* Position zone (middle ring) */}
+                <circle
+                  cx={zones.position.centerX}
+                  cy={zones.position.centerY}
+                  r={zones.position.outerRadius}
+                  fill="none"
+                  stroke="hsl(var(--ibis-position))"
+                  strokeWidth="2"
+                  strokeOpacity="0.5"
+                  strokeDasharray="8,4"
+                />
+                
+                {/* Argument zone (outer ring) */}
+                <circle
+                  cx={zones.argument.centerX}
+                  cy={zones.argument.centerY}
+                  r={zones.argument.outerRadius}
+                  fill="none"
+                  stroke="hsl(var(--ibis-argument))"
+                  strokeWidth="2"
+                  strokeOpacity="0.4"
+                  strokeDasharray="12,6"
+                />
+                
+                {/* Zone labels */}
+                <text
+                  x={zones.issue.centerX}
+                  y={zones.issue.centerY - zones.issue.outerRadius - 10}
+                  textAnchor="middle"
+                  fill="hsl(var(--ibis-issue))"
+                  fontSize="14"
+                  fontWeight="600"
+                  opacity="0.8"
+                >
+                  Issues
+                </text>
+                
+                <text
+                  x={zones.position.centerX}
+                  y={zones.position.centerY - zones.position.outerRadius - 10}
+                  textAnchor="middle"
+                  fill="hsl(var(--ibis-position))"
+                  fontSize="14"
+                  fontWeight="600"
+                  opacity="0.8"
+                >
+                  Positions
+                </text>
+                
+                <text
+                  x={zones.argument.centerX}
+                  y={zones.argument.centerY - zones.argument.outerRadius - 10}
+                  textAnchor="middle"
+                  fill="hsl(var(--ibis-argument))"
+                  fontSize="14"
+                  fontWeight="600"
+                  opacity="0.8"
+                >
+                  Arguments
+                </text>
+                
+                {/* Center point indicator */}
+                <circle
+                  cx={zones.issue.centerX}
+                  cy={zones.issue.centerY}
+                  r="4"
+                  fill="hsl(var(--muted-foreground))"
+                  opacity="0.6"
+                />
+              </svg>
+              
               <Controls />
             
               {/* Control Panel */}
