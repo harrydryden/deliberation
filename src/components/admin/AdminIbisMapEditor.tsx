@@ -639,13 +639,14 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     console.log('🔍 Edge clicked for editing:', { 
       edgeId: edge.id, 
       edgeData: edge.data,
-      relationship: edge.data?.relationship 
+      relationshipId: edge.data?.relationshipId 
     });
     
-    // Find the relationship directly from the relationships array using the edge ID
-    const ibisRelationship = ibisRelationships.find(rel => rel.id === edge.id);
+    // Find the relationship using the relationshipId from edge data, not the edge ID
+    const relationshipId = edge.data?.relationshipId || edge.id;
+    const ibisRelationship = ibisRelationships.find(rel => rel.id === relationshipId);
     if (!ibisRelationship || !ibisRelationship.id) {
-      console.error('🔍 Invalid relationship data - edge ID:', edge.id, 'available relationships:', ibisRelationships.map(r => r.id));
+      console.error('🔍 Invalid relationship data - relationshipId:', relationshipId, 'available relationships:', ibisRelationships.map(r => r.id));
       toast({
         title: "Error",
         description: "Cannot edit relationship - relationship not found",
