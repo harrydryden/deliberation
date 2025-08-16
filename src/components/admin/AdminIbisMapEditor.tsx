@@ -775,7 +775,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     }
   };
 
-  // Delete edge
+  // Delete edge with immediate visual removal
   const handleDeleteEdge = async () => {
     if (!editingEdge) return;
 
@@ -784,6 +784,17 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       
       console.log('🔍 Deleting relationship:', editingEdge.id);
       
+      // Immediately remove from visual map
+      setIbisRelationships(prev => {
+        const filtered = prev.filter(rel => rel.id !== editingEdge.id);
+        console.log('🔍 Immediate visual removal - relationships remaining:', filtered.length);
+        return filtered;
+      });
+      
+      // Close dialog immediately for better UX
+      setEditingEdge(null);
+      
+      // Delete from database
       const { error } = await supabase
         .from('ibis_relationships')
         .delete()
@@ -791,32 +802,22 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
       if (error) {
         console.error('🔍 Delete error:', error);
+        // Restore the relationship if deletion failed
+        setIbisRelationships(prev => [...prev, editingEdge]);
         throw error;
       }
 
-      console.log('🔍 Delete successful, updating local state');
+      console.log('🔍 Database deletion successful');
       
-      // Update local state immediately
-      setIbisRelationships(prev => {
-        const filtered = prev.filter(rel => rel.id !== editingEdge.id);
-        console.log('🔍 Relationships after delete:', filtered.length, 'remaining');
-        return filtered;
-      });
-
-      setEditingEdge(null);
-      
-      // Clear unsaved changes since we just saved a deletion
-      setHasUnsavedChanges(false);
-
       toast({
         title: "Relationship Deleted",
-        description: "Relationship removed successfully",
+        description: "Edge removed from map and database",
       });
 
     } catch (error) {
       logger.error('Error deleting relationship', error as any);
       toast({
-        title: "Error",
+        title: "Error", 
         description: "Failed to delete relationship",
         variant: "destructive",
       });
@@ -1143,16 +1144,22 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               </Select>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setEditingEdge(null)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteEdge} disabled={saving}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              {saving ? 'Deleting...' : 'Delete'}
-            </Button>
+            <div className="flex-1" />
             <Button onClick={handleSaveEdge} disabled={saving}>
               {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteEdge} 
+              disabled={saving}
+              className="ml-2"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              {saving ? 'Deleting...' : 'Delete Edge'}
             </Button>
           </DialogFooter>
         </DialogContent>
