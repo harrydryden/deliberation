@@ -277,9 +277,7 @@ const DeliberationChat = () => {
                 </div>
               </div>
 
-              <div className="p-3">
-                <ParticipantScoring engagement={userScores.engagement} shares={userScores.shares} sessions={userScores.sessions} target={10} />
-              </div>
+              <ParticipantScoring engagement={userScores.engagement} shares={userScores.shares} sessions={userScores.sessions} target={10} />
             </div>
           </div>
         </div>
