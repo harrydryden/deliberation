@@ -38,6 +38,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Initialize from localStorage on mount
+  React.useEffect(() => {
+    const storedUser = localStorage.getItem('simple_auth_user');
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.warn('Failed to parse stored user:', error);
+        localStorage.removeItem('simple_auth_user');
+      }
+    }
+  }, []);
+
   const authenticateWithAccessCode = async (accessCode: string, userRole: string) => {
     // Create a simple user for access code authentication
     const simpleUser: User = {
@@ -51,10 +64,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         expertiseAreas: []
       }
     };
+    
+    // Persist to localStorage
+    localStorage.setItem('simple_auth_user', JSON.stringify(simpleUser));
     setUser(simpleUser);
   };
 
   const logout = async () => {
+    localStorage.removeItem('simple_auth_user');
     setUser(null);
   };
 
