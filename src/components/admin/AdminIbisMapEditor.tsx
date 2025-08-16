@@ -294,16 +294,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             <div 
               className={`ibis-node-${node.node_type} node-content`} 
               style={{ transform: `scale(${scaleFactor})` }}
-              onClick={(e) => {
-                e.stopPropagation();
-                console.log('🔍 Node clicked from within node:', node.id);
-                setEditingNode(node);
-                setNodeForm({
-                  title: node.title,
-                  description: node.description || '',
-                  node_type: node.node_type,
-                });
-              }}
             >
               <div className="font-semibold text-xs mb-1 text-white">
                 {node.title.length > 30 ? `${node.title.substring(0, 30)}...` : node.title}
@@ -329,7 +319,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           padding: '8px',
           fontSize: '11px',
           textAlign: 'center',
-          cursor: 'pointer',
+          cursor: 'grab',
           transform: node.node_type === 'argument' ? 'rotate(45deg)' : 'none',
         },
         draggable: true,
@@ -390,6 +380,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
   // Handle node position changes
   const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
+    console.log('🔍 Node changes:', changes);
     onNodesChange(changes);
     
     const positionChanges = changes.filter(change => 
@@ -397,6 +388,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     );
     
     if (positionChanges.length > 0) {
+      console.log('🔍 Position changes detected:', positionChanges);
       setHasUnsavedChanges(true);
     }
   }, [onNodesChange]);
@@ -458,15 +450,20 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     }
   }, [deliberationId, toast]);
 
-  // Handle node editing
+  // Handle node editing with proper click detection
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    const ibisNode = node.data.originalNode as IbisNode;
-    setEditingNode(ibisNode);
-    setNodeForm({
-      title: ibisNode.title,
-      description: ibisNode.description || '',
-      node_type: ibisNode.node_type,
-    });
+    // Only trigger edit if this was a click, not a drag
+    const wasClick = !event.defaultPrevented;
+    if (wasClick) {
+      console.log('🔍 Node clicked for editing:', node.id);
+      const ibisNode = node.data.originalNode as IbisNode;
+      setEditingNode(ibisNode);
+      setNodeForm({
+        title: ibisNode.title,
+        description: ibisNode.description || '',
+        node_type: ibisNode.node_type,
+      });
+    }
   }, []);
 
   // Save node changes
@@ -748,10 +745,14 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             onEdgesChange={handleEdgesChange}
             onConnect={handleConnect}
             onNodeClick={handleNodeClick}
+            onNodeDoubleClick={handleNodeClick}
             connectionMode={ConnectionMode.Loose}
             fitView
             fitViewOptions={{ padding: 0.1 }}
             style={{ background: 'hsl(var(--background))' }}
+            nodesDraggable={true}
+            nodesConnectable={true}
+            elementsSelectable={true}
           >
             <Background />
             <Controls />
