@@ -291,7 +291,20 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         position,
         data: {
           label: (
-            <div className={`ibis-node-${node.node_type} node-content`} style={{ transform: `scale(${scaleFactor})` }}>
+            <div 
+              className={`ibis-node-${node.node_type} node-content`} 
+              style={{ transform: `scale(${scaleFactor})` }}
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('🔍 Node clicked from within node:', node.id);
+                setEditingNode(node);
+                setNodeForm({
+                  title: node.title,
+                  description: node.description || '',
+                  node_type: node.node_type,
+                });
+              }}
+            >
               <div className="font-semibold text-xs mb-1 text-white">
                 {node.title.length > 30 ? `${node.title.substring(0, 30)}...` : node.title}
               </div>
