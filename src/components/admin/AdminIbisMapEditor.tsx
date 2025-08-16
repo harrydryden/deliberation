@@ -127,6 +127,37 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   
+  // Handle node position changes and save to database
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    onNodesChange(changes);
+    
+    // Check for position changes
+    const positionChanges = changes.filter(change => 
+      change.type === 'position' && change.position
+    );
+    
+    if (positionChanges.length > 0) {
+      setHasUnsavedChanges(true);
+      
+      // Debounced save to database
+      setTimeout(async () => {
+        for (const change of positionChanges) {
+          if (change.type === 'position' && change.position) {
+            try {
+              await supabase.rpc('admin_update_ibis_node_position', {
+                p_node_id: change.id,
+                p_position_x: change.position.x,
+                p_position_y: change.position.y
+              });
+            } catch (error) {
+              console.error('Failed to save node position:', error);
+            }
+          }
+        }
+      }, 1000);
+    }
+  }, [onNodesChange]);
+  
   // ReactFlow instance ref
   const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   
@@ -421,16 +452,29 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               nodeTypes={nodeTypes}
               nodes={nodes}
               edges={edges}
-              onNodesChange={onNodesChange}
+              onNodesChange={handleNodesChange}
               onEdgesChange={handleEdgesChange}
               onConnect={handleConnect}
               className="admin-editor"
               connectionMode={ConnectionMode.Loose}
               connectOnClick={false}
               fitView
+              nodesDraggable={true}
+              nodesConnectable={true}
+              elementsSelectable={true}
+              selectNodesOnDrag={false}
             >
               <Controls />
               <Background />
+              
+              {/* Zone visualization */}
+              <ZoneVisualization 
+                zones={{
+                  issue: { outerRadius: 150, centerX: 0, centerY: 0 },
+                  position: { outerRadius: 300, centerX: 0, centerY: 0 },
+                  argument: { outerRadius: 450, centerX: 0, centerY: 0 }
+                }}
+              />
               
               {/* Connection Type Panel */}
               <Panel position="top-left" className="bg-background border rounded-lg p-4">
@@ -477,6 +521,10 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                         <span>{config.label}</span>
                       </div>
                     ))}
+                  </div>
+                  
+                  <div className="pt-2 mt-2 border-t text-xs text-muted-foreground">
+                    Drag nodes • Connect with handles • Select to edit
                   </div>
                 </div>
               </Panel>

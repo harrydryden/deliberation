@@ -48,6 +48,12 @@ All colors MUST be HSL.
 
     /* Democratic Theme Colors */
     --democratic-blue: 212 92% 46%;
+    
+    /* IBIS Colors */
+    --ibis-issue: 0 84% 60%;
+    --ibis-position: 45 93% 47%;
+    --ibis-argument: 140 70% 42%;
+    --ibis-rel-relates: 212 92% 46%;
     --democratic-green: 140 70% 42%;
     --civic-gold: 45 93% 47%;
     --deliberation-bg: 246 100% 98%;
