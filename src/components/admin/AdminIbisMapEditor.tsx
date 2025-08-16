@@ -974,39 +974,18 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             {/* Control Panel */}
             <Panel position="top-left" className="space-y-2">
               <Card className="p-4" style={{ pointerEvents: 'auto' }}>
-                <h3 className="font-semibold mb-2">Map Editor Controls</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Move className="h-4 w-4" />
-                    <span>Drag nodes to reposition</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Edit3 className="h-4 w-4" />
-                    <span>Click nodes to edit content</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link className="h-4 w-4" />
-                    <span>Drag from node edges to connect</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Unlink className="h-4 w-4" />
-                    <span>Click edges to edit/delete</span>
-                  </div>
-                </div>
-                <div className="mt-4 space-y-2">
-                  <h4 className="font-medium text-sm">New Connection Type</h4>
-                  <Select value={selectedEdgeType} onValueChange={(value: any) => setSelectedEdgeType(value)}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="supports">Supports</SelectItem>
-                      <SelectItem value="opposes">Opposes</SelectItem>
-                      <SelectItem value="relates_to">Relates to</SelectItem>
-                      <SelectItem value="responds_to">Responds to</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <h4 className="font-medium text-sm mb-2">New Connection Type</h4>
+                <Select value={selectedEdgeType} onValueChange={(value: any) => setSelectedEdgeType(value)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="supports">Supports</SelectItem>
+                    <SelectItem value="opposes">Opposes</SelectItem>
+                    <SelectItem value="relates_to">Relates to</SelectItem>
+                    <SelectItem value="responds_to">Responds to</SelectItem>
+                  </SelectContent>
+                </Select>
               </Card>
             </Panel>
 
