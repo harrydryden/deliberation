@@ -11,11 +11,16 @@ interface DeliberationService {
 }
 
 class SupabaseDeliberationService implements DeliberationService {
+  private user: any;
+  
+  constructor(user: any) {
+    this.user = user;
+  }
+  
   async getDeliberations(): Promise<any[]> {
     logger.info('Starting getDeliberations');
     
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    if (!this.user) throw new Error('User not authenticated');
     
     // First get deliberations
     const { data: deliberations, error: deliberationsError } = await supabase
@@ -57,7 +62,7 @@ class SupabaseDeliberationService implements DeliberationService {
           .from('participants')
           .select('id')
           .eq('deliberation_id', deliberation.id)
-          .eq('user_id', user.id)
+          .eq('user_id', this.user.id)
           .maybeSingle();
 
         if (participationError) {
@@ -83,8 +88,7 @@ class SupabaseDeliberationService implements DeliberationService {
   }
 
   async createDeliberation(deliberationData: any): Promise<any> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    if (!this.user) throw new Error('User not authenticated');
 
     // Create deliberation
     const { data: deliberation, error: deliberationError } = await supabase
@@ -94,7 +98,7 @@ class SupabaseDeliberationService implements DeliberationService {
         description: deliberationData.description,
         is_public: deliberationData.is_public,
         max_participants: deliberationData.max_participants,
-        facilitator_id: user.id,
+        facilitator_id: this.user.id,
         status: 'draft'
       })
       .select()
@@ -107,7 +111,7 @@ class SupabaseDeliberationService implements DeliberationService {
       .from('participants')
       .insert({
         deliberation_id: deliberation.id,
-        user_id: user.id,
+        user_id: this.user.id,
         role: 'facilitator'
       });
 
@@ -119,13 +123,12 @@ class SupabaseDeliberationService implements DeliberationService {
   async joinDeliberation(deliberationId: string): Promise<void> {
     logger.info('Starting joinDeliberation', { deliberationId });
     
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    if (!this.user) {
       logger.error('User not authenticated');
       throw new Error('User not authenticated');
     }
 
-    logger.info('User authenticated', { userId: user.id });
+    logger.info('User authenticated', { userId: this.user.id });
 
     // Check if already a participant
     logger.info('Checking if user is already a participant...');
@@ -133,7 +136,7 @@ class SupabaseDeliberationService implements DeliberationService {
       .from('participants')
       .select('id')
       .eq('deliberation_id', deliberationId)
-      .eq('user_id', user.id)
+      .eq('user_id', this.user.id)
       .maybeSingle();
 
     logger.info('Existing participant check result', { exists: Boolean(existing), hasError: Boolean(checkError) });
@@ -154,7 +157,7 @@ class SupabaseDeliberationService implements DeliberationService {
       .from('participants')
       .insert({
         deliberation_id: deliberationId,
-        user_id: user.id,
+        user_id: this.user.id,
         role: 'participant'
       });
 
@@ -201,14 +204,13 @@ class SupabaseDeliberationService implements DeliberationService {
   }
 
   async leaveDeliberation(deliberationId: string): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    if (!this.user) throw new Error('User not authenticated');
 
     const { error } = await supabase
       .from('participants')
       .delete()
       .eq('deliberation_id', deliberationId)
-      .eq('user_id', user.id);
+      .eq('user_id', this.user.id);
 
     if (error) throw error;
   }
@@ -286,6 +288,7 @@ class NodejsDeliberationService implements DeliberationService {
 }
 
 export const useDeliberationService = (): DeliberationService => {
+  const { user } = useAuth();
   // For now, always use Supabase since that's what's configured
-  return new SupabaseDeliberationService();
+  return new SupabaseDeliberationService(user);
 };
