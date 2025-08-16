@@ -122,7 +122,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     argument: { innerRadius: 300, outerRadius: 450, centerX: 0, centerY: 0 }
   }), []);
   
-  // Constrain node to its appropriate zone
+  // Constrain node to its appropriate zone with both inner and outer radius enforcement
   const constrainNodeToZone = useCallback((nodeId: string, position: { x: number; y: number }) => {
     const node = ibisNodes.find(n => n.id === nodeId);
     if (!node) return position;
@@ -132,13 +132,21 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     
     // Calculate distance from center
     const distance = Math.sqrt(position.x * position.x + position.y * position.y);
+    const angle = Math.atan2(position.y, position.x);
     
-    // If outside zone, project back to zone boundary
+    // If outside the outer radius, constrain to outer boundary
     if (distance > zone.outerRadius) {
-      const angle = Math.atan2(position.y, position.x);
       return {
         x: Math.cos(angle) * zone.outerRadius,
         y: Math.sin(angle) * zone.outerRadius
+      };
+    }
+    
+    // If inside the inner radius (too close to center), constrain to inner boundary
+    if (distance < zone.innerRadius) {
+      return {
+        x: Math.cos(angle) * zone.innerRadius,
+        y: Math.sin(angle) * zone.innerRadius
       };
     }
     
