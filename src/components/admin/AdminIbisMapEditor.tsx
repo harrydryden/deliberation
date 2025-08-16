@@ -141,9 +141,9 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   
   // Zone definitions (fixed in world space, centered at origin)
   const zones = [
-    { id: 'inner', worldRadius: 150, centerX: 0, centerY: 0, nodeTypes: ['issue'] },
-    { id: 'middle', worldRadius: 300, centerX: 0, centerY: 0, nodeTypes: ['position'] },
-    { id: 'outer', worldRadius: 500, centerX: 0, centerY: 0, nodeTypes: ['argument'] }
+    { id: 'inner', worldRadius: 100, centerX: 0, centerY: 0, nodeTypes: ['issue'] },
+    { id: 'middle', worldRadius: 220, centerX: 0, centerY: 0, nodeTypes: ['position'] },
+    { id: 'outer', worldRadius: 340, centerX: 0, centerY: 0, nodeTypes: ['argument'] }
   ];
   
   // Custom node types
@@ -371,33 +371,61 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     );
     
     if (nodesWithoutPositions.length > 0) {
-      // Generate initial positions in world space for each zone with smaller, more consistent radii
-      nodesWithoutPositions.forEach((node, index) => {
-        let targetRadius = 0;
+      // Generate initial positions in world space for each zone with collision detection
+      const nodesByType = {
+        issue: nodesWithoutPositions.filter(n => n.node_type === 'issue'),
+        position: nodesWithoutPositions.filter(n => n.node_type === 'position'), 
+        argument: nodesWithoutPositions.filter(n => n.node_type === 'argument')
+      };
+      
+      // Use smaller, more consistent radii for compact layout
+      const baseR1 = 200;
+      const R1 = baseR1;
+      const R2 = R1 + 120;
+      const R3 = R2 + 120;
+      
+      const zoneRadii = {
+        issue: R1 * 0.5,
+        position: (R1 + R2) * 0.5,
+        argument: (R2 + R3) * 0.5
+      };
+      
+      // Apply collision detection and spacing for each node type
+      Object.entries(nodesByType).forEach(([nodeType, typeNodes]) => {
+        const targetRadius = zoneRadii[nodeType as keyof typeof zoneRadii];
+        const minDistance = 80; // Minimum distance between nodes to prevent overlap
         
-        // Use smaller, more consistent radii for compact layout
-        const baseR1 = 200; // Fixed radius for consistency
-        const R1 = baseR1;
-        const R2 = R1 + 120; // Closer spacing
-        const R3 = R2 + 120; // Consistent gaps
-        
-        // Determine target radius based on node type (in world space)
-        if (node.node_type === 'issue') {
-          targetRadius = R1 * 0.5; // Middle of inner zone
-        } else if (node.node_type === 'position') {
-          targetRadius = (R1 + R2) * 0.5; // Middle of middle zone
-        } else if (node.node_type === 'argument') {
-          targetRadius = (R2 + R3) * 0.5; // Middle of outer zone
-        }
-        
-        // Calculate initial angle
-        const angle = (index / nodesWithoutPositions.length) * 2 * Math.PI;
-        
-        // Position directly in world coordinates
-        const worldX = targetRadius * Math.cos(angle);
-        const worldY = targetRadius * Math.sin(angle);
-        
-        positionsMap.set(node.id, { x: worldX, y: worldY });
+        typeNodes.forEach((node, index) => {
+          let attempts = 0;
+          let position;
+          
+          do {
+            // Calculate angle with some randomization to avoid perfect alignment
+            const baseAngle = (index / typeNodes.length) * 2 * Math.PI;
+            const angleOffset = (Math.random() - 0.5) * 0.3; // Small random offset
+            const angle = baseAngle + angleOffset;
+            
+            // Add some radius variation to avoid perfect circles
+            const radiusVariation = (Math.random() - 0.5) * 40;
+            const radius = targetRadius + radiusVariation;
+            
+            position = {
+              x: radius * Math.cos(angle),
+              y: radius * Math.sin(angle)
+            };
+            
+            attempts++;
+          } while (
+            attempts < 20 && 
+            Array.from(positionsMap.values()).some(existingPos => {
+              const dx = position.x - existingPos.x;
+              const dy = position.y - existingPos.y;
+              return Math.sqrt(dx * dx + dy * dy) < minDistance;
+            })
+          );
+          
+          positionsMap.set(node.id, position);
+        });
       });
     }
 
@@ -1270,8 +1298,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                         zone.nodeTypes[0] === 'position' ? "hsl(var(--ibis-position))" :
                         "hsl(var(--ibis-argument))"
                       }
-                      strokeWidth="2"
-                      strokeOpacity="0.4"
+                      strokeWidth="3"
+                      strokeOpacity="0.8"
                       strokeDasharray={index === 0 ? "none" : "8,4"}
                     />
                     
