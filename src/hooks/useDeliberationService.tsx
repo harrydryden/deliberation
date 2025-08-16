@@ -17,11 +17,19 @@ class SupabaseDeliberationService implements DeliberationService {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
     
-    // First get deliberations
+    // Get deliberations where user is a participant OR that are public
+    const { data: userParticipations } = await supabase
+      .from('participants')
+      .select('deliberation_id')
+      .eq('user_id', user.id);
+    
+    const participatingDeliberationIds = userParticipations?.map(p => p.deliberation_id) || [];
+    
+    // Get all deliberations the user can see (public OR participating in)
     const { data: deliberations, error: deliberationsError } = await supabase
       .from('deliberations')
       .select('*')
-      .eq('is_public', true)
+      .or(`is_public.eq.true,id.in.(${participatingDeliberationIds.length > 0 ? participatingDeliberationIds.join(',') : 'null'})`)
       .order('created_at', { ascending: false });
 
     logger.info('Deliberations query result', { count: deliberations?.length || 0, hasError: Boolean(deliberationsError) });
