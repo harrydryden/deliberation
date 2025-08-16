@@ -139,11 +139,36 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     height: 600
   });
   
-  // Zone definitions (fixed in world space, centered at origin)
+  // Zone definitions (equal areas) - fixed in world space, centered at origin
+  const baseRadius = 120; // Base radius for first zone
   const zones = [
-    { id: 'inner', worldRadius: 100, centerX: 0, centerY: 0, nodeTypes: ['issue'] },
-    { id: 'middle', worldRadius: 220, centerX: 0, centerY: 0, nodeTypes: ['position'] },
-    { id: 'outer', worldRadius: 340, centerX: 0, centerY: 0, nodeTypes: ['argument'] }
+    { 
+      id: 'inner', 
+      worldRadius: baseRadius, 
+      centerX: 0, 
+      centerY: 0, 
+      nodeTypes: ['issue'],
+      color: 'hsl(var(--ibis-issue))',
+      bgColor: 'hsl(var(--ibis-zone-issue))'
+    },
+    { 
+      id: 'middle', 
+      worldRadius: baseRadius * Math.sqrt(2), // √2 for equal area
+      centerX: 0, 
+      centerY: 0, 
+      nodeTypes: ['position'],
+      color: 'hsl(var(--ibis-position))', 
+      bgColor: 'hsl(var(--ibis-zone-position))'
+    },
+    { 
+      id: 'outer', 
+      worldRadius: baseRadius * Math.sqrt(3), // √3 for equal area
+      centerX: 0, 
+      centerY: 0, 
+      nodeTypes: ['argument'],
+      color: 'hsl(var(--ibis-argument))',
+      bgColor: 'hsl(var(--ibis-zone-argument))'
+    }
   ];
   
   // Custom node types
@@ -378,16 +403,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         argument: nodesWithoutPositions.filter(n => n.node_type === 'argument')
       };
       
-      // Use smaller, more consistent radii for compact layout
-      const baseR1 = 200;
-      const R1 = baseR1;
-      const R2 = R1 + 120;
-      const R3 = R2 + 120;
+      // Use equal-area zone radii for consistent spacing
+      const baseRadius = 120;
+      const R1 = baseRadius;
+      const R2 = baseRadius * Math.sqrt(2);
+      const R3 = baseRadius * Math.sqrt(3);
       
       const zoneRadii = {
-        issue: R1 * 0.5,
-        position: (R1 + R2) * 0.5,
-        argument: (R2 + R3) * 0.5
+        issue: R1 * 0.7, // 70% into the zone
+        position: R1 + (R2 - R1) * 0.5, // Middle of ring
+        argument: R2 + (R3 - R2) * 0.5 // Middle of outer ring
       };
       
       // Apply collision detection and spacing for each node type
@@ -1284,37 +1309,44 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 </defs>
                 <rect width="100%" height="100%" fill="url(#grid)" />
                 
-                {/* Zone circles in world coordinates */}
+                {/* Zone circles with equal areas and clear visibility */}
                 {zones.map((zone, index) => (
-                  <g key={zone.id} transform={`translate(${zone.centerX}, ${zone.centerY})`}>
+                  <g key={zone.id}>
+                    {/* Zone background fill */}
                     <circle
                       cx="0"
                       cy="0"
                       r={zone.worldRadius}
-                      fill={index === 0 ? "hsl(var(--ibis-issue))" : "none"}
-                      fillOpacity={index === 0 ? "0.03" : "0"}
-                      stroke={
-                        zone.nodeTypes[0] === 'issue' ? "hsl(var(--ibis-issue))" :
-                        zone.nodeTypes[0] === 'position' ? "hsl(var(--ibis-position))" :
-                        "hsl(var(--ibis-argument))"
-                      }
+                      fill={zone.bgColor}
+                      fillOpacity="0.1"
+                      stroke="none"
+                    />
+                    
+                    {/* Zone border */}
+                    <circle
+                      cx="0"
+                      cy="0"
+                      r={zone.worldRadius}
+                      fill="none"
+                      stroke={zone.color}
                       strokeWidth="3"
-                      strokeOpacity="0.8"
+                      strokeOpacity="0.9"
                       strokeDasharray={index === 0 ? "none" : "8,4"}
                     />
                     
-                    {/* Zone label */}
+                    {/* Zone label positioned outside the circle */}
                     <text 
                       x="0" 
-                      y={-zone.worldRadius - 20} 
+                      y={-zone.worldRadius - 15} 
                       textAnchor="middle" 
-                      fill="hsl(var(--muted-foreground))" 
-                      fontSize="16" 
-                      fontWeight="500"
+                      fill={zone.color}
+                      fontSize="14" 
+                      fontWeight="600"
+                      opacity="0.9"
                     >
-                      {zone.nodeTypes[0] === 'issue' ? 'Issues (Center)' :
-                       zone.nodeTypes[0] === 'position' ? 'Positions (Middle Ring)' :
-                       'Arguments (Outer Ring)'}
+                      {zone.nodeTypes[0] === 'issue' ? 'Issues' :
+                       zone.nodeTypes[0] === 'position' ? 'Positions' :
+                       'Arguments'}
                     </text>
                   </g>
                 ))}
