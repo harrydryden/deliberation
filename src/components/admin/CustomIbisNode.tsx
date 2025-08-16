@@ -74,16 +74,16 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position: 'relative',
       }}
     >
-      {/* Connection handles with specific IDs */}
+      {/* Connection handles with specific IDs - made larger and more visible */}
       <Handle
         id="top"
         type="source"
         position={Position.Top}
         style={{
-          background: '#6b7280',
-          border: '2px solid #4b5563',
-          width: '6px', // 50% smaller: 12px -> 6px
-          height: '6px', // 50% smaller: 12px -> 6px
+          background: '#3b82f6',
+          border: '2px solid #1d4ed8',
+          width: '10px',
+          height: '10px',
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -94,10 +94,10 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         type="source"
         position={Position.Bottom}
         style={{
-          background: '#6b7280',
-          border: '2px solid #4b5563',
-          width: '6px', // 50% smaller
-          height: '6px', // 50% smaller
+          background: '#3b82f6',
+          border: '2px solid #1d4ed8',
+          width: '10px',
+          height: '10px',
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -108,10 +108,10 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         type="source"
         position={Position.Left}
         style={{
-          background: '#6b7280',
-          border: '2px solid #4b5563',
-          width: '6px', // 50% smaller
-          height: '6px', // 50% smaller
+          background: '#3b82f6',
+          border: '2px solid #1d4ed8',
+          width: '10px',
+          height: '10px',
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -122,25 +122,25 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         type="source"
         position={Position.Right}
         style={{
-          background: '#6b7280',
-          border: '2px solid #4b5563',
-          width: '6px', // 50% smaller
-          height: '6px', // 50% smaller
+          background: '#3b82f6',
+          border: '2px solid #1d4ed8',
+          width: '10px',
+          height: '10px',
           borderRadius: '50%',
           zIndex: 10,
         }}
       />
       
-      {/* Target handles for receiving connections */}
+      {/* Target handles for receiving connections - made larger and more visible */}
       <Handle
         id="top-target"
         type="target"
         position={Position.Top}
         style={{
-          background: '#6b7280',
-          border: '2px solid #4b5563',
-          width: '6px', // 50% smaller
-          height: '6px', // 50% smaller
+          background: '#10b981',
+          border: '2px solid #059669',
+          width: '10px',
+          height: '10px',
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -151,10 +151,10 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         type="target"
         position={Position.Bottom}
         style={{
-          background: '#6b7280',
-          border: '2px solid #4b5563',
-          width: '6px', // 50% smaller
-          height: '6px', // 50% smaller
+          background: '#10b981',
+          border: '2px solid #059669',
+          width: '10px',
+          height: '10px',
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -165,10 +165,10 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         type="target"
         position={Position.Left}
         style={{
-          background: '#6b7280',
-          border: '2px solid #4b5563',
-          width: '6px', // 50% smaller
-          height: '6px', // 50% smaller
+          background: '#10b981',
+          border: '2px solid #059669',
+          width: '10px',
+          height: '10px',
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -179,10 +179,10 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         type="target"
         position={Position.Right}
         style={{
-          background: '#6b7280',
-          border: '2px solid #4b5563',
-          width: '6px', // 50% smaller
-          height: '6px', // 50% smaller
+          background: '#10b981',
+          border: '2px solid #059669',
+          width: '10px',
+          height: '10px',
           borderRadius: '50%',
           zIndex: 10,
         }}
