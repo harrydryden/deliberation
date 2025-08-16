@@ -1291,7 +1291,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               edges={edges}
               onNodesChange={handleNodesChange}
               onEdgesChange={handleEdgesChange}
-              onConnect={handleConnect}
               onNodeClick={handleNodeClick}
               onEdgeClick={handleEdgeClick}
               className="admin-editor"
@@ -1321,9 +1320,14 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               }}
               onConnectStart={(event, params) => {
                 console.log('🔍 Connection start:', params);
+                console.log('🔍 Connection start event:', event);
               }}
               onConnectEnd={(event) => {
                 console.log('🔍 Connection end:', event);
+              }}
+              onConnect={(connection) => {
+                console.log('🔍 onConnect triggered:', connection);
+                handleConnect(connection);
               }}
               onInit={(reactFlowInstance: ReactFlowInstance<Node, Edge>) => {
                 reactFlowRef.current = reactFlowInstance;

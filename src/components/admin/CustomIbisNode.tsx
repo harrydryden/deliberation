@@ -74,7 +74,7 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position: 'relative',
       }}
     >
-      {/* Connection handles with specific IDs - made larger and more visible */}
+      {/* Source handles for outgoing connections */}
       <Handle
         id="top"
         type="source"
@@ -82,10 +82,13 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#3b82f6',
           border: '2px solid #1d4ed8',
-          width: '10px',
-          height: '10px',
+          width: '12px',
+          height: '12px',
           borderRadius: '50%',
           zIndex: 10,
+          top: '-6px',
+          left: '50%',
+          transform: 'translateX(-50%)',
         }}
       />
       
@@ -96,10 +99,13 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#3b82f6',
           border: '2px solid #1d4ed8',
-          width: '10px',
-          height: '10px',
+          width: '12px',
+          height: '12px',
           borderRadius: '50%',
           zIndex: 10,
+          bottom: '-6px',
+          left: '50%',
+          transform: 'translateX(-50%)',
         }}
       />
       
@@ -110,10 +116,13 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#3b82f6',
           border: '2px solid #1d4ed8',
-          width: '10px',
-          height: '10px',
+          width: '12px',
+          height: '12px',
           borderRadius: '50%',
           zIndex: 10,
+          left: '-6px',
+          top: '50%',
+          transform: 'translateY(-50%)',
         }}
       />
       
@@ -124,14 +133,17 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#3b82f6',
           border: '2px solid #1d4ed8',
-          width: '10px',
-          height: '10px',
+          width: '12px',
+          height: '12px',
           borderRadius: '50%',
           zIndex: 10,
+          right: '-6px',
+          top: '50%',
+          transform: 'translateY(-50%)',
         }}
       />
-      
-      {/* Target handles for receiving connections - made larger and more visible */}
+
+      {/* Target handles for incoming connections - offset slightly */}
       <Handle
         id="top-target"
         type="target"
@@ -139,10 +151,13 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#10b981',
           border: '2px solid #059669',
-          width: '10px',
-          height: '10px',
+          width: '8px',
+          height: '8px',
           borderRadius: '50%',
-          zIndex: 10,
+          zIndex: 9,
+          top: '-4px',
+          left: '40%',
+          transform: 'translateX(-50%)',
         }}
       />
       
@@ -153,10 +168,13 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#10b981',
           border: '2px solid #059669',
-          width: '10px',
-          height: '10px',
+          width: '8px',
+          height: '8px',
           borderRadius: '50%',
-          zIndex: 10,
+          zIndex: 9,
+          bottom: '-4px',
+          left: '60%',
+          transform: 'translateX(-50%)',
         }}
       />
       
@@ -167,10 +185,13 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#10b981',
           border: '2px solid #059669',
-          width: '10px',
-          height: '10px',
+          width: '8px',
+          height: '8px',
           borderRadius: '50%',
-          zIndex: 10,
+          zIndex: 9,
+          left: '-4px',
+          top: '40%',
+          transform: 'translateY(-50%)',
         }}
       />
       
@@ -181,10 +202,13 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#10b981',
           border: '2px solid #059669',
-          width: '10px',
-          height: '10px',
+          width: '8px',
+          height: '8px',
           borderRadius: '50%',
-          zIndex: 10,
+          zIndex: 9,
+          right: '-4px',
+          top: '60%',
+          transform: 'translateY(-50%)',
         }}
       />
       
