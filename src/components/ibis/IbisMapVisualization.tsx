@@ -115,12 +115,18 @@ const { user } = useAuth();
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
+  const reactFlowRef = useRef<ReactFlowInstance | null>(null);
   const [computedPositions, setComputedPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [embeddingBackfillTriggered, setEmbeddingBackfillTriggered] = useState(false);
   const [zones, setZones] = useState<ConcentricZones | null>(null);
   const lastConversionSigRef = useRef<string | null>(null);
   const linkingTriggeredRef = useRef(false);
+
+  // Connection handler
+  const onConnect = useCallback(
+    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
+    [setEdges]
+  );
 
   // Handle node position changes and persist to database (admin only)
   const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
@@ -303,9 +309,9 @@ const { user } = useAuth();
         id: n.id,
         title: n.title,
         node_type: n.node_type,
-        position_x: n.position_x,
-        position_y: n.position_y,
-        embedding: null, // Add embeddings if available
+        position_x: null, // Force recalculation to apply zone constraints
+        position_y: null,
+        embedding: null,
         parent_id: n.parent_id,
         parent_node_id: undefined
       })),
@@ -323,8 +329,17 @@ const { user } = useAuth();
       positions.set(id, { x: pos.x, y: pos.y });
     });
     
-    // Store zones for rendering
+    // Store zones for rendering - set immediately for this layout
     setZones(layoutZones);
+    
+    console.log('🎯 Concentric layout applied:', {
+      nodesCount: nodes.length,
+      zonesCalculated: !!layoutZones,
+      issueZone: layoutZones?.issue,
+      positionZone: layoutZones?.position,
+      argumentZone: layoutZones?.argument,
+      samplePosition: positions.entries().next().value
+    });
 
     // Return simplified result for compatibility
     return positions;
@@ -600,149 +615,215 @@ const { user } = useAuth();
     );
   }
 
-  // Render zone backgrounds
+  // Render zone backgrounds using ReactFlow Panel for proper positioning
   const renderZoneBackgrounds = () => {
-    if (!zones) return null;
+    if (!zones || !reactFlowRef.current) return null;
     
-    const center = { x: 600, y: 400 }; // Approximate center for SVG overlay
+    const reactFlowBounds = reactFlowRef.current.getViewport();
+    const canvasWidth = 1600; // Our layout canvas size
+    const canvasHeight = 1000;
+    const center = { x: canvasWidth / 2, y: canvasHeight / 2 };
+    
+    console.log('🎯 Rendering zones:', {
+      zones,
+      reactFlowBounds,
+      center
+    });
     
     return (
-      <div className="absolute inset-0 pointer-events-none z-0">
-        <svg className="w-full h-full">
-          {/* Issue zone (center circle) */}
-          <circle
-            cx={center.x}
-            cy={center.y}
-            r={zones.issue.outerRadius}
-            fill={zones.issue.color}
-            stroke="hsl(var(--ibis-issue))"
-            strokeWidth="2"
-            strokeOpacity="0.3"
-            fillOpacity="0.1"
-          />
-          
-          {/* Position zone (middle ring) */}
-          <circle
-            cx={center.x}
-            cy={center.y}
-            r={zones.position.outerRadius}
-            fill={zones.position.color}
-            fillOpacity="0.05"
-            stroke="hsl(var(--ibis-position))"
-            strokeWidth="2"
-            strokeOpacity="0.2"
-            strokeDasharray="5,5"
-          />
-          <circle
-            cx={center.x}
-            cy={center.y}
-            r={zones.position.innerRadius}
-            fill="none"
-            stroke="hsl(var(--ibis-position))"
-            strokeWidth="1"
-            strokeOpacity="0.2"
-          />
-          
-          {/* Argument zone (outer ring) */}
-          <circle
-            cx={center.x}
-            cy={center.y}
-            r={zones.argument.outerRadius}
-            fill={zones.argument.color}
-            fillOpacity="0.05"
-            stroke="hsl(var(--ibis-argument))"
-            strokeWidth="2"
-            strokeOpacity="0.2"
-            strokeDasharray="10,5"
-          />
-          <circle
-            cx={center.x}
-            cy={center.y}
-            r={zones.argument.innerRadius}
-            fill="none"
-            stroke="hsl(var(--ibis-argument))"
-            strokeWidth="1"
-            strokeOpacity="0.2"
-          />
-          
-          {/* Zone labels */}
-          <text
-            x={center.x}
-            y={center.y + zones.issue.outerRadius - 20}
-            textAnchor="middle"
-            className="fill-[hsl(var(--ibis-issue))] text-sm font-medium opacity-60"
+      <>
+        {/* Zone background circles as ReactFlow Panel */}
+        <Panel position="top-left" className="pointer-events-none">
+          <svg 
+            width={canvasWidth} 
+            height={canvasHeight}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              pointerEvents: 'none',
+              zIndex: 0
+            }}
           >
-            Issues
-          </text>
-          <text
-            x={center.x + zones.position.outerRadius - 30}
-            y={center.y}
-            textAnchor="middle"
-            className="fill-[hsl(var(--ibis-position))] text-sm font-medium opacity-60"
-          >
-            Positions
-          </text>
-          <text
-            x={center.x + zones.argument.outerRadius - 30}
-            y={center.y + 20}
-            textAnchor="middle"
-            className="fill-[hsl(var(--ibis-argument))] text-sm font-medium opacity-60"
-          >
-            Arguments
-          </text>
-        </svg>
-      </div>
+            {/* Issue zone (center circle) */}
+            <circle
+              cx={center.x}
+              cy={center.y}
+              r={zones.issue.outerRadius}
+              fill={zones.issue.color}
+              stroke="hsl(var(--ibis-issue))"
+              strokeWidth="2"
+              strokeOpacity="0.3"
+              fillOpacity="0.15"
+            />
+            
+            {/* Position zone (middle ring) */}
+            <circle
+              cx={center.x}
+              cy={center.y}
+              r={zones.position.outerRadius}
+              fill={zones.position.color}
+              fillOpacity="0.08"
+              stroke="hsl(var(--ibis-position))"
+              strokeWidth="2"
+              strokeOpacity="0.25"
+              strokeDasharray="8,4"
+            />
+            <circle
+              cx={center.x}
+              cy={center.y}
+              r={zones.position.innerRadius}
+              fill="none"
+              stroke="hsl(var(--ibis-position))"
+              strokeWidth="1"
+              strokeOpacity="0.2"
+            />
+            
+            {/* Argument zone (outer ring) */}
+            <circle
+              cx={center.x}
+              cy={center.y}
+              r={zones.argument.outerRadius}
+              fill={zones.argument.color}
+              fillOpacity="0.08"
+              stroke="hsl(var(--ibis-argument))"
+              strokeWidth="2"
+              strokeOpacity="0.25"
+              strokeDasharray="12,6"
+            />
+            <circle
+              cx={center.x}
+              cy={center.y}
+              r={zones.argument.innerRadius}
+              fill="none"
+              stroke="hsl(var(--ibis-argument))"
+              strokeWidth="1"
+              strokeOpacity="0.2"
+            />
+            
+            {/* Zone labels */}
+            <text
+              x={center.x}
+              y={center.y - zones.issue.outerRadius + 30}
+              textAnchor="middle"
+              className="fill-[hsl(var(--ibis-issue))]"
+              style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
+            >
+              Issues
+            </text>
+            <text
+              x={center.x + zones.position.outerRadius - 50}
+              y={center.y}
+              textAnchor="middle"
+              className="fill-[hsl(var(--ibis-position))]"
+              style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
+            >
+              Positions
+            </text>
+            <text
+              x={center.x + zones.argument.outerRadius - 60}
+              y={center.y + 25}
+              textAnchor="middle"
+              className="fill-[hsl(var(--ibis-argument))]"
+              style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
+            >
+              Arguments
+            </text>
+          </svg>
+        </Panel>
+      </>
     );
   };
 
   return (
-    <div className="h-full flex">
-      {/* Main Flow Area */}
-      <div className="flex-1 relative">
+    <div className="h-full w-full relative">      
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={onNodeClick}
+        fitView={false}
+        nodesDraggable={isAdmin}
+        nodesConnectable={isAdmin}
+        nodesFocusable={isAdmin}
+        edgesFocusable={isAdmin}
+        connectOnClick={isAdmin}
+        connectionMode={ConnectionMode.Loose}
+        onInit={(instance: ReactFlowInstance) => {
+          reactFlowRef.current = instance;
+          if (!hasFocusedOnLoad.current && nodes.length > 0) {
+            setTimeout(() => {
+              instance.fitView({ padding: 0.15, duration: 1000 });
+              hasFocusedOnLoad.current = true;
+            }, 500);
+          }
+        }}
+        className="bg-background relative"
+      >
+        <Background color="hsl(var(--ibis-grid))" gap={20} />
+        <Controls />
+        
+        {/* Render zone backgrounds */}
         {renderZoneBackgrounds()}
         
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          fitView
-          attributionPosition="bottom-left"
-          className="bg-background relative z-10"
-          onInit={(instance: ReactFlowInstance<Node, Edge>) => { reactFlowRef.current = instance; }}
-          nodesConnectable={false}
-          elementsSelectable={true}
-          connectionMode={ConnectionMode.Loose}
-        >
-          <Background color="hsl(var(--ibis-grid))" gap={20} />
-          <Controls />
-          
-          {/* Type Filter Panel */}
-          <Panel position="top-left">
-            <div className="bg-white p-3 rounded-lg shadow-md border w-56">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
-                  <SelectTrigger className="h-8 w-full">
-                    <SelectValue placeholder="Filter by type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="issue">Issues</SelectItem>
-                    <SelectItem value="position">Positions</SelectItem>
-                    <SelectItem value="argument">Arguments</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* Debug info panel at top */}
+        <Panel position="top-left" className="bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-md">
+          <div className="text-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-3 h-3 rounded-full bg-[hsl(var(--ibis-issue))]"></div>
+              <span>Issues: {ibisNodes.filter(n => n.node_type === 'issue').length}</span>
             </div>
-          </Panel>
-        </ReactFlow>
-      </div>
-
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-3 h-3 bg-[hsl(var(--ibis-position))]"></div>
+              <span>Positions: {ibisNodes.filter(n => n.node_type === 'position').length}</span>
+            </div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-3 h-3 bg-[hsl(var(--ibis-argument))] transform rotate-45"></div>
+              <span>Arguments: {ibisNodes.filter(n => n.node_type === 'argument').length}</span>
+            </div>
+            <div className="text-muted-foreground">
+              Relationships: {ibisRelationships.length}
+            </div>
+            <div className="text-muted-foreground">
+              Filtered: {nodes.length} nodes, {edges.length} edges
+            </div>
+            {zones && (
+              <div className="text-xs text-muted-foreground mt-2 pt-2 border-t">
+                Zone Layout Active
+                <div>Issue R: {Math.round(zones.issue.outerRadius)}</div>
+                <div>Position R: {Math.round(zones.position.outerRadius)}</div>
+                <div>Argument R: {Math.round(zones.argument.outerRadius)}</div>
+              </div>
+            )}
+          </div>
+        </Panel>
+        
+        {/* Type Filter Panel */}
+        <Panel position="top-right">
+          <div className="bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-md w-56">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={filterType} onValueChange={(value: any) => setFilterType(value)}>
+                <SelectTrigger className="h-8 w-full">
+                  <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="issue">Issues</SelectItem>
+                  <SelectItem value="position">Positions</SelectItem>
+                  <SelectItem value="argument">Arguments</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </Panel>
+      </ReactFlow>
+      
       {/* Details Panel */}
       {selectedNode && (
-        <div className="w-80 h-full border-l border-border bg-card">
+        <div className="absolute top-0 right-0 w-80 h-full border-l border-border bg-card z-20">
           <Card className="h-full border-0 rounded-none flex flex-col min-h-0">
             <CardHeader className="border-b">
               <div className="flex items-center justify-between">
@@ -806,78 +887,6 @@ const { user } = useAuth();
           </Card>
         </div>
       )}
-
-      {/* Enhanced Legend */}
-      <Panel position="bottom-right">
-        <Card className={isGuideCollapsed ? "w-36" : "w-72"}>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-1">
-                <GitBranch className="h-4 w-4" />
-                Guide
-              </CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsGuideCollapsed((v) => !v)}
-                aria-label={isGuideCollapsed ? "Show guide" : "Hide guide"}
-              >
-                {isGuideCollapsed ? 'Show' : 'Hide'}
-              </Button>
-            </div>
-          </CardHeader>
-          {!isGuideCollapsed && (
-            <CardContent className="space-y-3 pt-0">
-              <div>
-                <h4 className="text-xs font-semibold mb-2">Node Types</h4>
-                {Object.entries(nodeTypeConfig).map(([type, config]) => (
-                  <div key={type} className="flex items-center gap-2 text-xs mb-1">
-                    <div 
-                      className="w-3 h-3 border border-white"
-                      style={{ 
-                        backgroundColor: config.color,
-                        borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px',
-                      }}
-                    />
-                    <span>{config.label}</span>
-                  </div>
-                ))}
-              </div>
-              
-              <div>
-                <h4 className="text-xs font-semibold mb-2">Relationships</h4>
-                {Object.entries(relationshipConfig).map(([type, config]) => (
-                  <div key={type} className="flex items-center gap-2 text-xs mb-1">
-                    <div 
-                      className="w-4 h-0.5"
-                      style={{ 
-                        backgroundColor: config.color,
-                        borderStyle: config.style === 'dashed' ? 'dashed' : 'solid',
-                        borderTopWidth: config.style === 'dotted' ? '1px' : '0',
-                      }}
-                    />
-                    <span>{config.label}</span>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
-                <div>• Similar issues are clustered</div>
-                {isAdmin ? (
-                  <div>• Drag nodes to reposition (Admin)</div>
-                ) : (
-                  <div>• Add new nodes and connections</div>
-                )}
-                <div>• Use Connect mode to link nodes</div>
-                <div>• Click nodes for details</div>
-                {!isAdmin && (
-                  <div className="text-amber-600">• Editing restricted to admins</div>
-                )}
-              </div>
-            </CardContent>
-          )}
-        </Card>
-      </Panel>
     </div>
   );
 };
