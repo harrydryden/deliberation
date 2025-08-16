@@ -967,6 +967,27 @@ export type Database = {
         }
         Relationships: []
       }
+      simplified_events: {
+        Row: {
+          created_at: string | null
+          details: Json | null
+          event_type: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          details?: Json | null
+          event_type: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          details?: Json | null
+          event_type?: string
+          id?: string
+        }
+        Relationships: []
+      }
       submissions: {
         Row: {
           created_at: string | null
