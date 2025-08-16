@@ -777,16 +777,35 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
   // Delete edge with immediate visual removal
   const handleDeleteEdge = async () => {
-    if (!editingEdge) return;
+    if (!editingEdge) {
+      console.error('🔍 No editing edge available for deletion');
+      return;
+    }
+
+    if (!editingEdge.id || typeof editingEdge.id !== 'string') {
+      console.error('🔍 Invalid edge ID for deletion:', editingEdge.id);
+      toast({
+        title: "Error",
+        description: "Cannot delete - invalid edge data",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setSaving(true);
       
-      console.log('🔍 Deleting relationship:', editingEdge.id);
+      console.log('🔍 Starting deletion process for relationship:', {
+        id: editingEdge.id,
+        type: editingEdge.relationship_type,
+        source: editingEdge.source_node_id,
+        target: editingEdge.target_node_id
+      });
       
-      // Immediately remove from visual map
+      // Immediately remove from visual map for instant feedback
+      const relationshipToDelete = editingEdge;
       setIbisRelationships(prev => {
-        const filtered = prev.filter(rel => rel.id !== editingEdge.id);
+        const filtered = prev.filter(rel => rel.id !== relationshipToDelete.id);
         console.log('🔍 Immediate visual removal - relationships remaining:', filtered.length);
         return filtered;
       });
@@ -794,31 +813,36 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       // Close dialog immediately for better UX
       setEditingEdge(null);
       
-      // Delete from database
+      // Try to delete from database using direct query first
+      console.log('🔍 Attempting database deletion...');
       const { error } = await supabase
         .from('ibis_relationships')
         .delete()
-        .eq('id', editingEdge.id);
+        .eq('id', relationshipToDelete.id);
 
       if (error) {
-        console.error('🔍 Delete error:', error);
+        console.error('🔍 Database deletion failed:', error);
         // Restore the relationship if deletion failed
-        setIbisRelationships(prev => [...prev, editingEdge]);
+        setIbisRelationships(prev => {
+          console.log('🔍 Restoring relationship due to deletion failure');
+          return [...prev, relationshipToDelete];
+        });
         throw error;
       }
 
       console.log('🔍 Database deletion successful');
       
       toast({
-        title: "Relationship Deleted",
-        description: "Edge removed from map and database",
+        title: "Edge Deleted",
+        description: "Relationship removed successfully",
       });
 
     } catch (error) {
+      console.error('🔍 Deletion process failed:', error);
       logger.error('Error deleting relationship', error as any);
       toast({
         title: "Error", 
-        description: "Failed to delete relationship",
+        description: `Failed to delete relationship: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
