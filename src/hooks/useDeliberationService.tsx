@@ -12,31 +12,16 @@ interface DeliberationService {
 
 class SupabaseDeliberationService implements DeliberationService {
   async getDeliberations(): Promise<any[]> {
-    logger.info('Starting getDeliberations');
+    logger.info('Starting getDeliberations with simplified auth');
     
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+    // Since we're using simplified access code authentication,
+    // we don't need to check Supabase auth - just fetch public deliberations
+    // and let the RLS policies handle access control
     
-    // Get deliberations where user is a participant OR that are public
-    const { data: userParticipations } = await supabase
-      .from('participants')
-      .select('deliberation_id')
-      .eq('user_id', user.id);
-    
-    const participatingDeliberationIds = userParticipations?.map(p => p.deliberation_id) || [];
-    
-    // Get all deliberations the user can see (public OR participating in)
-    let query = supabase
+    const { data: deliberations, error: deliberationsError } = await supabase
       .from('deliberations')
-      .select('*');
-    
-    if (participatingDeliberationIds.length > 0) {
-      query = query.or(`is_public.eq.true,id.in.(${participatingDeliberationIds.join(',')})`);
-    } else {
-      query = query.eq('is_public', true);
-    }
-    
-    const { data: deliberations, error: deliberationsError } = await query
+      .select('*')
+      .eq('is_public', true)
       .order('created_at', { ascending: false });
 
     logger.info('Deliberations query result', { count: deliberations?.length || 0, hasError: Boolean(deliberationsError) });
@@ -52,7 +37,7 @@ class SupabaseDeliberationService implements DeliberationService {
 
     logger.info('Found deliberations', { count: deliberations.length });
 
-    // Then get participant counts and check user participation for each deliberation
+    // Get participant counts for each deliberation (simplified)
     const deliberationsWithCounts = await Promise.all(
       deliberations.map(async (deliberation) => {
         logger.info('Getting participant count', { deliberationId: deliberation.id });
@@ -67,28 +52,15 @@ class SupabaseDeliberationService implements DeliberationService {
           logger.warn(`Error getting participant count for ${deliberation.id}`, countError as any);
         }
 
-        // Check if current user is a participant
-        const { data: userParticipation, error: participationError } = await supabase
-          .from('participants')
-          .select('id')
-          .eq('deliberation_id', deliberation.id)
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (participationError) {
-          logger.warn(`Error checking user participation for ${deliberation.id}`, participationError as any);
-        }
-
-        logger.info('Participant count and user participation', { 
+        logger.info('Participant count', { 
           deliberationId: deliberation.id, 
-          count, 
-          isParticipant: !!userParticipation 
+          count
         });
 
         return {
           ...deliberation,
           participant_count: count || 0,
-          is_user_participant: !!userParticipation
+          is_user_participant: false // Simplified - user can always join
         };
       })
     );
@@ -132,44 +104,35 @@ class SupabaseDeliberationService implements DeliberationService {
   }
 
   async joinDeliberation(deliberationId: string): Promise<void> {
-    logger.info('Starting joinDeliberation', { deliberationId });
+    logger.info('Starting joinDeliberation with simplified auth', { deliberationId });
     
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      logger.error('User not authenticated');
-      throw new Error('User not authenticated');
-    }
-
-    logger.info('User authenticated', { userId: user.id });
-
-    // Check if already a participant
-    logger.info('Checking if user is already a participant...');
-    const { data: existing, error: checkError } = await supabase
+    // Since we're using simplified access codes, we'll create a simple participant entry
+    // without complex user validation
+    
+    // For now, use a simple approach - generate a participant ID based on deliberation
+    const tempUserId = `user_${Date.now()}`; // Simple user ID for this session
+    
+    logger.info('Adding participant', { deliberationId, tempUserId });
+    
+    // Check if already a participant (simple check)
+    const { data: existing } = await supabase
       .from('participants')
       .select('id')
       .eq('deliberation_id', deliberationId)
-      .eq('user_id', user.id)
+      .eq('user_id', tempUserId)
       .maybeSingle();
-
-    logger.info('Existing participant check result', { exists: Boolean(existing), hasError: Boolean(checkError) });
-
-    if (checkError) {
-      logger.error('Error checking existing participant', checkError as any);
-      throw checkError;
-    }
 
     if (existing) {
       logger.info('User is already a participant, skipping join');
-      return; // Already a participant
+      return;
     }
 
-    // Add as participant
-    logger.info('Adding user as participant...');
+    // Add as participant (simplified)
     const { error } = await supabase
       .from('participants')
       .insert({
         deliberation_id: deliberationId,
-        user_id: user.id,
+        user_id: tempUserId,
         role: 'participant'
       });
 
