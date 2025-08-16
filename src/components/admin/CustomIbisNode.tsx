@@ -38,13 +38,13 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position: 'relative',
       }}
     >
-      {/* Connection handles - Top */}
+      {/* Connection handles - All same type, styled by selected edge type */}
       <Handle
-        type="target"
+        type="source"
         position={Position.Top}
         style={{
-          background: '#4ade80',
-          border: '2px solid #22c55e',
+          background: '#6b7280',
+          border: '2px solid #4b5563',
           width: '12px',
           height: '12px',
           borderRadius: '50%',
@@ -52,13 +52,12 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         }}
       />
       
-      {/* Connection handles - Bottom */}
       <Handle
         type="source"
         position={Position.Bottom}
         style={{
-          background: '#3b82f6',
-          border: '2px solid #2563eb',
+          background: '#6b7280',
+          border: '2px solid #4b5563',
           width: '12px',
           height: '12px',
           borderRadius: '50%',
@@ -66,13 +65,12 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         }}
       />
       
-      {/* Connection handles - Left */}
       <Handle
         type="source"
         position={Position.Left}
         style={{
-          background: '#f59e0b',
-          border: '2px solid #d97706',
+          background: '#6b7280',
+          border: '2px solid #4b5563',
           width: '12px',
           height: '12px',
           borderRadius: '50%',
@@ -80,13 +78,65 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         }}
       />
       
-      {/* Connection handles - Right */}
       <Handle
         type="source"
         position={Position.Right}
         style={{
-          background: '#ef4444',
-          border: '2px solid #dc2626',
+          background: '#6b7280',
+          border: '2px solid #4b5563',
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          zIndex: 10,
+        }}
+      />
+      
+      {/* Target handles for receiving connections */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        style={{
+          background: '#6b7280',
+          border: '2px solid #4b5563',
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          zIndex: 10,
+        }}
+      />
+      
+      <Handle
+        type="target"
+        position={Position.Bottom}
+        style={{
+          background: '#6b7280',
+          border: '2px solid #4b5563',
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          zIndex: 10,
+        }}
+      />
+      
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{
+          background: '#6b7280',
+          border: '2px solid #4b5563',
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          zIndex: 10,
+        }}
+      />
+      
+      <Handle
+        type="target"
+        position={Position.Right}
+        style={{
+          background: '#6b7280',
+          border: '2px solid #4b5563',
           width: '12px',
           height: '12px',
           borderRadius: '50%',

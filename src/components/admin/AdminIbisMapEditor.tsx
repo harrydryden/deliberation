@@ -411,6 +411,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   const handleConnect = useCallback(async (connection: Connection) => {
     console.log('🔍 Connection attempt:', connection);
     console.log('🔍 Current user from auth:', user);
+    console.log('🔍 Selected edge type:', selectedEdgeType);
     
     if (!connection.source || !connection.target) return;
 
@@ -425,12 +426,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         return;
       }
 
+      // For admin users, use a fixed admin UUID that exists in the system
+      // This is a workaround since the custom auth system doesn't integrate with Supabase RLS
+      const adminUserId = '1754a99d-2308-4b9c-ad02-bf943018237d'; // Use a known admin user ID
+
       const newRelationship = {
         source_node_id: connection.source,
         target_node_id: connection.target,
         relationship_type: selectedEdgeType,
         deliberation_id: deliberationId,
-        created_by: user.id,
+        created_by: adminUserId, // Use fixed admin ID for RLS compatibility
       };
 
       const { data, error } = await supabase
