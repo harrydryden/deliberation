@@ -369,7 +369,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           color: config.color,
         },
         data: {
-          relationship: rel,
+          relationshipId: rel.id, // Store just the ID to avoid data corruption
           label: config.label,
         },
         animated: false,
@@ -588,10 +588,10 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                   type: MarkerType.ArrowClosed,
                   color: config.color,
                 },
-                data: {
-                  relationship: rel,
-                  label: config.label,
-                },
+        data: {
+          relationshipId: rel.id, // Store just the ID to avoid data corruption
+          label: config.label,
+        },
                 animated: false,
               };
             });
@@ -642,22 +642,24 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       relationship: edge.data?.relationship 
     });
     
-    const ibisRelationship = edge.data?.relationship as IbisRelationship;
+    // Find the relationship directly from the relationships array using the edge ID
+    const ibisRelationship = ibisRelationships.find(rel => rel.id === edge.id);
     if (!ibisRelationship || !ibisRelationship.id) {
-      console.error('🔍 Invalid relationship data:', ibisRelationship);
+      console.error('🔍 Invalid relationship data - edge ID:', edge.id, 'available relationships:', ibisRelationships.map(r => r.id));
       toast({
         title: "Error",
-        description: "Cannot edit relationship - invalid data",
+        description: "Cannot edit relationship - relationship not found",
         variant: "destructive",
       });
       return;
     }
     
+    console.log('🔍 Valid relationship found:', ibisRelationship);
     setEditingEdge(ibisRelationship);
     setEdgeForm({
       relationship_type: ibisRelationship.relationship_type,
     });
-  }, [toast]);
+  }, [toast, ibisRelationships]);
 
   // Save node changes
   const handleSaveNode = async () => {
