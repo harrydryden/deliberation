@@ -23,10 +23,10 @@ export const calculateZoneBoundaries = (
   const centerY = canvas.height / 2;
   const maxRadius = Math.min(centerX, centerY) * 0.85; // Leave margin
   
-  // Base zone sizes with scaling based on node counts
-  const issueRadius = Math.max(120, Math.min(maxRadius * 0.25, 80 + nodeTypeCounts.issue * 8));
-  const positionRadius = Math.max(issueRadius + 140, Math.min(maxRadius * 0.6, issueRadius + 120 + nodeTypeCounts.position * 4));
-  const argumentRadius = Math.max(positionRadius + 120, Math.min(maxRadius, positionRadius + 100 + nodeTypeCounts.argument * 3));
+  // Base zone sizes with scaling based on node counts (expanded by 100%)
+  const issueRadius = Math.max(240, Math.min(maxRadius * 0.5, 160 + nodeTypeCounts.issue * 16));
+  const positionRadius = Math.max(issueRadius + 280, Math.min(maxRadius * 0.8, issueRadius + 240 + nodeTypeCounts.position * 8));
+  const argumentRadius = Math.max(positionRadius + 240, Math.min(maxRadius, positionRadius + 200 + nodeTypeCounts.argument * 6));
   
   return {
     issue: {
