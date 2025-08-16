@@ -567,6 +567,14 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         edgeForm: edgeForm
       });
 
+      // First, let's test if we can call a simple query to verify our supabase connection
+      console.log('🔍 DEBUG: Testing basic supabase connection...');
+      const { data: testData, error: testError } = await supabase.from('ibis_relationships').select('id').limit(1);
+      console.log('🔍 DEBUG: Basic query result:', { testData, testError });
+
+      // Now let's try to test our specific function directly
+      console.log('🔍 DEBUG: Testing function with exact call...');
+      
       // Use the admin RPC function to bypass RLS issues
       const { data, error } = await supabase.rpc('admin_update_ibis_relationship', {
         p_relationship_id: editingEdge.id,
@@ -581,7 +589,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           errorCode: error.code,
           errorMessage: error.message,
           errorDetails: error.details,
-          errorHint: error.hint
+          errorHint: error.hint,
+          fullError: JSON.stringify(error, null, 2)
         });
         throw error;
       }
