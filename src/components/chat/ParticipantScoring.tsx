@@ -45,19 +45,19 @@ export const ParticipantScoring = ({
 
   return (
     <div className="rounded-lg border bg-muted/40 p-3 h-full">
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         {scores.map((score) => (
           <div key={score.label} className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <score.icon className="h-3 w-3 text-muted-foreground" />
-              <span className="text-xs font-medium text-foreground">{score.label}</span>
+            <div className="flex items-center gap-3">
+              <score.icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm font-medium text-foreground">{score.label}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground font-mono">
                 {score.value}/{target}
               </span>
               <Badge 
-                className={`text-xs px-1.5 py-0.5 ${getScoreColor(score.value, target)}`}
+                className={`text-xs px-2 py-1 min-w-[3rem] text-center ${getScoreColor(score.value, target)}`}
                 variant="secondary"
               >
                 {Math.round((score.value / target) * 100)}%
