@@ -636,13 +636,28 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
   // Handle edge editing
   const handleEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
-    console.log('🔍 Edge clicked for editing:', edge.id);
-    const ibisRelationship = edge.data.relationship as IbisRelationship;
+    console.log('🔍 Edge clicked for editing:', { 
+      edgeId: edge.id, 
+      edgeData: edge.data,
+      relationship: edge.data?.relationship 
+    });
+    
+    const ibisRelationship = edge.data?.relationship as IbisRelationship;
+    if (!ibisRelationship || !ibisRelationship.id) {
+      console.error('🔍 Invalid relationship data:', ibisRelationship);
+      toast({
+        title: "Error",
+        description: "Cannot edit relationship - invalid data",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setEditingEdge(ibisRelationship);
     setEdgeForm({
       relationship_type: ibisRelationship.relationship_type,
     });
-  }, []);
+  }, [toast]);
 
   // Save node changes
   const handleSaveNode = async () => {
@@ -700,18 +715,17 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       console.log('🔍 DEBUG: About to call admin_update_ibis_relationship with params:', {
         p_relationship_id: editingEdge.id,
         p_relationship_type: edgeForm.relationship_type,
+        editingEdgeType: typeof editingEdge.id,
+        editingEdgeId: editingEdge.id,
         editingEdge: editingEdge,
         edgeForm: edgeForm
       });
 
-      // First, let's test if we can call a simple query to verify our supabase connection
-      console.log('🔍 DEBUG: Testing basic supabase connection...');
-      const { data: testData, error: testError } = await supabase.from('ibis_relationships').select('id').limit(1);
-      console.log('🔍 DEBUG: Basic query result:', { testData, testError });
+      // Ensure we have a valid relationship ID
+      if (!editingEdge.id || typeof editingEdge.id !== 'string') {
+        throw new Error(`Invalid relationship ID: ${editingEdge.id} (type: ${typeof editingEdge.id})`);
+      }
 
-      // Now let's try to test our specific function directly
-      console.log('🔍 DEBUG: Testing function with exact call...');
-      
       // Use the admin RPC function to bypass RLS issues
       const { data, error } = await supabase.rpc('admin_update_ibis_relationship', {
         p_relationship_id: editingEdge.id,
@@ -856,10 +870,20 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
   // Convert data when it changes
   useEffect(() => {
-    if (ibisNodes.length > 0) {
+    if (ibisNodes.length > 0 || ibisRelationships.length > 0) {
       convertToFlowNodes();
     }
   }, [ibisNodes, ibisRelationships, convertToFlowNodes]);
+
+  // Reload data when editing is complete to ensure fresh data
+  useEffect(() => {
+    if (!editingEdge && !editingNode && hasUnsavedChanges) {
+      // Small delay to ensure changes are propagated
+      setTimeout(() => {
+        fetchData();
+      }, 500);
+    }
+  }, [editingEdge, editingNode, hasUnsavedChanges, fetchData]);
 
   if (loading) {
     return (
