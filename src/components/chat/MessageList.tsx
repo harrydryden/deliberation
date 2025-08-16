@@ -23,25 +23,29 @@ const AGENTS = {
   bill_agent: {
     name: 'Bill',
     icon: FileText,
-    color: 'bg-blue-500',
+    color: 'bg-bill-agent',
+    bgColor: 'bg-bill-agent-bg',
     description: 'Policy & Legislative Analysis'
   },
   flow_agent: {
     name: 'Flo',
     icon: Workflow,
-    color: 'bg-green-500',
+    color: 'bg-flow-agent',
+    bgColor: 'bg-flow-agent-bg',
     description: 'Conversation Flow Management'
   },
   peer_agent: {
     name: 'Pia',
     icon: Users,
-    color: 'bg-purple-500',
+    color: 'bg-peer-agent',
+    bgColor: 'bg-peer-agent-bg',
     description: 'Peer Review & Analysis'
   },
   default: {
     name: 'AI Assistant',
     icon: Bot,
-    color: 'bg-gray-500',
+    color: 'bg-muted-foreground',
+    bgColor: 'bg-muted',
     description: 'General Assistant'
   }
 } as const;
@@ -70,7 +74,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
 
         <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
           <Avatar className="h-8 w-8 flex-shrink-0">
-            <AvatarFallback className={isUser ? 'bg-democratic-blue' : agentInfo?.color}>
+            <AvatarFallback className={isUser ? 'bg-user-message' : agentInfo?.color}>
               {isUser ? <User className="h-4 w-4 text-white" /> : <AgentIcon className="h-4 w-4 text-white" />}
             </AvatarFallback>
           </Avatar>
@@ -90,7 +94,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
               </span>
             </div>
 
-            <Card className={`p-3 ${isUser ? 'bg-democratic-blue text-white' : 'bg-muted'}`}>
+            <Card className={`p-3 ${isUser ? 'bg-user-message text-white' : agentInfo?.bgColor || 'bg-muted'}`}>
               <div className="text-sm leading-relaxed">
                 <Suspense fallback={<div className="h-4 w-20 bg-muted rounded animate-pulse" />}> 
                   <LazyMarkdownMessage 
@@ -225,7 +229,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
               isTyping ? (
                 <div className="flex gap-3 mt-2">
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-gray-500">
+                    <AvatarFallback className="bg-muted-foreground">
                       <Bot className="h-4 w-4 text-white" />
                     </AvatarFallback>
                   </Avatar>
@@ -233,9 +237,9 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
                     <div className="text-sm font-medium mb-1">Deliberating...</div>
                     <Card className="p-3 bg-muted">
                       <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                       </div>
                     </Card>
                   </div>

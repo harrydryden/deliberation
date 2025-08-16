@@ -44,7 +44,7 @@ All colors MUST be HSL.
     --flow-agent: 45 93% 47%;
     --flow-agent-bg: 45 93% 95%;
     --user-message: 215 15% 50%;
-    --user-message-bg: 215 15% 95%;
+    --user-message-bg: 215 15% 50%;
 
     /* Democratic Theme Colors */
     --democratic-blue: 212 92% 46%;
