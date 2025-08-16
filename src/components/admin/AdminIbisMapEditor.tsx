@@ -1099,52 +1099,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             </Card>
           </div>
         ) : (
-          // React Flow Map with Zone Backgrounds
+          // React Flow Map with Zone Backgrounds in World Space
           <div className="relative h-full">
-            {/* Fixed viewport zone overlays that don't zoom */}
-            <div 
-              ref={containerRef}
-              className="absolute inset-0 pointer-events-none z-[1] flex items-center justify-center"
-            >
-              <svg 
-                width="100%" 
-                height="100%" 
-                className="absolute"
-                viewBox="0 0 100 100"
-                preserveAspectRatio="xMidYMid meet"
-              >
-                {/* Render zones from world space */}
-                {zones.map((zone, index) => (
-                  <circle
-                    key={zone.id}
-                    cx="50"
-                    cy="50" 
-                    r={`${(zone.worldRadius / Math.max(800, 600)) * 100}`}
-                    fill={index === 0 ? "hsl(var(--ibis-issue))" : "none"}
-                    fillOpacity={index === 0 ? "0.1" : "0"}
-                    stroke={
-                      zone.nodeTypes[0] === 'issue' ? "hsl(var(--ibis-issue))" :
-                      zone.nodeTypes[0] === 'position' ? "hsl(var(--ibis-position))" :
-                      "hsl(var(--ibis-argument))"
-                    }
-                    strokeWidth="0.2"
-                    strokeOpacity="0.3"
-                  />
-                ))}
-                
-                {/* Zone labels */}
-                <text x="50" y="15" textAnchor="middle" className="fill-muted-foreground" fontSize="2">
-                  Issues
-                </text>
-                <text x="50" y="10" textAnchor="middle" className="fill-muted-foreground" fontSize="2">
-                  Positions  
-                </text>
-                <text x="50" y="5" textAnchor="middle" className="fill-muted-foreground" fontSize="2">
-                  Arguments
-                </text>
-              </svg>
-            </div>
-            
             <ReactFlow
               nodeTypes={nodeTypes}
               nodes={nodes}
@@ -1154,7 +1110,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               onConnect={handleConnect}
               onNodeClick={handleNodeClick}
               onEdgeClick={handleEdgeClick}
-              className="admin-editor relative z-10"
+              className="admin-editor"
               onNodeDragStart={(event, node) => {
                 console.log('🔍 Node drag started:', node.id);
               }}
@@ -1163,6 +1119,11 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               }}
               onNodeDragStop={(event, node) => {
                 console.log('🔍 Node drag stopped:', node.id, node.position);
+                // Apply zone constraints after drag
+                const constrainedNode = constrainNodeToZone(node);
+                if (constrainedNode.position.x !== node.position.x || constrainedNode.position.y !== node.position.y) {
+                  setNodes(nds => nds.map(n => n.id === node.id ? constrainedNode : n));
+                }
               }}
               onConnectStart={(event, params) => {
                 console.log('🔍 Connection start:', params);
@@ -1172,17 +1133,57 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               }}
               connectionMode={ConnectionMode.Loose}
               fitView
-              fitViewOptions={{ padding: 0.1 }}
+              fitViewOptions={{ padding: 0.2 }}
               style={{ background: 'hsl(var(--background))' }}
               nodesDraggable={true}
               nodesConnectable={true}
               elementsSelectable={true}
               panOnDrag={true}
+              zoomOnScroll={true}
+              zoomOnPinch={true}
+              zoomOnDoubleClick={true}
               defaultEdgeOptions={{
                 type: 'smoothstep',
                 animated: false,
               }}
             >
+              {/* Background with zone circles rendered in world space */}
+              <svg className="react-flow__background absolute inset-0 pointer-events-none">
+                {/* Render zones in world coordinates that scale with viewport */}
+                {zones.map((zone, index) => (
+                  <circle
+                    key={zone.id}
+                    cx={zone.centerX}
+                    cy={zone.centerY}
+                    r={zone.worldRadius}
+                    fill={index === 0 ? "hsl(var(--ibis-issue))" : "none"}
+                    fillOpacity={index === 0 ? "0.05" : "0"}
+                    stroke={
+                      zone.nodeTypes[0] === 'issue' ? "hsl(var(--ibis-issue))" :
+                      zone.nodeTypes[0] === 'position' ? "hsl(var(--ibis-position))" :
+                      "hsl(var(--ibis-argument))"
+                    }
+                    strokeWidth="2"
+                    strokeOpacity="0.3"
+                    strokeDasharray={index === 0 ? "none" : "10,5"}
+                  />
+                ))}
+                
+                {/* Zone labels in world coordinates */}
+                <text x={zones[0].centerX} y={zones[0].centerY - zones[0].worldRadius - 20} 
+                      textAnchor="middle" className="fill-muted-foreground" fontSize="14" fontWeight="500">
+                  Issues (Center)
+                </text>
+                <text x={zones[1].centerX} y={zones[1].centerY - zones[1].worldRadius - 20} 
+                      textAnchor="middle" className="fill-muted-foreground" fontSize="14" fontWeight="500">
+                  Positions (Middle Ring)
+                </text>
+                <text x={zones[2].centerX} y={zones[2].centerY - zones[2].worldRadius - 20} 
+                      textAnchor="middle" className="fill-muted-foreground" fontSize="14" fontWeight="500">
+                  Arguments (Outer Ring)
+                </text>
+              </svg>
+              
               <Background color="hsl(var(--ibis-grid))" gap={20} />
               <Controls />
             
