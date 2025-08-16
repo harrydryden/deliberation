@@ -1258,22 +1258,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      create_secure_user_session: {
-        Args: {
-          p_ip_address?: unknown
-          p_user_agent?: string
-          p_user_id: string
-        }
-        Returns: string
-      }
-      detect_suspicious_activity: {
-        Args: {
-          p_ip_address?: unknown
-          p_time_window?: unknown
-          p_user_id?: string
-        }
-        Returns: Json
-      }
       enhanced_audit_log: {
         Args: {
           details?: Json
@@ -1336,6 +1320,10 @@ export type Database = {
         Args: { user_id: string }
         Returns: boolean
       }
+      is_admin_user_simple: {
+        Args: { access_code: string }
+        Returns: boolean
+      }
       is_facilitator_of_deliberation: {
         Args: { deliberation_id: string; user_id: string }
         Returns: boolean
@@ -1378,15 +1366,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      log_security_violation: {
-        Args: {
-          p_details?: Json
-          p_risk_level?: string
-          p_user_id?: string
-          p_violation_type: string
-        }
-        Returns: undefined
-      }
       match_agent_knowledge: {
         Args: {
           input_agent_id: string
@@ -1423,10 +1402,6 @@ export type Database = {
         Args: { "": unknown[] }
         Returns: number
       }
-      use_access_code_secure: {
-        Args: { input_code: string }
-        Returns: Json
-      }
       validate_access_code: {
         Args: { input_code: string }
         Returns: {
@@ -1436,24 +1411,12 @@ export type Database = {
           valid: boolean
         }[]
       }
-      validate_access_code_enhanced: {
-        Args: { input_code: string; user_ip?: unknown }
-        Returns: Json
-      }
       validate_access_code_secure: {
         Args: { input_code: string }
         Returns: Json
       }
-      validate_access_code_security: {
-        Args: { code_to_check: string; user_ip?: unknown }
-        Returns: Json
-      }
       validate_access_code_simple: {
         Args: { input_code: string }
-        Returns: Json
-      }
-      validate_password_strength: {
-        Args: { password: string }
         Returns: Json
       }
       validate_role_change: {
