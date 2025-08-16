@@ -333,7 +333,12 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       id: node.id,
       type: 'custom',
       position: { x: node.position_x || 0, y: node.position_y || 0 },
-      data: { originalNode: node },
+      data: { 
+        originalNode: node,
+        label: node.title,
+        config: nodeTypeConfig[node.node_type],
+        scaleFactor: 1
+      },
       draggable: true,
       selectable: true,
       connectable: true,
