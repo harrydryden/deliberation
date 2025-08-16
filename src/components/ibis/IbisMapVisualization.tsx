@@ -32,6 +32,7 @@ import { RefreshCw, Plus, Search, Filter, MessageSquare, GitBranch } from 'lucid
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceDirectedLayout, getNodeDimensions } from './ibis-layout';
+import { resolveCollisions } from './collision-detection';
 import { logger } from '@/utils/logger';
 
 interface IbisNode {
@@ -475,7 +476,10 @@ const { user } = useAuth();
       }
     });
 
-    return positions;
+    // Apply collision detection to prevent node overlap
+    const finalPositions = resolveCollisions(positions, nodes);
+    
+    return finalPositions;
   };
 
   // Convert IBIS nodes to React Flow nodes and edges with enhanced layout
