@@ -1177,59 +1177,63 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 animated: false,
               }}
             >
-              {/* VIEWPORT-FIXED ZONE OVERLAYS - Centered in viewport, stay fixed during pan/zoom */}
-              <div 
-                className="absolute inset-0 pointer-events-none flex items-center justify-center"
-                style={{ zIndex: 0 }}
-              >
+              {/* ZONE BACKGROUNDS - Part of ReactFlow coordinate system */}
+              <Panel position="top-left" className="pointer-events-none">
                 <svg 
-                  width="640" 
-                  height="640"
-                  className="pointer-events-none"
+                  width="1600" 
+                  height="1000"
+                  viewBox="0 0 1600 1000"
+                  style={{ 
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    pointerEvents: 'none',
+                    zIndex: 0
+                  }}
                 >
-                  {/* Issues zone - center circle */}
+                  {/* Issues zone - center circle at layout center (800, 500) */}
                   <circle 
-                    cx="320" cy="320" r="120" 
+                    cx="800" cy="500" r="120" 
                     fill="hsl(0 84% 95%)" fillOpacity="0.3" 
                     stroke="hsl(0 84% 60%)" strokeWidth="4" strokeOpacity="0.8" 
                   />
                   
                   {/* Positions zone - middle ring */}
                   <circle 
-                    cx="320" cy="320" r="220" 
+                    cx="800" cy="500" r="220" 
                     fill="hsl(217 91% 95%)" fillOpacity="0.2" 
                     stroke="hsl(217 91% 60%)" strokeWidth="4" strokeOpacity="0.7" 
                     strokeDasharray="12,6" 
                   />
                   <circle 
-                    cx="320" cy="320" r="120" 
+                    cx="800" cy="500" r="120" 
                     fill="none" 
                     stroke="hsl(217 91% 60%)" strokeWidth="2" strokeOpacity="0.5" 
                   />
                   
                   {/* Arguments zone - outer ring */}
                   <circle 
-                    cx="320" cy="320" r="320" 
+                    cx="800" cy="500" r="320" 
                     fill="hsl(142 71% 95%)" fillOpacity="0.2" 
                     stroke="hsl(142 71% 45%)" strokeWidth="4" strokeOpacity="0.7" 
                     strokeDasharray="18,9" 
                   />
                   <circle 
-                    cx="320" cy="320" r="220" 
+                    cx="800" cy="500" r="220" 
                     fill="none" 
                     stroke="hsl(142 71% 45%)" strokeWidth="2" strokeOpacity="0.5" 
                   />
                   
                   {/* Zone labels */}
-                  <text x="320" y="220" textAnchor="middle" className="fill-[hsl(0_84%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ISSUES</text>
-                  <text x="470" y="320" textAnchor="middle" className="fill-[hsl(217_91%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>POSITIONS</text>
-                  <text x="570" y="370" textAnchor="middle" className="fill-[hsl(142_71%_45%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ARGUMENTS</text>
+                  <text x="800" y="400" textAnchor="middle" className="fill-[hsl(0_84%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ISSUES</text>
+                  <text x="950" y="500" textAnchor="middle" className="fill-[hsl(217_91%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>POSITIONS</text>
+                  <text x="1050" y="550" textAnchor="middle" className="fill-[hsl(142_71%_45%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ARGUMENTS</text>
                   
                   {/* Debug marker at center */}
-                  <circle cx="320" cy="320" r="10" fill="orange" opacity="0.8" />
-                  <text x="330" y="310" className="fill-orange-600" style={{ fontSize: '12px', fontWeight: 600 }}>CENTER</text>
+                  <circle cx="800" cy="500" r="10" fill="orange" opacity="0.8" />
+                  <text x="810" y="490" className="fill-orange-600" style={{ fontSize: '12px', fontWeight: 600 }}>CENTER</text>
                 </svg>
-              </div>
+              </Panel>
               
               <Background color="hsl(var(--ibis-grid))" gap={20} />
               <Controls />
