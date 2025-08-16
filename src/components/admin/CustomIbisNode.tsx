@@ -12,7 +12,43 @@ interface CustomIbisNodeData {
   scaleFactor: number;
 }
 
+interface ZoneBackgroundNodeData {
+  label: string;
+  isZoneBackground: boolean;
+  zoneType: string;
+}
+
 const CustomIbisNode = ({ data }: NodeProps) => {
+  // Handle zone background nodes that don't have originalNode
+  if ((data as any).isZoneBackground) {
+    const zoneData = data as unknown as ZoneBackgroundNodeData;
+    return (
+      <div
+        style={{
+          backgroundColor: 'transparent',
+          border: '2px solid gray',
+          borderRadius: '50%',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          opacity: 0.3,
+        }}
+      >
+        <span style={{ 
+          fontSize: '16px', 
+          fontWeight: 'bold',
+          color: 'hsl(var(--foreground))',
+          opacity: 0.7 
+        }}>
+          {zoneData.label}
+        </span>
+      </div>
+    );
+  }
+
   const { label, originalNode, config, scaleFactor } = data as unknown as CustomIbisNodeData;
   const nodeType = originalNode.node_type;
 
