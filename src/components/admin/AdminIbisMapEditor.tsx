@@ -993,7 +993,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             <Panel position="top-right" className="space-y-2">
               <Card className="p-4">
                 <h3 className="font-semibold mb-2">Node Types</h3>
-                <div className="space-y-2">
+                <div className="space-y-2 mb-4">
                   {Object.entries(nodeTypeConfig).map(([type, config]) => (
                     <div key={type} className="flex items-center gap-2 text-sm">
                       <div 
@@ -1003,6 +1003,25 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                           borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px'
                         }}
                       />
+                      <span>{config.label}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <h3 className="font-semibold mb-2">Edge Types</h3>
+                <div className="space-y-2">
+                  {Object.entries(relationshipConfig).map(([type, config]) => (
+                    <div key={type} className="flex items-center gap-2 text-sm">
+                      <div className="flex items-center">
+                        <div 
+                          className="w-6 h-0.5"
+                          style={{ backgroundColor: config.color }}
+                        />
+                        <div 
+                          className="w-0 h-0 border-l-4 border-t-2 border-b-2 border-transparent"
+                          style={{ borderLeftColor: config.color }}
+                        />
+                      </div>
                       <span>{config.label}</span>
                     </div>
                   ))}
