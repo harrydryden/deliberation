@@ -162,7 +162,21 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   };
   
   const containerRef = useRef<HTMLDivElement>(null);
-  // Node-zone constraint system (world coordinates)
+  // Enhanced collision detection function
+  const checkCollisionWithOtherNodes = useCallback((nodeId: string, position: {x: number, y: number}, nodeRadius: number = 40) => {
+    return nodes.some(otherNode => {
+      if (otherNode.id === nodeId) return false; // Don't check collision with self
+      
+      const dx = position.x - otherNode.position.x;
+      const dy = position.y - otherNode.position.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const minDistance = nodeRadius * 2 + 10; // Add some padding
+      
+      return distance < minDistance;
+    });
+  }, [nodes]);
+
+  // Enhanced node-zone constraint system with collision avoidance
   const constrainNodeToZone = useCallback((node: Node) => {
     const originalNode = node.data?.originalNode as IbisNode;
     const nodeType = originalNode?.node_type;
@@ -184,10 +198,10 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                        nodeType === 'position' ? zones.issue.outerRadius : zones.position.outerRadius;
     const outerRadius = zone.outerRadius;
     
-    // Node radius for padding
-    const nodeRadius = originalNode?.node_type === 'argument' ? 60 : 40;
+    // Node radius for padding (using the 50% smaller size)
+    const nodeRadius = originalNode?.node_type === 'argument' ? 30 : 20; // Half the width/height
     
-    // Constrain to ring
+    // Constrain to ring first
     let constrainedRadius = distance;
     if (distance < innerRadius + nodeRadius) {
       constrainedRadius = innerRadius + nodeRadius;
@@ -195,19 +209,57 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       constrainedRadius = outerRadius - nodeRadius;
     }
     
-    // Apply constrained position if changed
-    if (constrainedRadius !== distance) {
+    // Calculate initial constrained position
+    let constrainedPosition = {
+      x: zone.centerX + constrainedRadius * Math.cos(angle),
+      y: zone.centerY + constrainedRadius * Math.sin(angle)
+    };
+    
+    // Check for collisions and adjust if necessary
+    if (checkCollisionWithOtherNodes(node.id, constrainedPosition, nodeRadius)) {
+      // Try to find a non-colliding position within the zone
+      const angleStep = Math.PI / 8; // 22.5 degrees
+      let foundSafePosition = false;
+      
+      for (let radiusOffset = 0; radiusOffset <= 60 && !foundSafePosition; radiusOffset += 20) {
+        for (let angleOffset = 0; angleOffset < 2 * Math.PI && !foundSafePosition; angleOffset += angleStep) {
+          const testAngle = angle + angleOffset;
+          const testRadius = Math.max(innerRadius + nodeRadius, Math.min(outerRadius - nodeRadius, constrainedRadius + radiusOffset));
+          
+          const testPosition = {
+            x: zone.centerX + testRadius * Math.cos(testAngle),
+            y: zone.centerY + testRadius * Math.sin(testAngle)
+          };
+          
+          if (!checkCollisionWithOtherNodes(node.id, testPosition, nodeRadius)) {
+            constrainedPosition = testPosition;
+            foundSafePosition = true;
+          }
+        }
+      }
+    }
+    
+    // Apply constrained position if it changed significantly
+    const positionChanged = Math.abs(constrainedPosition.x - node.position.x) > 1 || 
+                           Math.abs(constrainedPosition.y - node.position.y) > 1;
+    
+    if (positionChanged) {
+      console.log('🔍 Node position constrained:', {
+        nodeId: node.id,
+        nodeType,
+        from: node.position,
+        to: constrainedPosition,
+        zone: zone
+      });
+      
       return {
         ...node,
-        position: {
-          x: zone.centerX + constrainedRadius * Math.cos(angle),
-          y: zone.centerY + constrainedRadius * Math.sin(angle)
-        }
+        position: constrainedPosition
       };
     }
     
     return node;
-  }, [zones]);
+  }, [zones, checkCollisionWithOtherNodes]);
 
   // Node editing form state
   const [nodeForm, setNodeForm] = useState({
@@ -353,7 +405,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     }
   }, [deliberationId, toast]);
 
-  // Convert IBIS data to React Flow format with world coordinates
+  // Convert IBIS data to React Flow format with world coordinates - memoized to prevent excessive re-renders
   const convertToFlowNodes = useCallback(() => {
     console.log('🔍 IBIS Map Editor - Converting nodes with coordinate system');
     
@@ -403,7 +455,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       // Apply improved collision detection and spacing for each node type
       Object.entries(nodesByType).forEach(([nodeType, typeNodes]) => {
         const targetRadius = zoneRadii[nodeType as keyof typeof zoneRadii];
-        const minDistance = 60; // Reduced minimum distance for more flexible spacing
+        const nodeRadius = nodeType === 'argument' ? 30 : 20; // 50% smaller nodes
+        const minDistance = nodeRadius * 2 + 20; // More spacing between nodes
         
         typeNodes.forEach((node, index) => {
           let attempts = 0;
@@ -411,23 +464,33 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           
           do {
             // Use spiral placement for better distribution
-            const spiralFactor = Math.floor(index / 6); // 6 nodes per spiral layer
-            const angleStep = (2 * Math.PI) / Math.max(6, typeNodes.length / (spiralFactor + 1));
-            const baseAngle = (index % Math.max(6, typeNodes.length / (spiralFactor + 1))) * angleStep;
+            const spiralFactor = Math.floor(index / 8); // 8 nodes per spiral layer
+            const angleStep = (2 * Math.PI) / Math.max(8, typeNodes.length / (spiralFactor + 1));
+            const baseAngle = (index % Math.max(8, typeNodes.length / (spiralFactor + 1))) * angleStep;
             
-            // Add spiral offset and some randomization
-            const spiralOffset = spiralFactor * 40; // Each spiral layer 40px further out
-            const radiusVariation = (Math.random() - 0.5) * 30;
+            // Add spiral offset and some randomization for natural spacing
+            const spiralOffset = spiralFactor * 50; // Each spiral layer 50px further out
+            const radiusVariation = (Math.random() - 0.5) * 20;
             const radius = targetRadius + spiralOffset + radiusVariation;
             
+            // Ensure radius stays within zone boundaries
+            const zone = nodeType === 'issue' ? zones.issue : 
+                        nodeType === 'position' ? zones.position : zones.argument;
+            const innerRadius = nodeType === 'issue' ? 0 : 
+                               nodeType === 'position' ? zones.issue.outerRadius : zones.position.outerRadius;
+            const constrainedRadius = Math.max(
+              innerRadius + nodeRadius, 
+              Math.min(zone.outerRadius - nodeRadius, radius)
+            );
+            
             position = {
-              x: centerX + radius * Math.cos(baseAngle),
-              y: centerY + radius * Math.sin(baseAngle)
+              x: centerX + constrainedRadius * Math.cos(baseAngle),
+              y: centerY + constrainedRadius * Math.sin(baseAngle)
             };
             
             attempts++;
           } while (
-            attempts < 30 && // More attempts for better placement
+            attempts < 50 && // More attempts for better placement
             Array.from(positionsMap.values()).some(existingPos => {
               const dx = position.x - existingPos.x;
               const dy = position.y - existingPos.y;
@@ -1116,12 +1179,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     }
   }, [deliberationId]); // Remove fetchData from dependencies to prevent unnecessary refetches
 
-  // Convert data when it changes
-  useEffect(() => {
+  // Convert data when it changes - memoize to prevent excessive re-renders
+  const convertToFlowNodesCallback = useCallback(() => {
     if (ibisNodes.length > 0 || ibisRelationships.length > 0) {
       convertToFlowNodes();
     }
-  }, [ibisNodes, ibisRelationships, convertToFlowNodes]);
+  }, [ibisNodes, ibisRelationships]); // Remove convertToFlowNodes from dependencies
+
+  useEffect(() => {
+    convertToFlowNodesCallback();
+  }, [convertToFlowNodesCallback]);
 
   // Enhanced initial viewport fit
   useEffect(() => {
@@ -1259,16 +1326,23 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 console.log('🔍 Node drag started:', node.id);
               }}
               onNodeDrag={(event, node) => {
-                console.log('🔍 Node dragging:', node.id, node.position);
+                // Real-time zone constraint during drag
+                const constrainedNode = constrainNodeToZone(node);
+                if (constrainedNode.position.x !== node.position.x || constrainedNode.position.y !== node.position.y) {
+                  // Update position in real-time to prevent dragging outside zones
+                  setNodes(nds => nds.map(n => n.id === node.id ? constrainedNode : n));
+                }
               }}
               onNodeDragStop={(event, node) => {
                 console.log('🔍 Node drag stopped:', node.id, node.position);
-                // Apply zone constraints after drag
+                
+                // Final zone constraint and collision check after drag
                 const constrainedNode = constrainNodeToZone(node);
                 if (constrainedNode.position.x !== node.position.x || constrainedNode.position.y !== node.position.y) {
                   setNodes(nds => nds.map(n => n.id === node.id ? constrainedNode : n));
-                  console.log('🔍 Node position constrained to zone:', constrainedNode.position);
+                  console.log('🔍 Node final position constrained:', constrainedNode.position);
                 }
+                
                 // Always mark as having unsaved changes when a node is moved
                 setHasUnsavedChanges(true);
               }}
