@@ -271,7 +271,7 @@ const DeliberationChat = () => {
                 </div>
               </div>
 
-              <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="p-3">
                 <div className="flex items-stretch gap-3 flex-wrap">
                   <div className="flex flex-col gap-3 h-full">
                     <div className="rounded-lg border bg-muted/40 p-3 flex-1">
