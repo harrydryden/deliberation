@@ -8,8 +8,8 @@ export interface NodeDimensions {
 }
 
 export interface HandleInfo {
-  sourceHandle: Position;
-  targetHandle: Position;
+  sourceHandle: string;
+  targetHandle: string;
 }
 
 /**
@@ -31,8 +31,8 @@ export function calculateOptimalHandles(
   const deltaY = targetCenterY - sourceCenterY;
   
   // Determine source handle position based on direction to target
-  let sourceHandle: Position;
-  let targetHandle: Position;
+  let sourceHandle: string;
+  let targetHandle: string;
 
   // Use absolute values to determine primary direction
   const absDeltaX = Math.abs(deltaX);
@@ -41,20 +41,20 @@ export function calculateOptimalHandles(
   if (absDeltaX > absDeltaY) {
     // Horizontal movement is dominant
     if (deltaX > 0) {
-      sourceHandle = Position.Right;
-      targetHandle = Position.Left;
+      sourceHandle = "right";
+      targetHandle = "left-target";
     } else {
-      sourceHandle = Position.Left;
-      targetHandle = Position.Right;
+      sourceHandle = "left";
+      targetHandle = "right-target";
     }
   } else {
     // Vertical movement is dominant
     if (deltaY > 0) {
-      sourceHandle = Position.Bottom;
-      targetHandle = Position.Top;
+      sourceHandle = "bottom";
+      targetHandle = "top-target";
     } else {
-      sourceHandle = Position.Top;
-      targetHandle = Position.Bottom;
+      sourceHandle = "top";
+      targetHandle = "bottom-target";
     }
   }
 

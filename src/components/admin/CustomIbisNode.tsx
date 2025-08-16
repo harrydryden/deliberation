@@ -38,8 +38,9 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position: 'relative',
       }}
     >
-      {/* Connection handles - All same type, styled by selected edge type */}
+      {/* Connection handles with specific IDs */}
       <Handle
+        id="top"
         type="source"
         position={Position.Top}
         style={{
@@ -53,6 +54,7 @@ const CustomIbisNode = ({ data }: NodeProps) => {
       />
       
       <Handle
+        id="bottom"
         type="source"
         position={Position.Bottom}
         style={{
@@ -66,6 +68,7 @@ const CustomIbisNode = ({ data }: NodeProps) => {
       />
       
       <Handle
+        id="left"
         type="source"
         position={Position.Left}
         style={{
@@ -79,6 +82,7 @@ const CustomIbisNode = ({ data }: NodeProps) => {
       />
       
       <Handle
+        id="right"
         type="source"
         position={Position.Right}
         style={{
@@ -93,6 +97,7 @@ const CustomIbisNode = ({ data }: NodeProps) => {
       
       {/* Target handles for receiving connections */}
       <Handle
+        id="top-target"
         type="target"
         position={Position.Top}
         style={{
@@ -106,6 +111,7 @@ const CustomIbisNode = ({ data }: NodeProps) => {
       />
       
       <Handle
+        id="bottom-target"
         type="target"
         position={Position.Bottom}
         style={{
@@ -119,6 +125,7 @@ const CustomIbisNode = ({ data }: NodeProps) => {
       />
       
       <Handle
+        id="left-target"
         type="target"
         position={Position.Left}
         style={{
@@ -132,6 +139,7 @@ const CustomIbisNode = ({ data }: NodeProps) => {
       />
       
       <Handle
+        id="right-target"
         type="target"
         position={Position.Right}
         style={{
