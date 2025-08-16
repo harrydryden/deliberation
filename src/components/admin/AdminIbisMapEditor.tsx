@@ -290,23 +290,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         type: 'default',
         position,
         data: {
-          label: (
-            <div 
-              className={`ibis-node-${node.node_type} node-content`} 
-              style={{ 
-                transform: `scale(${scaleFactor})`,
-                pointerEvents: 'none', // Allow drag events to bubble up
-                userSelect: 'none', // Prevent text selection during drag
-              }}
-            >
-              <div className="font-semibold text-xs mb-1 text-white">
-                {node.title.length > 30 ? `${node.title.substring(0, 30)}...` : node.title}
-              </div>
-              <div className="text-xs opacity-75 text-white">
-                {config.label}
-              </div>
-            </div>
-          ),
+          label: node.title.length > 30 ? `${node.title.substring(0, 30)}...` : node.title,
           originalNode: node,
         },
         style: {
@@ -323,16 +307,13 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           padding: '8px',
           fontSize: '11px',
           textAlign: 'center',
+          fontWeight: 'bold',
           cursor: 'grab',
           transform: node.node_type === 'argument' ? 'rotate(45deg)' : 'none',
-          // Ensure the node itself can be dragged
-          pointerEvents: 'auto',
         },
         draggable: true,
         selectable: true,
-        // Ensure these properties are set for proper interaction
-        focusable: true,
-        deletable: false,
+        connectable: true,
       };
     });
 
@@ -387,9 +368,20 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     return Math.min(importance / 5, 2);
   };
 
-  // Handle node position changes
+  // Handle node position changes with detailed logging
   const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
-    console.log('🔍 Node changes:', changes);
+    console.log('🔍 All node changes:', changes);
+    
+    // Log different types of changes
+    changes.forEach(change => {
+      if (change.type === 'position') {
+        console.log('🔍 Position change:', change);
+      } else if (change.type === 'select') {
+        console.log('🔍 Select change:', change);
+      }
+      // Note: 'drag' is not a valid NodeChange type in @xyflow/react
+    });
+    
     onNodesChange(changes);
     
     const positionChanges = changes.filter(change => 
@@ -755,6 +747,15 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             onConnect={handleConnect}
             onNodeClick={handleNodeClick}
             onNodeDoubleClick={handleNodeClick}
+            onNodeDragStart={(event, node) => {
+              console.log('🔍 Node drag started:', node.id);
+            }}
+            onNodeDrag={(event, node) => {
+              console.log('🔍 Node dragging:', node.id, node.position);
+            }}
+            onNodeDragStop={(event, node) => {
+              console.log('🔍 Node drag stopped:', node.id, node.position);
+            }}
             connectionMode={ConnectionMode.Loose}
             fitView
             fitViewOptions={{ padding: 0.1 }}
@@ -762,6 +763,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             nodesDraggable={true}
             nodesConnectable={true}
             elementsSelectable={true}
+            panOnDrag={false}
           >
             <Background />
             <Controls />
