@@ -1303,6 +1303,26 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               onConnectEnd={(event) => {
                 console.log('🔍 Connection end:', event);
               }}
+              onMove={(event, viewport) => {
+                // Update viewport state to sync zones with ReactFlow panning/zooming
+                setViewport(prev => ({
+                  ...prev,
+                  scale: viewport.zoom,
+                  offsetX: viewport.x + prev.width / 2, // Convert to center-based coordinates
+                  offsetY: viewport.y + prev.height / 2
+                }));
+              }}
+              onInit={(reactFlowInstance: ReactFlowInstance<Node, Edge>) => {
+                reactFlowRef.current = reactFlowInstance;
+                // Initialize viewport dimensions
+                const bounds = reactFlowInstance.getViewport();
+                setViewport(prev => ({
+                  ...prev,
+                  scale: bounds.zoom,
+                  offsetX: bounds.x + prev.width / 2,
+                  offsetY: bounds.y + prev.height / 2
+                }));
+              }}
               connectionMode={ConnectionMode.Loose}
               fitView
               fitViewOptions={{ padding: 0.2 }}
@@ -1321,102 +1341,105 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             >
               <Background color="hsl(var(--ibis-grid))" gap={20} />
               
-              {/* Zone visualization using ReactFlow coordinate system */}
+              {/* Zone visualization integrated with ReactFlow coordinate system */}
               <svg
                 style={{
                   position: 'absolute',
-                  top: '50%',
-                  left: '50%',
+                  top: 0,
+                  left: 0,
                   width: '100%',
                   height: '100%',
                   pointerEvents: 'none',
                   zIndex: 0,
-                  transform: 'translate(-50%, -50%)', // Center the SVG
                 }}
-                viewBox="-600 -400 1200 800" // Centered viewBox around origin
               >
-                {/* Issue zone (innermost circle) */}
-                <circle
-                  cx="0"
-                  cy="0"
-                  r={zones.issue.outerRadius}
-                  fill="hsl(var(--ibis-issue))"
-                  fillOpacity="0.08"
-                  stroke="hsl(var(--ibis-issue))"
-                  strokeWidth="3"
-                  strokeOpacity="0.6"
-                  strokeDasharray="none"
-                />
-                
-                {/* Position zone (middle ring) */}
-                <circle
-                  cx="0"
-                  cy="0"
-                  r={zones.position.outerRadius}
-                  fill="none"
-                  stroke="hsl(var(--ibis-position))"
-                  strokeWidth="2"
-                  strokeOpacity="0.5"
-                  strokeDasharray="8,4"
-                />
-                
-                {/* Argument zone (outer ring) */}
-                <circle
-                  cx="0"
-                  cy="0"
-                  r={zones.argument.outerRadius}
-                  fill="none"
-                  stroke="hsl(var(--ibis-argument))"
-                  strokeWidth="2"
-                  strokeOpacity="0.4"
-                  strokeDasharray="12,6"
-                />
-                
-                {/* Zone labels */}
-                <text
-                  x="0"
-                  y={-zones.issue.outerRadius - 15}
-                  textAnchor="middle"
-                  fill="hsl(var(--ibis-issue))"
-                  fontSize="14"
-                  fontWeight="600"
-                  opacity="0.8"
+                <g
+                  // Use ReactFlow's viewport transform to move zones with the map
+                  transform={`translate(${viewport.offsetX}, ${viewport.offsetY}) scale(${viewport.scale})`}
                 >
-                  Issues
-                </text>
-                
-                <text
-                  x="0"
-                  y={-zones.position.outerRadius - 15}
-                  textAnchor="middle"
-                  fill="hsl(var(--ibis-position))"
-                  fontSize="14"
-                  fontWeight="600"
-                  opacity="0.8"
-                >
-                  Positions
-                </text>
-                
-                <text
-                  x="0"
-                  y={-zones.argument.outerRadius - 15}
-                  textAnchor="middle"
-                  fill="hsl(var(--ibis-argument))"
-                  fontSize="14"
-                  fontWeight="600"
-                  opacity="0.8"
-                >
-                  Arguments
-                </text>
-                
-                {/* Center point indicator */}
-                <circle
-                  cx="0"
-                  cy="0"
-                  r="4"
-                  fill="hsl(var(--muted-foreground))"
-                  opacity="0.6"
-                />
+                  {/* Issue zone (innermost circle) */}
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r={zones.issue.outerRadius}
+                    fill="hsl(var(--ibis-issue))"
+                    fillOpacity="0.08"
+                    stroke="hsl(var(--ibis-issue))"
+                    strokeWidth="3"
+                    strokeOpacity="0.6"
+                    strokeDasharray="none"
+                  />
+                  
+                  {/* Position zone (middle ring) */}
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r={zones.position.outerRadius}
+                    fill="none"
+                    stroke="hsl(var(--ibis-position))"
+                    strokeWidth="2"
+                    strokeOpacity="0.5"
+                    strokeDasharray="8,4"
+                  />
+                  
+                  {/* Argument zone (outer ring) */}
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r={zones.argument.outerRadius}
+                    fill="none"
+                    stroke="hsl(var(--ibis-argument))"
+                    strokeWidth="2"
+                    strokeOpacity="0.4"
+                    strokeDasharray="12,6"
+                  />
+                  
+                  {/* Zone labels */}
+                  <text
+                    x="0"
+                    y={-zones.issue.outerRadius - 15}
+                    textAnchor="middle"
+                    fill="hsl(var(--ibis-issue))"
+                    fontSize="14"
+                    fontWeight="600"
+                    opacity="0.8"
+                  >
+                    Issues
+                  </text>
+                  
+                  <text
+                    x="0"
+                    y={-zones.position.outerRadius - 15}
+                    textAnchor="middle"
+                    fill="hsl(var(--ibis-position))"
+                    fontSize="14"
+                    fontWeight="600"
+                    opacity="0.8"
+                  >
+                    Positions
+                  </text>
+                  
+                  <text
+                    x="0"
+                    y={-zones.argument.outerRadius - 15}
+                    textAnchor="middle"
+                    fill="hsl(var(--ibis-argument))"
+                    fontSize="14"
+                    fontWeight="600"
+                    opacity="0.8"
+                  >
+                    Arguments
+                  </text>
+                  
+                  {/* Center point indicator */}
+                  <circle
+                    cx="0"
+                    cy="0"
+                    r="4"
+                    fill="hsl(var(--muted-foreground))"
+                    opacity="0.6"
+                  />
+                </g>
               </svg>
               
               <Controls />
