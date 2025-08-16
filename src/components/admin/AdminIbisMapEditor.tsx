@@ -535,32 +535,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       });
     });
 
-    console.log('🔍 IBIS Map Editor - Converted flow data:', {
-      flowNodesCount: flowNodes.length,
-      flowEdgesCount: flowEdges.length,
-      ibisRelationshipsCount: ibisRelationships.length,
-      sampleFlowNode: flowNodes[0],
-      sampleFlowEdge: flowEdges[0],
-      allRelationshipIds: ibisRelationships.map(r => r.id),
-      computedPositionsCount: positionsMap.size,
-      sampleNodes: flowNodes.slice(0, 3).map(n => ({
-        id: n.id,
-        position: n.position,
-        type: n.type,
-        draggable: n.draggable
-      })),
-      sampleEdges: flowEdges.slice(0, 3).map(e => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        type: e.type
-      }))
-    });
-
-    console.log('🔍 Setting new nodes and edges:', { 
-      newNodesCount: flowNodes.length, 
-      newEdgesCount: flowEdges.length
-    });
     setNodes(flowNodes);
     setEdges(flowEdges);
   }, [ibisNodes, ibisRelationships, setNodes, setEdges, user]);
@@ -1155,41 +1129,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     }
   }, [loading, nodes.length]);
 
-  // Debug helper to understand visualization state
-  useEffect(() => {
-    console.log('🔍 Visualization State Debug', {
-      nodesCount: nodes.length,
-      edgesCount: edges.length,
-      sampleNodes: nodes.slice(0, 3).map(n => ({
-        id: n.id,
-        position: n.position,
-        type: n.type,
-        draggable: n.draggable
-      })),
-      sampleEdges: edges.slice(0, 3).map(e => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        type: e.type,
-        animated: e.animated
-      }))
-    });
-  }, [nodes, edges]);
 
-  // Debug helper for troubleshooting
-  useEffect(() => {
-    const userIsAdmin = !!user?.id; // TODO: Replace with proper admin check
-    logger.info('🔍 Visualization Debug', {
-      nodesCount: nodes.length,
-      edgesCount: edges.length,
-      relationshipEdges: edges.filter(e => e.data?.type && e.data.type !== 'hierarchy').length,
-      hierarchyEdges: edges.filter(e => e.data?.type === 'hierarchy').length,
-      adminStatus: userIsAdmin,
-      draggableNodes: nodes.filter(n => n.draggable).length,
-      savedPositions: ibisNodes.filter(n => n.position_x !== null).length,
-      relationships: ibisRelationships.length
-    });
-  }, [nodes, edges, ibisNodes, ibisRelationships, user]);
 
 
   if (loading) {
