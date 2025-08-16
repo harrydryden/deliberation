@@ -117,9 +117,9 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   
   // Zone configuration for constraint enforcement
   const zoneConfig = useMemo(() => ({
-    issue: { outerRadius: 150, centerX: 0, centerY: 0 },
-    position: { outerRadius: 300, centerX: 0, centerY: 0 },
-    argument: { outerRadius: 450, centerX: 0, centerY: 0 }
+    issue: { innerRadius: 0, outerRadius: 150, centerX: 0, centerY: 0 },
+    position: { innerRadius: 150, outerRadius: 300, centerX: 0, centerY: 0 },
+    argument: { innerRadius: 300, outerRadius: 450, centerX: 0, centerY: 0 }
   }), []);
   
   // Constrain node to its appropriate zone
@@ -537,11 +537,13 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               nodesConnectable={true}
               elementsSelectable={true}
               selectNodesOnDrag={false}
+              snapToGrid={false}
+              snapGrid={[10, 10]}
             >
               <Controls />
               <Background />
               
-              {/* Zone visualization */}
+              {/* Enhanced Zone visualization */}
               <ZoneVisualization zones={zoneConfig} />
               
               {/* Connection Type Panel */}
@@ -562,20 +564,28 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 </div>
               </Panel>
 
-              {/* Legend Panel */}
+              {/* Enhanced Legend Panel with zone information */}
               <Panel position="bottom-right" className="bg-background border rounded-lg p-4">
                 <div className="space-y-3">
-                  <h4 className="font-medium text-sm">Node Types</h4>
+                  <h4 className="font-medium text-sm">Node Types & Zones</h4>
                   <div className="space-y-2">
-                    {Object.entries(nodeTypeConfig).map(([type, config]) => (
-                      <div key={type} className="flex items-center gap-2 text-xs">
-                        <div 
-                          className="w-3 h-3 rounded-sm border"
-                          style={{ backgroundColor: config.color }}
-                        />
-                        <span className="capitalize">{config.label}</span>
-                      </div>
-                    ))}
+                    {Object.entries(nodeTypeConfig).map(([type, config]) => {
+                      const zone = zoneConfig[type as keyof typeof zoneConfig];
+                      return (
+                        <div key={type} className="space-y-1">
+                          <div className="flex items-center gap-2 text-xs">
+                            <div 
+                              className="w-3 h-3 rounded-sm border"
+                              style={{ backgroundColor: config.color }}
+                            />
+                            <span className="capitalize font-medium">{config.label}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground ml-5">
+                            Zone: {zone.innerRadius}-{zone.outerRadius}px
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                   
                   <h4 className="font-medium text-sm mt-4">Relationships</h4>
@@ -592,8 +602,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                   </div>
                   
                   <div className="pt-2 mt-2 border-t text-xs text-muted-foreground">
-                    <div>• Drag nodes • Connect with handles • Select to edit</div>
-                    <div>• Nodes are constrained to their zone type</div>
+                    <div>• Drag nodes within their designated zones</div>
+                    <div>• Nodes auto-constrain to zone boundaries</div>
                     <div>• Click "Save Changes" to persist modifications</div>
                   </div>
                 </div>
