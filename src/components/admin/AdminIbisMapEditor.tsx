@@ -738,6 +738,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             onConnect={handleConnect}
             onNodeClick={handleNodeClick}
             onEdgeClick={handleEdgeClick}
+            className="admin-editor"
             onNodeDragStart={(event, node) => {
               console.log('🔍 Node drag started:', node.id);
             }}

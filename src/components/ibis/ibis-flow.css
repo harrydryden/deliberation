@@ -87,9 +87,14 @@
   }
 }
 
-/* Hide connection handles completely */
+/* Hide connection handles in regular view, show in admin editor */
 .react-flow__handle {
   display: none !important;
+}
+
+/* Show handles in admin editor */
+.admin-editor .react-flow__handle {
+  display: block !important;
 }
 
 .react-flow__node.new-node {
