@@ -843,20 +843,22 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         console.log('🔍 Direct deletion successful');
       }
       
+      // Only show success toast after confirmed database deletion
       toast({
         title: "Edge Deleted",
-        description: "Relationship removed successfully",
+        description: "Relationship successfully removed from database",
       });
 
     } catch (error) {
       console.error('🔍 Deletion process failed:', error);
       logger.error('Error deleting relationship', error as any);
       toast({
-        title: "Error", 
-        description: `Failed to delete relationship: ${error.message || 'Unknown error'}`,
+        title: "Deletion Failed", 
+        description: `Could not delete relationship: ${error.message || 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
+      // Reset saving state regardless of success/failure
       setSaving(false);
     }
   };
