@@ -122,7 +122,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     argument: { innerRadius: 300, outerRadius: 450, centerX: 0, centerY: 0 }
   }), []);
   
-  // Constrain node to its appropriate zone with both inner and outer radius enforcement
+  // Constrain node center position to its appropriate zone with both inner and outer radius enforcement
   const constrainNodeToZone = useCallback((nodeId: string, position: { x: number; y: number }) => {
     const node = ibisNodes.find(n => n.id === nodeId);
     if (!node) return position;
@@ -130,11 +130,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     const nodeType = node.node_type;
     const zone = zoneConfig[nodeType];
     
-    // Calculate distance from center
+    // Calculate distance from center (center position of the node)
     const distance = Math.sqrt(position.x * position.x + position.y * position.y);
     const angle = Math.atan2(position.y, position.x);
     
-    // If outside the outer radius, constrain to outer boundary
+    // Check if the center position is outside the allowed zone boundaries
+    // For issue nodes: center must be within 0 to outerRadius
+    // For position nodes: center must be within innerRadius to outerRadius  
+    // For argument nodes: center must be within innerRadius to outerRadius
+    
+    // If center is outside the outer radius, constrain to outer boundary
     if (distance > zone.outerRadius) {
       return {
         x: Math.cos(angle) * zone.outerRadius,
@@ -142,7 +147,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       };
     }
     
-    // If inside the inner radius (too close to center), constrain to inner boundary
+    // If center is inside the inner radius (only applies to position and argument zones), constrain to inner boundary
     if (distance < zone.innerRadius) {
       return {
         x: Math.cos(angle) * zone.innerRadius,
