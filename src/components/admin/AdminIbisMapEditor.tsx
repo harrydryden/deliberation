@@ -94,6 +94,25 @@ const relationshipConfig = {
   responds_to: { color: '#374151', style: 'solid', label: 'Responds to' },
 };
 
+// Transform state for world/viewport coordinate system
+interface Transform {
+  scale: number;
+  translateX: number;
+  translateY: number;
+}
+
+// Zone definitions in viewport pixels
+interface ZoneDefinition {
+  radius: number;
+  nodeTypes: string[];
+}
+
+interface ZonesConfig {
+  inner: ZoneDefinition;
+  middle: ZoneDefinition;
+  outer: ZoneDefinition;
+}
+
 export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }: AdminIbisMapEditorProps) => {
   console.log('🔍 IBIS Map Editor - Component initialized with props:', { deliberationId, deliberationTitle });
   const [ibisNodes, setIbisNodes] = useState<IbisNode[]>([]);
@@ -110,13 +129,104 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [zones, setZones] = useState<ConcentricZones | null>(null);
+  
+  // Transform state for coordinate system management
+  const [transform, setTransform] = useState<Transform>({
+    scale: 1.0,
+    translateX: 0,
+    translateY: 0
+  });
+  
+  // Fixed zones configuration (viewport coordinates)
+  const zonesConfig: ZonesConfig = {
+    inner: { radius: 150, nodeTypes: ['issue'] },
+    middle: { radius: 300, nodeTypes: ['position'] },
+    outer: { radius: 450, nodeTypes: ['argument'] }
+  };
   
   // Custom node types
   const nodeTypes = {
     custom: CustomIbisNode,
   };
   const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Coordinate conversion functions
+  const worldToViewport = useCallback((worldX: number, worldY: number) => {
+    return {
+      x: worldX * transform.scale + transform.translateX,
+      y: worldY * transform.scale + transform.translateY
+    };
+  }, [transform]);
+  
+  const viewportToWorld = useCallback((viewportX: number, viewportY: number) => {
+    return {
+      x: (viewportX - transform.translateX) / transform.scale,
+      y: (viewportY - transform.translateY) / transform.scale
+    };
+  }, [transform]);
+  
+  // Get viewport center (fixed)
+  const getViewportCenter = useCallback(() => {
+    if (!containerRef.current) return { x: 400, y: 300 };
+    const rect = containerRef.current.getBoundingClientRect();
+    return {
+      x: rect.width / 2,
+      y: rect.height / 2
+    };
+  }, []);
+  
+  // Enforce zone constraints for a node
+  const enforceZoneConstraints = useCallback((node: Node) => {
+    const center = getViewportCenter();
+    const nodeType = node.data?.originalNode?.node_type as 'issue' | 'position' | 'argument';
+    
+    // Get viewport position of node
+    const viewportPos = worldToViewport(node.position.x, node.position.y);
+    
+    // Calculate distance from viewport center
+    const distance = Math.sqrt(
+      Math.pow(viewportPos.x - center.x, 2) + Math.pow(viewportPos.y - center.y, 2)
+    );
+    
+    // Determine zone boundaries for this node type
+    let minRadius = 0;
+    let maxRadius = zonesConfig.outer.radius;
+    
+    if (nodeType === 'issue') {
+      minRadius = 0;
+      maxRadius = zonesConfig.inner.radius;
+    } else if (nodeType === 'position') {
+      minRadius = zonesConfig.inner.radius;
+      maxRadius = zonesConfig.middle.radius;
+    } else if (nodeType === 'argument') {
+      minRadius = zonesConfig.middle.radius;
+      maxRadius = zonesConfig.outer.radius;
+    }
+    
+    // Check if node is outside its zone
+    if (distance < minRadius || distance > maxRadius) {
+      const clampedDistance = Math.max(minRadius, Math.min(maxRadius, distance));
+      const angle = Math.atan2(viewportPos.y - center.y, viewportPos.x - center.x);
+      
+      // Calculate new viewport position
+      const newViewportX = center.x + Math.cos(angle) * clampedDistance;
+      const newViewportY = center.y + Math.sin(angle) * clampedDistance;
+      
+      // Convert back to world coordinates
+      const newWorldPos = viewportToWorld(newViewportX, newViewportY);
+      
+      return {
+        ...node,
+        position: {
+          x: newWorldPos.x,
+          y: newWorldPos.y
+        }
+      };
+    }
+    
+    return node;
+  }, [worldToViewport, viewportToWorld, getViewportCenter, zonesConfig]);
 
   // Node editing form state
   const [nodeForm, setNodeForm] = useState({
@@ -262,77 +372,52 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     }
   }, [deliberationId, toast]);
 
-  // Convert IBIS data to React Flow format
+  // Convert IBIS data to React Flow format with world coordinates
   const convertToFlowNodes = useCallback(() => {
-    console.log('🔍 IBIS Map Editor - Converting nodes:', { 
-      ibisNodesCount: ibisNodes.length, 
-      ibisRelationshipsCount: ibisRelationships.length,
-      sampleNode: ibisNodes[0]
-    });
-    const canvas = { width: 1600, height: 1000 };
+    console.log('🔍 IBIS Map Editor - Converting nodes with coordinate system');
     
-    // Use existing positions or compute layout
+    // Use world coordinates for node positioning
     const positionsMap = new Map<string, { x: number; y: number }>();
     
-    // First, add existing positions
+    // Convert existing positions to world coordinates if they exist
     ibisNodes.forEach(node => {
       if (node.position_x !== undefined && node.position_y !== undefined) {
+        // Existing positions are assumed to be in world coordinates
         positionsMap.set(node.id, { x: node.position_x, y: node.position_y });
       }
     });
     
-    // For nodes without positions, use layout algorithm
+    // For nodes without positions, place them in their designated zones
     const nodesWithoutPositions = ibisNodes.filter(node => 
       node.position_x === undefined || node.position_y === undefined
     );
     
-    // ALWAYS apply concentric layout for zone enforcement
-    console.log('🎯 Admin editor - Forcing concentric layout for ALL nodes');
-    
-    try {
-      const { positions: layoutPositions, zones: layoutZones } = applyConcentricLayout(
-        ibisNodes.map(n => ({
-          id: n.id,
-          title: n.title,
-          node_type: n.node_type,
-          position_x: null, // Force recalculation
-          position_y: null,
-          embedding: n.embedding || null,
-          parent_id: n.parent_id,
-          parent_node_id: undefined
-        })),
-        ibisRelationships.map(r => ({
-          source_node_id: r.source_node_id,
-          target_node_id: r.target_node_id,
-          relationship_type: r.relationship_type
-        })),
-        canvas
-      );
-      
-      console.log('🎯 Admin editor - Layout calculated:', {
-        positionsCount: layoutPositions.size,
-        zonesCalculated: !!layoutZones,
-        zones: layoutZones
+    if (nodesWithoutPositions.length > 0) {
+      // Generate initial positions in world space for each zone
+      nodesWithoutPositions.forEach((node, index) => {
+        const center = getViewportCenter();
+        let targetRadius = 0;
+        
+        // Determine target radius based on node type (in viewport space)
+        if (node.node_type === 'issue') {
+          targetRadius = zonesConfig.inner.radius * 0.5;
+        } else if (node.node_type === 'position') {
+          targetRadius = (zonesConfig.inner.radius + zonesConfig.middle.radius) * 0.5;
+        } else if (node.node_type === 'argument') {
+          targetRadius = (zonesConfig.middle.radius + zonesConfig.outer.radius) * 0.5;
+        }
+        
+        // Calculate initial angle
+        const angle = (index / nodesWithoutPositions.length) * 2 * Math.PI;
+        
+        // Position in viewport space
+        const viewportX = center.x + Math.cos(angle) * targetRadius;
+        const viewportY = center.y + Math.sin(angle) * targetRadius;
+        
+        // Convert to world coordinates
+        const worldPos = viewportToWorld(viewportX, viewportY);
+        positionsMap.set(node.id, worldPos);
       });
-      
-      // Store zones for rendering
-      if (layoutZones) {
-        setZones(layoutZones);
-        console.log('🎯 Admin editor - Zones set in state:', layoutZones);
-      }
-      
-      // Apply new positions to ALL nodes 
-      layoutPositions.forEach((pos, nodeId) => {
-        positionsMap.set(nodeId, { x: pos.x, y: pos.y });
-      });
-      
-      console.log('🎯 Admin editor - Concentric layout applied to ALL nodes:', {
-        positionsMapSize: positionsMap.size,
-        zonesSet: !!layoutZones,
-        samplePosition: positionsMap.entries().next().value
-      });
-    } catch (error) {
-      console.error('🚨 Error applying concentric layout:', error);
     }
 
     // Convert to React Flow nodes
@@ -1046,184 +1131,59 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         ) : (
           // React Flow Map with Zone Backgrounds
           <div className="relative h-full">
-            {/* Zone backgrounds */}
-            {zones && (
-              <div className="absolute inset-0 pointer-events-none z-0">
-                <svg className="w-full h-full">
-                  {/* Issue zone (center circle) */}
-                  <circle
-                    cx="50%"
-                    cy="50%"
-                    r={zones.issue.outerRadius}
-                    fill={zones.issue.color}
-                    stroke="hsl(var(--ibis-issue))"
-                    strokeWidth="2"
-                    strokeOpacity="0.3"
-                    fillOpacity="0.15"
-                  />
-                  
-                  {/* Position zone (middle ring) */}
-                  <circle
-                    cx="50%"
-                    cy="50%"
-                    r={zones.position.outerRadius}
-                    fill={zones.position.color}
-                    fillOpacity="0.08"
-                    stroke="hsl(var(--ibis-position))"
-                    strokeWidth="2"
-                    strokeOpacity="0.25"
-                    strokeDasharray="8,4"
-                  />
-                  <circle
-                    cx="50%"
-                    cy="50%"
-                    r={zones.position.innerRadius}
-                    fill="none"
-                    stroke="hsl(var(--ibis-position))"
-                    strokeWidth="1"
-                    strokeOpacity="0.2"
-                  />
-                  
-                  {/* Argument zone (outer ring) */}
-                  <circle
-                    cx="50%"
-                    cy="50%"
-                    r={zones.argument.outerRadius}
-                    fill={zones.argument.color}
-                    fillOpacity="0.08"
-                    stroke="hsl(var(--ibis-argument))"
-                    strokeWidth="2"
-                    strokeOpacity="0.25"
-                    strokeDasharray="12,6"
-                  />
-                  <circle
-                    cx="50%"
-                    cy="50%"
-                    r={zones.argument.innerRadius}
-                    fill="none"
-                    stroke="hsl(var(--ibis-argument))"
-                    strokeWidth="1"
-                    strokeOpacity="0.2"
-                  />
-                  
-                  {/* Zone labels */}
-                  <text
-                    x="50%"
-                    y={`${50 - (zones.issue.outerRadius / 8)}%`}
-                    textAnchor="middle"
-                    className="fill-[hsl(var(--ibis-issue))]"
-                    style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
-                  >
-                    Issues
-                  </text>
-                  <text
-                    x={`${50 + (zones.position.outerRadius / 16)}%`}
-                    y="50%"
-                    textAnchor="middle"
-                    className="fill-[hsl(var(--ibis-position))]"
-                    style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
-                  >
-                    Positions
-                  </text>
-                  <text
-                    x={`${50 + (zones.argument.outerRadius / 16)}%`}
-                    y={`${50 + 3}%`}
-                    textAnchor="middle"
-                    className="fill-[hsl(var(--ibis-argument))]"
-                    style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
-                  >
-                    Arguments
-                  </text>
-                </svg>
-              </div>
-            )}
-            
             {/* Fixed viewport zone overlays that don't zoom */}
-            <div className="absolute inset-0 pointer-events-none z-[1] flex items-center justify-center">
-              <svg width="800" height="600" className="absolute">
+            <div 
+              ref={containerRef}
+              className="absolute inset-0 pointer-events-none z-[1] flex items-center justify-center"
+            >
+              <svg 
+                width="100%" 
+                height="100%" 
+                className="absolute"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="xMidYMid meet"
+              >
                 {/* Issue zone (center circle) */}
                 <circle
-                  cx="400"
-                  cy="300"
-                  r="120"
-                  fill="hsl(0 84% 95%)"
-                  stroke="hsl(0 84% 60%)"
-                  strokeWidth="4"
-                  strokeOpacity="0.8"
-                  fillOpacity="0.3"
+                  cx="50"
+                  cy="50" 
+                  r={`${(zonesConfig.inner.radius / Math.max(800, 600)) * 100}`}
+                  fill="hsl(var(--ibis-issue))"
+                  fillOpacity="0.1"
+                  stroke="hsl(var(--ibis-issue))"
+                  strokeWidth="0.2"
+                  strokeOpacity="0.3"
                 />
-                
                 {/* Position zone (middle ring) */}
                 <circle
-                  cx="400"
-                  cy="300"
-                  r="220"
-                  fill="hsl(217 91% 95%)"
-                  stroke="hsl(217 91% 60%)"
-                  strokeWidth="4"
-                  strokeOpacity="0.7"
-                  strokeDasharray="12,6"
-                  fillOpacity="0.2"
-                />
-                <circle
-                  cx="400"
-                  cy="300"
-                  r="120"
+                  cx="50"
+                  cy="50"
+                  r={`${(zonesConfig.middle.radius / Math.max(800, 600)) * 100}`}
                   fill="none"
-                  stroke="hsl(217 91% 60%)"
-                  strokeWidth="2"
-                  strokeOpacity="0.5"
+                  stroke="hsl(var(--ibis-position))"
+                  strokeWidth="0.2"
+                  strokeOpacity="0.3"
                 />
-                
                 {/* Argument zone (outer ring) */}
                 <circle
-                  cx="400"
-                  cy="300"
-                  r="290"
-                  fill="hsl(142 71% 95%)"
-                  stroke="hsl(142 71% 45%)"
-                  strokeWidth="4"
-                  strokeOpacity="0.7"
-                  strokeDasharray="18,9"
-                  fillOpacity="0.2"
-                />
-                <circle
-                  cx="400"
-                  cy="300"
-                  r="220"
+                  cx="50"
+                  cy="50"
+                  r={`${(zonesConfig.outer.radius / Math.max(800, 600)) * 100}`}
                   fill="none"
-                  stroke="hsl(142 71% 45%)"
-                  strokeWidth="2"
-                  strokeOpacity="0.5"
+                  stroke="hsl(var(--ibis-argument))"
+                  strokeWidth="0.2"
+                  strokeOpacity="0.3"
                 />
                 
                 {/* Zone labels */}
-                <text
-                  x="400"
-                  y="200"
-                  textAnchor="middle"
-                  className="fill-[hsl(0_84%_60%)]"
-                  style={{ fontSize: '20px', fontWeight: 700 }}
-                >
-                  ISSUES
+                <text x="50" y="15" textAnchor="middle" className="fill-muted-foreground" fontSize="2">
+                  Issues
                 </text>
-                <text
-                  x="550"
-                  y="300"
-                  textAnchor="middle"
-                  className="fill-[hsl(217_91%_60%)]"
-                  style={{ fontSize: '20px', fontWeight: 700 }}
-                >
-                  POSITIONS
+                <text x="50" y="10" textAnchor="middle" className="fill-muted-foreground" fontSize="2">
+                  Positions  
                 </text>
-                <text
-                  x="650"
-                  y="350"
-                  textAnchor="middle"
-                  className="fill-[hsl(142_71%_45%)]"
-                  style={{ fontSize: '20px', fontWeight: 700 }}
-                >
-                  ARGUMENTS
+                <text x="50" y="5" textAnchor="middle" className="fill-muted-foreground" fontSize="2">
+                  Arguments
                 </text>
               </svg>
             </div>
@@ -1268,8 +1228,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             >
               <Background color="hsl(var(--ibis-grid))" gap={20} />
               <Controls />
-            <Background />
-            <Controls />
             
               {/* Control Panel */}
               <Panel position="top-left" className="space-y-2">
@@ -1286,14 +1244,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                       <SelectItem value="responds_to">Responds to</SelectItem>
                     </SelectContent>
                   </Select>
-                  {zones && (
-                    <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
-                      <div className="font-medium mb-1">Zone Layout Active</div>
-                      <div>Issue R: {Math.round(zones.issue.outerRadius)}</div>
-                      <div>Position R: {Math.round(zones.position.outerRadius)}</div>
-                      <div>Argument R: {Math.round(zones.argument.outerRadius)}</div>
-                    </div>
-                  )}
                 </Card>
               </Panel>
 
