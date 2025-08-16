@@ -99,8 +99,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [editingNode, setEditingNode] = useState<IbisNode | null>(null);
-  const [creatingRelationship, setCreatingRelationship] = useState<boolean>(false);
-  const [pendingConnection, setPendingConnection] = useState<OnConnectStartParams | null>(null);
+  const [editingEdge, setEditingEdge] = useState<IbisRelationship | null>(null);
+  const [selectedEdgeType, setSelectedEdgeType] = useState<'supports' | 'opposes' | 'relates_to' | 'responds_to'>('relates_to');
   
   const { toast } = useToast();
   
@@ -118,6 +118,11 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     title: '',
     description: '',
     node_type: 'issue' as 'issue' | 'position' | 'argument'
+  });
+
+  // Edge editing form state
+  const [edgeForm, setEdgeForm] = useState({
+    relationship_type: 'relates_to' as 'supports' | 'opposes' | 'relates_to' | 'responds_to'
   });
 
   // Fetch data from Supabase
@@ -375,7 +380,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       } else if (change.type === 'select') {
         console.log('🔍 Select change:', change);
       }
-      // Note: 'drag' is not a valid NodeChange type in @xyflow/react
     });
     
     onNodesChange(changes);
@@ -409,7 +413,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       const newRelationship = {
         source_node_id: connection.source,
         target_node_id: connection.target,
-        relationship_type: 'relates_to' as const,
+        relationship_type: selectedEdgeType,
         deliberation_id: deliberationId,
         created_by: 'admin', // This should be the actual admin user ID
       };
@@ -434,7 +438,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
       toast({
         title: "Connection Created",
-        description: "New relationship added between nodes",
+        description: `New ${selectedEdgeType.replace('_', ' ')} relationship added between nodes`,
       });
 
     } catch (error) {
@@ -445,7 +449,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         variant: "destructive",
       });
     }
-  }, [deliberationId, toast]);
+  }, [deliberationId, selectedEdgeType, toast]);
 
   // Handle node editing with proper click detection
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -461,6 +465,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         node_type: ibisNode.node_type,
       });
     }
+  }, []);
+
+  // Handle edge editing
+  const handleEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    console.log('🔍 Edge clicked for editing:', edge.id);
+    const ibisRelationship = edge.data.relationship as IbisRelationship;
+    setEditingEdge(ibisRelationship);
+    setEdgeForm({
+      relationship_type: ibisRelationship.relationship_type,
+    });
   }, []);
 
   // Save node changes
@@ -509,6 +523,86 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     }
   };
 
+  // Save edge changes
+  const handleSaveEdge = async () => {
+    if (!editingEdge) return;
+
+    try {
+      setSaving(true);
+      
+      const { error } = await supabase
+        .from('ibis_relationships')
+        .update({
+          relationship_type: edgeForm.relationship_type,
+        })
+        .eq('id', editingEdge.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setIbisRelationships(prev => prev.map(rel => 
+        rel.id === editingEdge.id 
+          ? { ...rel, relationship_type: edgeForm.relationship_type }
+          : rel
+      ));
+
+      setEditingEdge(null);
+      setHasUnsavedChanges(true);
+
+      toast({
+        title: "Relationship Updated",
+        description: "Relationship type changed successfully",
+      });
+
+    } catch (error) {
+      logger.error('Error updating relationship', error as any);
+      toast({
+        title: "Error",
+        description: "Failed to update relationship",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Delete edge
+  const handleDeleteEdge = async () => {
+    if (!editingEdge) return;
+
+    try {
+      setSaving(true);
+      
+      const { error } = await supabase
+        .from('ibis_relationships')
+        .delete()
+        .eq('id', editingEdge.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setIbisRelationships(prev => prev.filter(rel => rel.id !== editingEdge.id));
+
+      setEditingEdge(null);
+      setHasUnsavedChanges(true);
+
+      toast({
+        title: "Relationship Deleted",
+        description: "Relationship removed successfully",
+      });
+
+    } catch (error) {
+      logger.error('Error deleting relationship', error as any);
+      toast({
+        title: "Error",
+        description: "Failed to delete relationship",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Save all position changes
   const handleSaveChanges = async () => {
     try {
@@ -545,34 +639,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       });
     } finally {
       setSaving(false);
-    }
-  };
-
-  // Handle edge deletion
-  const handleDeleteEdge = async (edgeId: string) => {
-    try {
-      const { error } = await supabase
-        .from('ibis_relationships')
-        .delete()
-        .eq('id', edgeId);
-
-      if (error) throw error;
-
-      setIbisRelationships(prev => prev.filter(rel => rel.id !== edgeId));
-      setHasUnsavedChanges(true);
-
-      toast({
-        title: "Relationship Deleted",
-        description: "Connection removed successfully",
-      });
-
-    } catch (error) {
-      logger.error('Error deleting relationship', error as any);
-      toast({
-        title: "Error",
-        description: "Failed to delete relationship",
-        variant: "destructive",
-      });
     }
   };
 
@@ -613,52 +679,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       </Card>
     );
   }
-
-  // Handle creating a new node
-  const handleCreateNode = async (nodeType: 'issue' | 'position' | 'argument') => {
-    try {
-      const newNode = {
-        title: `New ${nodeType}`,
-        description: `This is a new ${nodeType} node`,
-        node_type: nodeType,
-        deliberation_id: deliberationId,
-        created_by: 'admin', // Should be actual admin user ID
-        position_x: Math.random() * 800 + 100, // Random position
-        position_y: Math.random() * 600 + 100,
-      };
-
-      const { data, error } = await supabase
-        .from('ibis_nodes')
-        .insert([newNode])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      const fullNode: IbisNode = {
-        id: data.id,
-        ...newNode,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-      };
-
-      setIbisNodes(prev => [...prev, fullNode]);
-      setHasUnsavedChanges(true);
-
-      toast({
-        title: "Node Created",
-        description: `New ${nodeType} node added to the map`,
-      });
-
-    } catch (error) {
-      logger.error('Error creating node', error as any);
-      toast({
-        title: "Error",
-        description: "Failed to create node",
-        variant: "destructive",
-      });
-    }
-  };
 
   return (
     <div className="h-screen flex flex-col">
@@ -702,34 +722,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-muted-foreground">
-                  This deliberation doesn't have any IBIS nodes yet. Create some nodes to start building the argument map.
+                  This deliberation doesn't have any IBIS nodes yet. IBIS nodes need to be created from the main deliberation interface.
                 </p>
-                <div className="space-y-2">
-                  <Button 
-                    onClick={() => handleCreateNode('issue')} 
-                    className="w-full"
-                    style={{ backgroundColor: 'hsl(var(--ibis-issue))' }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Issue Node
-                  </Button>
-                  <Button 
-                    onClick={() => handleCreateNode('position')} 
-                    className="w-full"
-                    style={{ backgroundColor: 'hsl(var(--ibis-position))' }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Position Node
-                  </Button>
-                  <Button 
-                    onClick={() => handleCreateNode('argument')} 
-                    className="w-full"
-                    style={{ backgroundColor: 'hsl(var(--ibis-argument))' }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Argument Node
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           </div>
@@ -743,7 +737,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             onEdgesChange={handleEdgesChange}
             onConnect={handleConnect}
             onNodeClick={handleNodeClick}
-            onNodeDoubleClick={handleNodeClick}
+            onEdgeClick={handleEdgeClick}
             onNodeDragStart={(event, node) => {
               console.log('🔍 Node drag started:', node.id);
             }}
@@ -760,7 +754,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             nodesDraggable={true}
             nodesConnectable={true}
             elementsSelectable={true}
-            panOnDrag={true} // Allow panning with left mouse button when not on nodes
+            panOnDrag={true}
           >
             <Background />
             <Controls />
@@ -784,34 +778,22 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                   </div>
                   <div className="flex items-center gap-2">
                     <Unlink className="h-4 w-4" />
-                    <span>Select edges and press Delete</span>
+                    <span>Click edges to edit/delete</span>
                   </div>
                 </div>
                 <div className="mt-4 space-y-2">
-                  <h4 className="font-medium text-sm">Add Nodes</h4>
-                  <div className="flex gap-1">
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleCreateNode('issue')}
-                      style={{ backgroundColor: 'hsl(var(--ibis-issue))', fontSize: '10px' }}
-                    >
-                      + Issue
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleCreateNode('position')}
-                      style={{ backgroundColor: 'hsl(var(--ibis-position))', fontSize: '10px' }}
-                    >
-                      + Position
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleCreateNode('argument')}
-                      style={{ backgroundColor: 'hsl(var(--ibis-argument))', fontSize: '10px' }}
-                    >
-                      + Argument
-                    </Button>
-                  </div>
+                  <h4 className="font-medium text-sm">New Connection Type</h4>
+                  <Select value={selectedEdgeType} onValueChange={(value: any) => setSelectedEdgeType(value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="supports">Supports</SelectItem>
+                      <SelectItem value="opposes">Opposes</SelectItem>
+                      <SelectItem value="relates_to">Relates to</SelectItem>
+                      <SelectItem value="responds_to">Responds to</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </Card>
             </Panel>
@@ -890,6 +872,48 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               Cancel
             </Button>
             <Button onClick={handleSaveNode} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edge Edit Dialog */}
+      <Dialog open={!!editingEdge} onOpenChange={() => setEditingEdge(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Relationship</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="relationship_type">Relationship Type</Label>
+              <Select
+                value={edgeForm.relationship_type}
+                onValueChange={(value: 'supports' | 'opposes' | 'relates_to' | 'responds_to') => 
+                  setEdgeForm(prev => ({ ...prev, relationship_type: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="supports">Supports</SelectItem>
+                  <SelectItem value="opposes">Opposes</SelectItem>
+                  <SelectItem value="relates_to">Relates to</SelectItem>
+                  <SelectItem value="responds_to">Responds to</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingEdge(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteEdge} disabled={saving}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              {saving ? 'Deleting...' : 'Delete'}
+            </Button>
+            <Button onClick={handleSaveEdge} disabled={saving}>
               {saving ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
