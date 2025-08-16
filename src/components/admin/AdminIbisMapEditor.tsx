@@ -1139,38 +1139,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             )}
             
             
-            {/* ACTUAL ZONE RENDERING */}
-            <div 
-              className="absolute top-0 left-0 w-full h-full pointer-events-none z-40"
-            >
-              <svg className="w-full h-full">
-                {/* Fixed zones until dynamic calculation works */}
-                <circle cx="50%" cy="50%" r="120" fill="hsl(0 84% 95%)" fillOpacity="0.2" stroke="hsl(0 84% 60%)" strokeWidth="3" strokeOpacity="0.6" />
-                <circle cx="50%" cy="50%" r="220" fill="hsl(217 91% 95%)" fillOpacity="0.15" stroke="hsl(217 91% 60%)" strokeWidth="3" strokeOpacity="0.5" strokeDasharray="10,5" />
-                <circle cx="50%" cy="50%" r="120" fill="none" stroke="hsl(217 91% 60%)" strokeWidth="2" strokeOpacity="0.3" />
-                <circle cx="50%" cy="50%" r="320" fill="hsl(142 71% 95%)" fillOpacity="0.15" stroke="hsl(142 71% 45%)" strokeWidth="3" strokeOpacity="0.5" strokeDasharray="15,8" />
-                <circle cx="50%" cy="50%" r="220" fill="none" stroke="hsl(142 71% 45%)" strokeWidth="2" strokeOpacity="0.3" />
-                
-                <text x="50%" y="35%" textAnchor="middle" className="fill-[hsl(0_84%_60%)]" style={{ fontSize: '16px', fontWeight: 700 }}>ISSUES</text>
-                <text x="70%" y="50%" textAnchor="middle" className="fill-[hsl(217_91%_60%)]" style={{ fontSize: '16px', fontWeight: 700 }}>POSITIONS</text>
-                <text x="80%" y="65%" textAnchor="middle" className="fill-[hsl(142_71%_45%)]" style={{ fontSize: '16px', fontWeight: 700 }}>ARGUMENTS</text>
-              </svg>
-            </div>
-            
-            {/* Dynamic zones if calculated */}
-            {zones && (() => { console.log('🎯 Dynamic zones available:', zones); return null; })()}
-            {zones && (
-              <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-45">
-                <svg className="w-full h-full">
-                  <circle cx="50%" cy="50%" r={zones.issue.outerRadius} fill={zones.issue.color} fillOpacity="0.1" stroke="hsl(var(--ibis-issue))" strokeWidth="2" strokeOpacity="0.4" />
-                  <circle cx="50%" cy="50%" r={zones.position.outerRadius} fill={zones.position.color} fillOpacity="0.08" stroke="hsl(var(--ibis-position))" strokeWidth="2" strokeOpacity="0.3" strokeDasharray="8,4" />
-                  <circle cx="50%" cy="50%" r={zones.position.innerRadius} fill="none" stroke="hsl(var(--ibis-position))" strokeWidth="1" strokeOpacity="0.2" />
-                  <circle cx="50%" cy="50%" r={zones.argument.outerRadius} fill={zones.argument.color} fillOpacity="0.08" stroke="hsl(var(--ibis-argument))" strokeWidth="2" strokeOpacity="0.3" strokeDasharray="12,6" />
-                  <circle cx="50%" cy="50%" r={zones.argument.innerRadius} fill="none" stroke="hsl(var(--ibis-argument))" strokeWidth="1" strokeOpacity="0.2" />
-                </svg>
-              </div>
-            )}
-            
             <ReactFlow
               nodeTypes={nodeTypes}
               nodes={nodes}
@@ -1209,7 +1177,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 animated: false,
               }}
             >
-              {/* ZONE BACKGROUNDS - Fixed to map coordinates */}
+              {/* ZONE BACKGROUNDS - Fixed to map coordinates and properly centered */}
               <Panel position="top-left" className="pointer-events-none">
                 <svg 
                   width="1600" 
@@ -1223,43 +1191,43 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                     zIndex: 0
                   }}
                 >
-                  {/* Issues zone - center circle at map center (800, 500) */}
+                  {/* Issues zone - center circle at proper map center */}
                   <circle 
-                    cx="800" cy="500" r="120" 
+                    cx="800" cy="400" r="120" 
                     fill="hsl(0 84% 95%)" fillOpacity="0.3" 
                     stroke="hsl(0 84% 60%)" strokeWidth="4" strokeOpacity="0.8" 
                   />
                   
                   {/* Positions zone - middle ring */}
                   <circle 
-                    cx="800" cy="500" r="220" 
+                    cx="800" cy="400" r="220" 
                     fill="hsl(217 91% 95%)" fillOpacity="0.2" 
                     stroke="hsl(217 91% 60%)" strokeWidth="4" strokeOpacity="0.7" 
                     strokeDasharray="12,6" 
                   />
                   <circle 
-                    cx="800" cy="500" r="120" 
+                    cx="800" cy="400" r="120" 
                     fill="none" 
                     stroke="hsl(217 91% 60%)" strokeWidth="2" strokeOpacity="0.5" 
                   />
                   
                   {/* Arguments zone - outer ring */}
                   <circle 
-                    cx="800" cy="500" r="320" 
+                    cx="800" cy="400" r="320" 
                     fill="hsl(142 71% 95%)" fillOpacity="0.2" 
                     stroke="hsl(142 71% 45%)" strokeWidth="4" strokeOpacity="0.7" 
                     strokeDasharray="18,9" 
                   />
                   <circle 
-                    cx="800" cy="500" r="220" 
+                    cx="800" cy="400" r="220" 
                     fill="none" 
                     stroke="hsl(142 71% 45%)" strokeWidth="2" strokeOpacity="0.5" 
                   />
                   
                   {/* Zone labels at map coordinates */}
-                  <text x="800" y="400" textAnchor="middle" className="fill-[hsl(0_84%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ISSUES</text>
-                  <text x="950" y="500" textAnchor="middle" className="fill-[hsl(217_91%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>POSITIONS</text>
-                  <text x="1050" y="550" textAnchor="middle" className="fill-[hsl(142_71%_45%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ARGUMENTS</text>
+                  <text x="800" y="300" textAnchor="middle" className="fill-[hsl(0_84%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ISSUES</text>
+                  <text x="950" y="400" textAnchor="middle" className="fill-[hsl(217_91%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>POSITIONS</text>
+                  <text x="1050" y="450" textAnchor="middle" className="fill-[hsl(142_71%_45%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ARGUMENTS</text>
                 </svg>
               </Panel>
               
