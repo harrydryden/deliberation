@@ -763,7 +763,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             nodesDraggable={true}
             nodesConnectable={true}
             elementsSelectable={true}
-            panOnDrag={false}
+            panOnDrag={[1, 2]} // Allow panning with middle and right mouse button
           >
             <Background />
             <Controls />
