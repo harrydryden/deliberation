@@ -16,6 +16,8 @@ import {
   ConnectionMode,
   ReactFlowInstance,
   OnConnectStartParams,
+  Handle,
+  Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import '../ibis/ibis-flow.css';
@@ -32,6 +34,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Save, X, Plus, Trash2, Edit3, Move, Link, Unlink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceDirectedLayout, getNodeDimensions } from '../ibis/ibis-layout';
+import CustomIbisNode from './CustomIbisNode';
 import { logger } from '@/utils/logger';
 
 interface IbisNode {
@@ -103,6 +106,11 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  
+  // Custom node types
+  const nodeTypes = {
+    custom: CustomIbisNode,
+  };
   const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
 
   // Node editing form state
@@ -287,29 +295,17 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
       return {
         id: node.id,
-        type: 'default',
+        type: 'custom',
         position,
         data: {
           label: node.title.length > 30 ? `${node.title.substring(0, 30)}...` : node.title,
           originalNode: node,
+          config,
+          scaleFactor,
         },
         style: {
-          backgroundColor: config.color,
-          color: 'white',
-          border: '2px solid white',
-          borderRadius: node.node_type === 'issue' ? '50%' : 
-                      node.node_type === 'argument' ? '0' : '8px',
           width: 120 * scaleFactor,
           height: node.node_type === 'argument' ? 120 * scaleFactor : 80 * scaleFactor,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '8px',
-          fontSize: '11px',
-          textAlign: 'center',
-          fontWeight: 'bold',
-          cursor: 'grab',
-          transform: node.node_type === 'argument' ? 'rotate(45deg)' : 'none',
         },
         draggable: true,
         selectable: true,
@@ -740,6 +736,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         ) : (
           // React Flow Map
           <ReactFlow
+            nodeTypes={nodeTypes}
             nodes={nodes}
             edges={edges}
             onNodesChange={handleNodesChange}
@@ -763,7 +760,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             nodesDraggable={true}
             nodesConnectable={true}
             elementsSelectable={true}
-            panOnDrag={[1, 2]} // Allow panning with middle and right mouse button
+            panOnDrag={true} // Allow panning with left mouse button when not on nodes
           >
             <Background />
             <Controls />
