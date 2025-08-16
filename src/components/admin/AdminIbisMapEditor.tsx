@@ -375,11 +375,11 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       nodesWithoutPositions.forEach((node, index) => {
         let targetRadius = 0;
         
-        // Use smaller, more consistent radii
-        const baseR1 = 200; // Fixed inner radius
+        // Use smaller, more consistent radii for compact layout
+        const baseR1 = 200; // Fixed, more predictable
         const R1 = baseR1;
-        const R2 = R1 + 120; // Closer spacing
-        const R3 = R2 + 120; // Consistent gaps
+        const R2 = R1 + 140; // Tighter spacing
+        const R3 = R2 + 140; // Consistent gaps
         
         // Determine target radius based on node type (in world space)
         if (node.node_type === 'issue') {
@@ -432,10 +432,21 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     };
 
     // Convert to React Flow nodes using saved or computed positions
-    const flowNodes: Node[] = ibisNodes.map((node) => {
-      const position = positionsMap.get(node.id) || { x: 100, y: 100 };
+    const flowNodes: Node[] = [];
+    
+    ibisNodes.forEach(node => {
+      // Use saved position if it exists, otherwise use computed position
+      let position;
+      if (node.position_x !== undefined && node.position_y !== undefined && 
+          node.position_x !== null && node.position_y !== null) {
+        position = { x: node.position_x, y: node.position_y };
+      } else {
+        position = positionsMap.get(node.id) || { x: 100, y: 100 };
+      }
+      
       const importance = calculateNodeImportance(node.id, ibisRelationships);
-      return createEnhancedFlowNode(node, position, importance, isAdmin || false);
+      const flowNode = createEnhancedFlowNode(node, position, importance, isAdmin || false);
+      flowNodes.push(flowNode);
     });
 
     // Convert relationships to React Flow edges with optimal handle routing
@@ -512,13 +523,14 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           color: config.color,
         },
         data: {
-          relationshipId: rel.id, // Ensure we're storing the valid relationship ID
-          relationshipType: rel.relationship_type, // Also store the type for reference
+          relationshipId: rel.id,
+          relationshipType: rel.relationship_type,
           label: config.label,
+          type: rel.relationship_type, // Add this for debug helper
         },
         animated: rel.relationship_type === 'supports', // Animate support relationships
         label: config.label,
-        labelStyle: { fontSize: 10 },
+        labelStyle: { fontSize: 10, fill: config.color },
       };
     });
 
@@ -1171,6 +1183,21 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       }))
     });
   }, [nodes, edges]);
+
+  // Debug helper for troubleshooting
+  useEffect(() => {
+    const userIsAdmin = !!user?.id; // TODO: Replace with proper admin check
+    console.log('🔍 Visualization Debug', {
+      nodesCount: nodes.length,
+      edgesCount: edges.length,
+      hasRelationshipEdges: edges.some(e => e.data?.type && e.data.type !== 'hierarchy'),
+      adminStatus: userIsAdmin,
+      draggableNodes: nodes.filter(n => n.draggable).length,
+      savedPositions: ibisNodes.filter(n => n.position_x !== null && n.position_x !== undefined).length,
+      relationshipTypes: edges.map(e => e.data?.relationshipType).filter(Boolean),
+      animatedEdges: edges.filter(e => e.animated).length
+    });
+  }, [nodes, edges, ibisNodes, user]);
 
 
   if (loading) {
