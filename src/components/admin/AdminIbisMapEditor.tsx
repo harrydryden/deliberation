@@ -806,44 +806,69 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       
       // Immediately remove from visual map for instant feedback
       const relationshipToDelete = editingEdge;
+      console.log('🔍 About to remove relationship from state:', relationshipToDelete.id);
       setIbisRelationships(prev => {
         const filtered = prev.filter(rel => rel.id !== relationshipToDelete.id);
-        console.log('🔍 Immediate visual removal - relationships remaining:', filtered.length);
+        console.log('🔍 Immediate visual removal - relationships before:', prev.length, 'after:', filtered.length);
+        console.log('🔍 Filtered out relationship:', relationshipToDelete.id);
         return filtered;
       });
       
       // Close dialog immediately for better UX
       setEditingEdge(null);
       
-      // Try to delete from database using direct query first
-      console.log('🔍 Attempting database deletion...');
-      const { error: directError } = await supabase
-        .from('ibis_relationships')
-        .delete()
-        .eq('id', relationshipToDelete.id);
+      // Try to delete from database using admin function first (more reliable)
+      console.log('🔍 Attempting admin deletion first...');
+      const { data: adminData, error: adminError } = await supabase.rpc('admin_delete_ibis_relationship', {
+        p_relationship_id: relationshipToDelete.id
+      });
 
-      if (directError) {
-        console.log('🔍 Direct deletion failed, trying admin function:', directError);
+      if (adminError || !adminData) {
+        console.log('🔍 Admin deletion failed, trying direct deletion:', adminError);
         
-        // Fallback to admin function for RLS bypass
-        const { data: adminData, error: adminError } = await supabase.rpc('admin_delete_ibis_relationship', {
-          p_relationship_id: relationshipToDelete.id
-        });
+        // Fallback to direct deletion
+        const { error: directError } = await supabase
+          .from('ibis_relationships')
+          .delete()
+          .eq('id', relationshipToDelete.id);
 
-        if (adminError || !adminData) {
-          console.error('🔍 Admin deletion also failed:', adminError);
+        if (directError) {
+          console.error('🔍 Both admin and direct deletion failed:', { adminError, directError });
           // Restore the relationship if both attempts failed
           setIbisRelationships(prev => {
             console.log('🔍 Restoring relationship due to deletion failure');
             return [...prev, relationshipToDelete];
           });
-          throw adminError || new Error('Deletion returned false');
+          throw directError;
         }
         
-        console.log('🔍 Admin deletion successful');
-      } else {
         console.log('🔍 Direct deletion successful');
+      } else {
+        console.log('🔍 Admin deletion successful');
       }
+      
+      // Force a data refresh to ensure consistency
+      console.log('🔍 Forcing data refresh after deletion...');
+      setTimeout(async () => {
+        try {
+          const { data: refreshedRelationships, error: refreshError } = await supabase.rpc('admin_get_ibis_relationships', {
+            target_deliberation_id: deliberationId
+          });
+          
+          if (!refreshError && refreshedRelationships) {
+            console.log('🔍 Refreshed relationships count:', refreshedRelationships.length);
+            const stillExists = refreshedRelationships.find(rel => rel.id === relationshipToDelete.id);
+            if (stillExists) {
+              console.warn('🔍 WARNING: Relationship still exists after deletion!', stillExists);
+            } else {
+              console.log('🔍 Confirmed: relationship successfully deleted');
+              setIbisRelationships(refreshedRelationships);
+            }
+          }
+        } catch (refreshError) {
+          console.error('🔍 Error refreshing data:', refreshError);
+        }
+      }, 500);
       
       // Only show success toast after confirmed database deletion
       toast({
