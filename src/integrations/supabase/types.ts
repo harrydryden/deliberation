@@ -1215,6 +1215,13 @@ export type Database = {
           target_node_id: string
         }[]
       }
+      admin_update_ibis_node_position: {
+        Args: { p_node_id: string; p_position_x: number; p_position_y: number }
+        Returns: {
+          id: string
+          updated_at: string
+        }[]
+      }
       admin_update_ibis_relationship: {
         Args: { p_relationship_id: string; p_relationship_type: string }
         Returns: {

@@ -642,20 +642,26 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     try {
       setSaving(true);
       
-      // Save all node positions
+      // Save all node positions using admin RPC function
       const positionUpdates = nodes.map(node => {
         const ibisNode = node.data.originalNode as IbisNode;
-        return supabase
-          .from('ibis_nodes')
-          .update({
-            position_x: node.position.x,
-            position_y: node.position.y,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', ibisNode.id);
+        return supabase.rpc('admin_update_ibis_node_position', {
+          p_node_id: ibisNode.id,
+          p_position_x: node.position.x,
+          p_position_y: node.position.y
+        });
       });
 
-      await Promise.all(positionUpdates);
+      const results = await Promise.all(positionUpdates);
+      
+      // Check for any errors
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        console.error('🔍 Errors updating node positions:', errors);
+        throw new Error('Failed to update some node positions');
+      }
+
+      console.log('🔍 Node positions updated successfully:', results.map(r => r.data));
 
       setHasUnsavedChanges(false);
 
