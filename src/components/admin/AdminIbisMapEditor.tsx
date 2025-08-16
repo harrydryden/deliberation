@@ -139,7 +139,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     height: 600
   });
   
-  // Zone definitions (fixed in world space)
+  // Zone definitions (fixed in world space, centered at origin)
   const zones = [
     { id: 'inner', worldRadius: 150, centerX: 0, centerY: 0, nodeTypes: ['issue'] },
     { id: 'middle', worldRadius: 300, centerX: 0, centerY: 0, nodeTypes: ['position'] },
@@ -1147,44 +1147,59 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 animated: false,
               }}
             >
-              {/* Background with zone circles rendered in world space */}
-              <svg className="react-flow__background absolute inset-0 pointer-events-none">
-                {/* Render zones in world coordinates that scale with viewport */}
+              <svg className="react-flow__background">
+                <defs>
+                  <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="hsl(var(--ibis-grid))" strokeWidth="0.5" opacity="0.2"/>
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+                
+                {/* Zone circles in world coordinates */}
                 {zones.map((zone, index) => (
-                  <circle
-                    key={zone.id}
-                    cx={zone.centerX}
-                    cy={zone.centerY}
-                    r={zone.worldRadius}
-                    fill={index === 0 ? "hsl(var(--ibis-issue))" : "none"}
-                    fillOpacity={index === 0 ? "0.05" : "0"}
-                    stroke={
-                      zone.nodeTypes[0] === 'issue' ? "hsl(var(--ibis-issue))" :
-                      zone.nodeTypes[0] === 'position' ? "hsl(var(--ibis-position))" :
-                      "hsl(var(--ibis-argument))"
-                    }
-                    strokeWidth="2"
-                    strokeOpacity="0.3"
-                    strokeDasharray={index === 0 ? "none" : "10,5"}
-                  />
+                  <g key={zone.id} transform={`translate(${zone.centerX}, ${zone.centerY})`}>
+                    <circle
+                      cx="0"
+                      cy="0"
+                      r={zone.worldRadius}
+                      fill={index === 0 ? "hsl(var(--ibis-issue))" : "none"}
+                      fillOpacity={index === 0 ? "0.03" : "0"}
+                      stroke={
+                        zone.nodeTypes[0] === 'issue' ? "hsl(var(--ibis-issue))" :
+                        zone.nodeTypes[0] === 'position' ? "hsl(var(--ibis-position))" :
+                        "hsl(var(--ibis-argument))"
+                      }
+                      strokeWidth="2"
+                      strokeOpacity="0.4"
+                      strokeDasharray={index === 0 ? "none" : "8,4"}
+                    />
+                    
+                    {/* Zone label */}
+                    <text 
+                      x="0" 
+                      y={-zone.worldRadius - 20} 
+                      textAnchor="middle" 
+                      fill="hsl(var(--muted-foreground))" 
+                      fontSize="16" 
+                      fontWeight="500"
+                    >
+                      {zone.nodeTypes[0] === 'issue' ? 'Issues (Center)' :
+                       zone.nodeTypes[0] === 'position' ? 'Positions (Middle Ring)' :
+                       'Arguments (Outer Ring)'}
+                    </text>
+                  </g>
                 ))}
                 
-                {/* Zone labels in world coordinates */}
-                <text x={zones[0].centerX} y={zones[0].centerY - zones[0].worldRadius - 20} 
-                      textAnchor="middle" className="fill-muted-foreground" fontSize="14" fontWeight="500">
-                  Issues (Center)
-                </text>
-                <text x={zones[1].centerX} y={zones[1].centerY - zones[1].worldRadius - 20} 
-                      textAnchor="middle" className="fill-muted-foreground" fontSize="14" fontWeight="500">
-                  Positions (Middle Ring)
-                </text>
-                <text x={zones[2].centerX} y={zones[2].centerY - zones[2].worldRadius - 20} 
-                      textAnchor="middle" className="fill-muted-foreground" fontSize="14" fontWeight="500">
-                  Arguments (Outer Ring)
-                </text>
+                {/* Center point indicator */}
+                <circle
+                  cx="0"
+                  cy="0"
+                  r="4"
+                  fill="hsl(var(--muted-foreground))"
+                  opacity="0.6"
+                />
               </svg>
               
-              <Background color="hsl(var(--ibis-grid))" gap={20} />
               <Controls />
             
               {/* Control Panel */}
