@@ -1,5 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useOptimizedState, useOptimizedArray } from '@/hooks/useOptimizedState';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   ReactFlow,
   Node,
@@ -37,7 +36,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Save, X, Plus, Trash2, Edit3, Move, Link, Unlink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
 import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceDirectedLayout, getNodeDimensions } from '../ibis/ibis-layout';
 import { applyConcentricLayout, constrainToZone, type ConcentricZones } from '../ibis/zone-layout';
 import { ZoneVisualization } from './ZoneVisualization';
@@ -101,18 +99,9 @@ const relationshipConfig = {
 export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }: AdminIbisMapEditorProps) => {
   console.log('🔍 IBIS Map Editor - Component initialized with props:', { deliberationId, deliberationTitle });
   
-  // Optimized state management to reduce re-renders
-  const [ibisNodes, setIbisNodes] = useOptimizedArray<IbisNode>([], 300);
-  const [ibisRelationships, setIbisRelationships] = useOptimizedArray<IbisRelationship>([], 300);
-  const [syncState, setSyncState] = useOptimizedState({ 
-    initialValue: { 
-      lastSync: Date.now(), 
-      conflictCount: 0, 
-      isOnline: true,
-      hasValidationErrors: false 
-    },
-    debounceMs: 100
-  });
+  // Simplified state management to prevent re-render loops
+  const [ibisNodes, setIbisNodes] = useState<IbisNode[]>([]);
+  const [ibisRelationships, setIbisRelationships] = useState<IbisRelationship[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -122,7 +111,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   const [selectedEdgeType, setSelectedEdgeType] = useState<'supports' | 'opposes' | 'relates_to' | 'responds_to'>('relates_to');
   
   const { toast } = useToast();
-  const { user } = useAuth();
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -161,9 +149,9 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   // ReactFlow instance ref
   const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   
-  const nodeTypes = {
+  const nodeTypes = useMemo(() => ({
     custom: CustomIbisNode,
-  };
+  }), []);
 
   // Enhanced edge deletion with proper temp ID handling
   const handleEdgeDelete = useCallback(async (edgeId: string) => {
@@ -212,7 +200,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     } finally {
       setSaving(false);
     }
-  }, [setIbisRelationships, toast]);
+  }, [toast]);
 
   // Handle edge changes with proper deletion support
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -239,15 +227,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     console.log('🔍 Connection attempt:', connection);
     
     if (!connection.source || !connection.target) return;
-
-    if (!user) {
-      toast({
-        title: "Error",
-        description: "You must be logged in to create relationships",
-        variant: "destructive",
-      });
-      return;
-    }
 
     const adminUserId = '1754a99d-2308-4b9c-ad02-bf943018237d';
     const tempId = `temp_${Date.now()}`;
@@ -315,7 +294,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         variant: "destructive",
       });
     }
-  }, [deliberationId, selectedEdgeType, user, toast, setIbisRelationships]);
+  }, [deliberationId, selectedEdgeType, toast]);
 
   // Fetch data from Supabase
   const fetchData = useCallback(async () => {
@@ -349,17 +328,17 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     } finally {
       setLoading(false);
     }
-  }, [deliberationId, toast, setIbisNodes, setIbisRelationships]);
+  }, [deliberationId, toast]);
 
-  // Load data on mount
+  // Load data on mount - memoized to prevent re-fetch loops
   useEffect(() => {
     if (deliberationId) {
       fetchData();
     }
-  }, [deliberationId, fetchData]);
+  }, [deliberationId]); // Removed fetchData from dependencies to prevent loops
 
-  // Convert data to React Flow format
-  useEffect(() => {
+  // Convert data to React Flow format - memoized to prevent re-calculation
+  const { flowNodes, flowEdges } = useMemo(() => {
     const flowNodes: Node[] = ibisNodes.map(node => ({
       id: node.id,
       type: 'custom',
@@ -388,9 +367,14 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       data: { relationshipType: rel.relationship_type },
     }));
 
+    return { flowNodes, flowEdges };
+  }, [ibisNodes, ibisRelationships]);
+
+  // Update nodes and edges when data changes
+  useEffect(() => {
     setNodes(flowNodes);
     setEdges(flowEdges);
-  }, [ibisNodes, ibisRelationships, setNodes, setEdges]);
+  }, [flowNodes, flowEdges, setNodes, setEdges]);
 
   if (loading) {
     return (
@@ -416,11 +400,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               Edit IBIS Map: {deliberationTitle}
             </CardTitle>
             <div className="flex items-center gap-2">
-              {!syncState.isOnline && (
-                <Badge variant="outline" className="text-xs">
-                  Offline
-                </Badge>
-              )}
               {hasUnsavedChanges && (
                 <Badge variant="secondary" className="text-orange-600">
                   Unsaved Changes
