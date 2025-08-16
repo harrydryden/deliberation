@@ -322,7 +322,32 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     });
 
     // Convert relationships to React Flow edges with optimal handle routing
-    const flowEdges: Edge[] = ibisRelationships.map((rel) => {
+    const flowEdges: Edge[] = ibisRelationships
+      .filter(rel => {
+        // Ensure the relationship has all required properties
+        if (!rel || !rel.id || !rel.source_node_id || !rel.target_node_id || !rel.relationship_type) {
+          console.warn('🔍 Skipping invalid relationship:', rel);
+          return false;
+        }
+        
+        // Ensure both source and target nodes exist
+        const sourceExists = flowNodes.some(node => node.id === rel.source_node_id);
+        const targetExists = flowNodes.some(node => node.id === rel.target_node_id);
+        
+        if (!sourceExists || !targetExists) {
+          console.warn('🔍 Skipping relationship with missing nodes:', {
+            relationshipId: rel.id,
+            sourceExists,
+            targetExists,
+            sourceId: rel.source_node_id,
+            targetId: rel.target_node_id
+          });
+          return false;
+        }
+        
+        return true;
+      })
+      .map((rel) => {
       const config = relationshipConfig[rel.relationship_type] || relationshipConfig.relates_to;
       
       // Find source and target nodes to calculate optimal handles
@@ -353,7 +378,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       }
       
       return {
-        id: rel.id,
+        id: rel.id, // Use the relationship ID as the edge ID
         source: rel.source_node_id,
         target: rel.target_node_id,
         sourceHandle,
@@ -369,7 +394,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           color: config.color,
         },
         data: {
-          relationshipId: rel.id, // Store just the ID to avoid data corruption
+          relationshipId: rel.id, // Ensure we're storing the valid relationship ID
+          relationshipType: rel.relationship_type, // Also store the type for reference
           label: config.label,
         },
         animated: false,
@@ -588,10 +614,11 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                   type: MarkerType.ArrowClosed,
                   color: config.color,
                 },
-        data: {
-          relationshipId: rel.id, // Store just the ID to avoid data corruption
-          label: config.label,
-        },
+                data: {
+                  relationshipId: rel.id, // Store just the ID to avoid data corruption
+                  relationshipType: rel.relationship_type, // Also store the type for reference
+                  label: config.label,
+                },
                 animated: false,
               };
             });
