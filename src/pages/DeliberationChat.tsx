@@ -259,23 +259,21 @@ const DeliberationChat = () => {
                 </div>
               </div>
 
-              <div className="p-3">
-                <div className="flex items-stretch gap-3 flex-wrap">
-                  <div className="flex flex-col gap-3 h-full">
-                    <div className="rounded-lg border bg-muted/40 p-3">
-                      <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
-                      <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
-                    </div>
-                    <div className="rounded-lg border bg-muted/40 p-3 flex-1">
-                      <div className="text-xs font-medium text-muted-foreground mb-2">View Mode</div>
-                      <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
-                    </div>
+              <div className="flex items-stretch gap-3 flex-wrap">
+                <div className="flex flex-col gap-3 h-full">
+                  <div className="rounded-lg border bg-muted/40 p-3">
+                    <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
+                    <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
                   </div>
-                  <div className="rounded-lg border bg-muted/40 p-3 h-full">
-                    <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
-                      <VoiceInterfaceLazy deliberationId={deliberation.id} variant="panel" />
-                    </Suspense>
+                  <div className="rounded-lg border bg-muted/40 p-3 flex-1">
+                    <div className="text-xs font-medium text-muted-foreground mb-2">View Mode</div>
+                    <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
                   </div>
+                </div>
+                <div className="rounded-lg border bg-muted/40 p-3 h-full">
+                  <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
+                    <VoiceInterfaceLazy deliberationId={deliberation.id} variant="panel" />
+                  </Suspense>
                 </div>
               </div>
 
