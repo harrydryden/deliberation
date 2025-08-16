@@ -1131,6 +1131,28 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               </div>
             )}
             
+            
+            {/* VERY OBVIOUS TEST OVERLAY */}
+            <div 
+              className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
+              style={{ 
+                background: 'linear-gradient(45deg, rgba(255,0,0,0.1) 0%, rgba(0,255,0,0.1) 50%, rgba(0,0,255,0.1) 100%)',
+                border: '5px solid orange'
+              }}
+            >
+              <div className="absolute top-10 left-10 bg-yellow-400 text-black p-4 rounded-lg text-xl font-bold">
+                🎯 ZONE OVERLAY TEST - CAN YOU SEE THIS?
+              </div>
+              <svg className="w-full h-full">
+                <circle cx="50%" cy="50%" r="150" fill="none" stroke="red" strokeWidth="10" strokeDasharray="20,10" />
+                <circle cx="50%" cy="50%" r="250" fill="none" stroke="blue" strokeWidth="8" strokeDasharray="15,5" />
+                <circle cx="50%" cy="50%" r="350" fill="none" stroke="green" strokeWidth="6" strokeDasharray="10,5" />
+                <text x="50%" y="45%" textAnchor="middle" style={{ fontSize: '24px', fontWeight: 'bold', fill: 'red' }}>ISSUES</text>
+                <text x="50%" y="50%" textAnchor="middle" style={{ fontSize: '20px', fontWeight: 'bold', fill: 'blue' }}>POSITIONS</text>
+                <text x="50%" y="55%" textAnchor="middle" style={{ fontSize: '18px', fontWeight: 'bold', fill: 'green' }}>ARGUMENTS</text>
+              </svg>
+            </div>
+            
             <ReactFlow
               nodeTypes={nodeTypes}
               nodes={nodes}
