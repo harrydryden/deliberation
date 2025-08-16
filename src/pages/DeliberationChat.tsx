@@ -7,10 +7,11 @@ import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
-const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({ default: m.IbisMapVisualization })));
+const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({
+  default: m.IbisMapVisualization
+})));
 import { useChat } from "@/hooks/useChat";
 import { AdminDeliberationView } from "@/components/admin/AdminDeliberationView";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ViewModeSelector } from "@/components/chat/ViewModeSelector";
@@ -18,7 +19,6 @@ import { Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
-
 import { useIsMobile } from "@/hooks/use-mobile";
 const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface"));
 import { logger } from "@/utils/logger";
@@ -39,7 +39,10 @@ const DeliberationChat = () => {
   } = useParams<{
     deliberationId: string;
   }>();
-  const { user, isLoading } = useAuth();
+  const {
+    user,
+    isLoading
+  } = useAuth();
   const isAdmin = user?.role === 'admin';
   const navigate = useNavigate();
   const {
@@ -63,14 +66,15 @@ const DeliberationChat = () => {
   const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<'chat' | 'ibis'>('chat');
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
-  
+
   // Scoring state - these would be tracked from actual user activity
   const [userScores, setUserScores] = useState({
-    engagement: 0, // Count of messages sent in current session
-    shares: 0,     // Count of IBIS submissions
-    sessions: 1    // Count of login sessions (4+ hours apart)
+    engagement: 0,
+    // Count of messages sent in current session
+    shares: 0,
+    // Count of IBIS submissions
+    sessions: 1 // Count of login sessions (4+ hours apart)
   });
-
   const {
     messages,
     isLoading: chatLoading,
@@ -82,7 +86,10 @@ const DeliberationChat = () => {
   const sendMessage = async (content: string) => {
     await originalSendMessage(content, chatMode);
     // Update engagement score when message is sent
-    setUserScores(prev => ({ ...prev, engagement: prev.engagement + 1 }));
+    setUserScores(prev => ({
+      ...prev,
+      engagement: prev.engagement + 1
+    }));
   };
   const handleAddToIbis = (messageId: string, messageContent: string) => {
     setIbisModal({
@@ -102,7 +109,10 @@ const DeliberationChat = () => {
     // Reload chat messages to reflect the updated submitted_to_ibis status
     loadChatHistory();
     // Update shares score when IBIS submission is successful
-    setUserScores(prev => ({ ...prev, shares: prev.shares + 1 }));
+    setUserScores(prev => ({
+      ...prev,
+      shares: prev.shares + 1
+    }));
   };
   useEffect(() => {
     setViewMode('chat');
@@ -122,7 +132,9 @@ const DeliberationChat = () => {
       return;
     }
     try {
-      logger.info('Loading deliberation details', { deliberationId });
+      logger.info('Loading deliberation details', {
+        deliberationId
+      });
       setLoading(true);
       const data = await deliberationService.getDeliberation(deliberationId);
       logger.info('Deliberation details loaded successfully', data);
@@ -179,14 +191,7 @@ const DeliberationChat = () => {
   };
   const ChatPanel = () => <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-hidden min-h-0">
-        <MessageList 
-          messages={messages} 
-          isLoading={chatLoading} 
-          isTyping={isTyping} 
-          onAddToIbis={handleAddToIbis} 
-          onRetry={retryMessage} 
-          deliberationId={deliberationId}
-        />
+        <MessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} deliberationId={deliberationId} />
       </div>
       <MessageInput onSendMessage={sendMessage} disabled={chatLoading} />
     </div>;
@@ -201,14 +206,12 @@ const DeliberationChat = () => {
       </Layout>;
   }
   if (!user || !deliberation) return null;
-  
+
   // Show simplified admin view for admin users
   if (isAdmin) {
-    return (
-      <Layout>
+    return <Layout>
         <AdminDeliberationView />
-      </Layout>
-    );
+      </Layout>;
   }
   return <Layout>
       <div className="flex flex-col bg-background rounded-lg border h-[calc(100vh-120px)] min-h-0">
@@ -233,16 +236,11 @@ const DeliberationChat = () => {
                       </div>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
                         <Users className="h-4 w-4" />
-                        <span>{(deliberation.participants?.length || deliberation.participant_count || 0)}/{deliberation.max_participants}</span>
+                        <span>{deliberation.participants?.length || deliberation.participant_count || 0}/{deliberation.max_participants}</span>
                       </div>
                     </div>
-                  {deliberation.description && (
-                    <>
-                      <p
-                        className="text-sm text-muted-foreground mt-1 line-clamp-6 cursor-pointer"
-                        onClick={() => setIsDescriptionOpen(true)}
-                        title="Click to view full description"
-                      >
+                  {deliberation.description && <>
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-6 cursor-pointer" onClick={() => setIsDescriptionOpen(true)} title="Click to view full description">
                         {deliberation.description}
                       </p>
                       <Dialog open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen}>
@@ -254,19 +252,9 @@ const DeliberationChat = () => {
                           </div>
                         </DialogContent>
                       </Dialog>
-                    </>
-                  )}
+                    </>}
                     <div className="mt-1">
-                      {!isParticipant && (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={handleJoinDeliberation}
-                          disabled={joiningDeliberation}
-                        >
-                          {joiningDeliberation ? 'Joining...' : 'Join Deliberation'}
-                        </Button>
-                      )}
+                      {!isParticipant}
                     </div>
                 </div>
               </div>
@@ -280,7 +268,7 @@ const DeliberationChat = () => {
                     </div>
                     <div className="rounded-lg border bg-muted/40 p-3 flex-1">
                       <div className="text-xs font-medium text-muted-foreground mb-2">View Mode</div>
-                      <ViewModeSelector mode={viewMode} onModeChange={(v) => v && setViewMode(v)} />
+                      <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
                     </div>
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-3 h-full">
@@ -292,12 +280,7 @@ const DeliberationChat = () => {
               </div>
 
               <div className="p-3">
-                <ParticipantScoring 
-                  engagement={userScores.engagement}
-                  shares={userScores.shares}
-                  sessions={userScores.sessions}
-                  target={10}
-                />
+                <ParticipantScoring engagement={userScores.engagement} shares={userScores.shares} sessions={userScores.sessions} target={10} />
               </div>
             </div>
           </div>
@@ -305,13 +288,9 @@ const DeliberationChat = () => {
         
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-h-0">
-          {viewMode === 'chat' ? (
-            <ChatPanel />
-          ) : (
-            <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading map…</div></div>}>
+          {viewMode === 'chat' ? <ChatPanel /> : <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading map…</div></div>}>
               <IbisMapVisualizationLazy deliberationId={deliberation.id} />
-            </Suspense>
-          )}
+            </Suspense>}
         </div>
         
         {/* IBIS Submission Modal */}
