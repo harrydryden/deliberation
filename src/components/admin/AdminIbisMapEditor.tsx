@@ -407,12 +407,15 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
   // Handle new connections
   const handleConnect = useCallback(async (connection: Connection) => {
+    console.log('🔍 Connection attempt:', connection);
     if (!connection.source || !connection.target) return;
 
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      // Get current session which is more reliable than getUser()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('🔍 Current session:', session, 'Error:', sessionError);
+      
+      if (!session?.user) {
         toast({
           title: "Error",
           description: "You must be logged in to create relationships",
@@ -426,7 +429,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         target_node_id: connection.target,
         relationship_type: selectedEdgeType,
         deliberation_id: deliberationId,
-        created_by: user.id,
+        created_by: session.user.id,
       };
 
       const { data, error } = await supabase
