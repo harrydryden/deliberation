@@ -179,9 +179,10 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   // Enforce zone constraints for a node
   const enforceZoneConstraints = useCallback((node: Node) => {
     const center = getViewportCenter();
-    const nodeType = node.data?.originalNode?.node_type as 'issue' | 'position' | 'argument';
+    const originalNode = node.data?.originalNode as IbisNode;
+    const nodeType = originalNode?.node_type;
     
-    // Get viewport position of node
+    if (!nodeType) return node;
     const viewportPos = worldToViewport(node.position.x, node.position.y);
     
     // Calculate distance from viewport center
