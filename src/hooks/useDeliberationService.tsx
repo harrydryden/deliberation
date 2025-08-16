@@ -124,61 +124,43 @@ class SupabaseDeliberationService implements DeliberationService {
     }
     
     const user = JSON.parse(storedUser);
-    const accessCode = user.accessCode; 
+    const userId = user.id; // This should be in format "access_ACCESSCODE"
     
-    logger.info('Using authenticated user for join', { accessCode: accessCode?.substring(0, 4) + '...' });
+    logger.info('Using authenticated user for join', { userId });
     
-    // Create or get a Supabase auth user for this access code
-    // We'll use a deterministic email based on the access code
-    const email = `${accessCode.toLowerCase()}@deliberation.local`;
-    const password = `${accessCode}_secure_password_2024!`;
-    
-    try {
-      // Try to sign up the user (this will fail if they already exist, which is fine)
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            access_code: accessCode,
-            display_name: user.profile?.displayName || `User_${accessCode.substring(0, 4)}`
-          }
-        }
-      });
-      
-      if (signUpError && !signUpError.message.includes('already registered')) {
-        logger.error('Error creating user:', signUpError);
-      } else if (signUpData.user) {
-        logger.info('Created new user:', { userId: signUpData.user.id });
+    // Generate a deterministic UUID that's always the same for the same access code
+    const generateDeterministicUUID = (input: string): string => {
+      // Simple hash function to convert string to pseudo-random but deterministic values
+      let hash = 0;
+      for (let i = 0; i < input.length; i++) {
+        const char = input.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
       }
-    } catch (error) {
-      logger.warn('Sign up attempt failed, user may already exist:', error);
-    }
+      
+      // Convert to positive number and pad
+      const positiveHash = Math.abs(hash).toString(16).padStart(8, '0');
+      
+      // Create UUID v4 format using deterministic values
+      return [
+        positiveHash.slice(0, 8),
+        positiveHash.slice(0, 4),
+        '4' + positiveHash.slice(1, 4), // v4 UUID starts with '4'
+        ((parseInt(positiveHash.slice(0, 1), 16) & 0x3) | 0x8).toString(16) + positiveHash.slice(1, 4),
+        positiveHash.slice(0, 8) + positiveHash.slice(0, 4)
+      ].join('-');
+    };
     
-    // Now sign in with the credentials
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    const participantUUID = generateDeterministicUUID(userId);
     
-    if (signInError) {
-      logger.error('Error signing in:', signInError);
-      throw new Error('Authentication failed');
-    }
-    
-    const authUserId = signInData.user?.id;
-    if (!authUserId) {
-      throw new Error('No user ID from authentication');
-    }
-    
-    logger.info('Successfully authenticated user', { authUserId });
+    logger.info('Generated UUID for participant', { originalId: userId, uuid: participantUUID });
     
     // Check if already a participant
     const { data: existing } = await supabase
       .from('participants')
       .select('id')
       .eq('deliberation_id', deliberationId)
-      .eq('user_id', authUserId)
+      .eq('user_id', participantUUID)
       .maybeSingle();
 
     if (existing) {
@@ -191,7 +173,7 @@ class SupabaseDeliberationService implements DeliberationService {
       .from('participants')
       .insert({
         deliberation_id: deliberationId,
-        user_id: authUserId,
+        user_id: participantUUID,
         role: 'participant'
       });
 
