@@ -289,44 +289,51 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     // ALWAYS apply concentric layout for zone enforcement
     console.log('🎯 Admin editor - Forcing concentric layout for ALL nodes');
     
-    const { positions: layoutPositions, zones: layoutZones } = applyConcentricLayout(
-      ibisNodes.map(n => ({
-        id: n.id,
-        title: n.title,
-        node_type: n.node_type,
-        position_x: null, // Force recalculation
-        position_y: null,
-        embedding: n.embedding || null,
-        parent_id: n.parent_id,
-        parent_node_id: undefined
-      })),
-      ibisRelationships.map(r => ({
-        source_node_id: r.source_node_id,
-        target_node_id: r.target_node_id,
-        relationship_type: r.relationship_type
-      })),
-      canvas
-    );
-    
-    console.log('🎯 Admin editor - Layout calculated:', {
-      positionsCount: layoutPositions.size,
-      zonesCalculated: !!layoutZones,
-      zones: layoutZones
-    });
-    
-    // Store zones for rendering
-    setZones(layoutZones);
-    
-    // Apply new positions to ALL nodes 
-    layoutPositions.forEach((pos, nodeId) => {
-      positionsMap.set(nodeId, { x: pos.x, y: pos.y });
-    });
-    
-    console.log('🎯 Admin editor - Concentric layout applied to ALL nodes:', {
-      positionsMapSize: positionsMap.size,
-      zonesSet: !!layoutZones,
-      samplePosition: positionsMap.entries().next().value
-    });
+    try {
+      const { positions: layoutPositions, zones: layoutZones } = applyConcentricLayout(
+        ibisNodes.map(n => ({
+          id: n.id,
+          title: n.title,
+          node_type: n.node_type,
+          position_x: null, // Force recalculation
+          position_y: null,
+          embedding: n.embedding || null,
+          parent_id: n.parent_id,
+          parent_node_id: undefined
+        })),
+        ibisRelationships.map(r => ({
+          source_node_id: r.source_node_id,
+          target_node_id: r.target_node_id,
+          relationship_type: r.relationship_type
+        })),
+        canvas
+      );
+      
+      console.log('🎯 Admin editor - Layout calculated:', {
+        positionsCount: layoutPositions.size,
+        zonesCalculated: !!layoutZones,
+        zones: layoutZones
+      });
+      
+      // Store zones for rendering
+      if (layoutZones) {
+        setZones(layoutZones);
+        console.log('🎯 Admin editor - Zones set in state:', layoutZones);
+      }
+      
+      // Apply new positions to ALL nodes 
+      layoutPositions.forEach((pos, nodeId) => {
+        positionsMap.set(nodeId, { x: pos.x, y: pos.y });
+      });
+      
+      console.log('🎯 Admin editor - Concentric layout applied to ALL nodes:', {
+        positionsMapSize: positionsMap.size,
+        zonesSet: !!layoutZones,
+        samplePosition: positionsMap.entries().next().value
+      });
+    } catch (error) {
+      console.error('🚨 Error applying concentric layout:', error);
+    }
 
     // Convert to React Flow nodes
     const flowNodes: Node[] = ibisNodes.map((node) => {
@@ -1132,26 +1139,37 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             )}
             
             
-            {/* VERY OBVIOUS TEST OVERLAY */}
+            {/* ACTUAL ZONE RENDERING */}
             <div 
-              className="absolute top-0 left-0 w-full h-full pointer-events-none z-50"
-              style={{ 
-                background: 'linear-gradient(45deg, rgba(255,0,0,0.1) 0%, rgba(0,255,0,0.1) 50%, rgba(0,0,255,0.1) 100%)',
-                border: '5px solid orange'
-              }}
+              className="absolute top-0 left-0 w-full h-full pointer-events-none z-40"
             >
-              <div className="absolute top-10 left-10 bg-yellow-400 text-black p-4 rounded-lg text-xl font-bold">
-                🎯 ZONE OVERLAY TEST - CAN YOU SEE THIS?
-              </div>
               <svg className="w-full h-full">
-                <circle cx="50%" cy="50%" r="150" fill="none" stroke="red" strokeWidth="10" strokeDasharray="20,10" />
-                <circle cx="50%" cy="50%" r="250" fill="none" stroke="blue" strokeWidth="8" strokeDasharray="15,5" />
-                <circle cx="50%" cy="50%" r="350" fill="none" stroke="green" strokeWidth="6" strokeDasharray="10,5" />
-                <text x="50%" y="45%" textAnchor="middle" style={{ fontSize: '24px', fontWeight: 'bold', fill: 'red' }}>ISSUES</text>
-                <text x="50%" y="50%" textAnchor="middle" style={{ fontSize: '20px', fontWeight: 'bold', fill: 'blue' }}>POSITIONS</text>
-                <text x="50%" y="55%" textAnchor="middle" style={{ fontSize: '18px', fontWeight: 'bold', fill: 'green' }}>ARGUMENTS</text>
+                {/* Fixed zones until dynamic calculation works */}
+                <circle cx="50%" cy="50%" r="120" fill="hsl(0 84% 95%)" fillOpacity="0.2" stroke="hsl(0 84% 60%)" strokeWidth="3" strokeOpacity="0.6" />
+                <circle cx="50%" cy="50%" r="220" fill="hsl(217 91% 95%)" fillOpacity="0.15" stroke="hsl(217 91% 60%)" strokeWidth="3" strokeOpacity="0.5" strokeDasharray="10,5" />
+                <circle cx="50%" cy="50%" r="120" fill="none" stroke="hsl(217 91% 60%)" strokeWidth="2" strokeOpacity="0.3" />
+                <circle cx="50%" cy="50%" r="320" fill="hsl(142 71% 95%)" fillOpacity="0.15" stroke="hsl(142 71% 45%)" strokeWidth="3" strokeOpacity="0.5" strokeDasharray="15,8" />
+                <circle cx="50%" cy="50%" r="220" fill="none" stroke="hsl(142 71% 45%)" strokeWidth="2" strokeOpacity="0.3" />
+                
+                <text x="50%" y="35%" textAnchor="middle" className="fill-[hsl(0_84%_60%)]" style={{ fontSize: '16px', fontWeight: 700 }}>ISSUES</text>
+                <text x="70%" y="50%" textAnchor="middle" className="fill-[hsl(217_91%_60%)]" style={{ fontSize: '16px', fontWeight: 700 }}>POSITIONS</text>
+                <text x="80%" y="65%" textAnchor="middle" className="fill-[hsl(142_71%_45%)]" style={{ fontSize: '16px', fontWeight: 700 }}>ARGUMENTS</text>
               </svg>
             </div>
+            
+            {/* Dynamic zones if calculated */}
+            {zones && (() => { console.log('🎯 Dynamic zones available:', zones); return null; })()}
+            {zones && (
+              <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-45">
+                <svg className="w-full h-full">
+                  <circle cx="50%" cy="50%" r={zones.issue.outerRadius} fill={zones.issue.color} fillOpacity="0.1" stroke="hsl(var(--ibis-issue))" strokeWidth="2" strokeOpacity="0.4" />
+                  <circle cx="50%" cy="50%" r={zones.position.outerRadius} fill={zones.position.color} fillOpacity="0.08" stroke="hsl(var(--ibis-position))" strokeWidth="2" strokeOpacity="0.3" strokeDasharray="8,4" />
+                  <circle cx="50%" cy="50%" r={zones.position.innerRadius} fill="none" stroke="hsl(var(--ibis-position))" strokeWidth="1" strokeOpacity="0.2" />
+                  <circle cx="50%" cy="50%" r={zones.argument.outerRadius} fill={zones.argument.color} fillOpacity="0.08" stroke="hsl(var(--ibis-argument))" strokeWidth="2" strokeOpacity="0.3" strokeDasharray="12,6" />
+                  <circle cx="50%" cy="50%" r={zones.argument.innerRadius} fill="none" stroke="hsl(var(--ibis-argument))" strokeWidth="1" strokeOpacity="0.2" />
+                </svg>
+              </div>
+            )}
             
             <ReactFlow
               nodeTypes={nodeTypes}
