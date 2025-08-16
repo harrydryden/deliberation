@@ -453,11 +453,88 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       allRelationshipIds: ibisRelationships.map(r => r.id)
     });
 
+    // Add zone background nodes to show zones in the ReactFlow coordinate system
+    const zoneBackgroundNodes: Node[] = [
+      {
+        id: 'zone-issues',
+        type: 'custom',
+        position: { x: 680, y: 380 }, // Position zones centered at layout center (800, 500)
+        data: {
+          label: 'ISSUES',
+          isZoneBackground: true,
+          zoneType: 'issues',
+        },
+        style: {
+          width: 240,
+          height: 240,
+          border: '4px solid hsl(0 84% 60%)',
+          borderRadius: '50%',
+          backgroundColor: 'hsl(0 84% 95%)',
+          opacity: 0.3,
+          pointerEvents: 'none',
+          zIndex: -1,
+        },
+        draggable: false,
+        selectable: false,
+        connectable: false,
+      },
+      {
+        id: 'zone-positions',
+        type: 'custom',
+        position: { x: 580, y: 280 },
+        data: {
+          label: 'POSITIONS',
+          isZoneBackground: true,
+          zoneType: 'positions',
+        },
+        style: {
+          width: 440,
+          height: 440,
+          border: '4px dashed hsl(217 91% 60%)',
+          borderRadius: '50%',
+          backgroundColor: 'hsl(217 91% 95%)',
+          opacity: 0.2,
+          pointerEvents: 'none',
+          zIndex: -1,
+        },
+        draggable: false,
+        selectable: false,
+        connectable: false,
+      },
+      {
+        id: 'zone-arguments',
+        type: 'custom',
+        position: { x: 480, y: 180 },
+        data: {
+          label: 'ARGUMENTS',
+          isZoneBackground: true,
+          zoneType: 'arguments',
+        },
+        style: {
+          width: 640,
+          height: 640,
+          border: '4px dashed hsl(142 71% 45%)',
+          borderRadius: '50%',
+          backgroundColor: 'hsl(142 71% 95%)',
+          opacity: 0.2,
+          pointerEvents: 'none',
+          zIndex: -1,
+        },
+        draggable: false,
+        selectable: false,
+        connectable: false,
+      },
+    ];
+
+    // Combine content nodes with zone background nodes
+    const allNodes = [...zoneBackgroundNodes, ...flowNodes];
+
     console.log('🔍 Setting new nodes and edges:', { 
-      newNodesCount: flowNodes.length, 
-      newEdgesCount: flowEdges.length 
+      newNodesCount: allNodes.length, 
+      newEdgesCount: flowEdges.length,
+      zoneNodesAdded: zoneBackgroundNodes.length
     });
-    setNodes(flowNodes);
+    setNodes(allNodes);
     setEdges(flowEdges);
   }, [ibisNodes, ibisRelationships, setNodes, setEdges]);
 
@@ -1177,64 +1254,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 animated: false,
               }}
             >
-              {/* ZONE BACKGROUNDS - Part of ReactFlow coordinate system */}
-              <Panel position="top-left" className="pointer-events-none">
-                <svg 
-                  width="1600" 
-                  height="1000"
-                  viewBox="0 0 1600 1000"
-                  style={{ 
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    pointerEvents: 'none',
-                    zIndex: 0
-                  }}
-                >
-                  {/* Issues zone - center circle at layout center (800, 500) */}
-                  <circle 
-                    cx="800" cy="500" r="120" 
-                    fill="hsl(0 84% 95%)" fillOpacity="0.3" 
-                    stroke="hsl(0 84% 60%)" strokeWidth="4" strokeOpacity="0.8" 
-                  />
-                  
-                  {/* Positions zone - middle ring */}
-                  <circle 
-                    cx="800" cy="500" r="220" 
-                    fill="hsl(217 91% 95%)" fillOpacity="0.2" 
-                    stroke="hsl(217 91% 60%)" strokeWidth="4" strokeOpacity="0.7" 
-                    strokeDasharray="12,6" 
-                  />
-                  <circle 
-                    cx="800" cy="500" r="120" 
-                    fill="none" 
-                    stroke="hsl(217 91% 60%)" strokeWidth="2" strokeOpacity="0.5" 
-                  />
-                  
-                  {/* Arguments zone - outer ring */}
-                  <circle 
-                    cx="800" cy="500" r="320" 
-                    fill="hsl(142 71% 95%)" fillOpacity="0.2" 
-                    stroke="hsl(142 71% 45%)" strokeWidth="4" strokeOpacity="0.7" 
-                    strokeDasharray="18,9" 
-                  />
-                  <circle 
-                    cx="800" cy="500" r="220" 
-                    fill="none" 
-                    stroke="hsl(142 71% 45%)" strokeWidth="2" strokeOpacity="0.5" 
-                  />
-                  
-                  {/* Zone labels */}
-                  <text x="800" y="400" textAnchor="middle" className="fill-[hsl(0_84%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ISSUES</text>
-                  <text x="950" y="500" textAnchor="middle" className="fill-[hsl(217_91%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>POSITIONS</text>
-                  <text x="1050" y="550" textAnchor="middle" className="fill-[hsl(142_71%_45%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ARGUMENTS</text>
-                  
-                  {/* Debug marker at center */}
-                  <circle cx="800" cy="500" r="10" fill="orange" opacity="0.8" />
-                  <text x="810" y="490" className="fill-orange-600" style={{ fontSize: '12px', fontWeight: 600 }}>CENTER</text>
-                </svg>
-              </Panel>
-              
               <Background color="hsl(var(--ibis-grid))" gap={20} />
               <Controls />
             <Background />
