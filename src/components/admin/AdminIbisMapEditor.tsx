@@ -139,46 +139,33 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     height: 600
   });
   
-  // Zone definitions (equal areas) - fixed in world space, centered at origin
-  const baseRadius = 120; // Base radius for first zone
-  const zones = [
-    { 
-      id: 'inner', 
-      worldRadius: baseRadius, 
-      centerX: 0, 
-      centerY: 0, 
-      nodeTypes: ['issue'],
-      color: 'hsl(var(--ibis-issue))',
-      bgColor: 'hsl(var(--ibis-zone-issue))'
+  // Zone definitions for consistent layout (world coordinates)
+  const baseRadius = 120;
+  const zones = {
+    issue: { 
+      outerRadius: baseRadius,
+      centerX: 800, // Match layout center
+      centerY: 500  // Match layout center
     },
-    { 
-      id: 'middle', 
-      worldRadius: baseRadius * Math.sqrt(2), // √2 for equal area
-      centerX: 0, 
-      centerY: 0, 
-      nodeTypes: ['position'],
-      color: 'hsl(var(--ibis-position))', 
-      bgColor: 'hsl(var(--ibis-zone-position))'
+    position: { 
+      outerRadius: baseRadius * Math.sqrt(2),
+      centerX: 800,
+      centerY: 500
     },
-    { 
-      id: 'outer', 
-      worldRadius: baseRadius * Math.sqrt(3), // √3 for equal area
-      centerX: 0, 
-      centerY: 0, 
-      nodeTypes: ['argument'],
-      color: 'hsl(var(--ibis-argument))',
-      bgColor: 'hsl(var(--ibis-zone-argument))'
+    argument: { 
+      outerRadius: baseRadius * Math.sqrt(3),
+      centerX: 800,
+      centerY: 500
     }
-  ];
-  
+  };
+
   // Custom node types
   const nodeTypes = {
     custom: CustomIbisNode,
   };
   const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Node-zone constraint system (everything in world space)
+  // Node-zone constraint system (world coordinates)
   const constrainNodeToZone = useCallback((node: Node) => {
     const originalNode = node.data?.originalNode as IbisNode;
     const nodeType = originalNode?.node_type;
@@ -186,10 +173,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     if (!nodeType) return node;
     
     // Find the zone for this node type
-    const zone = zones.find(z => z.nodeTypes.includes(nodeType));
-    if (!zone) return node;
-    
-    const zoneIndex = zones.indexOf(zone);
+    const zone = nodeType === 'issue' ? zones.issue : 
+                 nodeType === 'position' ? zones.position : zones.argument;
     
     // Calculate distance from zone center in world space
     const dx = node.position.x - zone.centerX;
@@ -197,9 +182,10 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     const distance = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx);
     
-    // Define ring boundaries in world space
-    const innerRadius = zoneIndex > 0 ? zones[zoneIndex - 1].worldRadius : 0;
-    const outerRadius = zone.worldRadius;
+    // Define zone boundaries
+    const innerRadius = nodeType === 'issue' ? 0 : 
+                       nodeType === 'position' ? zones.issue.outerRadius : zones.position.outerRadius;
+    const outerRadius = zone.outerRadius;
     
     // Node radius for padding
     const nodeRadius = originalNode?.node_type === 'argument' ? 60 : 40;
@@ -403,7 +389,9 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         argument: nodesWithoutPositions.filter(n => n.node_type === 'argument')
       };
       
-      // Use equal-area zone radii for consistent spacing
+      // Use consistent center coordinates and equal-area zone radii
+      const centerX = 800; // Fixed center X - matches zones
+      const centerY = 500; // Fixed center Y - matches zones
       const baseRadius = 120;
       const R1 = baseRadius;
       const R2 = baseRadius * Math.sqrt(2);
@@ -435,8 +423,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             const radius = targetRadius + radiusVariation;
             
             position = {
-              x: radius * Math.cos(angle),
-              y: radius * Math.sin(angle)
+              x: centerX + radius * Math.cos(angle),
+              y: centerY + radius * Math.sin(angle)
             };
             
             attempts++;
@@ -586,6 +574,35 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           label: config.label
         },
       });
+    });
+
+    // Create IBIS relationship edges - THIS IS CRITICAL!
+    ibisRelationships.forEach(rel => {
+      // Only create edges if both nodes are in the filtered set
+      if (ibisNodes.some(n => n.id === rel.source_node_id) && 
+          ibisNodes.some(n => n.id === rel.target_node_id)) {
+        const config = relationshipConfig[rel.relationship_type];
+        flowEdges.push({
+          id: rel.id,
+          source: rel.source_node_id,
+          target: rel.target_node_id,
+          type: 'smoothstep',
+          animated: rel.relationship_type === 'supports',
+          style: { 
+            stroke: config.color, 
+            strokeWidth: 2,
+            strokeDasharray: rel.relationship_type === 'opposes' ? '5,5' : undefined
+          },
+          markerEnd: { 
+            type: MarkerType.ArrowClosed, 
+            color: config.color 
+          },
+          label: config.label,
+          labelStyle: { fontSize: 10, fill: config.color },
+          labelBgStyle: { fill: 'white', fillOpacity: 0.8 },
+          data: { type: rel.relationship_type },
+        });
+      }
     });
 
     setNodes(flowNodes);
