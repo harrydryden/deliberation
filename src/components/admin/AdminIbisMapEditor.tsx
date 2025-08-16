@@ -1139,7 +1139,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             )}
             
             {/* Fixed viewport zone overlays that don't zoom */}
-            <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
+            <div className="absolute inset-0 pointer-events-none z-[1] flex items-center justify-center">
               <svg width="800" height="600" className="absolute">
                 {/* Issue zone (center circle) */}
                 <circle
