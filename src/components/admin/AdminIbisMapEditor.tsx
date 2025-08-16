@@ -637,34 +637,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       });
     });
 
-    // Create IBIS relationship edges - THIS IS CRITICAL!
-    ibisRelationships.forEach(rel => {
-      // Only create edges if both nodes are in the filtered set
-      if (ibisNodes.some(n => n.id === rel.source_node_id) && 
-          ibisNodes.some(n => n.id === rel.target_node_id)) {
-        const config = relationshipConfig[rel.relationship_type];
-        flowEdges.push({
-          id: rel.id,
-          source: rel.source_node_id,
-          target: rel.target_node_id,
-          type: 'smoothstep',
-          animated: rel.relationship_type === 'supports',
-          style: { 
-            stroke: config.color, 
-            strokeWidth: 2,
-            strokeDasharray: rel.relationship_type === 'opposes' ? '5,5' : undefined
-          },
-          markerEnd: { 
-            type: MarkerType.ArrowClosed, 
-            color: config.color 
-          },
-          label: config.label,
-          labelStyle: { fontSize: 10, fill: config.color },
-          labelBgStyle: { fill: 'white', fillOpacity: 0.8 },
-          data: { type: rel.relationship_type },
-        });
-      }
-    });
+    // Edge creation is already handled above with proper data structure
 
     setNodes(flowNodes);
     setEdges(flowEdges);
