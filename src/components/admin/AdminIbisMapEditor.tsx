@@ -130,7 +130,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   
-  // Viewport/camera state for pan/zoom
+  // Viewport/camera state for pan/zoom (world space camera)
   const [viewport, setViewport] = useState({
     scale: 1.0,
     offsetX: 0,
