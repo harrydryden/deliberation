@@ -1139,89 +1139,89 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             )}
             
             {/* Fixed viewport zone overlays that don't zoom */}
-            <div className="absolute inset-0 pointer-events-none z-0 flex items-center justify-center">
-              <svg width="100%" height="100%" className="opacity-30" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+            <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
+              <svg width="800" height="600" className="absolute">
                 {/* Issue zone (center circle) */}
                 <circle
-                  cx="50"
-                  cy="50"
-                  r="12"
+                  cx="400"
+                  cy="300"
+                  r="120"
                   fill="hsl(0 84% 95%)"
                   stroke="hsl(0 84% 60%)"
-                  strokeWidth="0.4"
+                  strokeWidth="4"
                   strokeOpacity="0.8"
                   fillOpacity="0.3"
                 />
                 
                 {/* Position zone (middle ring) */}
                 <circle
-                  cx="50"
-                  cy="50"
-                  r="22"
+                  cx="400"
+                  cy="300"
+                  r="220"
                   fill="hsl(217 91% 95%)"
                   stroke="hsl(217 91% 60%)"
-                  strokeWidth="0.4"
+                  strokeWidth="4"
                   strokeOpacity="0.7"
-                  strokeDasharray="1.2,0.6"
+                  strokeDasharray="12,6"
                   fillOpacity="0.2"
                 />
                 <circle
-                  cx="50"
-                  cy="50"
-                  r="12"
+                  cx="400"
+                  cy="300"
+                  r="120"
                   fill="none"
                   stroke="hsl(217 91% 60%)"
-                  strokeWidth="0.2"
+                  strokeWidth="2"
                   strokeOpacity="0.5"
                 />
                 
                 {/* Argument zone (outer ring) */}
                 <circle
-                  cx="50"
-                  cy="50"
-                  r="32"
+                  cx="400"
+                  cy="300"
+                  r="290"
                   fill="hsl(142 71% 95%)"
                   stroke="hsl(142 71% 45%)"
-                  strokeWidth="0.4"
+                  strokeWidth="4"
                   strokeOpacity="0.7"
-                  strokeDasharray="1.8,0.9"
+                  strokeDasharray="18,9"
                   fillOpacity="0.2"
                 />
                 <circle
-                  cx="50"
-                  cy="50"
-                  r="22"
+                  cx="400"
+                  cy="300"
+                  r="220"
                   fill="none"
                   stroke="hsl(142 71% 45%)"
-                  strokeWidth="0.2"
+                  strokeWidth="2"
                   strokeOpacity="0.5"
                 />
                 
                 {/* Zone labels */}
                 <text
-                  x="50"
-                  y="40"
+                  x="400"
+                  y="200"
                   textAnchor="middle"
                   className="fill-[hsl(0_84%_60%)]"
-                  style={{ fontSize: '2px', fontWeight: 700 }}
+                  style={{ fontSize: '20px', fontWeight: 700 }}
                 >
                   ISSUES
                 </text>
                 <text
-                  x="68"
-                  y="50"
+                  x="550"
+                  y="300"
                   textAnchor="middle"
                   className="fill-[hsl(217_91%_60%)]"
-                  style={{ fontSize: '2px', fontWeight: 700 }}
+                  style={{ fontSize: '20px', fontWeight: 700 }}
                 >
                   POSITIONS
                 </text>
                 <text
-                  x="78"
-                  y="58"
+                  x="650"
+                  y="350"
                   textAnchor="middle"
                   className="fill-[hsl(142_71%_45%)]"
-                  style={{ fontSize: '2px', fontWeight: 700 }}
+                  style={{ fontSize: '20px', fontWeight: 700 }}
                 >
                   ARGUMENTS
                 </text>
