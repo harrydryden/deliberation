@@ -1215,6 +1215,13 @@ export type Database = {
           target_node_id: string
         }[]
       }
+      admin_update_ibis_relationship: {
+        Args: { p_relationship_id: string; p_relationship_type: string }
+        Returns: {
+          id: string
+          updated_at: string
+        }[]
+      }
       assign_access_codes_to_users: {
         Args: Record<PropertyKey, never>
         Returns: undefined
