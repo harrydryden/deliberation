@@ -139,8 +139,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     height: 600
   });
   
-  // Zone definitions for consistent layout (world coordinates)
-  const baseRadius = 120;
+  // Zone definitions with much larger radii for better spacing
+  const baseRadius = 200; // Increased from 120
   const zones = {
     issue: { 
       outerRadius: baseRadius,
@@ -148,12 +148,12 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       centerY: 500  // Match layout center
     },
     position: { 
-      outerRadius: baseRadius * Math.sqrt(2),
+      outerRadius: baseRadius * 1.8, // Increased spacing between zones
       centerX: 800,
       centerY: 500
     },
     argument: { 
-      outerRadius: baseRadius * Math.sqrt(3),
+      outerRadius: baseRadius * 2.6, // Much larger outer zone
       centerX: 800,
       centerY: 500
     }
@@ -389,47 +389,48 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         argument: nodesWithoutPositions.filter(n => n.node_type === 'argument')
       };
       
-      // Use consistent center coordinates and equal-area zone radii
+      // Use larger zones and better collision detection
       const centerX = 800; // Fixed center X - matches zones
       const centerY = 500; // Fixed center Y - matches zones
-      const baseRadius = 120;
+      const baseRadius = 200; // Match zones
       const R1 = baseRadius;
-      const R2 = baseRadius * Math.sqrt(2);
-      const R3 = baseRadius * Math.sqrt(3);
+      const R2 = baseRadius * 1.8;
+      const R3 = baseRadius * 2.6;
       
       const zoneRadii = {
-        issue: R1 * 0.7, // 70% into the zone
+        issue: R1 * 0.6, // 60% into the zone for better spacing
         position: R1 + (R2 - R1) * 0.5, // Middle of ring
         argument: R2 + (R3 - R2) * 0.5 // Middle of outer ring
       };
       
-      // Apply collision detection and spacing for each node type
+      // Apply improved collision detection and spacing for each node type
       Object.entries(nodesByType).forEach(([nodeType, typeNodes]) => {
         const targetRadius = zoneRadii[nodeType as keyof typeof zoneRadii];
-        const minDistance = 80; // Minimum distance between nodes to prevent overlap
+        const minDistance = 60; // Reduced minimum distance for more flexible spacing
         
         typeNodes.forEach((node, index) => {
           let attempts = 0;
           let position;
           
           do {
-            // Calculate angle with some randomization to avoid perfect alignment
-            const baseAngle = (index / typeNodes.length) * 2 * Math.PI;
-            const angleOffset = (Math.random() - 0.5) * 0.3; // Small random offset
-            const angle = baseAngle + angleOffset;
+            // Use spiral placement for better distribution
+            const spiralFactor = Math.floor(index / 6); // 6 nodes per spiral layer
+            const angleStep = (2 * Math.PI) / Math.max(6, typeNodes.length / (spiralFactor + 1));
+            const baseAngle = (index % Math.max(6, typeNodes.length / (spiralFactor + 1))) * angleStep;
             
-            // Add some radius variation to avoid perfect circles
-            const radiusVariation = (Math.random() - 0.5) * 40;
-            const radius = targetRadius + radiusVariation;
+            // Add spiral offset and some randomization
+            const spiralOffset = spiralFactor * 40; // Each spiral layer 40px further out
+            const radiusVariation = (Math.random() - 0.5) * 30;
+            const radius = targetRadius + spiralOffset + radiusVariation;
             
             position = {
-              x: centerX + radius * Math.cos(angle),
-              y: centerY + radius * Math.sin(angle)
+              x: centerX + radius * Math.cos(baseAngle),
+              y: centerY + radius * Math.sin(baseAngle)
             };
             
             attempts++;
           } while (
-            attempts < 20 && 
+            attempts < 30 && // More attempts for better placement
             Array.from(positionsMap.values()).some(existingPos => {
               const dx = position.x - existingPos.x;
               const dy = position.y - existingPos.y;
