@@ -326,7 +326,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       .filter(rel => {
         // Ensure the relationship has all required properties
         if (!rel || !rel.id || !rel.source_node_id || !rel.target_node_id || !rel.relationship_type) {
-          console.warn('🔍 Skipping invalid relationship:', rel);
+          console.warn('🔍 Filtering out invalid relationship:', rel);
           return false;
         }
         
@@ -335,7 +335,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         const targetExists = flowNodes.some(node => node.id === rel.target_node_id);
         
         if (!sourceExists || !targetExists) {
-          console.warn('🔍 Skipping relationship with missing nodes:', {
+          console.warn('🔍 Filtering out relationship with missing nodes:', {
             relationshipId: rel.id,
             sourceExists,
             targetExists,
@@ -345,6 +345,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           return false;
         }
         
+        console.log('🔍 Including valid relationship:', { id: rel.id, type: rel.relationship_type });
         return true;
       })
       .map((rel) => {
@@ -572,16 +573,21 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
       console.log('🔍 Adding new relationship to local state:', fullRelationship);
       setIbisRelationships(prev => {
-        const updated = [...prev, fullRelationship];
-        console.log('🔍 State update - before:', prev.length, 'after:', updated.length);
-        console.log('🔍 New relationship in state:', updated.find(r => r.id === fullRelationship.id));
-        console.log('🔍 All relationships in updated state:', updated.map(r => ({ id: r.id, type: r.relationship_type })));
+        // Filter out any undefined/invalid relationships first
+        const cleanPrev = prev.filter(rel => rel && rel.id && rel.source_node_id && rel.target_node_id);
+        console.log('🔍 State update - cleaned before:', cleanPrev.length, 'raw before:', prev.length);
         
-        // Trigger immediate UI update by also forcing a re-render
-        setTimeout(() => {
-          console.log('🔍 Triggering convertToFlowNodes after relationship addition');
-          convertToFlowNodes();
-        }, 100);
+        // Check if this relationship already exists
+        const exists = cleanPrev.find(r => r.id === fullRelationship.id);
+        if (exists) {
+          console.log('🔍 Relationship already exists, not adding duplicate');
+          return cleanPrev;
+        }
+        
+        const updated = [...cleanPrev, fullRelationship];
+        console.log('🔍 State update - after:', updated.length);
+        console.log('🔍 New relationship verified in state:', updated.find(r => r.id === fullRelationship.id));
+        console.log('🔍 All relationship IDs:', updated.map(r => r.id));
         
         return updated;
       });
