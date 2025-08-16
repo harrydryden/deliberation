@@ -790,10 +790,11 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       console.log('🔍 Relationship created successfully:', data);
 
       // Add to local state - this will trigger convertDataToFlowElements
+      const relationshipData = Array.isArray(data) ? data[0] : data;
       const fullRelationship: IbisRelationship = {
-        id: data.id,
+        id: relationshipData.id,
         ...newRelationship,
-        created_at: data.created_at,
+        created_at: relationshipData.created_at,
       };
 
       console.log('🔍 Adding new relationship to local state:', fullRelationship);
