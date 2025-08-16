@@ -1191,43 +1191,47 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                     zIndex: 0
                   }}
                 >
-                  {/* Issues zone - center circle at proper map center */}
+                  {/* Issues zone - center circle at actual layout center (800, 500) */}
                   <circle 
-                    cx="800" cy="400" r="120" 
+                    cx="800" cy="500" r="120" 
                     fill="hsl(0 84% 95%)" fillOpacity="0.3" 
                     stroke="hsl(0 84% 60%)" strokeWidth="4" strokeOpacity="0.8" 
                   />
                   
                   {/* Positions zone - middle ring */}
                   <circle 
-                    cx="800" cy="400" r="220" 
+                    cx="800" cy="500" r="220" 
                     fill="hsl(217 91% 95%)" fillOpacity="0.2" 
                     stroke="hsl(217 91% 60%)" strokeWidth="4" strokeOpacity="0.7" 
                     strokeDasharray="12,6" 
                   />
                   <circle 
-                    cx="800" cy="400" r="120" 
+                    cx="800" cy="500" r="120" 
                     fill="none" 
                     stroke="hsl(217 91% 60%)" strokeWidth="2" strokeOpacity="0.5" 
                   />
                   
                   {/* Arguments zone - outer ring */}
                   <circle 
-                    cx="800" cy="400" r="320" 
+                    cx="800" cy="500" r="320" 
                     fill="hsl(142 71% 95%)" fillOpacity="0.2" 
                     stroke="hsl(142 71% 45%)" strokeWidth="4" strokeOpacity="0.7" 
                     strokeDasharray="18,9" 
                   />
                   <circle 
-                    cx="800" cy="400" r="220" 
+                    cx="800" cy="500" r="220" 
                     fill="none" 
                     stroke="hsl(142 71% 45%)" strokeWidth="2" strokeOpacity="0.5" 
                   />
                   
                   {/* Zone labels at map coordinates */}
-                  <text x="800" y="300" textAnchor="middle" className="fill-[hsl(0_84%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ISSUES</text>
-                  <text x="950" y="400" textAnchor="middle" className="fill-[hsl(217_91%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>POSITIONS</text>
-                  <text x="1050" y="450" textAnchor="middle" className="fill-[hsl(142_71%_45%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ARGUMENTS</text>
+                  <text x="800" y="400" textAnchor="middle" className="fill-[hsl(0_84%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ISSUES</text>
+                  <text x="950" y="500" textAnchor="middle" className="fill-[hsl(217_91%_60%)]" style={{ fontSize: '20px', fontWeight: 700 }}>POSITIONS</text>
+                  <text x="1050" y="550" textAnchor="middle" className="fill-[hsl(142_71%_45%)]" style={{ fontSize: '20px', fontWeight: 700 }}>ARGUMENTS</text>
+                  
+                  {/* Debug marker at center */}
+                  <circle cx="800" cy="500" r="10" fill="orange" opacity="0.8" />
+                  <text x="810" y="490" className="fill-orange-600" style={{ fontSize: '12px', fontWeight: 600 }}>CENTER (800,500)</text>
                 </svg>
               </Panel>
               
