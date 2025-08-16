@@ -36,6 +36,7 @@ import { ArrowLeft, Save, X, Plus, Trash2, Edit3, Move, Link, Unlink } from 'luc
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceDirectedLayout, getNodeDimensions } from '../ibis/ibis-layout';
+import { applyConcentricLayout, constrainToZone, type ConcentricZones } from '../ibis/zone-layout';
 import CustomIbisNode from './CustomIbisNode';
 import { logger } from '@/utils/logger';
 
@@ -109,6 +110,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [zones, setZones] = useState<ConcentricZones | null>(null);
   
   // Custom node types
   const nodeTypes = {
@@ -285,12 +287,39 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     );
     
     if (nodesWithoutPositions.length > 0) {
-      const layoutPositions = applyForceDirectedLayout(ibisNodes, ibisRelationships, canvas);
-      nodesWithoutPositions.forEach(node => {
-        const pos = layoutPositions.get(node.id);
-        if (pos) {
-          positionsMap.set(node.id, pos);
-        }
+      console.log('🎯 Admin editor - Using concentric layout for nodes without positions');
+      
+      // Use the new concentric layout system for all nodes
+      const { positions: layoutPositions, zones: layoutZones } = applyConcentricLayout(
+        ibisNodes.map(n => ({
+          id: n.id,
+          title: n.title,
+          node_type: n.node_type,
+          position_x: null, // Force recalculation
+          position_y: null,
+          embedding: n.embedding || null,
+          parent_id: n.parent_id,
+          parent_node_id: undefined
+        })),
+        ibisRelationships.map(r => ({
+          source_node_id: r.source_node_id,
+          target_node_id: r.target_node_id,
+          relationship_type: r.relationship_type
+        })),
+        canvas
+      );
+      
+      // Store zones for rendering
+      setZones(layoutZones);
+      
+      // Apply new positions to all nodes (overriding saved positions for consistency)
+      layoutPositions.forEach((pos, nodeId) => {
+        positionsMap.set(nodeId, { x: pos.x, y: pos.y });
+      });
+      
+      console.log('🎯 Admin editor - Concentric layout applied:', {
+        positionsCount: layoutPositions.size,
+        zonesCalculated: !!layoutZones
       });
     }
 
@@ -1003,106 +1032,208 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             </Card>
           </div>
         ) : (
-          // React Flow Map
-          <ReactFlow
-            nodeTypes={nodeTypes}
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={handleNodesChange}
-            onEdgesChange={handleEdgesChange}
-            onConnect={handleConnect}
-            onNodeClick={handleNodeClick}
-            onEdgeClick={handleEdgeClick}
-            className="admin-editor"
-            onNodeDragStart={(event, node) => {
-              console.log('🔍 Node drag started:', node.id);
-            }}
-            onNodeDrag={(event, node) => {
-              console.log('🔍 Node dragging:', node.id, node.position);
-            }}
-            onNodeDragStop={(event, node) => {
-              console.log('🔍 Node drag stopped:', node.id, node.position);
-            }}
-            onConnectStart={(event, params) => {
-              console.log('🔍 Connection start:', params);
-            }}
-            onConnectEnd={(event) => {
-              console.log('🔍 Connection end:', event);
-            }}
-            connectionMode={ConnectionMode.Loose}
-            fitView
-            fitViewOptions={{ padding: 0.1 }}
-            style={{ background: 'hsl(var(--background))' }}
-            nodesDraggable={true}
-            nodesConnectable={true}
-            elementsSelectable={true}
-            panOnDrag={true}
-            defaultEdgeOptions={{
-              type: 'smoothstep',
-              animated: false,
-            }}
-          >
+          // React Flow Map with Zone Backgrounds
+          <div className="relative h-full">
+            {/* Zone backgrounds */}
+            {zones && (
+              <div className="absolute inset-0 pointer-events-none z-0">
+                <svg className="w-full h-full">
+                  {/* Issue zone (center circle) */}
+                  <circle
+                    cx="50%"
+                    cy="50%"
+                    r={zones.issue.outerRadius}
+                    fill={zones.issue.color}
+                    stroke="hsl(var(--ibis-issue))"
+                    strokeWidth="2"
+                    strokeOpacity="0.3"
+                    fillOpacity="0.15"
+                  />
+                  
+                  {/* Position zone (middle ring) */}
+                  <circle
+                    cx="50%"
+                    cy="50%"
+                    r={zones.position.outerRadius}
+                    fill={zones.position.color}
+                    fillOpacity="0.08"
+                    stroke="hsl(var(--ibis-position))"
+                    strokeWidth="2"
+                    strokeOpacity="0.25"
+                    strokeDasharray="8,4"
+                  />
+                  <circle
+                    cx="50%"
+                    cy="50%"
+                    r={zones.position.innerRadius}
+                    fill="none"
+                    stroke="hsl(var(--ibis-position))"
+                    strokeWidth="1"
+                    strokeOpacity="0.2"
+                  />
+                  
+                  {/* Argument zone (outer ring) */}
+                  <circle
+                    cx="50%"
+                    cy="50%"
+                    r={zones.argument.outerRadius}
+                    fill={zones.argument.color}
+                    fillOpacity="0.08"
+                    stroke="hsl(var(--ibis-argument))"
+                    strokeWidth="2"
+                    strokeOpacity="0.25"
+                    strokeDasharray="12,6"
+                  />
+                  <circle
+                    cx="50%"
+                    cy="50%"
+                    r={zones.argument.innerRadius}
+                    fill="none"
+                    stroke="hsl(var(--ibis-argument))"
+                    strokeWidth="1"
+                    strokeOpacity="0.2"
+                  />
+                  
+                  {/* Zone labels */}
+                  <text
+                    x="50%"
+                    y={`${50 - (zones.issue.outerRadius / 8)}%`}
+                    textAnchor="middle"
+                    className="fill-[hsl(var(--ibis-issue))]"
+                    style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
+                  >
+                    Issues
+                  </text>
+                  <text
+                    x={`${50 + (zones.position.outerRadius / 16)}%`}
+                    y="50%"
+                    textAnchor="middle"
+                    className="fill-[hsl(var(--ibis-position))]"
+                    style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
+                  >
+                    Positions
+                  </text>
+                  <text
+                    x={`${50 + (zones.argument.outerRadius / 16)}%`}
+                    y={`${50 + 3}%`}
+                    textAnchor="middle"
+                    className="fill-[hsl(var(--ibis-argument))]"
+                    style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
+                  >
+                    Arguments
+                  </text>
+                </svg>
+              </div>
+            )}
+            
+            <ReactFlow
+              nodeTypes={nodeTypes}
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={handleNodesChange}
+              onEdgesChange={handleEdgesChange}
+              onConnect={handleConnect}
+              onNodeClick={handleNodeClick}
+              onEdgeClick={handleEdgeClick}
+              className="admin-editor relative z-10"
+              onNodeDragStart={(event, node) => {
+                console.log('🔍 Node drag started:', node.id);
+              }}
+              onNodeDrag={(event, node) => {
+                console.log('🔍 Node dragging:', node.id, node.position);
+              }}
+              onNodeDragStop={(event, node) => {
+                console.log('🔍 Node drag stopped:', node.id, node.position);
+              }}
+              onConnectStart={(event, params) => {
+                console.log('🔍 Connection start:', params);
+              }}
+              onConnectEnd={(event) => {
+                console.log('🔍 Connection end:', event);
+              }}
+              connectionMode={ConnectionMode.Loose}
+              fitView
+              fitViewOptions={{ padding: 0.1 }}
+              style={{ background: 'hsl(var(--background))' }}
+              nodesDraggable={true}
+              nodesConnectable={true}
+              elementsSelectable={true}
+              panOnDrag={true}
+              defaultEdgeOptions={{
+                type: 'smoothstep',
+                animated: false,
+              }}
+            >
             <Background />
             <Controls />
             
-            {/* Control Panel */}
-            <Panel position="top-left" className="space-y-2">
-              <Card className="p-4" style={{ pointerEvents: 'auto' }}>
-                <h4 className="font-medium text-sm mb-2">New Connection Type</h4>
-                <Select value={selectedEdgeType} onValueChange={(value: any) => setSelectedEdgeType(value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="supports">Supports</SelectItem>
-                    <SelectItem value="opposes">Opposes</SelectItem>
-                    <SelectItem value="relates_to">Relates to</SelectItem>
-                    <SelectItem value="responds_to">Responds to</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Card>
-            </Panel>
+              {/* Control Panel */}
+              <Panel position="top-left" className="space-y-2">
+                <Card className="p-4" style={{ pointerEvents: 'auto' }}>
+                  <h4 className="font-medium text-sm mb-2">New Connection Type</h4>
+                  <Select value={selectedEdgeType} onValueChange={(value: any) => setSelectedEdgeType(value)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="supports">Supports</SelectItem>
+                      <SelectItem value="opposes">Opposes</SelectItem>
+                      <SelectItem value="relates_to">Relates to</SelectItem>
+                      <SelectItem value="responds_to">Responds to</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {zones && (
+                    <div className="mt-3 pt-3 border-t text-xs text-muted-foreground">
+                      <div className="font-medium mb-1">Zone Layout Active</div>
+                      <div>Issue R: {Math.round(zones.issue.outerRadius)}</div>
+                      <div>Position R: {Math.round(zones.position.outerRadius)}</div>
+                      <div>Argument R: {Math.round(zones.argument.outerRadius)}</div>
+                    </div>
+                  )}
+                </Card>
+              </Panel>
 
-            {/* Legend */}
-            <Panel position="top-right" className="space-y-2">
-              <Card className="p-4">
-                <h3 className="font-semibold mb-2">Node Types</h3>
-                <div className="space-y-2 mb-4">
-                  {Object.entries(nodeTypeConfig).map(([type, config]) => (
-                    <div key={type} className="flex items-center gap-2 text-sm">
-                      <div 
-                        className="w-4 h-4 border border-gray-300"
-                        style={{ 
-                          backgroundColor: config.color,
-                          borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px'
-                        }}
-                      />
-                      <span>{config.label}</span>
-                    </div>
-                  ))}
-                </div>
-                
-                <h3 className="font-semibold mb-2">Edge Types</h3>
-                <div className="space-y-2">
-                  {Object.entries(relationshipConfig).map(([type, config]) => (
-                    <div key={type} className="flex items-center gap-2 text-sm">
-                      <div className="flex items-center">
+              {/* Legend */}
+              <Panel position="top-right" className="space-y-2">
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-2">Node Types</h3>
+                  <div className="space-y-2 mb-4">
+                    {Object.entries(nodeTypeConfig).map(([type, config]) => (
+                      <div key={type} className="flex items-center gap-2 text-sm">
                         <div 
-                          className="w-6 h-0.5"
-                          style={{ backgroundColor: config.color }}
+                          className="w-4 h-4 border border-gray-300"
+                          style={{ 
+                            backgroundColor: config.color,
+                            borderRadius: type === 'issue' ? '50%' : type === 'argument' ? '0' : '2px'
+                          }}
                         />
-                        <div 
-                          className="w-0 h-0 border-l-4 border-t-2 border-b-2 border-transparent"
-                          style={{ borderLeftColor: config.color }}
-                        />
+                        <span>{config.label}</span>
                       </div>
-                      <span>{config.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </Panel>
-          </ReactFlow>
+                    ))}
+                  </div>
+                  
+                  <h3 className="font-semibold mb-2">Edge Types</h3>
+                  <div className="space-y-2">
+                    {Object.entries(relationshipConfig).map(([type, config]) => (
+                      <div key={type} className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center">
+                          <div 
+                            className="w-6 h-0.5"
+                            style={{ backgroundColor: config.color }}
+                          />
+                          <div 
+                            className="w-0 h-0 border-l-4 border-t-2 border-b-2 border-transparent"
+                            style={{ borderLeftColor: config.color }}
+                          />
+                        </div>
+                        <span>{config.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </Panel>
+            </ReactFlow>
+          </div>
         )}
       </div>
 
