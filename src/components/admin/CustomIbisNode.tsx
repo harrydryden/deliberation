@@ -50,35 +50,28 @@ const CustomIbisNode = ({ data }: NodeProps) => {
   }
 
   const { label, originalNode, config, scaleFactor } = data as unknown as CustomIbisNodeData;
-  const nodeType = originalNode?.node_type;
-
-  // Provide default config values if config is undefined
-  const safeConfig = config || {
-    color: getDefaultColor(nodeType),
-    shape: 'rectangle',
-    label: label || 'Unknown'
+  const nodeType = originalNode?.node_type || 'issue';
+  
+  // Default config if not provided
+  const nodeConfig = config || {
+    color: nodeType === 'issue' ? 'hsl(var(--primary))' : 
+           nodeType === 'position' ? 'hsl(var(--secondary))' : 
+           'hsl(var(--accent))',
+    shape: nodeType === 'issue' ? 'circle' : 
+           nodeType === 'argument' ? 'diamond' : 'rectangle',
+    label: nodeType
   };
-
-  // Helper function to get default colors based on node type
-  function getDefaultColor(type: string) {
-    switch (type) {
-      case 'issue': return '#4F46E5'; // Indigo
-      case 'position': return '#059669'; // Green
-      case 'argument': return '#DC2626'; // Red
-      default: return '#6B7280'; // Gray
-    }
-  }
 
   return (
     <div
       style={{
-        backgroundColor: safeConfig.color,
+        backgroundColor: nodeConfig.color,
         color: 'white',
         border: '2px solid white',
         borderRadius: nodeType === 'issue' ? '50%' : 
                     nodeType === 'argument' ? '0' : '8px',
-        width: 60 * (scaleFactor || 1), // 50% smaller: 120 -> 60, with fallback
-        height: nodeType === 'argument' ? 60 * (scaleFactor || 1) : 40 * (scaleFactor || 1), // 50% smaller: 120->60, 80->40, with fallback
+        width: 60 * scaleFactor, // 50% smaller: 120 -> 60
+        height: nodeType === 'argument' ? 60 * scaleFactor : 40 * scaleFactor, // 50% smaller: 120->60, 80->40
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

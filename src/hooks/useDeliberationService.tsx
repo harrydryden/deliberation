@@ -10,78 +10,81 @@ interface DeliberationService {
   leaveDeliberation(deliberationId: string): Promise<void>;
 }
 
-class SimpleDeliberationService implements DeliberationService {
-  private user: any;
-  
-  constructor(user: any) {
-    this.user = user;
-  }
-  
+class SupabaseDeliberationService implements DeliberationService {
   async getDeliberations(): Promise<any[]> {
     logger.info('Starting getDeliberations');
     
-    if (!this.user) throw new Error('User not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
     
-    // Get public deliberations with simplified queries
+    // First get deliberations
     const { data: deliberations, error: deliberationsError } = await supabase
       .from('deliberations')
       .select('*')
       .eq('is_public', true)
       .order('created_at', { ascending: false });
 
+    logger.info('Deliberations query result', { count: deliberations?.length || 0, hasError: Boolean(deliberationsError) });
+
     if (deliberationsError) {
       logger.error('Error fetching deliberations', deliberationsError as any);
       throw deliberationsError;
     }
-    
     if (!deliberations) {
+      logger.info('No deliberations found');
       return [];
     }
 
-    // Simplified participant counting - get counts for all deliberations at once
-    const deliberationIds = deliberations.map(d => d.id);
-    
-    const { data: participantCounts, error: countError } = await supabase
-      .from('participants')
-      .select('deliberation_id')
-      .in('deliberation_id', deliberationIds);
+    logger.info('Found deliberations', { count: deliberations.length });
 
-    if (countError) {
-      logger.warn('Error getting participant counts', countError as any);
-    }
+    // Then get participant counts and check user participation for each deliberation
+    const deliberationsWithCounts = await Promise.all(
+      deliberations.map(async (deliberation) => {
+        logger.info('Getting participant count', { deliberationId: deliberation.id });
+        
+        // Get total participant count
+        const { count, error: countError } = await supabase
+          .from('participants')
+          .select('*', { count: 'exact', head: true })
+          .eq('deliberation_id', deliberation.id);
 
-    // Count participants per deliberation
-    const counts = participantCounts?.reduce((acc, p) => {
-      acc[p.deliberation_id] = (acc[p.deliberation_id] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>) || {};
+        if (countError) {
+          logger.warn(`Error getting participant count for ${deliberation.id}`, countError as any);
+        }
 
-    // Check user participation for all deliberations at once
-    const { data: userParticipations, error: participationError } = await supabase
-      .from('participants')
-      .select('deliberation_id')
-      .in('deliberation_id', deliberationIds)
-      .eq('user_id', this.user.id);
+        // Check if current user is a participant
+        const { data: userParticipation, error: participationError } = await supabase
+          .from('participants')
+          .select('id')
+          .eq('deliberation_id', deliberation.id)
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-    if (participationError) {
-      logger.warn('Error checking user participation', participationError as any);
-    }
+        if (participationError) {
+          logger.warn(`Error checking user participation for ${deliberation.id}`, participationError as any);
+        }
 
-    const userParticipationSet = new Set(userParticipations?.map(p => p.deliberation_id) || []);
+        logger.info('Participant count and user participation', { 
+          deliberationId: deliberation.id, 
+          count, 
+          isParticipant: !!userParticipation 
+        });
 
-    // Map results
-    const result = deliberations.map(deliberation => ({
-      ...deliberation,
-      participant_count: counts[deliberation.id] || 0,
-      is_user_participant: userParticipationSet.has(deliberation.id)
-    }));
+        return {
+          ...deliberation,
+          participant_count: count || 0,
+          is_user_participant: !!userParticipation
+        };
+      })
+    );
 
-    logger.info('Deliberations loaded successfully', { count: result.length });
-    return result;
+    logger.info('Final deliberations with counts', { count: deliberationsWithCounts.length });
+    return deliberationsWithCounts;
   }
 
   async createDeliberation(deliberationData: any): Promise<any> {
-    if (!this.user) throw new Error('User not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
 
     // Create deliberation
     const { data: deliberation, error: deliberationError } = await supabase
@@ -91,7 +94,7 @@ class SimpleDeliberationService implements DeliberationService {
         description: deliberationData.description,
         is_public: deliberationData.is_public,
         max_participants: deliberationData.max_participants,
-        facilitator_id: this.user.id,
+        facilitator_id: user.id,
         status: 'draft'
       })
       .select()
@@ -104,7 +107,7 @@ class SimpleDeliberationService implements DeliberationService {
       .from('participants')
       .insert({
         deliberation_id: deliberation.id,
-        user_id: this.user.id,
+        user_id: user.id,
         role: 'facilitator'
       });
 
@@ -116,20 +119,24 @@ class SimpleDeliberationService implements DeliberationService {
   async joinDeliberation(deliberationId: string): Promise<void> {
     logger.info('Starting joinDeliberation', { deliberationId });
     
-    if (!this.user) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
       logger.error('User not authenticated');
       throw new Error('User not authenticated');
     }
 
-    logger.info('User authenticated', { userId: this.user.id });
+    logger.info('User authenticated', { userId: user.id });
 
     // Check if already a participant
+    logger.info('Checking if user is already a participant...');
     const { data: existing, error: checkError } = await supabase
       .from('participants')
       .select('id')
       .eq('deliberation_id', deliberationId)
-      .eq('user_id', this.user.id)
+      .eq('user_id', user.id)
       .maybeSingle();
+
+    logger.info('Existing participant check result', { exists: Boolean(existing), hasError: Boolean(checkError) });
 
     if (checkError) {
       logger.error('Error checking existing participant', checkError as any);
@@ -142,11 +149,12 @@ class SimpleDeliberationService implements DeliberationService {
     }
 
     // Add as participant
+    logger.info('Adding user as participant...');
     const { error } = await supabase
       .from('participants')
       .insert({
         deliberation_id: deliberationId,
-        user_id: this.user.id,
+        user_id: user.id,
         role: 'participant'
       });
 
@@ -174,6 +182,8 @@ class SimpleDeliberationService implements DeliberationService {
       .eq('id', deliberationId)
       .maybeSingle();
 
+    logger.info('Get deliberation result', { hasError: Boolean(error), hasData: Boolean(data) });
+
     if (error) {
       logger.error('Error getting deliberation', error as any);
       throw error;
@@ -191,19 +201,91 @@ class SimpleDeliberationService implements DeliberationService {
   }
 
   async leaveDeliberation(deliberationId: string): Promise<void> {
-    if (!this.user) throw new Error('User not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
 
     const { error } = await supabase
       .from('participants')
       .delete()
       .eq('deliberation_id', deliberationId)
-      .eq('user_id', this.user.id);
+      .eq('user_id', user.id);
 
     if (error) throw error;
   }
 }
 
+class NodejsDeliberationService implements DeliberationService {
+  private getAuthHeaders() {
+    const token = localStorage.getItem('auth_token');
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+  }
+
+  async getDeliberations(): Promise<any[]> {
+    const response = await fetch('/api/v1/deliberations', {
+      headers: this.getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch deliberations');
+    }
+
+    return response.json();
+  }
+
+  async createDeliberation(deliberationData: any): Promise<any> {
+    const response = await fetch('/api/v1/deliberations', {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(deliberationData)
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create deliberation');
+    }
+
+    return response.json();
+  }
+
+  async joinDeliberation(deliberationId: string): Promise<void> {
+    const response = await fetch('/api/v1/deliberations/join', {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ deliberationId })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to join deliberation');
+    }
+  }
+
+  async getDeliberation(deliberationId: string): Promise<any> {
+    const response = await fetch(`/api/v1/deliberations/${deliberationId}`, {
+      headers: this.getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch deliberation');
+    }
+
+    return response.json();
+  }
+
+  async leaveDeliberation(deliberationId: string): Promise<void> {
+    const response = await fetch(`/api/v1/deliberations/${deliberationId}/leave`, {
+      method: 'POST',
+      headers: this.getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to leave deliberation');
+    }
+  }
+}
+
 export const useDeliberationService = (): DeliberationService => {
-  const { user } = useAuth();
-  return new SimpleDeliberationService(user);
+  // For now, always use Supabase since that's what's configured
+  return new SupabaseDeliberationService();
 };
