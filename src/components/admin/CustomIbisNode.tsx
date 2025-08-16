@@ -58,20 +58,19 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         backgroundColor: config.color,
         color: 'white',
         border: '2px solid white',
-        borderRadius: nodeType === 'issue' ? '50%' : 
-                    nodeType === 'argument' ? '0' : '8px',
-        width: 60 * scaleFactor, // 50% smaller: 120 -> 60
-        height: nodeType === 'argument' ? 60 * scaleFactor : 40 * scaleFactor, // 50% smaller: 120->60, 80->40
+        borderRadius: '8px', // All nodes are rectangular with rounded corners
+        width: 120, // Fixed width for all nodes
+        height: 60, // Fixed height for all nodes
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '4px', // 50% smaller: 8px -> 4px
-        fontSize: '6px', // 50% smaller: 11px -> 6px
+        padding: '8px',
+        fontSize: '11px', // Keep original font size
         textAlign: 'center',
         fontWeight: 'bold',
         cursor: 'grab',
-        transform: nodeType === 'argument' ? 'rotate(45deg)' : 'none',
         position: 'relative',
+        overflow: 'hidden', // Hide overflowing text
       }}
     >
       {/* Source handles for outgoing connections */}
@@ -212,10 +211,14 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         }}
       />
       
-      {/* Node content */}
+      {/* Node content with text truncation */}
       <div style={{ 
         zIndex: 1,
-        transform: nodeType === 'argument' ? 'rotate(-45deg)' : 'none',
+        width: '100%',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        lineHeight: '1.2',
       }}>
         {label}
       </div>
