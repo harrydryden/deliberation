@@ -130,19 +130,21 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   
-  // Transform state for coordinate system management
-  const [transform, setTransform] = useState<Transform>({
+  // Viewport/camera state for pan/zoom
+  const [viewport, setViewport] = useState({
     scale: 1.0,
-    translateX: 0,
-    translateY: 0
+    offsetX: 0,
+    offsetY: 0,
+    width: 800,
+    height: 600
   });
   
-  // Fixed zones configuration (viewport coordinates)
-  const zonesConfig: ZonesConfig = {
-    inner: { radius: 150, nodeTypes: ['issue'] },
-    middle: { radius: 300, nodeTypes: ['position'] },
-    outer: { radius: 450, nodeTypes: ['argument'] }
-  };
+  // Zone definitions (fixed in world space)
+  const zones = [
+    { id: 'inner', worldRadius: 150, centerX: 0, centerY: 0, nodeTypes: ['issue'] },
+    { id: 'middle', worldRadius: 300, centerX: 0, centerY: 0, nodeTypes: ['position'] },
+    { id: 'outer', worldRadius: 500, centerX: 0, centerY: 0, nodeTypes: ['argument'] }
+  ];
   
   // Custom node types
   const nodeTypes = {
@@ -151,83 +153,53 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  // Coordinate conversion functions
-  const worldToViewport = useCallback((worldX: number, worldY: number) => {
-    return {
-      x: worldX * transform.scale + transform.translateX,
-      y: worldY * transform.scale + transform.translateY
-    };
-  }, [transform]);
-  
-  const viewportToWorld = useCallback((viewportX: number, viewportY: number) => {
-    return {
-      x: (viewportX - transform.translateX) / transform.scale,
-      y: (viewportY - transform.translateY) / transform.scale
-    };
-  }, [transform]);
-  
-  // Get viewport center (fixed)
-  const getViewportCenter = useCallback(() => {
-    if (!containerRef.current) return { x: 400, y: 300 };
-    const rect = containerRef.current.getBoundingClientRect();
-    return {
-      x: rect.width / 2,
-      y: rect.height / 2
-    };
-  }, []);
-  
-  // Enforce zone constraints for a node
-  const enforceZoneConstraints = useCallback((node: Node) => {
-    const center = getViewportCenter();
+  // Node-zone constraint system (everything in world space)
+  const constrainNodeToZone = useCallback((node: Node) => {
     const originalNode = node.data?.originalNode as IbisNode;
     const nodeType = originalNode?.node_type;
     
     if (!nodeType) return node;
-    const viewportPos = worldToViewport(node.position.x, node.position.y);
     
-    // Calculate distance from viewport center
-    const distance = Math.sqrt(
-      Math.pow(viewportPos.x - center.x, 2) + Math.pow(viewportPos.y - center.y, 2)
-    );
+    // Find the zone for this node type
+    const zone = zones.find(z => z.nodeTypes.includes(nodeType));
+    if (!zone) return node;
     
-    // Determine zone boundaries for this node type
-    let minRadius = 0;
-    let maxRadius = zonesConfig.outer.radius;
+    const zoneIndex = zones.indexOf(zone);
     
-    if (nodeType === 'issue') {
-      minRadius = 0;
-      maxRadius = zonesConfig.inner.radius;
-    } else if (nodeType === 'position') {
-      minRadius = zonesConfig.inner.radius;
-      maxRadius = zonesConfig.middle.radius;
-    } else if (nodeType === 'argument') {
-      minRadius = zonesConfig.middle.radius;
-      maxRadius = zonesConfig.outer.radius;
+    // Calculate distance from zone center in world space
+    const dx = node.position.x - zone.centerX;
+    const dy = node.position.y - zone.centerY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+    
+    // Define ring boundaries in world space
+    const innerRadius = zoneIndex > 0 ? zones[zoneIndex - 1].worldRadius : 0;
+    const outerRadius = zone.worldRadius;
+    
+    // Node radius for padding
+    const nodeRadius = originalNode?.node_type === 'argument' ? 60 : 40;
+    
+    // Constrain to ring
+    let constrainedRadius = distance;
+    if (distance < innerRadius + nodeRadius) {
+      constrainedRadius = innerRadius + nodeRadius;
+    } else if (distance > outerRadius - nodeRadius) {
+      constrainedRadius = outerRadius - nodeRadius;
     }
     
-    // Check if node is outside its zone
-    if (distance < minRadius || distance > maxRadius) {
-      const clampedDistance = Math.max(minRadius, Math.min(maxRadius, distance));
-      const angle = Math.atan2(viewportPos.y - center.y, viewportPos.x - center.x);
-      
-      // Calculate new viewport position
-      const newViewportX = center.x + Math.cos(angle) * clampedDistance;
-      const newViewportY = center.y + Math.sin(angle) * clampedDistance;
-      
-      // Convert back to world coordinates
-      const newWorldPos = viewportToWorld(newViewportX, newViewportY);
-      
+    // Apply constrained position if changed
+    if (constrainedRadius !== distance) {
       return {
         ...node,
         position: {
-          x: newWorldPos.x,
-          y: newWorldPos.y
+          x: zone.centerX + constrainedRadius * Math.cos(angle),
+          y: zone.centerY + constrainedRadius * Math.sin(angle)
         }
       };
     }
     
     return node;
-  }, [worldToViewport, viewportToWorld, getViewportCenter, zonesConfig]);
+  }, [zones]);
 
   // Node editing form state
   const [nodeForm, setNodeForm] = useState({
@@ -396,28 +368,25 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     if (nodesWithoutPositions.length > 0) {
       // Generate initial positions in world space for each zone
       nodesWithoutPositions.forEach((node, index) => {
-        const center = getViewportCenter();
         let targetRadius = 0;
         
-        // Determine target radius based on node type (in viewport space)
+        // Determine target radius based on node type (in world space)
         if (node.node_type === 'issue') {
-          targetRadius = zonesConfig.inner.radius * 0.5;
+          targetRadius = zones[0].worldRadius * 0.5; // Middle of inner zone
         } else if (node.node_type === 'position') {
-          targetRadius = (zonesConfig.inner.radius + zonesConfig.middle.radius) * 0.5;
+          targetRadius = (zones[0].worldRadius + zones[1].worldRadius) * 0.5; // Middle of middle zone
         } else if (node.node_type === 'argument') {
-          targetRadius = (zonesConfig.middle.radius + zonesConfig.outer.radius) * 0.5;
+          targetRadius = (zones[1].worldRadius + zones[2].worldRadius) * 0.5; // Middle of outer zone
         }
         
         // Calculate initial angle
         const angle = (index / nodesWithoutPositions.length) * 2 * Math.PI;
         
-        // Position in viewport space
-        const viewportX = center.x + Math.cos(angle) * targetRadius;
-        const viewportY = center.y + Math.sin(angle) * targetRadius;
+        // Position directly in world coordinates
+        const worldX = targetRadius * Math.cos(angle);
+        const worldY = targetRadius * Math.sin(angle);
         
-        // Convert to world coordinates
-        const worldPos = viewportToWorld(viewportX, viewportY);
-        positionsMap.set(node.id, worldPos);
+        positionsMap.set(node.id, { x: worldX, y: worldY });
       });
     }
 
@@ -1144,37 +1113,24 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 viewBox="0 0 100 100"
                 preserveAspectRatio="xMidYMid meet"
               >
-                {/* Issue zone (center circle) */}
-                <circle
-                  cx="50"
-                  cy="50" 
-                  r={`${(zonesConfig.inner.radius / Math.max(800, 600)) * 100}`}
-                  fill="hsl(var(--ibis-issue))"
-                  fillOpacity="0.1"
-                  stroke="hsl(var(--ibis-issue))"
-                  strokeWidth="0.2"
-                  strokeOpacity="0.3"
-                />
-                {/* Position zone (middle ring) */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r={`${(zonesConfig.middle.radius / Math.max(800, 600)) * 100}`}
-                  fill="none"
-                  stroke="hsl(var(--ibis-position))"
-                  strokeWidth="0.2"
-                  strokeOpacity="0.3"
-                />
-                {/* Argument zone (outer ring) */}
-                <circle
-                  cx="50"
-                  cy="50"
-                  r={`${(zonesConfig.outer.radius / Math.max(800, 600)) * 100}`}
-                  fill="none"
-                  stroke="hsl(var(--ibis-argument))"
-                  strokeWidth="0.2"
-                  strokeOpacity="0.3"
-                />
+                {/* Render zones from world space */}
+                {zones.map((zone, index) => (
+                  <circle
+                    key={zone.id}
+                    cx="50"
+                    cy="50" 
+                    r={`${(zone.worldRadius / Math.max(800, 600)) * 100}`}
+                    fill={index === 0 ? "hsl(var(--ibis-issue))" : "none"}
+                    fillOpacity={index === 0 ? "0.1" : "0"}
+                    stroke={
+                      zone.nodeTypes[0] === 'issue' ? "hsl(var(--ibis-issue))" :
+                      zone.nodeTypes[0] === 'position' ? "hsl(var(--ibis-position))" :
+                      "hsl(var(--ibis-argument))"
+                    }
+                    strokeWidth="0.2"
+                    strokeOpacity="0.3"
+                  />
+                ))}
                 
                 {/* Zone labels */}
                 <text x="50" y="15" textAnchor="middle" className="fill-muted-foreground" fontSize="2">
