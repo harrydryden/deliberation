@@ -410,12 +410,23 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     if (!connection.source || !connection.target) return;
 
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to create relationships",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const newRelationship = {
         source_node_id: connection.source,
         target_node_id: connection.target,
         relationship_type: selectedEdgeType,
         deliberation_id: deliberationId,
-        created_by: 'admin', // This should be the actual admin user ID
+        created_by: user.id,
       };
 
       const { data, error } = await supabase
