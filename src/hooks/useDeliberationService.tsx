@@ -26,10 +26,17 @@ class SupabaseDeliberationService implements DeliberationService {
     const participatingDeliberationIds = userParticipations?.map(p => p.deliberation_id) || [];
     
     // Get all deliberations the user can see (public OR participating in)
-    const { data: deliberations, error: deliberationsError } = await supabase
+    let query = supabase
       .from('deliberations')
-      .select('*')
-      .or(`is_public.eq.true,id.in.(${participatingDeliberationIds.length > 0 ? participatingDeliberationIds.join(',') : 'null'})`)
+      .select('*');
+    
+    if (participatingDeliberationIds.length > 0) {
+      query = query.or(`is_public.eq.true,id.in.(${participatingDeliberationIds.join(',')})`);
+    } else {
+      query = query.eq('is_public', true);
+    }
+    
+    const { data: deliberations, error: deliberationsError } = await query
       .order('created_at', { ascending: false });
 
     logger.info('Deliberations query result', { count: deliberations?.length || 0, hasError: Boolean(deliberationsError) });
