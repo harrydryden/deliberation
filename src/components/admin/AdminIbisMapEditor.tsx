@@ -90,7 +90,7 @@ const relationshipConfig = {
   supports: { color: 'hsl(var(--ibis-rel-supports))', style: 'solid', label: 'Supports' },
   opposes: { color: '#FFA500', style: 'solid', label: 'Opposes' },
   relates_to: { color: 'hsl(var(--ibis-rel-relates))', style: 'solid', label: 'Relates to' },
-  responds_to: { color: '#9333EA', style: 'solid', label: 'Responds to' },
+  responds_to: { color: '#374151', style: 'solid', label: 'Responds to' },
 };
 
 export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }: AdminIbisMapEditorProps) => {
