@@ -115,13 +115,55 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   
-  // Handle node position changes and save to database
-  const handleNodesChange = useCallback((changes: NodeChange[]) => {
-    onNodesChange(changes);
+  // Zone configuration for constraint enforcement
+  const zoneConfig = useMemo(() => ({
+    issue: { outerRadius: 150, centerX: 0, centerY: 0 },
+    position: { outerRadius: 300, centerX: 0, centerY: 0 },
+    argument: { outerRadius: 450, centerX: 0, centerY: 0 }
+  }), []);
+  
+  // Constrain node to its appropriate zone
+  const constrainNodeToZone = useCallback((nodeId: string, position: { x: number; y: number }) => {
+    const node = ibisNodes.find(n => n.id === nodeId);
+    if (!node) return position;
     
-    // Check for position changes
-    const positionChanges = changes.filter(change => 
-      change.type === 'position' && change.position
+    const nodeType = node.node_type;
+    const zone = zoneConfig[nodeType];
+    
+    // Calculate distance from center
+    const distance = Math.sqrt(position.x * position.x + position.y * position.y);
+    
+    // If outside zone, project back to zone boundary
+    if (distance > zone.outerRadius) {
+      const angle = Math.atan2(position.y, position.x);
+      return {
+        x: Math.cos(angle) * zone.outerRadius,
+        y: Math.sin(angle) * zone.outerRadius
+      };
+    }
+    
+    return position;
+  }, [ibisNodes, zoneConfig]);
+  
+  // Handle node position changes with zone enforcement and save to database
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    // Apply zone constraints to position changes
+    const constrainedChanges = changes.map(change => {
+      if (change.type === 'position' && change.position && !change.dragging) {
+        const constrainedPosition = constrainNodeToZone(change.id, change.position);
+        return {
+          ...change,
+          position: constrainedPosition
+        };
+      }
+      return change;
+    });
+    
+    onNodesChange(constrainedChanges);
+    
+    // Save position changes to database
+    const positionChanges = constrainedChanges.filter(change => 
+      change.type === 'position' && change.position && !change.dragging
     );
     
     if (positionChanges.length > 0) {
@@ -139,12 +181,17 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               });
             } catch (error) {
               console.error('Failed to save node position:', error);
+              toast({
+                title: "Error",
+                description: "Failed to save node position",
+                variant: "destructive",
+              });
             }
           }
         }
       }, 1000);
     }
-  }, [onNodesChange]);
+  }, [onNodesChange, constrainNodeToZone, toast]);
   
   // ReactFlow instance ref
   const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
@@ -296,6 +343,45 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     }
   }, [deliberationId, selectedEdgeType, toast]);
 
+  // Save all changes to database
+  const saveChanges = useCallback(async () => {
+    if (!hasUnsavedChanges) return;
+    
+    try {
+      setSaving(true);
+      
+      // Save all node positions
+      await Promise.all(
+        ibisNodes.map(async (node) => {
+          if (node.position_x !== undefined && node.position_y !== undefined) {
+            return supabase.rpc('admin_update_ibis_node_position', {
+              p_node_id: node.id,
+              p_position_x: node.position_x,
+              p_position_y: node.position_y
+            });
+          }
+        })
+      );
+      
+      setHasUnsavedChanges(false);
+      
+      toast({
+        title: "Success",
+        description: "All changes saved successfully",
+      });
+      
+    } catch (error) {
+      console.error('Error saving changes:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, [hasUnsavedChanges, ibisNodes, toast]);
+
   // Fetch data from Supabase
   const fetchData = useCallback(async () => {
     try {
@@ -405,6 +491,15 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                   Unsaved Changes
                 </Badge>
               )}
+              <Button 
+                onClick={saveChanges}
+                disabled={!hasUnsavedChanges || saving}
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -447,13 +542,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
               <Background />
               
               {/* Zone visualization */}
-              <ZoneVisualization 
-                zones={{
-                  issue: { outerRadius: 150, centerX: 0, centerY: 0 },
-                  position: { outerRadius: 300, centerX: 0, centerY: 0 },
-                  argument: { outerRadius: 450, centerX: 0, centerY: 0 }
-                }}
-              />
+              <ZoneVisualization zones={zoneConfig} />
               
               {/* Connection Type Panel */}
               <Panel position="top-left" className="bg-background border rounded-lg p-4">
@@ -503,7 +592,9 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                   </div>
                   
                   <div className="pt-2 mt-2 border-t text-xs text-muted-foreground">
-                    Drag nodes • Connect with handles • Select to edit
+                    <div>• Drag nodes • Connect with handles • Select to edit</div>
+                    <div>• Nodes are constrained to their zone type</div>
+                    <div>• Click "Save Changes" to persist modifications</div>
                   </div>
                 </div>
               </Panel>
