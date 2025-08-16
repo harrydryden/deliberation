@@ -815,22 +815,33 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       
       // Try to delete from database using direct query first
       console.log('🔍 Attempting database deletion...');
-      const { error } = await supabase
+      const { error: directError } = await supabase
         .from('ibis_relationships')
         .delete()
         .eq('id', relationshipToDelete.id);
 
-      if (error) {
-        console.error('🔍 Database deletion failed:', error);
-        // Restore the relationship if deletion failed
-        setIbisRelationships(prev => {
-          console.log('🔍 Restoring relationship due to deletion failure');
-          return [...prev, relationshipToDelete];
+      if (directError) {
+        console.log('🔍 Direct deletion failed, trying admin function:', directError);
+        
+        // Fallback to admin function for RLS bypass
+        const { data: adminData, error: adminError } = await supabase.rpc('admin_delete_ibis_relationship', {
+          p_relationship_id: relationshipToDelete.id
         });
-        throw error;
-      }
 
-      console.log('🔍 Database deletion successful');
+        if (adminError || !adminData) {
+          console.error('🔍 Admin deletion also failed:', adminError);
+          // Restore the relationship if both attempts failed
+          setIbisRelationships(prev => {
+            console.log('🔍 Restoring relationship due to deletion failure');
+            return [...prev, relationshipToDelete];
+          });
+          throw adminError || new Error('Deletion returned false');
+        }
+        
+        console.log('🔍 Admin deletion successful');
+      } else {
+        console.log('🔍 Direct deletion successful');
+      }
       
       toast({
         title: "Edge Deleted",

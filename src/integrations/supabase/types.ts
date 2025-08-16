@@ -1185,6 +1185,10 @@ export type Database = {
           id: string
         }[]
       }
+      admin_delete_ibis_relationship: {
+        Args: { p_relationship_id: string }
+        Returns: boolean
+      }
       admin_get_ibis_nodes: {
         Args: { target_deliberation_id: string }
         Returns: {
