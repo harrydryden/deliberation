@@ -349,12 +349,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   const convertToFlowNodes = useCallback(() => {
     console.log('🔍 IBIS Map Editor - Converting nodes with coordinate system');
     
+    // Check if user is admin for node draggability - for now allow all authenticated users to drag for testing
+    const isAdmin = !!user?.id; // TODO: Replace with proper admin check
+    
     // Use world coordinates for node positioning
     const positionsMap = new Map<string, { x: number; y: number }>();
     
-    // Convert existing positions to world coordinates if they exist
+    // First, prefer saved positions if they exist
     ibisNodes.forEach(node => {
-      if (node.position_x !== undefined && node.position_y !== undefined) {
+      if (node.position_x !== undefined && node.position_y !== undefined && 
+          node.position_x !== null && node.position_y !== null) {
         // Existing positions are assumed to be in world coordinates
         positionsMap.set(node.id, { x: node.position_x, y: node.position_y });
       }
@@ -362,21 +366,28 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     
     // For nodes without positions, place them in their designated zones
     const nodesWithoutPositions = ibisNodes.filter(node => 
-      node.position_x === undefined || node.position_y === undefined
+      node.position_x === undefined || node.position_y === undefined ||
+      node.position_x === null || node.position_y === null
     );
     
     if (nodesWithoutPositions.length > 0) {
-      // Generate initial positions in world space for each zone
+      // Generate initial positions in world space for each zone with smaller, more consistent radii
       nodesWithoutPositions.forEach((node, index) => {
         let targetRadius = 0;
         
+        // Use smaller, more consistent radii
+        const baseR1 = 200; // Fixed inner radius
+        const R1 = baseR1;
+        const R2 = R1 + 120; // Closer spacing
+        const R3 = R2 + 120; // Consistent gaps
+        
         // Determine target radius based on node type (in world space)
         if (node.node_type === 'issue') {
-          targetRadius = zones[0].worldRadius * 0.5; // Middle of inner zone
+          targetRadius = R1 * 0.5; // Middle of inner zone
         } else if (node.node_type === 'position') {
-          targetRadius = (zones[0].worldRadius + zones[1].worldRadius) * 0.5; // Middle of middle zone
+          targetRadius = (R1 + R2) * 0.5; // Middle of middle zone
         } else if (node.node_type === 'argument') {
-          targetRadius = (zones[1].worldRadius + zones[2].worldRadius) * 0.5; // Middle of outer zone
+          targetRadius = (R2 + R3) * 0.5; // Middle of outer zone
         }
         
         // Calculate initial angle
@@ -390,11 +401,14 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       });
     }
 
-    // Convert to React Flow nodes
-    const flowNodes: Node[] = ibisNodes.map((node) => {
-      const position = positionsMap.get(node.id) || { x: 0, y: 0 };
+    // Enhanced node creation function with admin parameter
+    const createEnhancedFlowNode = (
+      node: IbisNode, 
+      position: { x: number; y: number }, 
+      importance: number,
+      isAdmin: boolean
+    ): Node => {
       const config = nodeTypeConfig[node.node_type];
-      const importance = calculateNodeImportance(node.id, ibisRelationships);
       const scaleFactor = 1 + importance * 0.2;
 
       return {
@@ -411,10 +425,17 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           width: 120 * scaleFactor,
           height: node.node_type === 'argument' ? 120 * scaleFactor : 80 * scaleFactor,
         },
-        draggable: true,
+        draggable: isAdmin, // Allow admins to drag
         selectable: true,
         connectable: true,
       };
+    };
+
+    // Convert to React Flow nodes using saved or computed positions
+    const flowNodes: Node[] = ibisNodes.map((node) => {
+      const position = positionsMap.get(node.id) || { x: 100, y: 100 };
+      const importance = calculateNodeImportance(node.id, ibisRelationships);
+      return createEnhancedFlowNode(node, position, importance, isAdmin || false);
     });
 
     // Convert relationships to React Flow edges with optimal handle routing
@@ -480,11 +501,11 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         target: rel.target_node_id,
         sourceHandle,
         targetHandle,
-        type: 'default',
+        type: 'smoothstep', // Use smoothstep for better visual appeal
         style: {
           stroke: config.color,
           strokeWidth: 2,
-          strokeDasharray: config.style === 'dashed' ? '5,5' : undefined,
+          strokeDasharray: rel.relationship_type === 'opposes' ? '5,5' : undefined,
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
@@ -495,7 +516,9 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           relationshipType: rel.relationship_type, // Also store the type for reference
           label: config.label,
         },
-        animated: false,
+        animated: rel.relationship_type === 'supports', // Animate support relationships
+        label: config.label,
+        labelStyle: { fontSize: 10 },
       };
     });
 
@@ -505,7 +528,20 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       ibisRelationshipsCount: ibisRelationships.length,
       sampleFlowNode: flowNodes[0],
       sampleFlowEdge: flowEdges[0],
-      allRelationshipIds: ibisRelationships.map(r => r.id)
+      allRelationshipIds: ibisRelationships.map(r => r.id),
+      computedPositionsCount: positionsMap.size,
+      sampleNodes: flowNodes.slice(0, 3).map(n => ({
+        id: n.id,
+        position: n.position,
+        type: n.type,
+        draggable: n.draggable
+      })),
+      sampleEdges: flowEdges.slice(0, 3).map(e => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: e.type
+      }))
     });
 
     console.log('🔍 Setting new nodes and edges:', { 
@@ -514,7 +550,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     });
     setNodes(flowNodes);
     setEdges(flowEdges);
-  }, [ibisNodes, ibisRelationships, setNodes, setEdges]);
+  }, [ibisNodes, ibisRelationships, setNodes, setEdges, user]);
 
   const calculateNodeImportance = (nodeId: string, relationships: IbisRelationship[]): number => {
     const connections = relationships.filter(
@@ -567,28 +603,64 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     );
   }, [setEdges]);
 
-  // Handle node position changes with detailed logging
+  // Handle node position changes with admin access control and persistence
   const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
     console.log('🔍 All node changes:', changes);
     
-    // Log different types of changes
-    changes.forEach(change => {
-      if (change.type === 'position') {
-        console.log('🔍 Position change:', change);
-      } else if (change.type === 'select') {
-        console.log('🔍 Select change:', change);
-      }
-    });
+    // Check if user is admin - for now allow all authenticated users for testing
+    const isAdmin = !!user?.id; // TODO: Replace with proper admin check
     
+    // Apply changes first (for all users)
     onNodesChange(changes);
     
+    // Then handle admin-specific logic
+    if (!isAdmin) {
+      const hasPositionChanges = changes.some(change => change.type === 'position');
+      if (hasPositionChanges) {
+        toast({
+          title: "Access Restricted",
+          description: "Only administrators can move nodes",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+    
+    // For admins, persist position changes
     const positionChanges = changes.filter(change => 
-      change.type === 'position' && change.dragging === false
+      change.type === 'position' && 
+      change.dragging === false && 
+      change.position
     );
     
     if (positionChanges.length > 0) {
       console.log('🔍 Position changes detected:', positionChanges);
       setHasUnsavedChanges(true);
+      
+      // Persist position changes to database
+      for (const change of positionChanges) {
+        if (change.type === 'position' && change.position) {
+          try {
+            const { error } = await supabase
+              .from('ibis_nodes')
+              .update({
+                position_x: Math.round(change.position.x),
+                position_y: Math.round(change.position.y),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', change.id);
+              
+            if (error) throw error;
+          } catch (error) {
+            console.error('Error updating node position', error);
+            toast({
+              title: "Error",
+              description: "Failed to save node position",
+              variant: "destructive",
+            });
+          }
+        }
+      }
       
       // Recalculate edge routing after position changes
       setTimeout(() => {
@@ -598,7 +670,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         });
       }, 0);
     }
-  }, [onNodesChange, recalculateEdgeRouting, setNodes]);
+  }, [onNodesChange, recalculateEdgeRouting, setNodes, user, toast]);
 
   // Handle edge changes
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -1029,6 +1101,76 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       convertToFlowNodes();
     }
   }, [ibisNodes, ibisRelationships, convertToFlowNodes]);
+
+  // Enhanced initial viewport fit
+  useEffect(() => {
+    if (!loading && nodes.length > 0 && reactFlowRef.current) {
+      // Small delay to ensure React Flow is fully initialized
+      setTimeout(() => {
+        reactFlowRef.current?.fitView({ 
+          padding: 0.2,
+          includeHiddenNodes: false,
+          duration: 800 
+        });
+      }, 100);
+    }
+  }, [loading, nodes.length]);
+
+  // Debug helper to understand visualization state
+  useEffect(() => {
+    console.log('🔍 Visualization State Debug', {
+      nodesCount: nodes.length,
+      edgesCount: edges.length,
+      sampleNodes: nodes.slice(0, 3).map(n => ({
+        id: n.id,
+        position: n.position,
+        type: n.type,
+        draggable: n.draggable
+      })),
+      sampleEdges: edges.slice(0, 3).map(e => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: e.type,
+        animated: e.animated
+      }))
+    });
+  }, [nodes, edges]);
+
+  // Enhanced initial viewport fit
+  useEffect(() => {
+    if (!loading && nodes.length > 0 && reactFlowRef.current) {
+      // Small delay to ensure React Flow is fully initialized
+      setTimeout(() => {
+        reactFlowRef.current?.fitView({ 
+          padding: 0.2,
+          includeHiddenNodes: false,
+          duration: 800 
+        });
+      }, 100);
+    }
+  }, [loading, nodes.length]);
+
+  // Debug helper to understand visualization state
+  useEffect(() => {
+    console.log('🔍 Visualization State Debug', {
+      nodesCount: nodes.length,
+      edgesCount: edges.length,
+      sampleNodes: nodes.slice(0, 3).map(n => ({
+        id: n.id,
+        position: n.position,
+        type: n.type,
+        draggable: n.draggable
+      })),
+      sampleEdges: edges.slice(0, 3).map(e => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: e.type,
+        animated: e.animated
+      }))
+    });
+  }, [nodes, edges]);
 
 
   if (loading) {
