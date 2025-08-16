@@ -1318,68 +1318,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 animated: false,
               }}
             >
-              <svg className="react-flow__background" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-                <defs>
-                  <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="hsl(var(--ibis-grid))" strokeWidth="0.5" opacity="0.2"/>
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill="url(#grid)" />
-                
-                {/* Zone circles centered in viewport */}
-                <g transform="translate(50%, 50%)">
-                  {zones.map((zone, index) => (
-                    <g key={zone.id}>
-                      {/* Zone background fill */}
-                      <circle
-                        cx="0"
-                        cy="0"
-                        r={zone.worldRadius}
-                        fill={zone.bgColor}
-                        fillOpacity="0.15"
-                        stroke="none"
-                      />
-                      
-                      {/* Zone border */}
-                      <circle
-                        cx="0"
-                        cy="0"
-                        r={zone.worldRadius}
-                        fill="none"
-                        stroke={zone.color}
-                        strokeWidth="4"
-                        strokeOpacity="1"
-                        strokeDasharray={index === 0 ? "none" : "8,4"}
-                      />
-                      
-                      {/* Zone label positioned outside the circle */}
-                      <text 
-                        x="0" 
-                        y={-zone.worldRadius - 15} 
-                        textAnchor="middle" 
-                        fill={zone.color}
-                        fontSize="16" 
-                        fontWeight="700"
-                        opacity="0.9"
-                      >
-                        {zone.nodeTypes[0] === 'issue' ? 'Issues' :
-                         zone.nodeTypes[0] === 'position' ? 'Positions' :
-                         'Arguments'}
-                      </text>
-                    </g>
-                  ))}
-                </g>
-                
-                {/* Center point indicator */}
-                <circle
-                  cx="0"
-                  cy="0"
-                  r="4"
-                  fill="hsl(var(--muted-foreground))"
-                  opacity="0.6"
-                />
-              </svg>
-              
+              <Background color="hsl(var(--ibis-grid))" gap={20} />
               <Controls />
             
               {/* Control Panel */}
