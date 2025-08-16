@@ -782,18 +782,31 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     try {
       setSaving(true);
       
+      console.log('🔍 Deleting relationship:', editingEdge.id);
+      
       const { error } = await supabase
         .from('ibis_relationships')
         .delete()
         .eq('id', editingEdge.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('🔍 Delete error:', error);
+        throw error;
+      }
 
-      // Update local state
-      setIbisRelationships(prev => prev.filter(rel => rel.id !== editingEdge.id));
+      console.log('🔍 Delete successful, updating local state');
+      
+      // Update local state immediately
+      setIbisRelationships(prev => {
+        const filtered = prev.filter(rel => rel.id !== editingEdge.id);
+        console.log('🔍 Relationships after delete:', filtered.length, 'remaining');
+        return filtered;
+      });
 
       setEditingEdge(null);
-      setHasUnsavedChanges(true);
+      
+      // Clear unsaved changes since we just saved a deletion
+      setHasUnsavedChanges(false);
 
       toast({
         title: "Relationship Deleted",
@@ -875,15 +888,6 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     }
   }, [ibisNodes, ibisRelationships, convertToFlowNodes]);
 
-  // Reload data when editing is complete to ensure fresh data
-  useEffect(() => {
-    if (!editingEdge && !editingNode && hasUnsavedChanges) {
-      // Small delay to ensure changes are propagated
-      setTimeout(() => {
-        fetchData();
-      }, 500);
-    }
-  }, [editingEdge, editingNode, hasUnsavedChanges, fetchData]);
 
   if (loading) {
     return (
