@@ -139,23 +139,23 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     height: 600
   });
   
-  // Zone definitions with much larger radii for better spacing
-  const baseRadius = 200; // Increased from 120
+  // Zone definitions with center at (0,0) for proper ReactFlow positioning
+  const baseRadius = 200;
   const zones = {
     issue: { 
       outerRadius: baseRadius,
-      centerX: 800, // Match layout center
-      centerY: 500  // Match layout center
+      centerX: 0, // Center at ReactFlow origin
+      centerY: 0  // Center at ReactFlow origin
     },
     position: { 
-      outerRadius: baseRadius * 1.8, // Increased spacing between zones
-      centerX: 800,
-      centerY: 500
+      outerRadius: baseRadius * 1.8,
+      centerX: 0,
+      centerY: 0
     },
     argument: { 
-      outerRadius: baseRadius * 2.6, // Much larger outer zone
-      centerX: 800,
-      centerY: 500
+      outerRadius: baseRadius * 2.6,
+      centerX: 0,
+      centerY: 0
     }
   };
 
@@ -389,9 +389,9 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         argument: nodesWithoutPositions.filter(n => n.node_type === 'argument')
       };
       
-      // Use larger zones and better collision detection
-      const centerX = 800; // Fixed center X - matches zones
-      const centerY = 500; // Fixed center Y - matches zones
+      // Use center at (0,0) to match zone positioning
+      const centerX = 0; // Center at ReactFlow origin
+      const centerY = 0; // Center at ReactFlow origin
       const baseRadius = 200; // Match zones
       const R1 = baseRadius;
       const R2 = baseRadius * 1.8;
@@ -1321,22 +1321,24 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             >
               <Background color="hsl(var(--ibis-grid))" gap={20} />
               
-              {/* Zone visualization as custom background SVG */}
+              {/* Zone visualization using ReactFlow coordinate system */}
               <svg
                 style={{
                   position: 'absolute',
-                  top: 0,
-                  left: 0,
+                  top: '50%',
+                  left: '50%',
                   width: '100%',
                   height: '100%',
                   pointerEvents: 'none',
                   zIndex: 0,
+                  transform: 'translate(-50%, -50%)', // Center the SVG
                 }}
+                viewBox="-600 -400 1200 800" // Centered viewBox around origin
               >
                 {/* Issue zone (innermost circle) */}
                 <circle
-                  cx={zones.issue.centerX}
-                  cy={zones.issue.centerY}
+                  cx="0"
+                  cy="0"
                   r={zones.issue.outerRadius}
                   fill="hsl(var(--ibis-issue))"
                   fillOpacity="0.08"
@@ -1348,8 +1350,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 
                 {/* Position zone (middle ring) */}
                 <circle
-                  cx={zones.position.centerX}
-                  cy={zones.position.centerY}
+                  cx="0"
+                  cy="0"
                   r={zones.position.outerRadius}
                   fill="none"
                   stroke="hsl(var(--ibis-position))"
@@ -1360,8 +1362,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 
                 {/* Argument zone (outer ring) */}
                 <circle
-                  cx={zones.argument.centerX}
-                  cy={zones.argument.centerY}
+                  cx="0"
+                  cy="0"
                   r={zones.argument.outerRadius}
                   fill="none"
                   stroke="hsl(var(--ibis-argument))"
@@ -1372,8 +1374,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 
                 {/* Zone labels */}
                 <text
-                  x={zones.issue.centerX}
-                  y={zones.issue.centerY - zones.issue.outerRadius - 10}
+                  x="0"
+                  y={-zones.issue.outerRadius - 15}
                   textAnchor="middle"
                   fill="hsl(var(--ibis-issue))"
                   fontSize="14"
@@ -1384,8 +1386,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 </text>
                 
                 <text
-                  x={zones.position.centerX}
-                  y={zones.position.centerY - zones.position.outerRadius - 10}
+                  x="0"
+                  y={-zones.position.outerRadius - 15}
                   textAnchor="middle"
                   fill="hsl(var(--ibis-position))"
                   fontSize="14"
@@ -1396,8 +1398,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 </text>
                 
                 <text
-                  x={zones.argument.centerX}
-                  y={zones.argument.centerY - zones.argument.outerRadius - 10}
+                  x="0"
+                  y={-zones.argument.outerRadius - 15}
                   textAnchor="middle"
                   fill="hsl(var(--ibis-argument))"
                   fontSize="14"
@@ -1409,8 +1411,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 
                 {/* Center point indicator */}
                 <circle
-                  cx={zones.issue.centerX}
-                  cy={zones.issue.centerY}
+                  cx="0"
+                  cy="0"
                   r="4"
                   fill="hsl(var(--muted-foreground))"
                   opacity="0.6"
