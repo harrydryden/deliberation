@@ -556,76 +556,17 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
       console.log('🔍 Relationship created successfully:', data);
 
-      // Add to local state and immediately update the visual edges
+      // Add to local state - this will trigger convertDataToFlowElements
       const fullRelationship: IbisRelationship = {
         id: data.id,
         ...newRelationship,
         created_at: data.created_at,
       };
 
+      console.log('🔍 Adding new relationship to local state:', fullRelationship);
       setIbisRelationships(prev => {
         const updated = [...prev, fullRelationship];
-        // Force immediate edge recalculation
-        setTimeout(() => {
-          setNodes(currentNodes => {
-            const newEdges = updated.map((rel) => {
-              const config = relationshipConfig[rel.relationship_type] || relationshipConfig.relates_to;
-              
-              // Find source and target nodes to calculate optimal handles
-              const sourceNode = currentNodes.find(n => n.id === rel.source_node_id);
-              const targetNode = currentNodes.find(n => n.id === rel.target_node_id);
-              
-              let sourceHandle: string | undefined;
-              let targetHandle: string | undefined;
-              
-              if (sourceNode && targetNode) {
-                const sourceDimensions = {
-                  x: sourceNode.position.x,
-                  y: sourceNode.position.y,
-                  width: sourceNode.style?.width as number || 120,
-                  height: sourceNode.style?.height as number || 80,
-                };
-                
-                const targetDimensions = {
-                  x: targetNode.position.x,
-                  y: targetNode.position.y,
-                  width: targetNode.style?.width as number || 120,
-                  height: targetNode.style?.height as number || 80,
-                };
-                
-                const handles = calculateOptimalHandles(sourceDimensions, targetDimensions);
-                sourceHandle = handles.sourceHandle;
-                targetHandle = handles.targetHandle;
-              }
-              
-              return {
-                id: rel.id,
-                source: rel.source_node_id,
-                target: rel.target_node_id,
-                sourceHandle,
-                targetHandle,
-                type: 'default',
-                style: {
-                  stroke: config.color,
-                  strokeWidth: 2,
-                  strokeDasharray: config.style === 'dashed' ? '5,5' : undefined,
-                },
-                markerEnd: {
-                  type: MarkerType.ArrowClosed,
-                  color: config.color,
-                },
-                data: {
-                  relationshipId: rel.id, // Store just the ID to avoid data corruption
-                  relationshipType: rel.relationship_type, // Also store the type for reference
-                  label: config.label,
-                },
-                animated: false,
-              };
-            });
-            setEdges(newEdges);
-            return currentNodes;
-          });
-        }, 0);
+        console.log('🔍 Updated relationships count:', updated.length);
         return updated;
       });
       setHasUnsavedChanges(true);
