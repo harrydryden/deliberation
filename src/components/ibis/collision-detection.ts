@@ -50,6 +50,7 @@ export const doNodesOverlap = (
 
 /**
  * Find a non-overlapping position for a new node near a target position
+ * Now includes zone constraint checking
  */
 export const findNonOverlappingPosition = (
   targetPosition: NodePosition,
@@ -57,7 +58,8 @@ export const findNonOverlappingPosition = (
   existingNodes: NodeWithPosition[],
   maxAttempts: number = 36,
   initialRadius: number = 80,
-  radiusIncrement: number = 40
+  radiusIncrement: number = 40,
+  zoneConstraintFn?: (pos: NodePosition) => NodePosition
 ): NodePosition => {
   const candidateNode: NodeWithPosition = {
     id: 'temp',
@@ -81,10 +83,15 @@ export const findNonOverlappingPosition = (
     
     for (let i = 0; i < anglesPerRadius && attempts < maxAttempts; i++) {
       const angle = (i / anglesPerRadius) * 2 * Math.PI;
-      const testPosition = {
+      let testPosition = {
         x: targetPosition.x + Math.cos(angle) * radius,
         y: targetPosition.y + Math.sin(angle) * radius,
       };
+      
+      // Apply zone constraint if provided
+      if (zoneConstraintFn) {
+        testPosition = zoneConstraintFn(testPosition);
+      }
       
       candidateNode.x = testPosition.x;
       candidateNode.y = testPosition.y;
@@ -102,10 +109,17 @@ export const findNonOverlappingPosition = (
   
   // Fallback: return target position with a random offset
   const fallbackAngle = Math.random() * 2 * Math.PI;
-  return {
+  let fallbackPosition = {
     x: targetPosition.x + Math.cos(fallbackAngle) * radius,
     y: targetPosition.y + Math.sin(fallbackAngle) * radius,
   };
+  
+  // Apply zone constraint to fallback if provided
+  if (zoneConstraintFn) {
+    fallbackPosition = zoneConstraintFn(fallbackPosition);
+  }
+  
+  return fallbackPosition;
 };
 
 /**

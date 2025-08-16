@@ -91,6 +91,11 @@ All colors MUST be HSL.
     --ibis-rel-responds: 38 92% 50%;    /* amber-500 (#f59e0b) */
     --ibis-edge-hierarchy: 215 20% 65%; /* slate-ish (#94a3b8) */
     --ibis-grid: 214 32% 91%;           /* slate-200 (#e2e8f0) */
+    
+    /* Concentric Zone Colors (pale backgrounds) */
+    --ibis-zone-issue: 0 84% 95%;       /* pale red */
+    --ibis-zone-position: 217 91% 95%;  /* pale blue */
+    --ibis-zone-argument: 142 71% 95%;  /* pale green */
   }
 
   .dark {

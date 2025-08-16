@@ -32,7 +32,8 @@ import { RefreshCw, Plus, Search, Filter, MessageSquare, GitBranch } from 'lucid
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceDirectedLayout, getNodeDimensions } from './ibis-layout';
-import { resolveCollisions } from './collision-detection';
+import { resolveCollisions, findNonOverlappingPosition } from './collision-detection';
+import { applyConcentricLayout, constrainToZone, type ConcentricZones } from './zone-layout';
 import { logger } from '@/utils/logger';
 
 interface IbisNode {
@@ -117,6 +118,7 @@ const { user } = useAuth();
   const reactFlowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   const [computedPositions, setComputedPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const [embeddingBackfillTriggered, setEmbeddingBackfillTriggered] = useState(false);
+  const [zones, setZones] = useState<ConcentricZones | null>(null);
   const lastConversionSigRef = useRef<string | null>(null);
   const linkingTriggeredRef = useRef(false);
 
@@ -289,197 +291,43 @@ const { user } = useAuth();
     
     return Math.min(importance / 5, 2); // Normalize to max 2x scaling
   };
-  // Compute center-out mind map layout with semantic clustering of Issues
-  const computeMindMapLayout = (
+  // Compute concentric circle layout with zone constraints
+  const computeConcentricLayout = (
     nodes: IbisNode[],
     relationships: IbisRelationship[] = [],
     canvas: { width: number; height: number } = { width: 1600, height: 1000 }
   ) => {
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const positions = new Map<string, { x: number; y: number }>();
-
-    // Add central deliberation node position
-    positions.set('deliberation-center', { x: cx, y: cy });
-
-    const allById = new Map(nodes.map(n => [n.id, n] as const));
-
-    const getParentId = (n: any): string | undefined => n.parent_node_id || n.parent_id || undefined;
-
-    const issues = nodes.filter(n => n.node_type === 'issue');
-    const positionsNodes = nodes.filter(n => n.node_type === 'position');
-    const argumentsNodes = nodes.filter(n => n.node_type === 'argument');
-
-    // Similarity: use embedding cosine if present, else fallback to title Jaccard
-    const cosine = (a: number[], b: number[]) => {
-      let dot = 0, na = 0, nb = 0;
-      for (let i = 0; i < Math.min(a.length, b.length); i++) {
-        dot += a[i] * b[i];
-        na += a[i] * a[i];
-        nb += b[i] * b[i];
-      }
-      return (na && nb) ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
-    };
-    const getEmbed = (n: any): number[] | null => Array.isArray(n.embedding) ? n.embedding as number[] : null;
-    const simIssues = (a: IbisNode, b: IbisNode) => {
-      const ea = getEmbed(a), eb = getEmbed(b);
-      if (ea && eb) return cosine(ea, eb);
-      return calculateSemanticSimilarity(a, b);
-    };
-
-    // Greedy ordering: place similar issues adjacent
-    const remaining = [...issues];
-    const ordered: IbisNode[] = [];
-    if (remaining.length) {
-      remaining.sort((x, y) => x.title.localeCompare(y.title));
-      ordered.push(remaining.shift()!);
-      while (remaining.length) {
-        const last = ordered[ordered.length - 1];
-        let bestIdx = 0;
-        let bestScore = -Infinity;
-        for (let i = 0; i < remaining.length; i++) {
-          const s = simIssues(last, remaining[i]);
-          if (s > bestScore) { bestScore = s; bestIdx = i; }
-        }
-        ordered.push(remaining.splice(bestIdx, 1)[0]);
-      }
-    }
-
-    // Place Issues on R1 evenly
-    const nI = ordered.length;
-    const baseR1 = 260 + Math.min(240, Math.max(0, nI - 8) * 6);
-    const R1 = baseR1; // issues ring (scaled)
-    const R2 = R1 + 180 + Math.min(300, positionsNodes.length * 0.5); // positions ring
-    const R3 = R2 + 180 + Math.min(300, argumentsNodes.length * 0.3); // arguments ring
-
-    // Place Issues on R1 evenly
-    ordered.forEach((iss, i) => {
-      const angle = (i / Math.max(1, nI)) * 2 * Math.PI - Math.PI / 2;
-      positions.set(iss.id, { x: cx + Math.cos(angle) * R1, y: cy + Math.sin(angle) * R1 });
-    });
-
-    // For each Issue, place its Positions in a small sector around the issue angle
-    const issueAngle = new Map<string, number>();
-    ordered.forEach((iss, i) => {
-      const angle = (i / Math.max(1, nI)) * 2 * Math.PI - Math.PI / 2;
-      issueAngle.set(iss.id, angle);
-    });
-
-    // Helper to find connections in relationships
-    const getConnectedNodes = (nodeId: string, targetType: string) => {
-      return relationships
-        .filter(rel => rel.source_node_id === nodeId || rel.target_node_id === nodeId)
-        .map(rel => rel.source_node_id === nodeId ? rel.target_node_id : rel.source_node_id)
-        .map(id => allById.get(id))
-        .filter(n => n && n.node_type === targetType) as IbisNode[];
-    };
-
-    const byParent = (list: IbisNode[], pid: string) => list.filter(n => getParentId(n) === pid);
-
-    // Position positions near their connected issues or their parent issues
-    positionsNodes.forEach((position) => {
-      const connectedIssues = getConnectedNodes(position.id, 'issue');
-      const parentIssues = getParentId(position) ? [allById.get(getParentId(position)!)].filter(Boolean) as IbisNode[] : [];
-      const relevantIssues = connectedIssues.length > 0 ? connectedIssues : parentIssues;
-      
-      if (relevantIssues.length > 0) {
-        // Position near the centroid of connected/parent issues
-        let sumX = 0, sumY = 0;
-        
-        relevantIssues.forEach(issue => {
-          const issuePos = positions.get(issue.id);
-          if (issuePos) {
-            sumX += issuePos.x;
-            sumY += issuePos.y;
-          }
-        });
-        
-        const centroidX = sumX / relevantIssues.length;
-        const centroidY = sumY / relevantIssues.length;
-        const avgAngle = Math.atan2(centroidY - cy, centroidX - cx);
-        
-        // Add slight offset based on position index to avoid overlap
-        const positionIndex = positionsNodes.indexOf(position);
-        const offsetAngle = (positionIndex % 3 - 1) * 0.2;
-        const finalAngle = avgAngle + offsetAngle;
-        
-        positions.set(position.id, {
-          x: cx + Math.cos(finalAngle) * R2,
-          y: cy + Math.sin(finalAngle) * R2
-        });
-      } else {
-        // Fallback: use parent-based positioning for hierarchical layout
-        ordered.forEach((iss) => {
-          const angleCenter = issueAngle.get(iss.id)!;
-          const children = byParent(positionsNodes, iss.id);
-          const count = children.length;
-          const sector = Math.min(Math.PI / 3, Math.max(Math.PI / 12, count * 0.08));
-          for (let i = 0; i < count; i++) {
-            const t = count > 1 ? (i / (count - 1)) - 0.5 : 0;
-            const a = angleCenter + t * sector;
-            if (children[i].id === position.id) {
-              positions.set(position.id, { x: cx + Math.cos(a) * R2, y: cy + Math.sin(a) * R2 });
-            }
-          }
-        });
-      }
-    });
-
-    // Position arguments near their connected positions or their parent positions  
-    argumentsNodes.forEach((argument) => {
-      const connectedPositions = getConnectedNodes(argument.id, 'position');
-      const parentPositions = getParentId(argument) ? [allById.get(getParentId(argument)!)].filter(Boolean) as IbisNode[] : [];
-      const relevantPositions = connectedPositions.length > 0 ? connectedPositions : parentPositions;
-      
-      if (relevantPositions.length > 0) {
-        // Position near the centroid of connected/parent positions
-        let sumX = 0, sumY = 0;
-        
-        relevantPositions.forEach(pos => {
-          const posPos = positions.get(pos.id);
-          if (posPos) {
-            sumX += posPos.x;
-            sumY += posPos.y;
-          }
-        });
-        
-        const centroidX = sumX / relevantPositions.length;
-        const centroidY = sumY / relevantPositions.length;
-        const avgAngle = Math.atan2(centroidY - cy, centroidX - cx);
-        
-        // Add slight offset based on argument index to avoid overlap
-        const argumentIndex = argumentsNodes.indexOf(argument);
-        const offsetAngle = (argumentIndex % 3 - 1) * 0.15;
-        const finalAngle = avgAngle + offsetAngle;
-        
-        positions.set(argument.id, {
-          x: cx + Math.cos(finalAngle) * R3,
-          y: cy + Math.sin(finalAngle) * R3
-        });
-      } else {
-        // Fallback: use parent-based positioning for hierarchical layout
-        positionsNodes.forEach((posNode) => {
-          if (positions.has(posNode.id)) {
-            const posAngle = Math.atan2((positions.get(posNode.id)!.y - cy), (positions.get(posNode.id)!.x - cx));
-            const args = byParent(argumentsNodes, posNode.id);
-            const ac = args.length;
-            const aSector = Math.min(Math.PI / 6, Math.max(Math.PI / 24, ac * 0.06));
-            for (let j = 0; j < ac; j++) {
-              const t = ac > 1 ? (j / (ac - 1)) - 0.5 : 0;
-              const a = posAngle + t * aSector;
-              if (args[j].id === argument.id) {
-                positions.set(argument.id, { x: cx + Math.cos(a) * R3, y: cy + Math.sin(a) * R3 });
-              }
-            }
-          }
-        });
-      }
-    });
-
-    // Apply collision detection to prevent node overlap
-    const finalPositions = resolveCollisions(positions, nodes);
+    // Use the new concentric layout system
+    const { positions: layoutPositions, zones: layoutZones } = applyConcentricLayout(
+      nodes.map(n => ({
+        id: n.id,
+        title: n.title,
+        node_type: n.node_type,
+        position_x: n.position_x,
+        position_y: n.position_y,
+        embedding: null, // Add embeddings if available
+        parent_id: n.parent_id,
+        parent_node_id: undefined
+      })),
+      relationships.map(r => ({
+        source_node_id: r.source_node_id,
+        target_node_id: r.target_node_id,
+        relationship_type: r.relationship_type
+      })),
+      canvas
+    );
     
-    return finalPositions;
+    // Convert layout positions to simple positions map
+    const positions = new Map<string, { x: number; y: number }>();
+    layoutPositions.forEach((pos, id) => {
+      positions.set(id, { x: pos.x, y: pos.y });
+    });
+    
+    // Store zones for rendering
+    setZones(layoutZones);
+
+    // Return simplified result for compatibility
+    return positions;
   };
 
   // Convert IBIS nodes to React Flow nodes and edges with enhanced layout
@@ -653,7 +501,7 @@ const { user } = useAuth();
   // Precompute positions for the full dataset to keep layout stable across filters
   useEffect(() => {
     if (ibisNodes.length > 0) {
-      const pos = computeMindMapLayout(ibisNodes, ibisRelationships);
+      const pos = computeConcentricLayout(ibisNodes, ibisRelationships);
       setComputedPositions(pos);
     } else {
       setComputedPositions(new Map());
@@ -752,19 +600,116 @@ const { user } = useAuth();
     );
   }
 
+  // Render zone backgrounds
+  const renderZoneBackgrounds = () => {
+    if (!zones) return null;
+    
+    const center = { x: 600, y: 400 }; // Approximate center for SVG overlay
+    
+    return (
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <svg className="w-full h-full">
+          {/* Issue zone (center circle) */}
+          <circle
+            cx={center.x}
+            cy={center.y}
+            r={zones.issue.outerRadius}
+            fill={zones.issue.color}
+            stroke="hsl(var(--ibis-issue))"
+            strokeWidth="2"
+            strokeOpacity="0.3"
+            fillOpacity="0.1"
+          />
+          
+          {/* Position zone (middle ring) */}
+          <circle
+            cx={center.x}
+            cy={center.y}
+            r={zones.position.outerRadius}
+            fill={zones.position.color}
+            fillOpacity="0.05"
+            stroke="hsl(var(--ibis-position))"
+            strokeWidth="2"
+            strokeOpacity="0.2"
+            strokeDasharray="5,5"
+          />
+          <circle
+            cx={center.x}
+            cy={center.y}
+            r={zones.position.innerRadius}
+            fill="none"
+            stroke="hsl(var(--ibis-position))"
+            strokeWidth="1"
+            strokeOpacity="0.2"
+          />
+          
+          {/* Argument zone (outer ring) */}
+          <circle
+            cx={center.x}
+            cy={center.y}
+            r={zones.argument.outerRadius}
+            fill={zones.argument.color}
+            fillOpacity="0.05"
+            stroke="hsl(var(--ibis-argument))"
+            strokeWidth="2"
+            strokeOpacity="0.2"
+            strokeDasharray="10,5"
+          />
+          <circle
+            cx={center.x}
+            cy={center.y}
+            r={zones.argument.innerRadius}
+            fill="none"
+            stroke="hsl(var(--ibis-argument))"
+            strokeWidth="1"
+            strokeOpacity="0.2"
+          />
+          
+          {/* Zone labels */}
+          <text
+            x={center.x}
+            y={center.y + zones.issue.outerRadius - 20}
+            textAnchor="middle"
+            className="fill-[hsl(var(--ibis-issue))] text-sm font-medium opacity-60"
+          >
+            Issues
+          </text>
+          <text
+            x={center.x + zones.position.outerRadius - 30}
+            y={center.y}
+            textAnchor="middle"
+            className="fill-[hsl(var(--ibis-position))] text-sm font-medium opacity-60"
+          >
+            Positions
+          </text>
+          <text
+            x={center.x + zones.argument.outerRadius - 30}
+            y={center.y + 20}
+            textAnchor="middle"
+            className="fill-[hsl(var(--ibis-argument))] text-sm font-medium opacity-60"
+          >
+            Arguments
+          </text>
+        </svg>
+      </div>
+    );
+  };
+
   return (
     <div className="h-full flex">
       {/* Main Flow Area */}
       <div className="flex-1 relative">
+        {renderZoneBackgrounds()}
+        
         <ReactFlow
           nodes={nodes}
           edges={edges}
           onNodesChange={handleNodesChange}
-onEdgesChange={onEdgesChange}
+          onEdgesChange={onEdgesChange}
           onNodeClick={onNodeClick}
           fitView
           attributionPosition="bottom-left"
-          className="bg-background"
+          className="bg-background relative z-10"
           onInit={(instance: ReactFlowInstance<Node, Edge>) => { reactFlowRef.current = instance; }}
           nodesConnectable={false}
           elementsSelectable={true}
