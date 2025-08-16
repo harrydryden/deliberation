@@ -55,13 +55,12 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
     console.log('🔍 IbisNodeManagement - Starting fetchNodes for deliberationId:', deliberationId);
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('ibis_nodes')
-        .select('*')
-        .eq('deliberation_id', deliberationId)
-        .order('created_at', { ascending: false });
+      // Use the admin function instead of direct table access to bypass RLS
+      const { data, error } = await supabase.rpc('admin_get_ibis_nodes', {
+        target_deliberation_id: deliberationId
+      });
 
-      console.log('🔍 IbisNodeManagement - Supabase query result:', { data, error, count: data?.length });
+      console.log('🔍 IbisNodeManagement - Admin function result:', { data, error, count: data?.length });
       
       if (error) throw error;
       setNodes(data || []);
