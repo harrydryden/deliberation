@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '@/types/api';
 
 /**
@@ -36,27 +36,69 @@ interface AuthProviderProps {
  */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start with loading to check existing session
 
   const authenticateWithAccessCode = async (accessCode: string, userRole: string) => {
-    // Create a simple user for access code authentication
-    const simpleUser: User = {
-      id: `access_${accessCode}`,
-      accessCode: accessCode,
-      role: userRole,
-      profile: {
-        displayName: `User_${accessCode.substring(0, 4)}`,
-        avatarUrl: '',
-        bio: '',
-        expertiseAreas: []
-      }
-    };
-    setUser(simpleUser);
+    setIsLoading(true);
+    try {
+      // Create a simple user for access code authentication with persistent session
+      const simpleUser: User = {
+        id: `user_${accessCode}`, // More user-friendly ID
+        accessCode: accessCode,
+        role: userRole,
+        profile: {
+          displayName: `User_${accessCode.substring(0, 4)}`,
+          avatarUrl: '',
+          bio: '',
+          expertiseAreas: []
+        }
+      };
+      
+      // Store auth session in localStorage for persistence
+      localStorage.setItem('auth_session', JSON.stringify({
+        user: simpleUser,
+        timestamp: Date.now()
+      }));
+      
+      setUser(simpleUser);
+    } catch (error) {
+      console.error('Authentication error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = async () => {
+    localStorage.removeItem('auth_session');
     setUser(null);
   };
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const checkExistingSession = () => {
+      try {
+        const storedSession = localStorage.getItem('auth_session');
+        if (storedSession) {
+          const { user: storedUser, timestamp } = JSON.parse(storedSession);
+          // Check if session is less than 24 hours old
+          const isValid = Date.now() - timestamp < 24 * 60 * 60 * 1000;
+          if (isValid && storedUser) {
+            setUser(storedUser);
+          } else {
+            localStorage.removeItem('auth_session');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking existing session:', error);
+        localStorage.removeItem('auth_session');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkExistingSession();
+  }, []);
 
   const value = {
     user,
