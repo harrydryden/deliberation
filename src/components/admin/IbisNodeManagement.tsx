@@ -52,6 +52,7 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
   const { toast } = useToast();
 
   const fetchNodes = async () => {
+    console.log('🔍 IbisNodeManagement - Starting fetchNodes for deliberationId:', deliberationId);
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -60,10 +61,13 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
         .eq('deliberation_id', deliberationId)
         .order('created_at', { ascending: false });
 
+      console.log('🔍 IbisNodeManagement - Supabase query result:', { data, error, count: data?.length });
+      
       if (error) throw error;
       setNodes(data || []);
+      console.log('🔍 IbisNodeManagement - Nodes set in state:', data?.length || 0);
     } catch (error) {
-      console.error('Error fetching IBIS nodes:', error);
+      console.error('🚨 IbisNodeManagement - Error fetching IBIS nodes:', error);
       toast({
         title: "Error",
         description: "Failed to load IBIS nodes",
@@ -71,6 +75,7 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
       });
     } finally {
       setLoading(false);
+      console.log('🔍 IbisNodeManagement - fetchNodes completed, loading set to false');
     }
   };
 
