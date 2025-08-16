@@ -1333,16 +1333,20 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 reactFlowRef.current = reactFlowInstance;
               }}
               connectionMode={ConnectionMode.Loose}
+              connectOnClick={false}
+              connectionRadius={20}
               fitView
               fitViewOptions={{ padding: 0.2 }}
               style={{ background: 'hsl(var(--background))' }}
               nodesDraggable={true}
               nodesConnectable={true}
               elementsSelectable={true}
-              panOnDrag={true}
+              panOnDrag={[1, 2]} // Only pan with middle and right mouse button
               zoomOnScroll={true}
               zoomOnPinch={true}
               zoomOnDoubleClick={true}
+              selectionOnDrag={false}
+              selectNodesOnDrag={false}
               defaultEdgeOptions={{
                 type: 'smoothstep',
                 animated: false,
