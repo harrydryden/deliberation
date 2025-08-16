@@ -438,13 +438,23 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         created_by: adminUserId, // Use fixed admin ID for RLS compatibility
       };
 
-      const { data, error } = await supabase
-        .from('ibis_relationships')
-        .insert([newRelationship])
-        .select()
-        .single();
+      console.log('🔍 Creating relationship:', newRelationship);
 
-      if (error) throw error;
+      // Use the admin RPC function to bypass RLS issues
+      const { data, error } = await supabase.rpc('admin_create_ibis_relationship', {
+        p_source_node_id: newRelationship.source_node_id,
+        p_target_node_id: newRelationship.target_node_id,
+        p_relationship_type: newRelationship.relationship_type,
+        p_deliberation_id: newRelationship.deliberation_id,
+        p_created_by: newRelationship.created_by
+      });
+
+      if (error) {
+        console.error('Error creating relationship', { error });
+        throw error;
+      }
+
+      console.log('🔍 Relationship created successfully:', data);
 
       // Add to local state
       const fullRelationship: IbisRelationship = {
