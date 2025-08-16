@@ -33,6 +33,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Save, X, Plus, Trash2, Edit3, Move, Link, Unlink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceDirectedLayout, getNodeDimensions } from '../ibis/ibis-layout';
 import CustomIbisNode from './CustomIbisNode';
 import { logger } from '@/utils/logger';
@@ -103,6 +104,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   const [selectedEdgeType, setSelectedEdgeType] = useState<'supports' | 'opposes' | 'relates_to' | 'responds_to'>('relates_to');
   
   const { toast } = useToast();
+  const { user } = useAuth();
   
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -408,14 +410,13 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   // Handle new connections
   const handleConnect = useCallback(async (connection: Connection) => {
     console.log('🔍 Connection attempt:', connection);
+    console.log('🔍 Current user from auth:', user);
+    
     if (!connection.source || !connection.target) return;
 
     try {
-      // Get current session which is more reliable than getUser()
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('🔍 Current session:', session, 'Error:', sessionError);
-      
-      if (!session?.user) {
+      // Use the custom auth system instead of Supabase auth
+      if (!user) {
         toast({
           title: "Error",
           description: "You must be logged in to create relationships",
@@ -429,7 +430,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         target_node_id: connection.target,
         relationship_type: selectedEdgeType,
         deliberation_id: deliberationId,
-        created_by: session.user.id,
+        created_by: user.id,
       };
 
       const { data, error } = await supabase
@@ -463,7 +464,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         variant: "destructive",
       });
     }
-  }, [deliberationId, selectedEdgeType, toast]);
+  }, [deliberationId, selectedEdgeType, user, toast]);
 
   // Handle node editing with proper click detection
   const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
