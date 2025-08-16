@@ -759,6 +759,12 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             onNodeDragStop={(event, node) => {
               console.log('🔍 Node drag stopped:', node.id, node.position);
             }}
+            onConnectStart={(event, params) => {
+              console.log('🔍 Connection start:', params);
+            }}
+            onConnectEnd={(event) => {
+              console.log('🔍 Connection end:', event);
+            }}
             connectionMode={ConnectionMode.Loose}
             fitView
             fitViewOptions={{ padding: 0.1 }}
@@ -767,6 +773,10 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             nodesConnectable={true}
             elementsSelectable={true}
             panOnDrag={true}
+            defaultEdgeOptions={{
+              type: 'smoothstep',
+              animated: false,
+            }}
           >
             <Background />
             <Controls />
