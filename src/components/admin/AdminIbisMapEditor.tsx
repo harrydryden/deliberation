@@ -286,42 +286,47 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       node.position_x === undefined || node.position_y === undefined
     );
     
-    if (nodesWithoutPositions.length > 0) {
-      console.log('🎯 Admin editor - Using concentric layout for nodes without positions');
-      
-      // Use the new concentric layout system for all nodes
-      const { positions: layoutPositions, zones: layoutZones } = applyConcentricLayout(
-        ibisNodes.map(n => ({
-          id: n.id,
-          title: n.title,
-          node_type: n.node_type,
-          position_x: null, // Force recalculation
-          position_y: null,
-          embedding: n.embedding || null,
-          parent_id: n.parent_id,
-          parent_node_id: undefined
-        })),
-        ibisRelationships.map(r => ({
-          source_node_id: r.source_node_id,
-          target_node_id: r.target_node_id,
-          relationship_type: r.relationship_type
-        })),
-        canvas
-      );
-      
-      // Store zones for rendering
-      setZones(layoutZones);
-      
-      // Apply new positions to all nodes (overriding saved positions for consistency)
-      layoutPositions.forEach((pos, nodeId) => {
-        positionsMap.set(nodeId, { x: pos.x, y: pos.y });
-      });
-      
-      console.log('🎯 Admin editor - Concentric layout applied:', {
-        positionsCount: layoutPositions.size,
-        zonesCalculated: !!layoutZones
-      });
-    }
+    // ALWAYS apply concentric layout for zone enforcement
+    console.log('🎯 Admin editor - Forcing concentric layout for ALL nodes');
+    
+    const { positions: layoutPositions, zones: layoutZones } = applyConcentricLayout(
+      ibisNodes.map(n => ({
+        id: n.id,
+        title: n.title,
+        node_type: n.node_type,
+        position_x: null, // Force recalculation
+        position_y: null,
+        embedding: n.embedding || null,
+        parent_id: n.parent_id,
+        parent_node_id: undefined
+      })),
+      ibisRelationships.map(r => ({
+        source_node_id: r.source_node_id,
+        target_node_id: r.target_node_id,
+        relationship_type: r.relationship_type
+      })),
+      canvas
+    );
+    
+    console.log('🎯 Admin editor - Layout calculated:', {
+      positionsCount: layoutPositions.size,
+      zonesCalculated: !!layoutZones,
+      zones: layoutZones
+    });
+    
+    // Store zones for rendering
+    setZones(layoutZones);
+    
+    // Apply new positions to ALL nodes 
+    layoutPositions.forEach((pos, nodeId) => {
+      positionsMap.set(nodeId, { x: pos.x, y: pos.y });
+    });
+    
+    console.log('🎯 Admin editor - Concentric layout applied to ALL nodes:', {
+      positionsMapSize: positionsMap.size,
+      zonesSet: !!layoutZones,
+      samplePosition: positionsMap.entries().next().value
+    });
 
     // Convert to React Flow nodes
     const flowNodes: Node[] = ibisNodes.map((node) => {
