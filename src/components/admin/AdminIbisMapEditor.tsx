@@ -376,10 +376,10 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         let targetRadius = 0;
         
         // Use smaller, more consistent radii for compact layout
-        const baseR1 = 200; // Fixed, more predictable
+        const baseR1 = 200; // Fixed radius for consistency
         const R1 = baseR1;
-        const R2 = R1 + 140; // Tighter spacing
-        const R3 = R2 + 140; // Consistent gaps
+        const R2 = R1 + 120; // Closer spacing
+        const R3 = R2 + 120; // Consistent gaps
         
         // Determine target radius based on node type (in world space)
         if (node.node_type === 'issue') {
@@ -445,7 +445,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       }
       
       const importance = calculateNodeImportance(node.id, ibisRelationships);
-      const flowNode = createEnhancedFlowNode(node, position, importance, isAdmin || false);
+      const flowNode = createEnhancedFlowNode(node, position, importance, isAdmin);
       flowNodes.push(flowNode);
     });
 
@@ -618,16 +618,13 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
   // Handle node position changes with admin access control and persistence
   const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
-    console.log('🔍 All node changes:', changes);
-    
-    // Check if user is admin - for now allow all authenticated users for testing
-    const isAdmin = !!user?.id; // TODO: Replace with proper admin check
-    
-    // Apply changes first (for all users)
+    // Apply visual changes for all users first
     onNodesChange(changes);
     
-    // Then handle admin-specific logic
-    if (!isAdmin) {
+    // Handle persistence for admins only
+    const userIsAdmin = !!user?.id; // TODO: Replace with proper admin check
+    
+    if (!userIsAdmin) {
       const hasPositionChanges = changes.some(change => change.type === 'position');
       if (hasPositionChanges) {
         toast({
@@ -639,41 +636,36 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       return;
     }
     
-    // For admins, persist position changes
+    // Persist position changes for admins
     const positionChanges = changes.filter(change => 
       change.type === 'position' && 
       change.dragging === false && 
       change.position
     );
     
-    if (positionChanges.length > 0) {
-      console.log('🔍 Position changes detected:', positionChanges);
-      setHasUnsavedChanges(true);
-      
-      // Persist position changes to database
-      for (const change of positionChanges) {
-        if (change.type === 'position' && change.position) {
-          try {
-            const { error } = await supabase
-              .from('ibis_nodes')
-              .update({
-                position_x: Math.round(change.position.x),
-                position_y: Math.round(change.position.y),
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', change.id);
-              
-            if (error) throw error;
-          } catch (error) {
-            console.error('Error updating node position', error);
-            toast({
-              title: "Error",
-              description: "Failed to save node position",
-              variant: "destructive",
-            });
-          }
+    for (const change of positionChanges) {
+      if (change.type === 'position' && change.position) {
+        try {
+          const { error } = await supabase
+            .from('ibis_nodes')
+            .update({
+              position_x: Math.round(change.position.x),
+              position_y: Math.round(change.position.y),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', change.id);
+            
+          if (error) throw error;
+        } catch (error) {
+          logger.error('Error updating node position', error as any);
+          toast({
+            title: "Error",
+            description: "Failed to save node position",
+            variant: "destructive",
+          });
         }
       }
+    }
       
       // Recalculate edge routing after position changes
       setTimeout(() => {
@@ -682,8 +674,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           return currentNodes;
         });
       }, 0);
-    }
-  }, [onNodesChange, recalculateEdgeRouting, setNodes, user, toast]);
+  }, [onNodesChange, user, toast]);
 
   // Handle edge changes
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -1188,17 +1179,17 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
   // Debug helper for troubleshooting
   useEffect(() => {
     const userIsAdmin = !!user?.id; // TODO: Replace with proper admin check
-    console.log('🔍 Visualization Debug', {
+    logger.info('🔍 Visualization Debug', {
       nodesCount: nodes.length,
       edgesCount: edges.length,
-      hasRelationshipEdges: edges.some(e => e.data?.type && e.data.type !== 'hierarchy'),
+      relationshipEdges: edges.filter(e => e.data?.type && e.data.type !== 'hierarchy').length,
+      hierarchyEdges: edges.filter(e => e.data?.type === 'hierarchy').length,
       adminStatus: userIsAdmin,
       draggableNodes: nodes.filter(n => n.draggable).length,
-      savedPositions: ibisNodes.filter(n => n.position_x !== null && n.position_x !== undefined).length,
-      relationshipTypes: edges.map(e => e.data?.relationshipType).filter(Boolean),
-      animatedEdges: edges.filter(e => e.animated).length
+      savedPositions: ibisNodes.filter(n => n.position_x !== null).length,
+      relationships: ibisRelationships.length
     });
-  }, [nodes, edges, ibisNodes, user]);
+  }, [nodes, edges, ibisNodes, ibisRelationships, user]);
 
 
   if (loading) {
