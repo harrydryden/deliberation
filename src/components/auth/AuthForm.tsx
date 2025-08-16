@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Network } from "lucide-react";
 import { getErrorMessage } from "@/utils/errors";
 import { logger } from '@/utils/logger';
+import { supabase } from '@/integrations/supabase/client';
 
 export const AuthForm = () => {
   console.log('🔍 AuthForm component rendering');
@@ -43,27 +44,68 @@ export const AuthForm = () => {
       
       logger.info('Starting authentication with access code');
       
-      // Simple validation - in production, you'd validate against your access codes
-      const isValidCode = accessCode.length >= 8 && accessCode.length <= 15;
-      if (!isValidCode) {
-        throw new Error('Invalid access code format');
+      // Validate access code against Supabase database
+      const { data: codeData, error: codeError } = await supabase
+        .from('access_codes')
+        .select('code_type, is_active, expires_at, max_uses, current_uses')
+        .eq('code', accessCode)
+        .maybeSingle();
+
+      if (codeError) {
+        logger.error('Error validating access code', codeError);
+        throw new Error('Error validating access code');
       }
+
+      if (!codeData) {
+        throw new Error('Invalid access code');
+      }
+
+      // Check if code is active and not expired
+      if (!codeData.is_active) {
+        throw new Error('Access code is inactive');
+      }
+
+      if (codeData.expires_at && new Date(codeData.expires_at) < new Date()) {
+        throw new Error('Access code has expired');
+      }
+
+      if (codeData.max_uses && codeData.current_uses >= codeData.max_uses) {
+        throw new Error('Access code usage limit reached');
+      }
+
+      // Determine user role from code type
+      const userRole = codeData.code_type === 'admin' ? 'admin' : 'user';
       
-      // Determine user role based on code prefix or type
-      const userRole = accessCode.startsWith('ADMIN') ? 'admin' : 'user';
+      // Update usage count
+      const { error: updateError } = await supabase
+        .from('access_codes')
+        .update({ 
+          current_uses: (codeData.current_uses || 0) + 1,
+          last_used_at: new Date().toISOString()
+        })
+        .eq('code', accessCode);
+
+      if (updateError) {
+        logger.warn('Failed to update access code usage', updateError);
+        // Don't fail authentication for this
+      }
       
       // Authenticate with the simplified system
       await authenticateWithAccessCode(accessCode, userRole);
       
-      logger.info('Authentication successful');
+      logger.info('Authentication successful', { userRole });
       
       toast({
         title: "Authentication Successful",
-        description: "Welcome! You have been authenticated.",
+        description: `Welcome! You have been authenticated as ${userRole}.`,
       });
 
-      // Navigate to main app
-      navigate("/");
+      // Navigate to appropriate page based on role
+      if (userRole === 'admin') {
+        navigate("/admin");
+      } else {
+        navigate("/deliberations");
+      }
       
     } catch (error: any) {
       logger.error('Authentication failed', error);
