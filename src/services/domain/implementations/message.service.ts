@@ -22,14 +22,19 @@ export class MessageService implements IMessageService {
     content: string, 
     messageType: string = 'user', 
     deliberationId?: string, 
-    mode: 'chat' | 'learn' = 'chat'
+    mode: 'chat' | 'learn' = 'chat',
+    userId?: string
   ): Promise<Message> {
     try {
+      if (!userId) {
+        throw new Error('User ID is required to send a message');
+      }
+
       const messageData = {
         content: content.trim(),
-        message_type: messageType as any,
-        deliberation_id: deliberationId,
-        // Note: user_id should be set by the calling context with current user
+        messageType: messageType as any,
+        userId: userId,
+        deliberationId: deliberationId,
       } as any;
 
       const message = await this.messageRepository.create(messageData);
@@ -37,7 +42,8 @@ export class MessageService implements IMessageService {
       logger.info('Message sent successfully', { 
         messageId: message.id, 
         type: messageType, 
-        deliberationId 
+        deliberationId,
+        userId 
       });
       
       return message;

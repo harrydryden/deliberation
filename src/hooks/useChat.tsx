@@ -122,7 +122,7 @@ export const useChat = (deliberationId?: string) => {
 
     try {
       const timer = performanceMonitor.startTimer('sendMessage');
-      const saved = await messageService.sendMessage(content.trim(), 'user', deliberationId, mode);
+      const saved = await messageService.sendMessage(content.trim(), 'user', deliberationId, mode, user?.id);
       const savedChat = convertApiMessageToChatMessage(saved);
       timer();
       logger.api.response('POST', '/messages', 200, { deliberationId, mode, contentLength: content.length });
@@ -144,7 +144,7 @@ export const useChat = (deliberationId?: string) => {
     // Mark pending
     setMessages(prev => prev.map(m => (m.id === id ? { ...m, status: 'pending', error: undefined } : m)));
     try {
-      const saved = await messageService.sendMessage(target.content, 'user', deliberationId, 'chat');
+      const saved = await messageService.sendMessage(target.content, 'user', deliberationId, 'chat', user?.id);
       const savedChat = convertApiMessageToChatMessage(saved);
       setMessages(prev => prev.map(m => (m.id === id ? { ...savedChat, status: 'sent' } : m)));
       setIsTyping(true);

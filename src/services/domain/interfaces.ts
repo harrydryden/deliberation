@@ -11,7 +11,7 @@ export interface ISimpleAuthService {
 
 export interface IMessageService {
   getMessages(deliberationId?: string): Promise<Message[]>;
-  sendMessage(content: string, messageType?: string, deliberationId?: string, mode?: 'chat' | 'learn'): Promise<Message>;
+  sendMessage(content: string, messageType?: string, deliberationId?: string, mode?: 'chat' | 'learn', userId?: string): Promise<Message>;
   getUserMessages(userId: string): Promise<Message[]>;
 }
 
