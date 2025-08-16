@@ -19,6 +19,7 @@ import {
   Handle,
   Position,
 } from '@xyflow/react';
+import { calculateOptimalHandles, NodeDimensions } from '@/utils/edgeRouting';
 import '@xyflow/react/dist/style.css';
 import '../ibis/ibis-flow.css';
 import { supabase } from '@/integrations/supabase/client';
@@ -320,14 +321,43 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       };
     });
 
-    // Convert relationships to React Flow edges
+    // Convert relationships to React Flow edges with optimal handle routing
     const flowEdges: Edge[] = ibisRelationships.map((rel) => {
       const config = relationshipConfig[rel.relationship_type] || relationshipConfig.relates_to;
+      
+      // Find source and target nodes to calculate optimal handles
+      const sourceNode = flowNodes.find(n => n.id === rel.source_node_id);
+      const targetNode = flowNodes.find(n => n.id === rel.target_node_id);
+      
+      let sourceHandle: string | undefined;
+      let targetHandle: string | undefined;
+      
+      if (sourceNode && targetNode) {
+        const sourceDimensions: NodeDimensions = {
+          x: sourceNode.position.x,
+          y: sourceNode.position.y,
+          width: sourceNode.style?.width as number || 120,
+          height: sourceNode.style?.height as number || 80,
+        };
+        
+        const targetDimensions: NodeDimensions = {
+          x: targetNode.position.x,
+          y: targetNode.position.y,
+          width: targetNode.style?.width as number || 120,
+          height: targetNode.style?.height as number || 80,
+        };
+        
+        const handles = calculateOptimalHandles(sourceDimensions, targetDimensions);
+        sourceHandle = handles.sourceHandle;
+        targetHandle = handles.targetHandle;
+      }
       
       return {
         id: rel.id,
         source: rel.source_node_id,
         target: rel.target_node_id,
+        sourceHandle,
+        targetHandle,
         type: 'default',
         style: {
           stroke: config.color,
@@ -371,6 +401,42 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     return Math.min(importance / 5, 2);
   };
 
+  // Recalculate edge routing based on current node positions
+  const recalculateEdgeRouting = useCallback((currentNodes: Node[]) => {
+    setEdges(currentEdges => 
+      currentEdges.map(edge => {
+        const sourceNode = currentNodes.find(n => n.id === edge.source);
+        const targetNode = currentNodes.find(n => n.id === edge.target);
+        
+        if (sourceNode && targetNode) {
+          const sourceDimensions: NodeDimensions = {
+            x: sourceNode.position.x,
+            y: sourceNode.position.y,
+            width: sourceNode.style?.width as number || 120,
+            height: sourceNode.style?.height as number || 80,
+          };
+          
+          const targetDimensions: NodeDimensions = {
+            x: targetNode.position.x,
+            y: targetNode.position.y,
+            width: targetNode.style?.width as number || 120,
+            height: targetNode.style?.height as number || 80,
+          };
+          
+          const handles = calculateOptimalHandles(sourceDimensions, targetDimensions);
+          
+          return {
+            ...edge,
+            sourceHandle: handles.sourceHandle,
+            targetHandle: handles.targetHandle,
+          };
+        }
+        
+        return edge;
+      })
+    );
+  }, [setEdges]);
+
   // Handle node position changes with detailed logging
   const handleNodesChange = useCallback(async (changes: NodeChange[]) => {
     console.log('🔍 All node changes:', changes);
@@ -393,8 +459,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     if (positionChanges.length > 0) {
       console.log('🔍 Position changes detected:', positionChanges);
       setHasUnsavedChanges(true);
+      
+      // Recalculate edge routing after position changes
+      setTimeout(() => {
+        setNodes(currentNodes => {
+          recalculateEdgeRouting(currentNodes);
+          return currentNodes;
+        });
+      }, 0);
     }
-  }, [onNodesChange]);
+  }, [onNodesChange, recalculateEdgeRouting, setNodes]);
 
   // Handle edge changes
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -456,7 +530,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
       console.log('🔍 Relationship created successfully:', data);
 
-      // Add to local state
+      // Add to local state with optimal handle routing
       const fullRelationship: IbisRelationship = {
         id: data.id,
         ...newRelationship,
