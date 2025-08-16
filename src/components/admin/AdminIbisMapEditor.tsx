@@ -293,7 +293,11 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           label: (
             <div 
               className={`ibis-node-${node.node_type} node-content`} 
-              style={{ transform: `scale(${scaleFactor})` }}
+              style={{ 
+                transform: `scale(${scaleFactor})`,
+                pointerEvents: 'none', // Allow drag events to bubble up
+                userSelect: 'none', // Prevent text selection during drag
+              }}
             >
               <div className="font-semibold text-xs mb-1 text-white">
                 {node.title.length > 30 ? `${node.title.substring(0, 30)}...` : node.title}
@@ -321,9 +325,14 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           textAlign: 'center',
           cursor: 'grab',
           transform: node.node_type === 'argument' ? 'rotate(45deg)' : 'none',
+          // Ensure the node itself can be dragged
+          pointerEvents: 'auto',
         },
         draggable: true,
         selectable: true,
+        // Ensure these properties are set for proper interaction
+        focusable: true,
+        deletable: false,
       };
     });
 
@@ -759,7 +768,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
             
             {/* Control Panel */}
             <Panel position="top-left" className="space-y-2">
-              <Card className="p-4">
+              <Card className="p-4" style={{ pointerEvents: 'auto' }}>
                 <h3 className="font-semibold mb-2">Map Editor Controls</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2">
