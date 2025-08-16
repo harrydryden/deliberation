@@ -88,7 +88,7 @@ const nodeTypeConfig = {
 
 const relationshipConfig = {
   supports: { color: 'hsl(var(--ibis-rel-supports))', style: 'solid', label: 'Supports' },
-  opposes: { color: 'hsl(var(--ibis-rel-opposes))', style: 'solid', label: 'Opposes' },
+  opposes: { color: '#FFA500', style: 'solid', label: 'Opposes' },
   relates_to: { color: 'hsl(var(--ibis-rel-relates))', style: 'solid', label: 'Relates to' },
   responds_to: { color: 'hsl(var(--ibis-rel-responds))', style: 'solid', label: 'Responds to' },
 };
