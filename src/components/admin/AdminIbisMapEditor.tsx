@@ -405,9 +405,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     console.log('🔍 IBIS Map Editor - Converted flow data:', {
       flowNodesCount: flowNodes.length,
       flowEdgesCount: flowEdges.length,
-      sampleFlowNode: flowNodes[0]
+      ibisRelationshipsCount: ibisRelationships.length,
+      sampleFlowNode: flowNodes[0],
+      sampleFlowEdge: flowEdges[0],
+      allRelationshipIds: ibisRelationships.map(r => r.id)
     });
 
+    console.log('🔍 Setting new nodes and edges:', { 
+      newNodesCount: flowNodes.length, 
+      newEdgesCount: flowEdges.length 
+    });
     setNodes(flowNodes);
     setEdges(flowEdges);
   }, [ibisNodes, ibisRelationships, setNodes, setEdges]);
@@ -566,7 +573,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       console.log('🔍 Adding new relationship to local state:', fullRelationship);
       setIbisRelationships(prev => {
         const updated = [...prev, fullRelationship];
-        console.log('🔍 Updated relationships count:', updated.length);
+        console.log('🔍 State update - before:', prev.length, 'after:', updated.length);
+        console.log('🔍 New relationship in state:', updated.find(r => r.id === fullRelationship.id));
+        console.log('🔍 All relationships in updated state:', updated.map(r => ({ id: r.id, type: r.relationship_type })));
+        
+        // Trigger immediate UI update by also forcing a re-render
+        setTimeout(() => {
+          console.log('🔍 Triggering convertToFlowNodes after relationship addition');
+          convertToFlowNodes();
+        }, 100);
+        
         return updated;
       });
       setHasUnsavedChanges(true);
