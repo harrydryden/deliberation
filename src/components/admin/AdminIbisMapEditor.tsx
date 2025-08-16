@@ -464,8 +464,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
           scaleFactor,
         },
         style: {
-          width: 120 * scaleFactor,
-          height: node.node_type === 'argument' ? 120 * scaleFactor : 80 * scaleFactor,
+          width: 60 * scaleFactor, // 50% smaller: 120 -> 60
+          height: node.node_type === 'argument' ? 60 * scaleFactor : 40 * scaleFactor, // 50% smaller: 120->60, 80->40
         },
         draggable: isAdmin, // Allow admins to drag
         selectable: true,

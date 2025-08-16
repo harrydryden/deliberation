@@ -38,7 +38,7 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         }}
       >
         <span style={{ 
-          fontSize: '16px', 
+          fontSize: '8px', // 50% smaller: 16px -> 8px
           fontWeight: 'bold',
           color: 'hsl(var(--foreground))',
           opacity: 0.7 
@@ -60,13 +60,13 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         border: '2px solid white',
         borderRadius: nodeType === 'issue' ? '50%' : 
                     nodeType === 'argument' ? '0' : '8px',
-        width: 120 * scaleFactor,
-        height: nodeType === 'argument' ? 120 * scaleFactor : 80 * scaleFactor,
+        width: 60 * scaleFactor, // 50% smaller: 120 -> 60
+        height: nodeType === 'argument' ? 60 * scaleFactor : 40 * scaleFactor, // 50% smaller: 120->60, 80->40
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '8px',
-        fontSize: '11px',
+        padding: '4px', // 50% smaller: 8px -> 4px
+        fontSize: '6px', // 50% smaller: 11px -> 6px
         textAlign: 'center',
         fontWeight: 'bold',
         cursor: 'grab',
@@ -82,8 +82,8 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#6b7280',
           border: '2px solid #4b5563',
-          width: '12px',
-          height: '12px',
+          width: '6px', // 50% smaller: 12px -> 6px
+          height: '6px', // 50% smaller: 12px -> 6px
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -96,8 +96,8 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#6b7280',
           border: '2px solid #4b5563',
-          width: '12px',
-          height: '12px',
+          width: '6px', // 50% smaller
+          height: '6px', // 50% smaller
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -110,8 +110,8 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#6b7280',
           border: '2px solid #4b5563',
-          width: '12px',
-          height: '12px',
+          width: '6px', // 50% smaller
+          height: '6px', // 50% smaller
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -124,8 +124,8 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#6b7280',
           border: '2px solid #4b5563',
-          width: '12px',
-          height: '12px',
+          width: '6px', // 50% smaller
+          height: '6px', // 50% smaller
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -139,8 +139,8 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#6b7280',
           border: '2px solid #4b5563',
-          width: '12px',
-          height: '12px',
+          width: '6px', // 50% smaller
+          height: '6px', // 50% smaller
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -153,8 +153,8 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#6b7280',
           border: '2px solid #4b5563',
-          width: '12px',
-          height: '12px',
+          width: '6px', // 50% smaller
+          height: '6px', // 50% smaller
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -167,8 +167,8 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#6b7280',
           border: '2px solid #4b5563',
-          width: '12px',
-          height: '12px',
+          width: '6px', // 50% smaller
+          height: '6px', // 50% smaller
           borderRadius: '50%',
           zIndex: 10,
         }}
@@ -181,8 +181,8 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         style={{
           background: '#6b7280',
           border: '2px solid #4b5563',
-          width: '12px',
-          height: '12px',
+          width: '6px', // 50% smaller
+          height: '6px', // 50% smaller
           borderRadius: '50%',
           zIndex: 10,
         }}
