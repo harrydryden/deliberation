@@ -1172,6 +1172,19 @@ export type Database = {
       }
     }
     Functions: {
+      admin_create_ibis_relationship: {
+        Args: {
+          p_created_by: string
+          p_deliberation_id: string
+          p_relationship_type: string
+          p_source_node_id: string
+          p_target_node_id: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+        }[]
+      }
       admin_get_ibis_nodes: {
         Args: { target_deliberation_id: string }
         Returns: {
