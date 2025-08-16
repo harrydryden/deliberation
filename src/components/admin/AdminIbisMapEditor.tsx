@@ -450,33 +450,33 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     });
 
     // Convert relationships to React Flow edges with optimal handle routing
-    const flowEdges: Edge[] = ibisRelationships
-      .filter(rel => {
-        // Ensure the relationship has all required properties
-        if (!rel || !rel.id || !rel.source_node_id || !rel.target_node_id || !rel.relationship_type) {
-          console.warn('🔍 Filtering out invalid relationship:', rel);
-          return false;
-        }
-        
-        // Ensure both source and target nodes exist
-        const sourceExists = flowNodes.some(node => node.id === rel.source_node_id);
-        const targetExists = flowNodes.some(node => node.id === rel.target_node_id);
-        
-        if (!sourceExists || !targetExists) {
-          console.warn('🔍 Filtering out relationship with missing nodes:', {
-            relationshipId: rel.id,
-            sourceExists,
-            targetExists,
-            sourceId: rel.source_node_id,
-            targetId: rel.target_node_id
-          });
-          return false;
-        }
-        
-        console.log('🔍 Including valid relationship:', { id: rel.id, type: rel.relationship_type });
-        return true;
-      })
-      .map((rel) => {
+    const flowEdges: Edge[] = [];
+    
+    // Create IBIS relationship edges
+    ibisRelationships.forEach(rel => {
+      // Ensure the relationship has all required properties
+      if (!rel || !rel.id || !rel.source_node_id || !rel.target_node_id || !rel.relationship_type) {
+        console.warn('🔍 Filtering out invalid relationship:', rel);
+        return;
+      }
+      
+      // Only create edges if both nodes are in the filtered set
+      const sourceExists = flowNodes.some(node => node.id === rel.source_node_id);
+      const targetExists = flowNodes.some(node => node.id === rel.target_node_id);
+      
+      if (!sourceExists || !targetExists) {
+        console.warn('🔍 Filtering out relationship with missing nodes:', {
+          relationshipId: rel.id,
+          sourceExists,
+          targetExists,
+          sourceId: rel.source_node_id,
+          targetId: rel.target_node_id
+        });
+        return;
+      }
+      
+      console.log('🔍 Including valid relationship:', { id: rel.id, type: rel.relationship_type });
+      
       const config = relationshipConfig[rel.relationship_type] || relationshipConfig.relates_to;
       
       // Find source and target nodes to calculate optimal handles
@@ -506,32 +506,33 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         targetHandle = handles.targetHandle;
       }
       
-      return {
-        id: rel.id, // Use the relationship ID as the edge ID
+      flowEdges.push({
+        id: rel.id,
         source: rel.source_node_id,
         target: rel.target_node_id,
         sourceHandle,
         targetHandle,
-        type: 'smoothstep', // Use smoothstep for better visual appeal
-        style: {
-          stroke: config.color,
+        type: 'smoothstep',
+        animated: rel.relationship_type === 'supports',
+        style: { 
+          stroke: config.color, 
           strokeWidth: 2,
-          strokeDasharray: rel.relationship_type === 'opposes' ? '5,5' : undefined,
+          strokeDasharray: rel.relationship_type === 'opposes' ? '5,5' : undefined
         },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: config.color,
+        markerEnd: { 
+          type: MarkerType.ArrowClosed, 
+          color: config.color 
         },
-        data: {
-          relationshipId: rel.id,
-          relationshipType: rel.relationship_type,
-          label: config.label,
-          type: rel.relationship_type, // Add this for debug helper
-        },
-        animated: rel.relationship_type === 'supports', // Animate support relationships
         label: config.label,
         labelStyle: { fontSize: 10, fill: config.color },
-      };
+        labelBgStyle: { fill: 'white', fillOpacity: 0.8 },
+        data: { 
+          type: rel.relationship_type,
+          relationshipId: rel.id,
+          relationshipType: rel.relationship_type,
+          label: config.label
+        },
+      });
     });
 
     console.log('🔍 IBIS Map Editor - Converted flow data:', {
