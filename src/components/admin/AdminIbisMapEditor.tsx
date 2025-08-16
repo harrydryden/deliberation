@@ -849,26 +849,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       
       // Force a data refresh to ensure consistency
       console.log('🔍 Forcing data refresh after deletion...');
+      
+      // Wait a bit longer to ensure database changes are propagated
       setTimeout(async () => {
         try {
-          const { data: refreshedRelationships, error: refreshError } = await supabase.rpc('admin_get_ibis_relationships', {
-            target_deliberation_id: deliberationId
-          });
-          
-          if (!refreshError && refreshedRelationships) {
-            console.log('🔍 Refreshed relationships count:', refreshedRelationships.length);
-            const stillExists = refreshedRelationships.find(rel => rel.id === relationshipToDelete.id);
-            if (stillExists) {
-              console.warn('🔍 WARNING: Relationship still exists after deletion!', stillExists);
-            } else {
-              console.log('🔍 Confirmed: relationship successfully deleted');
-              setIbisRelationships(refreshedRelationships);
-            }
-          }
+          console.log('🔍 Refreshing data after deletion...');
+          await fetchData(); // Use the existing fetchData function instead of separate refresh
         } catch (refreshError) {
           console.error('🔍 Error refreshing data:', refreshError);
         }
-      }, 500);
+      }, 1000); // Increased delay to ensure database consistency
       
       // Only show success toast after confirmed database deletion
       toast({
@@ -935,16 +925,16 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     }
   };
 
-  // Load data on mount
+  // Load data on mount and when deliberationId changes
   useEffect(() => {
-    console.log('🔍 IBIS Map Editor - useEffect mounted with deliberationId:', deliberationId);
+    console.log('🔍 IBIS Map Editor - useEffect triggered with deliberationId:', deliberationId);
     if (deliberationId) {
       console.log('🔍 IBIS Map Editor - About to call fetchData()');
       fetchData();
     } else {
       console.log('🔍 IBIS Map Editor - No deliberation ID, skipping fetchData()');
     }
-  }, [fetchData, deliberationId]);
+  }, [deliberationId]); // Remove fetchData from dependencies to prevent unnecessary refetches
 
   // Convert data when it changes
   useEffect(() => {
