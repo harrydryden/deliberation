@@ -38,45 +38,59 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position: 'relative',
       }}
     >
-      {/* Connection handles */}
+      {/* Connection handles - Top */}
       <Handle
         type="target"
         position={Position.Top}
         style={{
-          background: 'white',
-          border: '2px solid #555',
-          width: '10px',
-          height: '10px',
+          background: '#4ade80',
+          border: '2px solid #22c55e',
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          zIndex: 10,
         }}
       />
+      
+      {/* Connection handles - Bottom */}
       <Handle
         type="source"
         position={Position.Bottom}
         style={{
-          background: 'white',
-          border: '2px solid #555',
-          width: '10px',
-          height: '10px',
+          background: '#3b82f6',
+          border: '2px solid #2563eb',
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          zIndex: 10,
         }}
       />
+      
+      {/* Connection handles - Left */}
       <Handle
         type="source"
         position={Position.Left}
         style={{
-          background: 'white',
-          border: '2px solid #555',
-          width: '10px',
-          height: '10px',
+          background: '#f59e0b',
+          border: '2px solid #d97706',
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          zIndex: 10,
         }}
       />
+      
+      {/* Connection handles - Right */}
       <Handle
         type="source"
         position={Position.Right}
         style={{
-          background: 'white',
-          border: '2px solid #555',
-          width: '10px',
-          height: '10px',
+          background: '#ef4444',
+          border: '2px solid #dc2626',
+          width: '12px',
+          height: '12px',
+          borderRadius: '50%',
+          zIndex: 10,
         }}
       />
       
