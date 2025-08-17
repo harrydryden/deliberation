@@ -25,8 +25,7 @@ export class MemoryService {
     this.cache = new CacheManager();
     this.llm = new ChatOpenAI({
       openAIApiKey: config.openaiApiKey,
-      modelName: 'gpt-4.1-2025-04-14',
-      temperature: 0.1,
+      modelName: 'gpt-5-2025-08-07',
     });
   }
 

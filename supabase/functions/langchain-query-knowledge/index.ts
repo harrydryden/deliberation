@@ -98,8 +98,7 @@ serve(async (req) => {
 
     const llm = new ChatOpenAI({
       openAIApiKey: openAIApiKey,
-      modelName: 'gpt-4.1-2025-04-14',
-      temperature: 0.7,
+      modelName: 'gpt-5-2025-08-07',
     });
 
     // Create vector store instance for retrieval

@@ -282,13 +282,12 @@ Provide analysis in the following JSON format:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-5-2025-08-07',
         messages: [
           { role: 'system', content: 'You are a semantic analyzer for a multi-agent deliberation system. Analyze the message and respond with ONLY valid JSON.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.3,
-        max_tokens: 200
+        max_completion_tokens: 200
       })
     });
 
@@ -796,10 +795,9 @@ You MUST mention these similar contributions in your response using this exact f
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: 'gpt-5-2025-08-07',
         messages,
-        max_tokens: 1000,
-        temperature: 0.7,
+        max_completion_tokens: 1000,
       }),
     });
 
@@ -1000,13 +998,12 @@ Respond with only a number between 0.0 and 1.0:`;
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              model: 'gpt-4.1-2025-04-14',
+              model: 'gpt-5-2025-08-07',
               messages: [
                 { role: 'system', content: 'You are a semantic similarity analyzer. Respond only with a decimal number between 0.0 and 1.0.' },
                 { role: 'user', content: relevancePrompt }
               ],
-              temperature: 0.1,
-              max_tokens: 10
+              max_completion_tokens: 10
             })
           });
 
@@ -1052,13 +1049,12 @@ Respond with just one word: "supportive" or "contradictory"`;
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              model: 'gpt-4.1-2025-04-14',
+              model: 'gpt-5-2025-08-07',
               messages: [
                 { role: 'system', content: 'You are analyzing argument relationships. Respond with only "supportive" or "contradictory".' },
                 { role: 'user', content: relationshipPrompt }
               ],
-              temperature: 0.1,
-              max_tokens: 5
+              max_completion_tokens: 5
             })
           });
 

@@ -33,7 +33,7 @@ export class AIService {
   private temperature: number;
 
   constructor(params: AIServiceParams = {}) {
-    this.model = params.model || 'gpt-4.1-2025-04-14';
+    this.model = params.model || 'gpt-5-2025-08-07';
     this.maxTokens = params.maxTokens || 1000;
     this.temperature = params.temperature || 0.7;
   }
@@ -82,8 +82,7 @@ export class AIService {
 
       const response = await openai.chat.completions.create({
         model: params.model || this.model,
-        max_tokens: params.maxTokens || this.maxTokens,
-        temperature: params.temperature || this.temperature,
+        max_completion_tokens: params.maxTokens || this.maxTokens,
         messages,
       });
 
@@ -143,7 +142,6 @@ Respond with only the category name.`;
 
     const response = await this.generateResponse(prompt, undefined, {
       maxTokens: 50,
-      temperature: 0.3,
       traceId,
     });
 
@@ -186,7 +184,6 @@ Respond with a JSON object:
 
     const response = await this.generateResponse(prompt, undefined, {
       maxTokens: 200,
-      temperature: 0.1,
       traceId,
     });
 
@@ -220,7 +217,6 @@ Respond with only a decimal number.`;
 
     const response = await this.generateResponse(prompt, undefined, {
       maxTokens: 10,
-      temperature: 0,
       traceId,
     });
 
@@ -258,8 +254,7 @@ Respond with only a decimal number.`;
 
       const stream = await openai.chat.completions.create({
         model: params.model || this.model,
-        max_tokens: params.maxTokens || this.maxTokens,
-        temperature: params.temperature || this.temperature,
+        max_completion_tokens: params.maxTokens || this.maxTokens,
         messages,
         stream: true,
       });

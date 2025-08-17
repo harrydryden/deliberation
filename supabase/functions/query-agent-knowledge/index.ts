@@ -327,9 +327,8 @@ async function generateResponseWithKnowledge(query: string, knowledgeContext: st
         'Authorization': `Bearer ${openaiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
-        max_tokens: 1000,
-        temperature: 0.7,
+        model: 'gpt-5-2025-08-07',
+        max_completion_tokens: 1000,
         messages: [{
           role: 'user',
           content: buildAnalyticalPrompt(query, knowledgeContext, queryAnalysis)
