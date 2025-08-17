@@ -1,7 +1,7 @@
 
 import { User } from './api';
 
-export { User };
+export type { User };
 
 export interface AuthContextType {
   user: User | null;
