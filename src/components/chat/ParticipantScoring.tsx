@@ -50,28 +50,32 @@ export const ParticipantScoring = ({
     rawValue: engagement,
     stars: calculateStars(engagement, 10),
     icon: MessageSquare,
-    description: `${engagement} messages`,
+    description: 'How active you are in discussions',
+    tooltip: `${engagement} messages sent in this deliberation`,
     renderMethod: 'stars'
   }, {
     label: 'Shares',
     rawValue: shares,
     stars: calculateStars(shares, 5),
     icon: Share2,
-    description: `${shares} IBIS contributions`,
+    description: 'Your contributions to the knowledge map',
+    tooltip: `${shares} IBIS node${shares !== 1 ? 's' : ''} shared`,
     renderMethod: 'stars'
   }, {
     label: 'Sessions',
     rawValue: sessions,
     stars: calculateStars(sessions, 2),
     icon: Clock,
-    description: `${sessions} login sessions`,
+    description: 'How often you participate',
+    tooltip: `${sessions} login session${sessions !== 1 ? 's' : ''} recorded`,
     renderMethod: 'stars'
   }, {
     label: 'Helping',
     rawValue: helpfulness,
     stars: Math.min(5, helpfulness), // Direct mapping for thumbs up (max 5)
     icon: ThumbsUp,
-    description: `${helpfulness} net positive contribution${helpfulness !== 1 ? 's' : ''}`,
+    description: 'Quality of your contributions rated by others',
+    tooltip: `${helpfulness} net positive rating${helpfulness !== 1 ? 's' : ''} received`,
     renderMethod: 'thumbs'
   }];
 
@@ -87,7 +91,10 @@ export const ParticipantScoring = ({
                   <span className="text-xs font-medium text-foreground cursor-help">{score.label}</span>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="z-50">
-                  <p className="text-xs">{score.description}</p>
+                  <div className="text-xs">
+                    <p className="font-medium">{score.description}</p>
+                    <p className="text-muted-foreground">{score.tooltip}</p>
+                  </div>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
