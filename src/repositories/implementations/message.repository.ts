@@ -71,10 +71,7 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
         throw error;
       }
 
-      // Trigger agent responses for user messages in deliberations
-      if (data.messageType === 'user' && (data as any).deliberationId) {
-        this.triggerAgentResponses(result.id, (data as any).deliberationId);
-      }
+      // Agent orchestration is handled at the service layer, not repository layer
 
       logger.info('Message created successfully', { messageId: result.id, type: data.messageType });
       
@@ -93,24 +90,4 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
     }
   }
 
-  private async triggerAgentResponses(messageId: string, deliberationId: string): Promise<void> {
-    try {
-      // Use Supabase function to trigger agent responses
-      const { error } = await supabase.functions.invoke('agent-orchestration', {
-        body: {
-          messageId,
-          deliberationId,
-          mode: 'chat'
-        }
-      });
-
-      if (error) {
-        logger.warn('Agent response trigger failed', { error, messageId, deliberationId });
-      } else {
-        logger.info('Agent responses triggered', { messageId, deliberationId });
-      }
-    } catch (error) {
-      logger.warn('Agent response trigger error', { error, messageId, deliberationId });
-    }
-  }
 }
