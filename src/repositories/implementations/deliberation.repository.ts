@@ -86,8 +86,7 @@ export class DeliberationRepository extends BaseRepository<Deliberation> impleme
           max_participants,
           is_public,
           created_at,
-          updated_at,
-          participants:participants(id, user_id)
+          updated_at
         `);
 
       if (filter) {
@@ -105,53 +104,18 @@ export class DeliberationRepository extends BaseRepository<Deliberation> impleme
         throw error;
       }
 
-      // Get current user ID for participation check
-      const currentUserId = JSON.parse(localStorage.getItem('simple_auth_user') || '{}').id;
-
-      // Map database format to API format with participant info
+      // Map database format to API format
       return data.map(item => ({
         id: item.id,
         title: item.title,
         description: item.description,
         notion: item.notion,
         status: item.status,
-        facilitator_id: item.facilitator_id,
-        start_time: item.start_time,
-        end_time: item.end_time,
-        max_participants: item.max_participants,
-        is_public: item.is_public,
-        created_at: item.created_at,
         createdAt: item.created_at,
-        updated_at: item.updated_at,
         updatedAt: item.updated_at,
-        participant_count: Array.isArray(item.participants) ? item.participants.length : 0,
-        is_user_participant: Array.isArray(item.participants) ? 
-          item.participants.some((p: any) => p.user_id === currentUserId) : false
       })) as Deliberation[];
     } catch (error) {
       logger.error({ error, filter }, 'Deliberation repository findAll failed');
-      throw error;
-    }
-  }
-
-  async joinDeliberation(deliberationId: string, userId: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('participants')
-        .insert({
-          deliberation_id: deliberationId,
-          user_id: userId,
-          role: 'participant'
-        });
-
-      if (error && error.code !== '23505') { // Ignore duplicate key error
-        logger.error({ error, deliberationId, userId }, 'Failed to join deliberation');
-        throw error;
-      }
-
-      logger.info('User joined deliberation successfully', { deliberationId, userId });
-    } catch (error) {
-      logger.error({ error, deliberationId, userId }, 'Join deliberation failed');
       throw error;
     }
   }
