@@ -235,10 +235,10 @@ const DeliberationChat = () => {
                 </Badge>
               </div>
               <Button
-                variant="ghost"
+                variant="default"
                 size="sm"
                 onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
-                className="shrink-0"
+                className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {isHeaderCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
               </Button>
