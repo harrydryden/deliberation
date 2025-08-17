@@ -313,7 +313,7 @@ const DeliberationChat = () => {
                       <VoiceInterfaceLazy deliberationId={deliberation.id} variant="panel" />
                     </Suspense>
                   </div>
-                  <div className="shrink-0">
+                  <div className="rounded-lg border bg-muted/40 px-3 py-2 flex flex-col justify-center">
                     <ParticipantScoring 
                       engagement={userScores.engagement} 
                       shares={userScores.shares} 
