@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, setUserContext } from '@/integrations/supabase/client';
 import { BaseRepository } from './base.repository';
 import { IMessageRepository } from '../interfaces';
 import { Message } from '@/types/api';
@@ -11,6 +11,9 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
 
   async findByDeliberation(deliberationId: string): Promise<Message[]> {
     try {
+      // Set user context for RLS policies
+      await setUserContext();
+      
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -31,6 +34,9 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
 
   async findByUser(userId: string): Promise<Message[]> {
     try {
+      // Set user context for RLS policies
+      await setUserContext();
+      
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -49,9 +55,11 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
     }
   }
 
-  // Enhanced create method for messages with agent response triggering
   async create(data: Omit<Message, 'id' | 'createdAt' | 'updatedAt'>): Promise<Message> {
     try {
+      // Set user context for RLS policies
+      await setUserContext();
+      
       // Map the data to database column names
       const dbData = {
         content: data.content,
