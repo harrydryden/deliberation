@@ -78,11 +78,16 @@ export abstract class BaseRepository<T extends { id: string }> implements IRepos
         .update({ ...data, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
       
       if (error) {
         logger.error('Repository update error', { error, tableName: this.tableName, id, data });
         throw error;
+      }
+      
+      if (!result) {
+        logger.error('Repository update failed: No matching record found', { tableName: this.tableName, id });
+        throw new Error(`No ${this.tableName} record found with id: ${id}`);
       }
       
       logger.info('Repository update success', { tableName: this.tableName, id });
