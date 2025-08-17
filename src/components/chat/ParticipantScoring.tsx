@@ -1,5 +1,6 @@
 import { MessageSquare, Share2, Clock, Star, ThumbsUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ParticipantScoringProps {
   engagement: number;
@@ -75,18 +76,27 @@ export const ParticipantScoring = ({
   }];
 
   return (
-    <div className="flex flex-col gap-2 w-full">
-      {scores.map(score => (
-        <div key={score.label} className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <score.icon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-            <span className="text-xs font-medium text-foreground">{score.label}</span>
+    <TooltipProvider>
+      <div className="flex flex-col gap-2 w-full">
+        {scores.map(score => (
+          <div key={score.label} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <score.icon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-xs font-medium text-foreground cursor-help">{score.label}</span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{score.description}</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="flex items-center gap-1">
+              {score.renderMethod === 'thumbs' ? renderThumbs(score.stars) : renderStars(score.stars)}
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            {score.renderMethod === 'thumbs' ? renderThumbs(score.stars) : renderStars(score.stars)}
-          </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </TooltipProvider>
   );
 };
