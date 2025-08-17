@@ -11,7 +11,6 @@ import { LocalAgentManagement } from './LocalAgentManagement';
 import { DeliberationOverview } from './DeliberationOverview';
 import { DeliberationCreation } from './DeliberationCreation';
 import { KnowledgeManagement } from './KnowledgeManagement';
-import { SecurityDashboard } from './SecurityDashboard';
 import { SystemStats } from './SystemStats';
 import { useAdminData } from '@/hooks/useAdminData';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
@@ -68,12 +67,11 @@ export const AdminDashboard = () => {
       {/* Main Content Tabs - Sticky */}
       <Tabs defaultValue="users" className="w-full">
         <div className="sticky top-28 z-30 bg-deliberation-bg/95 backdrop-blur-sm py-2 -mx-6 px-6 border-b border-border/50">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users">Users & Access</TabsTrigger>
           <TabsTrigger value="agents">Agents</TabsTrigger>
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="deliberations">Deliberations</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
         </div>
 
@@ -138,10 +136,6 @@ export const AdminDashboard = () => {
             onLoad={adminData.fetchDeliberations}
             onUpdateStatus={async () => {}} // TODO: implement
           />
-        </TabsContent>
-
-        <TabsContent value="security" className="space-y-4">
-          <SecurityDashboard />
         </TabsContent>
       </Tabs>
     </div>
