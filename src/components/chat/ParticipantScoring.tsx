@@ -36,7 +36,7 @@ export const ParticipantScoring = ({
     description: 'Login sessions'
   }];
   return (
-    <div className="flex flex-col gap-2 w-full">
+    <div className="flex flex-col gap-2 w-full p-3 bg-card border border-border rounded-lg">
       {scores.map(score => (
         <div key={score.label} className="flex items-center justify-between">
           <div className="flex items-center gap-2">
