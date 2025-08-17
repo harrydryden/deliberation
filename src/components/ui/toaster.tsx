@@ -1,3 +1,4 @@
+
 import { useToast } from "@/hooks/use-toast"
 import {
   Toast,
@@ -16,7 +17,7 @@ export function Toaster() {
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (
           <Toast key={id} {...props} className="animate-in slide-in-from-bottom-2 slide-in-from-left-2 duration-300">
-            <div className="grid gap-1">
+            <div className="grid gap-1 justify-center text-center">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
                 <ToastDescription>{description}</ToastDescription>
