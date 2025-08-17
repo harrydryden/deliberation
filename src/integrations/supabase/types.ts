@@ -622,13 +622,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "item_keywords_classified_item_id_fkey"
-            columns: ["classified_item_id"]
-            isOneToOne: false
-            referencedRelation: "notions"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "item_keywords_keyword_id_fkey"
             columns: ["keyword_id"]
             isOneToOne: false
@@ -677,24 +670,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "item_relationships_source_item_id_fkey"
-            columns: ["source_item_id"]
-            isOneToOne: false
-            referencedRelation: "notions"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "item_relationships_target_item_id_fkey"
             columns: ["target_item_id"]
             isOneToOne: false
             referencedRelation: "classified_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "item_relationships_target_item_id_fkey"
-            columns: ["target_item_id"]
-            isOneToOne: false
-            referencedRelation: "notions"
             referencedColumns: ["id"]
           },
         ]
@@ -733,24 +712,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "item_similarities_item1_id_fkey"
-            columns: ["item1_id"]
-            isOneToOne: false
-            referencedRelation: "notions"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "item_similarities_item2_id_fkey"
             columns: ["item2_id"]
             isOneToOne: false
             referencedRelation: "classified_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "item_similarities_item2_id_fkey"
-            columns: ["item2_id"]
-            isOneToOne: false
-            referencedRelation: "notions"
             referencedColumns: ["id"]
           },
         ]
@@ -1047,120 +1012,7 @@ export type Database = {
       }
     }
     Views: {
-      notions: {
-        Row: {
-          ai_generated: boolean | null
-          confidence_score: number | null
-          created_at: string | null
-          created_by: string | null
-          deliberation_id: string | null
-          full_content: string | null
-          headline: string | null
-          id: string | null
-          incoming_relationships: number | null
-          item_type: string | null
-          keywords: string[] | null
-          message_id: string | null
-          outgoing_relationships: number | null
-          raw_content: string | null
-          stance_score: number | null
-          status: string | null
-          submission_id: string | null
-          submitter_id: string | null
-          updated_at: string | null
-          user_edited: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "classified_items_deliberation_id_fkey"
-            columns: ["deliberation_id"]
-            isOneToOne: false
-            referencedRelation: "deliberations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "classified_items_submission_id_fkey"
-            columns: ["submission_id"]
-            isOneToOne: false
-            referencedRelation: "submissions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "submissions_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "messages"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_cache: {
-        Row: {
-          deliberation_ids: string[] | null
-          display_name: string | null
-          expertise_areas: string[] | null
-          id: string | null
-          user_role: string | null
-        }
-        Insert: {
-          deliberation_ids?: never
-          display_name?: string | null
-          expertise_areas?: string[] | null
-          id?: string | null
-          user_role?: string | null
-        }
-        Update: {
-          deliberation_ids?: never
-          display_name?: string | null
-          expertise_areas?: string[] | null
-          id?: string | null
-          user_role?: string | null
-        }
-        Relationships: []
-      }
-      user_profiles_with_codes: {
-        Row: {
-          access_code: string | null
-          archive_reason: string | null
-          archived_at: string | null
-          archived_by: string | null
-          avatar_url: string | null
-          bio: string | null
-          code_type: string | null
-          created_at: string | null
-          display_name: string | null
-          expertise_areas: string[] | null
-          id: string | null
-          is_archived: boolean | null
-          role: string | null
-          updated_at: string | null
-          used_at: string | null
-          user_role: string | null
-        }
-        Relationships: []
-      }
-      user_profiles_with_deliberations: {
-        Row: {
-          access_code: string | null
-          archive_reason: string | null
-          archived_at: string | null
-          archived_by: string | null
-          avatar_url: string | null
-          bio: string | null
-          code_type: string | null
-          created_at: string | null
-          deliberations: Json | null
-          display_name: string | null
-          expertise_areas: string[] | null
-          id: string | null
-          is_archived: boolean | null
-          role: string | null
-          updated_at: string | null
-          used_at: string | null
-          user_role: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       admin_create_ibis_relationship: {
