@@ -46,12 +46,8 @@ export class MessageService implements IMessageService {
         userId 
       });
 
-      // Trigger agent orchestration for user messages
-      if (messageType === 'user' && deliberationId) {
-        this.triggerAgentOrchestration(message.id, deliberationId, mode).catch(error => {
-          logger.error('Agent orchestration failed', { error, messageId: message.id });
-        });
-      }
+      // Agent orchestration is now handled via streaming in the frontend
+      // Remove automatic orchestration to prevent duplicate responses
       
       return message;
     } catch (error) {
