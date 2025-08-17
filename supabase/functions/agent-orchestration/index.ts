@@ -797,7 +797,7 @@ You MUST mention these similar contributions in your response using this exact f
       body: JSON.stringify({
         model: 'gpt-5-2025-08-07',
         messages,
-        max_completion_tokens: 1000,
+        max_completion_tokens: 2000,
       }),
     });
 
@@ -813,6 +813,16 @@ You MUST mention these similar contributions in your response using this exact f
     
     if (!data.choices?.[0]?.message?.content) {
       console.error('❌ No content in OpenAI response:', data);
+      
+      // If finish_reason is 'length', the response was cut off - provide a helpful fallback
+      if (data.choices?.[0]?.finish_reason === 'length') {
+        console.warn('⚠️ Response was truncated due to length limit, providing fallback');
+        const fallbackResponse = agentType === 'bill_agent' 
+          ? "I apologize, but I'm experiencing technical difficulties accessing the full information. Could you please rephrase your question or make it more specific?"
+          : "I'm sorry, I'm experiencing technical difficulties. Could you please try asking your question again?";
+        return fallbackResponse;
+      }
+      
       throw new Error('No response content from OpenAI');
     }
     
