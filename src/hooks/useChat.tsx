@@ -94,12 +94,28 @@ export const useChat = (deliberationId?: string) => {
   };
 
   const loadChatHistory = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('loadChatHistory: No user found, skipping');
+      return;
+    }
 
+    console.log('loadChatHistory: Starting load for', { userId: user.id, deliberationId });
     setIsLoading(true);
+    
     await handleAsyncError(async () => {
       const timer = performanceMonitor.startTimer('loadChatHistory');
+      
+      // Debug: Check user context before loading
+      console.log('loadChatHistory: About to call messageService.getMessages');
       const data = await messageService.getMessages(deliberationId);
+      console.log('loadChatHistory: Received data', { 
+        messageCount: data?.length || 0, 
+        deliberationId,
+        userId: user.id,
+        firstMessage: data?.[0],
+        lastMessage: data?.[data?.length - 1]
+      });
+      
       setMessages(convertApiMessagesToChatMessages(data || []));
       timer();
       logger.api.response('GET', '/messages', 200, { deliberationId, messageCount: data?.length || 0 });

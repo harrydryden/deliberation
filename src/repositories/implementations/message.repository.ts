@@ -11,11 +11,23 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
 
   async findByDeliberation(deliberationId: string): Promise<Message[]> {
     try {
+      console.log('MessageRepository.findByDeliberation: Starting', { deliberationId });
+      
       // Ensure user context is properly set for RLS policies
       const contextSet = await this.ensureUserContextWithRetry();
+      console.log('MessageRepository.findByDeliberation: Context set result', { contextSet, deliberationId });
+      
       if (!contextSet) {
         logger.warn('Could not set user context for RLS, may return empty results', { deliberationId });
       }
+      
+      // Debug: Check current user context
+      const { data: debugData } = await supabase.rpc('debug_current_user_settings');
+      console.log('MessageRepository.findByDeliberation: Current user context', { 
+        debugData, 
+        deliberationId,
+        contextSet 
+      });
       
       logger.info('Loading messages for deliberation', { deliberationId, contextSet });
       
@@ -24,6 +36,13 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
         .select('*')
         .eq('deliberation_id', deliberationId)
         .order('created_at', { ascending: true });
+
+      console.log('MessageRepository.findByDeliberation: Query result', { 
+        deliberationId,
+        error: error?.message,
+        dataCount: data?.length || 0,
+        sampleData: data?.slice(0, 2)
+      });
 
       if (error) {
         logger.error('Message repository findByDeliberation error', error, { deliberationId });
@@ -38,6 +57,7 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
 
       return data as Message[];
     } catch (error) {
+      console.error('MessageRepository.findByDeliberation: Error', { error, deliberationId });
       logger.error('Message repository findByDeliberation failed', error, { deliberationId });
       throw error;
     }
@@ -45,13 +65,26 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
 
   private async ensureUserContextWithRetry(): Promise<boolean> {
     try {
+      console.log('ensureUserContextWithRetry: Starting');
+      
+      // Get current user from localStorage for debugging
+      const storedUser = localStorage.getItem('simple_auth_user');
+      const user = storedUser ? JSON.parse(storedUser) : null;
+      console.log('ensureUserContextWithRetry: Current user', { userId: user?.id });
+      
       // Import ensureUserContext dynamically to avoid circular imports
       const { ensureUserContext } = await import('@/integrations/supabase/client');
-      return await ensureUserContext();
+      const result = await ensureUserContext();
+      
+      console.log('ensureUserContextWithRetry: Result', { result, userId: user?.id });
+      return result;
     } catch (error) {
+      console.error('ensureUserContextWithRetry: Error, falling back to setUserContext', { error });
       // Fallback to setUserContext if ensureUserContext is not available
       const { setUserContext } = await import('@/integrations/supabase/client');
-      return await setUserContext();
+      const result = await setUserContext();
+      console.log('ensureUserContextWithRetry: Fallback result', { result });
+      return result;
     }
   }
 
