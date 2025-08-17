@@ -1240,6 +1240,13 @@ export type Database = {
           target_node_id: string
         }[]
       }
+      admin_update_agent_configuration: {
+        Args: { p_access_code: string; p_agent_id: string; p_updates: Json }
+        Returns: {
+          id: string
+          updated_at: string
+        }[]
+      }
       admin_update_ibis_node_position: {
         Args: { p_node_id: string; p_position_x: number; p_position_y: number }
         Returns: {
