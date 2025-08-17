@@ -223,6 +223,42 @@ export const useAdminData = () => {
     }
   };
 
+  // Local agent operations
+  const updateLocalAgent = async (id: string, updates: Partial<Agent>) => {
+    try {
+      await services.agentService.updateAgent(id, updates);
+      
+      // Update local state for local agents
+      setLocalAgents(prevAgents => 
+        prevAgents.map(agent => 
+          agent.id === id ? { ...agent, ...updates } : agent
+        )
+      );
+      
+      toast.success('Local agent updated successfully');
+      logger.info('Local agent updated', { agentId: id, updates });
+    } catch (error) {
+      handleError(error, 'update local agent');
+      throw error;
+    }
+  };
+
+  const createLocalAgent = async (agentData: LocalAgentCreate) => {
+    try {
+      const newAgent = await services.agentService.createAgent(agentData as any);
+      
+      // Add to local state
+      setLocalAgents(prevAgents => [...prevAgents, newAgent]);
+      
+      toast.success('Local agent created successfully');
+      logger.info('Local agent created', { agentId: newAgent.id });
+      return newAgent;
+    } catch (error) {
+      handleError(error, 'create local agent');
+      throw error;
+    }
+  };
+
   return {
     // States
     users,
@@ -253,6 +289,8 @@ export const useAdminData = () => {
     updateAgent,
     createAgent,
     fetchLocalAgents,
+    updateLocalAgent,
+    createLocalAgent,
     fetchDeliberations,
     fetchStats,
   };

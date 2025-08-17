@@ -111,8 +111,8 @@ export const AdminDashboard = () => {
                 deliberations={adminData.deliberations}
                 loading={adminData.loadingLocalAgents}
                 onLoad={adminData.fetchLocalAgents}
-                onUpdate={async () => {}} // TODO: implement
-                onCreate={async () => {}} // TODO: implement
+                onUpdate={adminData.updateLocalAgent}
+                onCreate={adminData.createLocalAgent}
               />
             </div>
           </div>
