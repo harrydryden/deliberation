@@ -42,19 +42,17 @@ class SupabaseDeliberationService implements DeliberationService {
       deliberations.map(async (deliberation) => {
         logger.info('Getting participant count', { deliberationId: deliberation.id });
         
-        // Get active participant count (last active within 24 hours)
-        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        // Get total participant count
         const { count, error: countError } = await supabase
           .from('participants')
           .select('*', { count: 'exact', head: true })
-          .eq('deliberation_id', deliberation.id)
-          .gte('last_active', twentyFourHoursAgo);
+          .eq('deliberation_id', deliberation.id);
 
         if (countError) {
           logger.warn(`Error getting participant count for ${deliberation.id}`, countError as any);
         }
 
-        logger.info('Active participant count', { 
+        logger.info('Participant count', { 
           deliberationId: deliberation.id, 
           count
         });
