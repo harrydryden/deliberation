@@ -22,6 +22,59 @@ import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
 import { useIsMobile } from "@/hooks/use-mobile";
 const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface"));
 import { logger } from "@/utils/logger";
+
+// Helper function to calculate helpfulness score from IBIS node ratings
+const calculateHelpfulnessScore = async (userId: string, deliberationId: string, supabase: any): Promise<number> => {
+  try {
+    // Get all IBIS nodes created by this user in this deliberation
+    const { data: userNodes, error: nodesError } = await supabase
+      .from('ibis_nodes')
+      .select('id')
+      .eq('created_by', userId)
+      .eq('deliberation_id', deliberationId);
+
+    if (nodesError || !userNodes || userNodes.length === 0) {
+      return 0;
+    }
+
+    const nodeIds = userNodes.map(node => node.id);
+
+    // Get all ratings for this user's nodes
+    const { data: ratings, error: ratingsError } = await supabase
+      .from('ibis_node_ratings')
+      .select('ibis_node_id, rating')
+      .in('ibis_node_id', nodeIds)
+      .eq('deliberation_id', deliberationId);
+
+    if (ratingsError || !ratings) {
+      return 0;
+    }
+
+    // Group ratings by node and calculate net positive contributions
+    const nodeRatings = new Map<string, number>();
+    
+    ratings.forEach(rating => {
+      const nodeId = rating.ibis_node_id;
+      const currentSum = nodeRatings.get(nodeId) || 0;
+      nodeRatings.set(nodeId, currentSum + rating.rating);
+    });
+
+    // Count nodes with net positive ratings (≥1)
+    let helpfulnessScore = 0;
+    nodeRatings.forEach(netRating => {
+      if (netRating >= 1) {
+        helpfulnessScore++;
+      }
+    });
+
+    // Cap at maximum of 5
+    return Math.min(5, helpfulnessScore);
+  } catch (error) {
+    console.error('Error calculating helpfulness score:', error);
+    return 0;
+  }
+};
+
 interface Deliberation {
   id: string;
   title: string;
@@ -72,7 +125,8 @@ const DeliberationChat = () => {
   const [userScores, setUserScores] = useState({
     engagement: 0, // Count of user messages sent total
     shares: 0, // Count of IBIS submissions total
-    sessions: 1 // Count of login sessions (placeholder)
+    sessions: 1, // Count of login sessions (placeholder)
+    helpfulness: 0 // Count of net positive IBIS contribution ratings
   });
   const {
     messages,
@@ -151,10 +205,14 @@ const DeliberationChat = () => {
       const userMessages = messageStats?.filter(m => m.message_type === 'user').length || 0;
       const ibisSubmissions = messageStats?.filter(m => m.submitted_to_ibis === true).length || 0;
       
+      // Calculate helpfulness score from IBIS node ratings
+      const helpfulnessScore = await calculateHelpfulnessScore(user.id, deliberationId, supabase);
+      
       setUserScores({
         engagement: userMessages,
         shares: ibisSubmissions,
-        sessions: 1 // TODO: Calculate actual sessions from login data
+        sessions: 1, // TODO: Calculate actual sessions from login data
+        helpfulness: helpfulnessScore
       });
       
       logger.info('User scores loaded', { engagement: userMessages, shares: ibisSubmissions });
@@ -317,7 +375,8 @@ const DeliberationChat = () => {
                     <ParticipantScoring 
                       engagement={userScores.engagement} 
                       shares={userScores.shares} 
-                      sessions={userScores.sessions} 
+                      sessions={userScores.sessions}
+                      helpfulness={userScores.helpfulness}
                     />
                   </div>
                 </div>
@@ -384,7 +443,8 @@ const DeliberationChat = () => {
                   <ParticipantScoring 
                     engagement={userScores.engagement} 
                     shares={userScores.shares} 
-                    sessions={userScores.sessions} 
+                    sessions={userScores.sessions}
+                    helpfulness={userScores.helpfulness}
                   />
                 </div>
               </div>

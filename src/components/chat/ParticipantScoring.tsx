@@ -1,15 +1,17 @@
-import { MessageSquare, Share2, Clock, Star } from "lucide-react";
+import { MessageSquare, Share2, Clock, Star, ThumbsUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface ParticipantScoringProps {
   engagement: number;
   shares: number;
   sessions: number;
+  helpfulness: number;
 }
 export const ParticipantScoring = ({
   engagement,
   shares,
   sessions,
+  helpfulness,
 }: ParticipantScoringProps) => {
   // Convert raw values to star ratings (1-5)
   const calculateStars = (value: number, threshold: number): number => {
@@ -29,24 +31,47 @@ export const ParticipantScoring = ({
     ));
   };
 
+  const renderThumbs = (filledThumbs: number) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <ThumbsUp
+        key={i}
+        className={`h-3 w-3 ${
+          i < filledThumbs 
+            ? 'fill-civic-blue text-civic-blue' 
+            : 'text-muted-foreground'
+        }`}
+      />
+    ));
+  };
+
   const scores = [{
     label: 'Engagement',
     rawValue: engagement,
     stars: calculateStars(engagement, 10),
     icon: MessageSquare,
-    description: `${engagement} messages`
+    description: `${engagement} messages`,
+    renderMethod: 'stars'
   }, {
     label: 'Shares',
     rawValue: shares,
     stars: calculateStars(shares, 5),
     icon: Share2,
-    description: `${shares} IBIS contributions`
+    description: `${shares} IBIS contributions`,
+    renderMethod: 'stars'
   }, {
     label: 'Sessions',
     rawValue: sessions,
     stars: calculateStars(sessions, 2),
     icon: Clock,
-    description: `${sessions} login sessions`
+    description: `${sessions} login sessions`,
+    renderMethod: 'stars'
+  }, {
+    label: 'Helping',
+    rawValue: helpfulness,
+    stars: Math.min(5, helpfulness), // Direct mapping for thumbs up (max 5)
+    icon: ThumbsUp,
+    description: `${helpfulness} net positive contribution${helpfulness !== 1 ? 's' : ''}`,
+    renderMethod: 'thumbs'
   }];
 
   return (
@@ -58,7 +83,7 @@ export const ParticipantScoring = ({
             <span className="text-xs font-medium text-foreground">{score.label}</span>
           </div>
           <div className="flex items-center gap-1">
-            {renderStars(score.stars)}
+            {score.renderMethod === 'thumbs' ? renderThumbs(score.stars) : renderStars(score.stars)}
           </div>
         </div>
       ))}
