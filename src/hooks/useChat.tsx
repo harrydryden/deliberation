@@ -10,6 +10,7 @@ import { logger } from '@/utils/logger';
 import { performanceMonitor } from '@/utils/performanceUtils';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 import { useToast } from '@/hooks/use-toast';
+import { useResponseStreaming } from '@/hooks/useResponseStreaming';
 
 export const useChat = (deliberationId?: string) => {
   const { user, isLoading: authLoading } = useAuth();
@@ -19,6 +20,7 @@ export const useChat = (deliberationId?: string) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const { streamingState, startStreaming, stopStreaming } = useResponseStreaming();
   
   useMemoryLeakDetection('useChat');
 
@@ -141,14 +143,72 @@ export const useChat = (deliberationId?: string) => {
 
       // Replace optimistic with saved
       setMessages(prev => prev.map(m => (m.id === tempId ? { ...savedChat, status: 'sent' } : m)));
+
+      // Start streaming the agent response
+      if (deliberationId) {
+        await startStreaming(
+          saved.id,
+          deliberationId,
+          // onUpdate callback - update streaming message in real-time
+          (streamContent: string, agentType: string) => {
+            const streamingMessage: ChatMessage = {
+              id: `streaming-${saved.id}`,
+              content: streamContent,
+              message_type: agentType as ChatMessage['message_type'],
+              created_at: new Date().toISOString(),
+              user_id: 'agent',
+              status: 'streaming',
+              agent_context: { agentType }
+            };
+
+            setMessages(prev => {
+              const existingStreamingIndex = prev.findIndex(m => m.id === `streaming-${saved.id}`);
+              if (existingStreamingIndex >= 0) {
+                // Update existing streaming message
+                return prev.map((msg, index) => 
+                  index === existingStreamingIndex ? streamingMessage : msg
+                );
+              } else {
+                // Add new streaming message
+                return [...prev, streamingMessage];
+              }
+            });
+          },
+          // onComplete callback - replace with final message
+          async (finalContent: string, agentType: string) => {
+            try {
+              // Remove streaming message and reload to get the actual stored message
+              setMessages(prev => prev.filter(m => m.id !== `streaming-${saved.id}`));
+              await loadChatHistory();
+            } catch (error) {
+              logger.error('Error loading final message', { error });
+            } finally {
+              setIsTyping(false);
+            }
+          },
+          // onError callback
+          (error: string) => {
+            logger.error('Streaming error', { error });
+            setMessages(prev => prev.filter(m => m.id !== `streaming-${saved.id}`));
+            setIsTyping(false);
+            toast({
+              title: "Response Error",
+              description: "Failed to get agent response. Please try again.",
+              variant: "destructive"
+            });
+          }
+        );
+      } else {
+        setIsTyping(false);
+      }
+
     } catch (error) {
       const errMsg = getErrorMessage(error);
       setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, status: 'failed', error: errMsg } : m)));
       setIsTyping(false);
       throw error;
     }
-    // Keep typing until agent message arrives (realtime turns it off)
-  }, [user, deliberationId, setMessages, messageService]);
+  }, [user, deliberationId, setMessages, messageService, startStreaming, loadChatHistory, toast]);
 
   const retryMessage = useCallback(async (id: string) => {
     const target = messages.find(m => m.id === id);
@@ -170,9 +230,11 @@ export const useChat = (deliberationId?: string) => {
   return {
     messages,
     isLoading,
-    isTyping,
+    isTyping: isTyping || streamingState.isStreaming,
     sendMessage,
     loadChatHistory,
     retryMessage,
+    streamingState,
+    stopStreaming
   };
 };

@@ -7,7 +7,7 @@ export interface ChatMessage {
   agent_context?: any;
   submitted_to_ibis?: boolean;
   // Client-only transient fields for UX
-  status?: 'pending' | 'failed' | 'sent';
+  status?: 'pending' | 'failed' | 'sent' | 'streaming';
   error?: string;
   local_id?: string;
 }
