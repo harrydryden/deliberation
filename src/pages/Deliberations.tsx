@@ -53,8 +53,9 @@ const Deliberations = () => {
     try {
       logger.info('Loading deliberations...');
       setLoading(true);
+      logger.info('About to call deliberationService.getDeliberations()');
       const data = await deliberationService.getDeliberations();
-      logger.info('Deliberations loaded successfully', { count: data?.length || 0 });
+      logger.info('Deliberations loaded successfully', { count: data?.length || 0, data });
       setDeliberations(data);
     } catch (error) {
       logger.error('Failed to load deliberations', error as any);
