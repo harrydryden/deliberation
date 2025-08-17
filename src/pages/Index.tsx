@@ -100,7 +100,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Brain className="h-5 w-5 text-democratic-green" />
-                  <span>AI Assistance</span>
+                  <span>Three AI agents help guide the conversation: Bill provides facts particular around policy, Flo manages discussion, and most importantly Pia facilitates the sharing of views between participants.</span>
                 </CardTitle>
                 <CardDescription>
                   Three AI agents help guide the conversation: Bill provides policy analysis, Flo manages discussion flow, and Pia offers peer perspectives.
