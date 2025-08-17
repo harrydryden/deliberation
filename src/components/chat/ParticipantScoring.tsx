@@ -76,27 +76,27 @@ export const ParticipantScoring = ({
   }];
 
   return (
-    <TooltipProvider>
-      <div className="flex flex-col gap-2 w-full">
-        {scores.map(score => (
-          <div key={score.label} className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <score.icon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+    <div className="flex flex-col gap-2 w-full">
+      {scores.map(score => (
+        <div key={score.label} className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <score.icon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="text-xs font-medium text-foreground cursor-help">{score.label}</span>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>{score.description}</p>
+                <TooltipContent side="top" className="z-50">
+                  <p className="text-xs">{score.description}</p>
                 </TooltipContent>
               </Tooltip>
-            </div>
-            <div className="flex items-center gap-1">
-              {score.renderMethod === 'thumbs' ? renderThumbs(score.stars) : renderStars(score.stars)}
-            </div>
+            </TooltipProvider>
           </div>
-        ))}
-      </div>
-    </TooltipProvider>
+          <div className="flex items-center gap-1">
+            {score.renderMethod === 'thumbs' ? renderThumbs(score.stars) : renderStars(score.stars)}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 };
