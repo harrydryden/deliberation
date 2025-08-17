@@ -226,7 +226,7 @@ const DeliberationChat = () => {
             {/* Title moved into left box below */}
 
             {/* Sub-header with three boxes */}
-            <div className="flex items-stretch justify-between gap-3 flex-wrap">
+            <div className="flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="rounded-lg border bg-muted/40 p-3 h-full">
                     <div className="flex items-start justify-between gap-3">
@@ -259,7 +259,7 @@ const DeliberationChat = () => {
                 </div>
               </div>
 
-              <div className="flex items-stretch gap-3 flex-wrap">
+              <div className="flex flex-col sm:flex-row lg:flex-row items-stretch gap-3">
                 <div className="flex flex-col gap-3 h-full">
                   <div className="rounded-lg border bg-muted/40 p-3">
                     <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
