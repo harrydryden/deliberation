@@ -357,18 +357,18 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
         </div>
       ) : (
         variant === 'panel' ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             <Button
               onClick={() => { mode === 'bill' ? void stop() : void startBill(); }}
               variant={mode === 'bill' ? 'default' : 'secondary'}
               size="sm"
               aria-label="Chat to Policy"
               aria-pressed={mode === 'bill'}
-              className="w-full"
+              className="w-full h-8 text-xs"
             >
-              <Mic className="h-4 w-4 mr-2" />
+              <Mic className="h-3 w-3 mr-1" />
               Chat to Policy
-              {mode === 'bill' && speaking && <Waves className="h-4 w-4 ml-2" />}
+              {mode === 'bill' && speaking && <Waves className="h-3 w-3 ml-1" />}
             </Button>
 
             <Button
@@ -377,11 +377,11 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
               size="sm"
               aria-label="Deliberation Summary"
               aria-pressed={mode === 'ibis'}
-              className="w-full"
+              className="w-full h-8 text-xs"
             >
-              <AudioLines className="h-4 w-4 mr-2" />
+              <AudioLines className="h-3 w-3 mr-1" />
               Deliberation Summary
-              {mode === 'ibis' && speaking && <Waves className="h-4 w-4 ml-2" />}
+              {mode === 'ibis' && speaking && <Waves className="h-3 w-3 ml-1" />}
             </Button>
 
             <Button
@@ -390,9 +390,9 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
               size="sm"
               aria-label="Dictate to text"
               aria-pressed={mode === 'stt'}
-              className="w-full"
+              className="w-full h-8 text-xs"
             >
-              <Type className="h-4 w-4 mr-2" />
+              <Type className="h-3 w-3 mr-1" />
               Dictate to Text
             </Button>
           </div>
