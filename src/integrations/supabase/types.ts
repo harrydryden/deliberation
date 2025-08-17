@@ -1286,6 +1286,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      debug_current_user_settings: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       enhanced_audit_log: {
         Args: {
           details?: Json
