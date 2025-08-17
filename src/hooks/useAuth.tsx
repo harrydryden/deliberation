@@ -108,9 +108,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (codeUpdateError) throw codeUpdateError;
       }
 
-      // Create user object for the auth context
+      // Create user object for the auth context with access_ prefix format
       const simpleUser: User = {
-        id: userId,
+        id: `access_${accessCode}`,
         accessCode: accessCode,
         role: userRole,
         profile: {

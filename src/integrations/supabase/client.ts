@@ -17,13 +17,16 @@ export const setUserContext = async (): Promise<boolean> => {
       const user = JSON.parse(storedUser);
       
       if (user.id) {
+        // Ensure user ID uses access_ prefix format
+        const userIdForContext = user.id.startsWith('access_') ? user.id : `access_${user.accessCode || user.id}`;
+        
         // Set the user context for RLS policies with retry logic
         let retries = 3;
         while (retries > 0) {
           try {
             const { data, error } = await supabase.rpc('set_config', {
               setting_name: 'app.current_user_id',
-              new_value: user.id,
+              new_value: userIdForContext,
               is_local: false
             });
             
@@ -36,7 +39,7 @@ export const setUserContext = async (): Promise<boolean> => {
               }
               return false;
             } else {
-              console.log('User context set successfully:', { userId: user.id });
+              console.log('User context set successfully:', { userId: userIdForContext });
               return true;
             }
           } catch (error) {
@@ -74,9 +77,10 @@ export const ensureUserContext = async (): Promise<boolean> => {
     const storedUser = localStorage.getItem('simple_auth_user');
     if (storedUser) {
       const user = JSON.parse(storedUser);
-      const isContextValid = data?.config_value === user.id;
+      const expectedUserId = user.id.startsWith('access_') ? user.id : `access_${user.accessCode || user.id}`;
+      const isContextValid = data?.config_value === expectedUserId;
       console.log('User context verification:', { 
-        expected: user.id, 
+        expected: expectedUserId, 
         actual: data?.config_value, 
         valid: isContextValid 
       });
