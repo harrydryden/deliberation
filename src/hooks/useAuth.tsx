@@ -56,57 +56,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsLoading(true);
     
     try {
-      // First, validate the access code and get user data from database
+      // First, validate the access code
       const { data: validationData, error: validationError } = await supabase.rpc('validate_access_code_simple', {
         input_code: accessCode.toUpperCase()
       });
 
       if (validationError) throw validationError;
       if (!validationData?.valid) throw new Error('Invalid access code');
-
-      // Check if user already exists in profiles table by looking for the access code
-      const { data: existingCode, error: codeError } = await supabase
-        .from('access_codes')
-        .select('used_by, id')
-        .eq('code', accessCode.toUpperCase())
-        .eq('is_active', true)
-        .single();
-
-      if (codeError && codeError.code !== 'PGRST116') throw codeError;
-
-      let userId: string;
-
-      if (existingCode?.used_by) {
-        // User already exists, use their UUID
-        userId = existingCode.used_by;
-      } else {
-        // New user - create profile and link to access code
-        userId = crypto.randomUUID();
-
-        // Create profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: userId,
-            display_name: `User_${accessCode.substring(0, 4)}`,
-            role: userRole,
-            user_role: userRole
-          });
-
-        if (profileError) throw profileError;
-
-        // Link access code to user
-        const { error: codeUpdateError } = await supabase
-          .from('access_codes')
-          .update({
-            used_by: userId,
-            is_used: true,
-            used_at: new Date().toISOString()
-          })
-          .eq('code', accessCode.toUpperCase());
-
-        if (codeUpdateError) throw codeUpdateError;
-      }
 
       // Create user object for the auth context with access_ prefix format
       const simpleUser: User = {
