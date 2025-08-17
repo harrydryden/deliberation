@@ -46,15 +46,7 @@ const Deliberations = () => {
       navigate("/auth");
       return;
     }
-    
-    // Redirect admins to admin dashboard - they shouldn't participate in deliberations
-    if (!isLoading && user && user.role === 'admin') {
-      console.log('Admin user detected, redirecting to admin dashboard');
-      navigate("/admin", { replace: true });
-      return;
-    }
-    
-    if (user && user.role !== 'admin') {
+    if (user) {
       loadDeliberations();
     }
   }, [user, isLoading, navigate]);

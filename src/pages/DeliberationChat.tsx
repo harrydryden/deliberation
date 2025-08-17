@@ -4,7 +4,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useServices } from "@/hooks/useServices";
 import { useChat } from "@/hooks/useChat";
 import { useUserAgents } from "@/hooks/useUserAgents";
-import { Layout } from "@/components/layout/Layout";
 import { MessageList } from "@/components/chat/MessageList";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -36,14 +35,6 @@ const DeliberationChat = () => {
       localStorage.setItem('last_deliberation_id', deliberationId);
     }
   }, [deliberationId]);
-
-  // Redirect admins to admin dashboard - they shouldn't participate in deliberations
-  useEffect(() => {
-    if (user && user.role === 'admin') {
-      console.log('Admin user detected in deliberation chat, redirecting to admin dashboard');
-      navigate("/admin", { replace: true });
-    }
-  }, [user, navigate]);
 
   // Load deliberation details
   useEffect(() => {
@@ -95,22 +86,20 @@ const DeliberationChat = () => {
 
   if (isLoadingDeliberation) {
     return (
-      <Layout>
-        <div className="container mx-auto p-6 space-y-6">
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-10 w-10" />
-            <Skeleton className="h-8 w-48" />
-          </div>
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-32" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-24 w-full" />
-            </CardContent>
-          </Card>
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10" />
+          <Skeleton className="h-8 w-48" />
         </div>
-      </Layout>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-24 w-full" />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -119,70 +108,68 @@ const DeliberationChat = () => {
   }
 
   return (
-    <Layout>
-      <div className="container mx-auto p-6 max-w-6xl">
-        <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/deliberations')}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Deliberations
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{deliberation.title}</h1>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-              <div className="flex items-center gap-1">
-                <Users className="h-4 w-4" />
-                <span>Active Discussion</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <MessageSquare className="h-4 w-4" />
-                <span>{messages.length} messages</span>
-              </div>
+    <div className="container mx-auto p-6 max-w-6xl">
+      <div className="flex items-center gap-4 mb-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate('/deliberations')}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Deliberations
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">{deliberation.title}</h1>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+            <div className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              <span>Active Discussion</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <MessageSquare className="h-4 w-4" />
+              <span>{messages.length} messages</span>
             </div>
           </div>
         </div>
-
-        <div className="grid grid-cols-1 gap-6">
-          <Card className="flex-1 flex flex-col h-[calc(100vh-12rem)]">
-            <CardHeader className="pb-4">
-              <CardTitle>Discussion</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col p-0">
-              <div className="flex-1 overflow-hidden">
-                <MessageList
-                  messages={messages}
-                  isLoading={isLoading}
-                  isTyping={isTyping}
-                  onAddToIbis={handleAddToIbis}
-                  onRetry={retryMessage}
-                  deliberationId={deliberationId}
-                  agentConfigs={localAgents}
-                />
-              </div>
-              <div className="border-t p-4">
-                <MessageInput
-                  onSendMessage={sendMessage}
-                  disabled={isTyping}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <IbisSubmissionModal
-          isOpen={isSubmissionModalOpen}
-          onClose={() => setIsSubmissionModalOpen(false)}
-          onSuccess={handleSubmissionSuccess}
-          messageId={selectedMessage?.id || ''}
-          messageContent={selectedMessage?.content || ''}
-          deliberationId={deliberationId || ''}
-        />
       </div>
-    </Layout>
+
+      <div className="grid grid-cols-1 gap-6">
+        <Card className="flex-1 flex flex-col h-[calc(100vh-12rem)]">
+          <CardHeader className="pb-4">
+            <CardTitle>Discussion</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col p-0">
+            <div className="flex-1 overflow-hidden">
+              <MessageList
+                messages={messages}
+                isLoading={isLoading}
+                isTyping={isTyping}
+                onAddToIbis={handleAddToIbis}
+                onRetry={retryMessage}
+                deliberationId={deliberationId}
+                agentConfigs={localAgents}
+              />
+            </div>
+            <div className="border-t p-4">
+              <MessageInput
+                onSendMessage={sendMessage}
+                disabled={isTyping}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <IbisSubmissionModal
+        isOpen={isSubmissionModalOpen}
+        onClose={() => setIsSubmissionModalOpen(false)}
+        onSuccess={handleSubmissionSuccess}
+        messageId={selectedMessage?.id || ''}
+        messageContent={selectedMessage?.content || ''}
+        deliberationId={deliberationId || ''}
+      />
+    </div>
   );
 };
 
