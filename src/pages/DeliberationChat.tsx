@@ -345,12 +345,14 @@ const DeliberationChat = () => {
 
               {/* Scores */}
               <div className="shrink-0">
-                <ParticipantScoring 
-                  engagement={userScores.engagement} 
-                  shares={userScores.shares} 
-                  sessions={userScores.sessions} 
-                  target={10} 
-                />
+                <div className="rounded-lg border bg-muted/40 px-3 py-2 h-20 flex flex-col justify-center">
+                  <ParticipantScoring 
+                    engagement={userScores.engagement} 
+                    shares={userScores.shares} 
+                    sessions={userScores.sessions} 
+                    target={10} 
+                  />
+                </div>
               </div>
             </div>
           </div>

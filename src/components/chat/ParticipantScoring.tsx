@@ -35,20 +35,19 @@ export const ParticipantScoring = ({
     icon: Clock,
     description: 'Login sessions'
   }];
-  return <div className="rounded-lg border bg-muted/40 p-3 h-full flex flex-col">
-      <div className="flex flex-col gap-3 flex-1 justify-center">
-        {scores.map(score => <div key={score.label} className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <score.icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm font-medium text-foreground">{score.label}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground font-mono">
-                {score.value}/{target}
-              </span>
-              
-            </div>
-          </div>)}
-      </div>
-    </div>;
+  return (
+    <div className="flex flex-col gap-2 w-full">
+      {scores.map(score => (
+        <div key={score.label} className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <score.icon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <span className="text-xs font-medium text-foreground">{score.label}</span>
+          </div>
+          <span className="text-xs text-muted-foreground font-mono">
+            {score.value}/{target}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 };
