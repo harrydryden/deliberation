@@ -1,140 +1,148 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { AuthContextType, User } from '@/types/auth';
-import { simpleAuthService } from '@/services/domain/container';
-import { logger } from '@/utils/logger';
-import { setUserContext } from '@/integrations/supabase/client';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { User } from '@/types/api';
+import { supabase } from '@/integrations/supabase/client';
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+/**
+ * Authentication context type definition
+ * 
+ * Provides the shape of the authentication context with user state,
+ * loading state, and authentication methods for simple access code authentication.
+ */
+export interface AuthContextType {
+  /** Current authenticated user or null if not authenticated */
+  user: User | null;
+  /** Loading state for authentication operations */
+  isLoading: boolean;
+  /** Access code authentication function */
+  authenticateWithAccessCode: (accessCode: string, userRole: string) => Promise<void>;
+  /** Logout function that signs out the current user */
+  logout: () => Promise<void>;
+  /** Whether the user is currently authenticated */
+  isAuthenticated: boolean;
+}
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+const AuthContext = createContext<AuthContextType | null>(null);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+/**
+ * Simple Authentication Provider Component
+ * 
+ * Provides authentication context to the entire application using
+ * simple access code authentication instead of traditional email/password.
+ * 
+ * @param children - React children to wrap with authentication context
+ */
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Initialize authentication state
-  useEffect(() => {
-    const initAuth = async () => {
+  // Initialize from localStorage on mount
+  React.useEffect(() => {
+    const storedUser = localStorage.getItem('simple_auth_user');
+    if (storedUser) {
       try {
-        const storedUser = localStorage.getItem('simple_auth_user');
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          console.log('Restoring user session:', parsedUser.id);
-          
-          // Set user context for RLS policies immediately
-          await setUserContext();
-          
-          setUser(parsedUser);
-        }
+        setUser(JSON.parse(storedUser));
       } catch (error) {
-        console.error('Failed to initialize auth:', error);
+        console.warn('Failed to parse stored user:', error);
         localStorage.removeItem('simple_auth_user');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initAuth();
-  }, []); // Remove location dependency to prevent re-runs
-
-  // Handle redirects separately when user state changes
-  useEffect(() => {
-    if (!isLoading && user) {
-      // If user is on auth page and has valid session, redirect to their last deliberation
-      if (location.pathname === '/auth' || location.pathname === '/') {
-        const lastDeliberationId = localStorage.getItem('last_deliberation_id');
-        if (lastDeliberationId) {
-          console.log('Redirecting to last deliberation:', lastDeliberationId);
-          navigate(`/deliberations/${lastDeliberationId}`, { replace: true });
-        } else {
-          navigate('/deliberations', { replace: true });
-        }
       }
     }
-  }, [user, isLoading, location.pathname, navigate]);
+  }, []);
 
-  const authenticate = async (accessCode: string): Promise<void> => {
+  const authenticateWithAccessCode = async (accessCode: string, userRole: string) => {
+    setIsLoading(true);
+    
     try {
-      setIsLoading(true);
-      const result = await simpleAuthService.authenticateWithAccessCode(accessCode);
-      
-      console.log('Authentication successful:', result.user.id);
-      
-      // Store user and set context
-      localStorage.setItem('simple_auth_user', JSON.stringify(result.user));
-      await setUserContext();
-      
-      setUser(result.user);
-      
-      logger.info('User authenticated successfully', { userId: result.user.id });
-      
-      // Check for last deliberation and redirect
-      const lastDeliberationId = localStorage.getItem('last_deliberation_id');
-      if (lastDeliberationId) {
-        console.log('Redirecting to last deliberation after auth:', lastDeliberationId);
-        // Add delay to ensure all context is set
-        setTimeout(() => {
-          navigate(`/deliberations/${lastDeliberationId}`);
-        }, 200);
+      // First, validate the access code and get user data from database
+      const { data: validationData, error: validationError } = await supabase.rpc('validate_access_code_simple', {
+        input_code: accessCode.toUpperCase()
+      });
+
+      if (validationError) throw validationError;
+      if (!validationData?.valid) throw new Error('Invalid access code');
+
+      // Check if user already exists in profiles table by looking for the access code
+      const { data: existingCode, error: codeError } = await supabase
+        .from('access_codes')
+        .select('used_by, id')
+        .eq('code', accessCode.toUpperCase())
+        .eq('is_active', true)
+        .single();
+
+      if (codeError && codeError.code !== 'PGRST116') throw codeError;
+
+      let userId: string;
+
+      if (existingCode?.used_by) {
+        // User already exists, use their UUID
+        userId = existingCode.used_by;
       } else {
-        navigate('/deliberations');
+        // New user - create profile and link to access code
+        userId = crypto.randomUUID();
+
+        // Create profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            display_name: `User_${accessCode.substring(0, 4)}`,
+            role: userRole,
+            user_role: userRole
+          });
+
+        if (profileError) throw profileError;
+
+        // Link access code to user
+        const { error: codeUpdateError } = await supabase
+          .from('access_codes')
+          .update({
+            used_by: userId,
+            is_used: true,
+            used_at: new Date().toISOString()
+          })
+          .eq('code', accessCode.toUpperCase());
+
+        if (codeUpdateError) throw codeUpdateError;
       }
+
+      // Create user object for the auth context
+      const simpleUser: User = {
+        id: userId,
+        accessCode: accessCode,
+        role: userRole,
+        profile: {
+          displayName: `User_${accessCode.substring(0, 4)}`,
+          avatarUrl: '',
+          bio: '',
+          expertiseAreas: []
+        }
+      };
+      
+      // Persist to localStorage
+      localStorage.setItem('simple_auth_user', JSON.stringify(simpleUser));
+      setUser(simpleUser);
     } catch (error) {
-      logger.error('Authentication failed', { error });
+      console.error('Authentication failed:', error);
       throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const authenticateWithAccessCode = async (accessCode: string, codeType?: string): Promise<void> => {
-    return authenticate(accessCode);
+  const logout = async () => {
+    localStorage.removeItem('simple_auth_user');
+    setUser(null);
   };
 
-  const signOut = async (): Promise<void> => {
-    try {
-      await simpleAuthService.signOut();
-      localStorage.removeItem('simple_auth_user');
-      localStorage.removeItem('last_deliberation_id');
-      setUser(null);
-      navigate('/auth');
-      logger.info('User signed out successfully');
-    } catch (error) {
-      logger.error('Sign out failed', { error });
-      throw error;
-    }
-  };
-
-  const logout = async (): Promise<void> => {
-    return signOut();
-  };
-
-  const refreshToken = async (): Promise<void> => {
-    // Simple auth doesn't use refresh tokens
-    // Just ensure user context is set
-    if (user) {
-      await setUserContext();
-    }
-  };
-
-  const value: AuthContextType = {
+  const value = {
     user,
     isLoading,
-    authenticate,
     authenticateWithAccessCode,
-    signOut,
     logout,
     isAuthenticated: !!user,
-    refreshToken
   };
 
   return (
@@ -142,4 +150,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </AuthContext.Provider>
   );
+};
+
+/**
+ * Authentication hook
+ * 
+ * Provides access to authentication context and methods.
+ * Must be used within an AuthProvider.
+ * 
+ * @returns Authentication context with user state and methods
+ * @throws {Error} When used outside of AuthProvider
+ */
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
