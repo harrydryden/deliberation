@@ -32,7 +32,7 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
-                  {/* chat deprecated */}
+                  
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/backend" element={<div>Backend configuration removed</div>} />
                   <Route path="/deliberations" element={<Deliberations />} />
