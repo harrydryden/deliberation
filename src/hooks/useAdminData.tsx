@@ -185,7 +185,38 @@ export const useAdminData = () => {
   // Agent update and creation operations
   const updateAgent = async (id: string, updates: Partial<Agent>) => {
     try {
-      await services.agentService.updateAgent(id, updates);
+      // Get access code from user data in localStorage
+      const storedUser = localStorage.getItem('simple_auth_user');
+      if (!storedUser) {
+        throw new Error('User not authenticated');
+      }
+
+      const userData = JSON.parse(storedUser);
+      const accessCode = userData.accessCode;
+      
+      if (!accessCode) {
+        throw new Error('Access code not found in user session');
+      }
+
+      console.log('Calling admin database function for global agent...');
+      
+      // Use admin database function to bypass RLS properly
+      const { data, error } = await supabase.rpc('admin_update_agent_configuration', {
+        p_agent_id: id,
+        p_access_code: accessCode,
+        p_updates: updates
+      });
+
+      console.log('Database function response:', { data, error });
+
+      if (error) {
+        console.error('Database function error:', error);
+        throw new Error(`Failed to update agent: ${error.message}`);
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error(`No agent found with id: ${id}`);
+      }
       
       // Update local state
       setAgents(prevAgents => 
@@ -195,7 +226,7 @@ export const useAdminData = () => {
       );
       
       toast.success('Agent updated successfully');
-      logger.info('Agent updated', { agentId: id, updates });
+      logger.info('Global agent updated', { agentId: id, updates });
     } catch (error) {
       handleError(error, 'update agent');
       throw error;
