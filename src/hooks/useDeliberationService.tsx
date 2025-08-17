@@ -1,5 +1,5 @@
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, setUserContext } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 
 interface DeliberationService {
@@ -13,6 +13,9 @@ interface DeliberationService {
 class SupabaseDeliberationService implements DeliberationService {
   async getDeliberations(): Promise<any[]> {
     logger.info('Starting getDeliberations with simplified auth');
+    
+    // Set user context for RLS policies
+    await setUserContext();
     
     // Since we're using simplified access code authentication,
     // we don't need to check Supabase auth - just fetch public deliberations
