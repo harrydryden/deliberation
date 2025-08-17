@@ -41,16 +41,7 @@ export const useChat = (deliberationId?: string) => {
     };
   }, [user, authLoading, deliberationId]);
 
-  // Reload chat history when component mounts/remounts to catch missed messages
-  useEffect(() => {
-    const reloadTimer = setTimeout(() => {
-      if (!authLoading && user) {
-        loadChatHistory();
-      }
-    }, 2000); // Reload after 2 seconds to catch any missed agent responses
-
-    return () => clearTimeout(reloadTimer);
-  }, []);  // Only run once on mount
+  // Remove redundant reload - realtime updates should handle missed messages
 
   // Listen for agent failure events (e.g., OpenAI quota exceeded)
   useEffect(() => {

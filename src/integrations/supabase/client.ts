@@ -20,15 +20,22 @@ export const setUserContext = async (): Promise<void> => {
       console.log('User ID extracted:', user.id);
       
       if (user.id) {
+        console.log('Setting user context for RLS:', user.id);
         // Set the user context for RLS policies
         try {
-          await supabase.rpc('set_config', {
+          const { data, error } = await supabase.rpc('set_config', {
             setting_name: 'app.current_user_id',
             new_value: user.id,
             is_local: false
           });
+          
+          if (error) {
+            console.error('Failed to set user context - RPC error:', error);
+          } else {
+            console.log('User context set successfully:', { userId: user.id, rpcResult: data });
+          }
         } catch (error) {
-          console.warn('Failed to set user context:', error);
+          console.warn('Failed to set user context - Exception:', error);
         }
       }
     } catch (error) {

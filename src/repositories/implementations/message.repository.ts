@@ -14,6 +14,11 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
       // Set user context for RLS policies
       await setUserContext();
       
+      // Add a small delay to ensure context is set
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      logger.info('Loading messages for deliberation with user context', { deliberationId });
+      
       const { data, error } = await supabase
         .from('messages')
         .select('*')
