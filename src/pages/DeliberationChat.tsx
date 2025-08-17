@@ -346,7 +346,7 @@ const DeliberationChat = () => {
                     </div>
                   </div>
                   {deliberation.description && (
-                    <p className="text-sm text-muted-foreground mt-2 line-clamp-1 cursor-pointer" 
+                    <p className="text-sm text-muted-foreground mt-2 line-clamp-3 cursor-pointer" 
                        onClick={() => setIsDescriptionOpen(true)} 
                        title="Click to view full description">
                       {deliberation.description}
