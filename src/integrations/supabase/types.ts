@@ -1446,6 +1446,10 @@ export type Database = {
         Args: { input_code: string }
         Returns: boolean
       }
+      set_config: {
+        Args: { is_local?: boolean; new_value: string; setting_name: string }
+        Returns: string
+      }
       sparsevec_out: {
         Args: { "": unknown }
         Returns: unknown
