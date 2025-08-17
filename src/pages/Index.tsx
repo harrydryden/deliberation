@@ -115,7 +115,7 @@ const Index = () => {
                   <span>Structured Framework</span>
                 </CardTitle>
                 <CardDescription>
-                  Discussions follow the IBIS method - identifying Issues, exploring Positions, and examining Arguments. This keeps conversations focused and productive.
+                  Deliberations follow the IBIS map method - start with Issues, explore associated Positions, and finally supporting or dissenting arguments.
                 </CardDescription>
               </CardHeader>
             </Card>
