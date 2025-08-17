@@ -6,16 +6,15 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown, Type, AudioLines } from 'lucide-react';
 import { RealtimeRTC } from '@/utils/realtimeRtc';
-import { useChat } from '@/hooks/useChat';
-
 interface VoiceInterfaceProps {
   deliberationId: string;
   preferredBillAgentId?: string;
   className?: string;
   variant?: 'default' | 'toggle' | 'panel';
+  sendMessage?: (content: string) => Promise<void>;
 }
 
-const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferredBillAgentId, className, variant = 'default' }) => {
+const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferredBillAgentId, className, variant = 'default', sendMessage: sendChatMessage }) => {
   const { toast } = useToast();
   const [connected, setConnected] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -29,9 +28,6 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   const sttRecorderRef = useRef<MediaRecorder | null>(null);
   const sttChunksRef = useRef<BlobPart[]>([]);
   const [sttBusy, setSttBusy] = useState(false);
-  
-  // Chat sender for deliberation messages
-  const { sendMessage: sendChatMessage } = useChat(deliberationId);
   const selectPreferred = async (next: 'bill' | 'ibis' | 'stt') => {
     setPreferred(next);
     if (mode !== 'idle') {
@@ -226,8 +222,12 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
           if (error) throw error;
           const text = (data?.text || '').toString().trim();
           if (text.length > 0) {
-            await sendChatMessage(text, 'chat');
-            toast({ title: 'Added message', description: 'Voice transcription sent to chat.' });
+            if (sendChatMessage) {
+              await sendChatMessage(text);
+              toast({ title: 'Added message', description: 'Voice transcription sent to chat.' });
+            } else {
+              toast({ title: 'Error', description: 'No sendMessage function provided', variant: 'destructive' });
+            }
           } else {
             toast({ title: 'No speech detected', description: 'Nothing was transcribed.', variant: 'destructive' });
           }
