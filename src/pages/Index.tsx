@@ -112,7 +112,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Users className="h-5 w-5 text-civic-gold" />
-                  <span>Discussions follow the IBIS method - identifying Issues, related Positions, and associated Arguments. This helps to organise the discussion - which you can see in the map view, or ask Pia</span>
+                  <span>Structured Framework</span>
                 </CardTitle>
                 <CardDescription>
                   Discussions follow the IBIS method - identifying Issues, exploring Positions, and examining Arguments. This keeps conversations focused and productive.
