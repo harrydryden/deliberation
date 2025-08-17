@@ -696,9 +696,17 @@ async function executeAgentResponse(
           console.log('📖 Sources found:', sources);
         } else {
           console.log('ℹ️ No relevant knowledge found for this query');
+          // Add fallback knowledge context when no specific knowledge is found
+          if (agentType === 'bill_agent') {
+            knowledgeContext = '\n\nNote: No specific documents found for this query. Provide a general response based on your training knowledge about the topic.';
+          }
         }
       } catch (error) {
         console.warn('⚠️ Knowledge retrieval failed:', error);
+        // Add fallback knowledge context on error
+        if (agentType === 'bill_agent') {
+          knowledgeContext = '\n\nNote: Unable to access knowledge base. Provide a general response based on your training knowledge about the topic.';
+        }
       }
     }
 
@@ -785,6 +793,8 @@ You MUST mention these similar contributions in your response using this exact f
       }
     ];
 
+    console.log(`📏 System prompt length: ${finalSystemPrompt.length} characters`);
+    console.log(`📝 User message length: ${context.content.length} characters`);
     console.log('🧠 Generating response with OpenAI...');
 
     // Call OpenAI API
