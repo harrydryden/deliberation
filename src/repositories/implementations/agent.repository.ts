@@ -46,60 +46,16 @@ export class AgentRepository extends BaseRepository<Agent> implements IAgentRepo
 
   async findLocalAgents(): Promise<Agent[]> {
     try {
-      // First get the agent configurations - bypass RLS temporarily for debugging
+      // Use the admin function to bypass RLS
       const { data: agentData, error: agentError } = await supabase
-        .rpc('get_local_agents_admin')
-        .then(result => {
-          if (result.error) {
-            console.log('❌ RPC failed, trying direct query...');
-            // Fallback to direct query
-            return supabase
-              .from('agent_configurations')
-              .select(`
-                id,
-                name,
-                description,
-                agent_type,
-                system_prompt,
-                goals,
-                response_style,
-                is_active,
-                is_default,
-                deliberation_id,
-                created_by,
-                created_at,
-                updated_at,
-                preset_questions,
-                facilitator_config
-              `)
-              .not('deliberation_id', 'is', null);
-          }
-          return result;
-        });
-          id,
-          name,
-          description,
-          agent_type,
-          system_prompt,
-          goals,
-          response_style,
-          is_active,
-          is_default,
-          deliberation_id,
-          created_by,
-          created_at,
-          updated_at,
-          preset_questions,
-          facilitator_config
-        `)
-        .not('deliberation_id', 'is', null);
+        .rpc('get_local_agents_admin');
 
       if (agentError) {
-        logger.error({ error: agentError }, 'Agent repository findLocalAgents error');
+        logger.error({ error: agentError }, 'Agent repository findLocalAgents RPC error');
         throw agentError;
       }
 
-      console.log('🔍 Raw local agents from DB:', agentData);
+      console.log('🔍 Raw local agents from DB via RPC:', agentData);
 
       if (!agentData || agentData.length === 0) {
         return [];

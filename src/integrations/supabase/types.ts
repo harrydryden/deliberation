@@ -1301,6 +1301,26 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_local_agents_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          agent_type: string
+          created_at: string
+          created_by: string
+          deliberation_id: string
+          description: string
+          facilitator_config: Json
+          goals: string[]
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          preset_questions: Json
+          response_style: string
+          system_prompt: string
+          updated_at: string
+        }[]
+      }
       halfvec_avg: {
         Args: { "": number[] }
         Returns: unknown
