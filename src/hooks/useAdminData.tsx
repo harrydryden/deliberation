@@ -227,11 +227,17 @@ export const useAdminData = () => {
   // Local agent operations
   const updateLocalAgent = async (id: string, updates: Partial<Agent>) => {
     try {
-      // Get access code from localStorage for admin operations
-      const accessCode = localStorage.getItem('accessCode');
+      // Get access code from user data in localStorage
+      const storedUser = localStorage.getItem('simple_auth_user');
+      if (!storedUser) {
+        throw new Error('User not authenticated');
+      }
+
+      const userData = JSON.parse(storedUser);
+      const accessCode = userData.accessCode;
       
       if (!accessCode) {
-        throw new Error('Access code required for agent updates');
+        throw new Error('Access code not found in user session');
       }
 
       // Use admin edge function for updates to bypass RLS properly
