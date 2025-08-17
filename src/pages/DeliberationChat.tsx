@@ -261,7 +261,7 @@ const DeliberationChat = () => {
 
               <div className="flex flex-col sm:flex-row lg:flex-row items-stretch gap-3">
                 <div className="flex flex-col gap-3 h-full">
-                  <div className="rounded-lg border bg-muted/40 p-1.5 w-[85%]">
+                  <div className="rounded-lg border bg-muted/40 p-1.5 w-[90%]">
                     <div className="text-xs font-medium text-muted-foreground mb-1">Text Mode</div>
                     <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
                   </div>
