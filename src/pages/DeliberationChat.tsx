@@ -227,7 +227,7 @@ const DeliberationChat = () => {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               
               {/* Title Section - Takes most space on large screens */}
-              <div className="lg:col-span-6 xl:col-span-7">
+              <div className="lg:col-span-3 xl:col-span-3">
                 <div className="rounded-lg border bg-muted/40 p-3 h-full">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
