@@ -317,19 +317,17 @@ const DeliberationChat = () => {
                 </div>
               </div>
 
-              {/* Text Mode */}
+              {/* Modes */}
               <div className="shrink-0">
-                <div className="rounded-lg border bg-muted/40 p-3">
-                  <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
-                  <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
-                </div>
-              </div>
-
-              {/* View Mode */}
-              <div className="shrink-0">
-                <div className="rounded-lg border bg-muted/40 p-3">
-                  <div className="text-xs font-medium text-muted-foreground mb-2">View Mode</div>
-                  <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
+                <div className="rounded-lg border bg-muted/40 p-3 space-y-3">
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
+                    <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-muted-foreground mb-2">View Mode</div>
+                    <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
+                  </div>
                 </div>
               </div>
 
