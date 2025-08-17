@@ -115,8 +115,11 @@ class ServiceContainer {
       // Simple implementation that works with access codes
       this._simpleAuthService = {
         authenticateWithAccessCode: async (accessCode: string) => {
+          // Generate proper UUID instead of using access code as ID
+          const userId = crypto.randomUUID();
+          
           const simpleUser = {
-            id: `access_${accessCode}`,
+            id: userId, // Use proper UUID
             accessCode: accessCode,
             role: 'user',
             profile: {
