@@ -93,6 +93,16 @@ export interface Deliberation {
   status: string;
   createdAt: string;
   updatedAt: string;
+  // Additional fields populated by repository
+  facilitator_id?: string;
+  start_time?: string;
+  end_time?: string;
+  max_participants?: number;
+  is_public?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  participant_count?: number;
+  is_user_participant?: boolean;
 }
 
 export interface ApiError {
