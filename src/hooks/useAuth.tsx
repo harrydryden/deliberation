@@ -64,9 +64,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (validationError) throw validationError;
       if (!validationData?.valid) throw new Error('Invalid access code');
 
-      // Create user object using access code as the ID directly
+      // Create user object for the auth context with access_ prefix format
       const simpleUser: User = {
-        id: accessCode, // Use access code directly as user ID
+        id: `access_${accessCode}`,
+        accessCode: accessCode,
         role: userRole,
         profile: {
           displayName: `User_${accessCode.substring(0, 4)}`,

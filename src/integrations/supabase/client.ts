@@ -17,8 +17,8 @@ export const setUserContext = async (): Promise<boolean> => {
       const user = JSON.parse(storedUser);
       
       if (user.id) {
-        // User ID is the access code, add access_ prefix for context
-        const userIdForContext = `access_${user.id}`;
+        // User ID is always in access_ format now
+        const userIdForContext = user.id;
         
         // Set the user context for RLS policies with retry logic
         let retries = 3;
@@ -77,8 +77,8 @@ export const ensureUserContext = async (): Promise<boolean> => {
     const storedUser = localStorage.getItem('simple_auth_user');
     if (storedUser) {
       const user = JSON.parse(storedUser);
-      // User ID is the access code, check against the access_ prefixed version
-      const expectedUserId = `access_${user.id}`;
+      // User ID is always in access_ format now
+      const expectedUserId = user.id;
       const isContextValid = data?.config_value === expectedUserId;
       console.log('User context verification:', { 
         expected: expectedUserId, 

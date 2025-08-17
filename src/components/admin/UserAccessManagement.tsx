@@ -225,12 +225,12 @@ export const UserAccessManagement = ({
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <code className="font-mono bg-muted px-2 py-1 rounded text-sm">
-                              {user.id}
+                              {user.accessCode}
                             </code>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => copyToClipboard(user.id)}
+                              onClick={() => copyToClipboard(user.accessCode)}
                             >
                               <Copy className="h-4 w-4" />
                             </Button>

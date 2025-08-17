@@ -75,7 +75,8 @@ export class AuthService {
     try {
       const payload = this.parseTokenPayload(this.token!);
       return {
-        id: payload.accessCode, // Use access code as the user ID
+        id: payload.sub,
+        accessCode: payload.accessCode,
         profile: null, // Will be fetched separately
       };
     } catch {

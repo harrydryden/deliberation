@@ -97,7 +97,7 @@ export function UserManagement({ users, loading, onLoad, onUpdateRole, onArchive
                 {users.map((user) => (
                   <TableRow key={user.id} className={user.isArchived ? 'opacity-60' : ''}>
                     <TableCell className="font-mono text-sm">
-                      {user.id}
+                      {user.accessCode}
                     </TableCell>
                     <TableCell>
                       <Select
