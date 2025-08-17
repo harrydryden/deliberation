@@ -172,7 +172,7 @@ const Index = () => {
                 <CardDescription className="space-y-3">
                   <div>
                     <p className="font-medium text-blue-600">Bill:</p>
-                    <p className="text-sm">Provides policy analysis and legislative context to inform your discussions.</p>
+                    <p className="text-sm">Provides facts, particularly policy information highly relevant to the discourse.</p>
                   </div>
                   <div>
                     <p className="font-medium text-green-600">Flo:</p>
