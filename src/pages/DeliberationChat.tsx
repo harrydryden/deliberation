@@ -68,13 +68,11 @@ const DeliberationChat = () => {
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
-  // Scoring state - these would be tracked from actual user activity
+  // Scoring state - loaded from actual user activity in database
   const [userScores, setUserScores] = useState({
-    engagement: 0,
-    // Count of messages sent in current session
-    shares: 0,
-    // Count of IBIS submissions
-    sessions: 1 // Count of login sessions (4+ hours apart)
+    engagement: 0, // Count of user messages sent total
+    shares: 0, // Count of IBIS submissions total
+    sessions: 1 // Count of login sessions (placeholder)
   });
   const {
     messages,
@@ -125,8 +123,46 @@ const DeliberationChat = () => {
     }
     if (user && deliberationId) {
       loadDeliberation();
+      loadUserScores();
     }
   }, [user, isLoading, deliberationId, navigate]);
+
+  // Load user scores from database
+  const loadUserScores = async () => {
+    if (!user?.id || !deliberationId) return;
+    
+    try {
+      // Import supabase client
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      // Query user's message statistics for this deliberation
+      const { data: messageStats, error } = await supabase
+        .from('messages')
+        .select('message_type, submitted_to_ibis')
+        .eq('deliberation_id', deliberationId)
+        .eq('user_id', user.id);
+      
+      if (error) {
+        console.error('Error loading user scores:', error);
+        return;
+      }
+      
+      // Calculate scores from actual data
+      const userMessages = messageStats?.filter(m => m.message_type === 'user').length || 0;
+      const ibisSubmissions = messageStats?.filter(m => m.submitted_to_ibis === true).length || 0;
+      
+      setUserScores({
+        engagement: userMessages,
+        shares: ibisSubmissions,
+        sessions: 1 // TODO: Calculate actual sessions from login data
+      });
+      
+      logger.info('User scores loaded', { engagement: userMessages, shares: ibisSubmissions });
+    } catch (error) {
+      console.error('Failed to load user scores:', error);
+    }
+  };
+
   const loadDeliberation = async () => {
     if (!deliberationId) {
       logger.warn('No deliberationId provided');
