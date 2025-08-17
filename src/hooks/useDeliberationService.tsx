@@ -148,12 +148,16 @@ class SupabaseDeliberationService implements DeliberationService {
     logger.info('Using authenticated user for join', { userId });
     
     // Check if already a participant
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('participants')
       .select('id')
       .eq('deliberation_id', deliberationId)
       .eq('user_id', userId)
       .maybeSingle();
+
+    if (existingError) {
+      logger.error('Error checking existing participation', existingError as any);
+    }
 
     if (existing) {
       logger.info('User is already a participant, skipping join');
@@ -170,6 +174,12 @@ class SupabaseDeliberationService implements DeliberationService {
       });
 
     if (error) {
+      // If it's a duplicate key error, the user is already a participant
+      if (error.code === '23505' && error.message.includes('participants_deliberation_id_user_id_key')) {
+        logger.info('User is already a participant (caught duplicate key error)');
+        return; // Don't throw error, just return successfully
+      }
+      
       logger.error('Error adding participant', error as any);
       throw error;
     }
