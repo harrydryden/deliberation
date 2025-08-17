@@ -49,14 +49,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Handle redirects separately when user state changes
   useEffect(() => {
     if (!isLoading && user) {
-      // If user is on auth page and has valid session, redirect to their last deliberation
+      // If user is on auth page and has valid session, redirect based on role
       if (location.pathname === '/auth' || location.pathname === '/') {
-        const lastDeliberationId = localStorage.getItem('last_deliberation_id');
-        if (lastDeliberationId) {
-          console.log('Redirecting to last deliberation:', lastDeliberationId);
-          navigate(`/deliberations/${lastDeliberationId}`, { replace: true });
+        if (user.role === 'admin') {
+          console.log('Redirecting admin to admin dashboard');
+          navigate('/admin', { replace: true });
         } else {
-          navigate('/deliberations', { replace: true });
+          const lastDeliberationId = localStorage.getItem('last_deliberation_id');
+          if (lastDeliberationId) {
+            console.log('Redirecting to last deliberation:', lastDeliberationId);
+            navigate(`/deliberations/${lastDeliberationId}`, { replace: true });
+          } else {
+            navigate('/deliberations', { replace: true });
+          }
         }
       }
     }
@@ -80,16 +85,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         role: result.user.role 
       });
       
-      // Check for last deliberation and redirect
-      const lastDeliberationId = localStorage.getItem('last_deliberation_id');
-      if (lastDeliberationId) {
-        console.log('Redirecting to last deliberation after auth:', lastDeliberationId);
-        // Add delay to ensure all context is set
-        setTimeout(() => {
-          navigate(`/deliberations/${lastDeliberationId}`, { replace: true });
-        }, 200);
+      // Redirect based on user role
+      if (result.user.role === 'admin') {
+        console.log('Redirecting admin to admin dashboard');
+        navigate('/admin', { replace: true });
       } else {
-        navigate('/deliberations', { replace: true });
+        // Check for last deliberation and redirect regular users
+        const lastDeliberationId = localStorage.getItem('last_deliberation_id');
+        if (lastDeliberationId) {
+          console.log('Redirecting to last deliberation after auth:', lastDeliberationId);
+          setTimeout(() => {
+            navigate(`/deliberations/${lastDeliberationId}`, { replace: true });
+          }, 200);
+        } else {
+          navigate('/deliberations', { replace: true });
+        }
       }
     } catch (error) {
       logger.error('Authentication failed', { error });

@@ -16,6 +16,9 @@ const Index = () => {
   useEffect(() => {
     if (!user) {
       navigate("/auth");
+    } else if (user.role === 'admin') {
+      // Admins should go to admin dashboard, not participant guide
+      navigate("/admin", { replace: true });
     } else {
       loadDeliberations();
     }
