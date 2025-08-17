@@ -39,7 +39,7 @@ const Index = () => {
           <h1 className="text-4xl font-bold text-democratic-blue">
             Participant Guide
           </h1>
-          <p className="text-lg text-muted-foreground max-w-3xl mx-auto">Important note. Topics may be sensitive, you are able to stop participating at any time.  Third party tools may access information you share during the deliberation, do not share personal information.  The agents use OpenAI LLMs (AI) and may provide inaccurate information. </p>
+          <p className="text-muted-foreground max-w-3xl mx-auto text-base py-0">Important note. Topics may be sensitive, you are able to stop participating at any time.  Third party tools may access information you share during the deliberation, do not share personal information.  The agents use OpenAI LLMs (AI) and may provide inaccurate information. </p>
         </div>
 
         {/* How to Participate */}
@@ -100,7 +100,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Brain className="h-5 w-5 text-democratic-green" />
-                  <span>AI Assistance</span>
+                  <span>Three AI agents help guide the conversation: Bill provides facts particularly policy information, Flo mediates the discussion, and most importantly Pia facilitates the exchange of views between participants</span>
                 </CardTitle>
                 <CardDescription>
                   Three AI agents help guide the conversation: Bill provides policy analysis, Flo manages discussion flow, and Pia offers peer perspectives.
@@ -112,10 +112,10 @@ const Index = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Users className="h-5 w-5 text-civic-gold" />
-                  <span>Structured Framework</span>
+                  <span>Discussions follow the IBIS method - identifying Issues, related Positions, and associated Arguments. This helps to organise the discussion - which you can see in the map view, or ask Pia</span>
                 </CardTitle>
                 <CardDescription>
-                  Deliberations follow the IBIS map method - start with Issues, explore associated Positions, and finally supporting or dissenting arguments.
+                  Discussions follow the IBIS method - identifying Issues, exploring Positions, and examining Arguments. This keeps conversations focused and productive.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -156,7 +156,7 @@ const Index = () => {
                   </div>
                   <div>
                     <p className="font-medium text-foreground">View Mode Switch:</p>
-                    <p className="text-sm">Switch between "Message" view (see conversation flow) and "Map" view (visualise the discussion structure using IBIS methodology).</p>
+                    <p className="text-sm">Switch between "Message" view (see conversation flow) and "Map" view (visualize the discussion structure using IBIS methodology).</p>
                   </div>
                 </CardDescription>
               </CardHeader>
@@ -172,15 +172,15 @@ const Index = () => {
                 <CardDescription className="space-y-3">
                   <div>
                     <p className="font-medium text-blue-600">Bill:</p>
-                    <p className="text-sm">Provides facts, particularly policy information highly relevant to the discourse.</p>
+                    <p className="text-sm">Provides policy analysis and legislative context to inform your discussions.</p>
                   </div>
                   <div>
                     <p className="font-medium text-green-600">Flo:</p>
-                    <p className="text-sm">Mediates the conversations, encourages participation, and guides the conversation.</p>
+                    <p className="text-sm">Manages conversation flow, ensures balanced participation, and guides discussion structure.</p>
                   </div>
                   <div>
                     <p className="font-medium text-purple-600">Pia:</p>
-                    <p className="text-sm">Facilitates the sharing of views between participants - this is the most important agent.</p>
+                    <p className="text-sm">Offers peer perspectives and helps synthesize different viewpoints in the conversation.</p>
                   </div>
                 </CardDescription>
               </CardHeader>
