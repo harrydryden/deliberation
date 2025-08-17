@@ -185,6 +185,81 @@ const Index = () => {
           </div>
         </div>
 
+        {/* Interface Features */}
+        <div className="space-y-6">
+          <h2 className="text-2xl font-semibold text-foreground">Understanding the Interface</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Mode Toggles */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <MessageSquare className="h-5 w-5 text-democratic-blue" />
+                  <span>Interface Toggles</span>
+                </CardTitle>
+                <CardDescription className="space-y-3">
+                  <div>
+                    <p className="font-medium text-foreground">Chat Mode Switch:</p>
+                    <p className="text-sm">Toggle between "Deliberate" (join the group discussion) and "Policy Q&A" (ask questions to experts privately).</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">View Mode Switch:</p>
+                    <p className="text-sm">Switch between "Message" view (see conversation flow) and "Map" view (visualize the discussion structure using IBIS methodology).</p>
+                  </div>
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            {/* Agent Orchestration */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Brain className="h-5 w-5 text-democratic-green" />
+                  <span>AI Agent Team</span>
+                </CardTitle>
+                <CardDescription className="space-y-3">
+                  <div>
+                    <p className="font-medium text-blue-600">Bill:</p>
+                    <p className="text-sm">Provides policy analysis and legislative context to inform your discussions.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-green-600">Flo:</p>
+                    <p className="text-sm">Manages conversation flow, ensures balanced participation, and guides discussion structure.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-purple-600">Pia:</p>
+                    <p className="text-sm">Offers peer perspectives and helps synthesize different viewpoints in the conversation.</p>
+                  </div>
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            {/* Scoring System */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="h-5 w-5 text-civic-gold" />
+                  <span>Engagement Metrics</span>
+                </CardTitle>
+                <CardDescription className="space-y-3">
+                  <div>
+                    <p className="font-medium text-foreground">Engagement Stars:</p>
+                    <p className="text-sm">Measures your active participation in discussions (messages, responses, questions).</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Shares & Sessions:</p>
+                    <p className="text-sm">Tracks how often you contribute insights and attend deliberation sessions.</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Helpfulness:</p>
+                    <p className="text-sm">Reflects how your contributions help advance the group's understanding and decision-making.</p>
+                  </div>
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </div>
+        </div>
+
         {/* Getting Started */}
         <div className="text-center space-y-4 bg-gradient-to-r from-democratic-blue/5 to-democratic-green/5 rounded-lg p-6">
           <h2 className="text-2xl font-semibold text-foreground">Ready to Begin?</h2>
