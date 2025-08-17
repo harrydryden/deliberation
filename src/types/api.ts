@@ -10,8 +10,7 @@ export interface AuthResponse {
 }
 
 export interface User {
-  id: string;
-  accessCode: string;
+  id: string; // This is now the access code itself
   profile: UserProfile | null;
   role?: string;
   deliberations?: UserDeliberation[];

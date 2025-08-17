@@ -1130,6 +1130,10 @@ export type Database = {
         Args: { access_code: string }
         Returns: string
       }
+      get_current_user_access_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1191,7 +1195,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin_user: {
-        Args: { user_id: string }
+        Args: Record<PropertyKey, never> | { user_id: string }
         Returns: boolean
       }
       is_admin_user_simple: {
@@ -1282,6 +1286,10 @@ export type Database = {
       }
       user_participates_in_deliberation: {
         Args: { deliberation_uuid: string; user_uuid: string }
+        Returns: boolean
+      }
+      user_participates_in_deliberation_by_code: {
+        Args: { deliberation_uuid: string }
         Returns: boolean
       }
       validate_access_code: {

@@ -37,10 +37,10 @@ class SupabaseDeliberationService implements DeliberationService {
 
     logger.info('Found deliberations', { count: deliberations.length });
 
-    // Get current user from localStorage
+    // Get current user access code from localStorage
     const storedUser = localStorage.getItem('simple_auth_user');
-    const currentUserId = storedUser ? JSON.parse(storedUser).id : null;
-    logger.info('Current user ID for participation check', { currentUserId });
+    const currentUserAccessCode = storedUser ? JSON.parse(storedUser).id : null;
+    logger.info('Current user access code for participation check', { currentUserAccessCode });
 
     // Get participant counts for each deliberation (simplified)
     const deliberationsWithCounts = await Promise.all(
@@ -59,9 +59,9 @@ class SupabaseDeliberationService implements DeliberationService {
 
         // Check if current user is a participant
         let isUserParticipant = false;
-        if (currentUserId) {
+        if (currentUserAccessCode) {
           logger.info('Checking participation for user', { 
-            currentUserId, 
+            currentUserAccessCode, 
             deliberationId: deliberation.id 
           });
           
@@ -69,7 +69,7 @@ class SupabaseDeliberationService implements DeliberationService {
             .from('participants')
             .select('id')
             .eq('deliberation_id', deliberation.id)
-            .eq('user_id', currentUserId)
+            .eq('user_id', currentUserAccessCode)
             .maybeSingle();
           
           if (participationError) {
@@ -80,7 +80,7 @@ class SupabaseDeliberationService implements DeliberationService {
           
           logger.info('Participation check result', { 
             deliberationId: deliberation.id, 
-            currentUserId,
+            currentUserAccessCode,
             userParticipation,
             isUserParticipant
           });
@@ -112,7 +112,7 @@ class SupabaseDeliberationService implements DeliberationService {
     }
     
     const user = JSON.parse(storedUser);
-    const facilitatorId = user.id; // Use the actual user UUID
+    const facilitatorId = user.id; // Use the access code as ID
 
     // Create deliberation
     const { data: deliberation, error: deliberationError } = await supabase
@@ -143,7 +143,7 @@ class SupabaseDeliberationService implements DeliberationService {
     }
     
     const user = JSON.parse(storedUser);
-    const userId = user.id; // This is the proper UUID from authentication
+    const userId = user.id; // This is the access code
     
     logger.info('Using authenticated user for join', { userId });
     
@@ -229,7 +229,7 @@ class SupabaseDeliberationService implements DeliberationService {
     }
     
     const user = JSON.parse(storedUser);
-    const userId = user.id; // Use the actual user UUID
+    const userId = user.id; // Use the access code as ID
 
     const { error } = await supabase
       .from('participants')
