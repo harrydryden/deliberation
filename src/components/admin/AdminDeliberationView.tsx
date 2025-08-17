@@ -10,7 +10,6 @@ import { formatToUKDate, formatToUKTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { MarkdownMessage } from '@/components/common/MarkdownMessage';
 import type { ChatMessage } from '@/types/chat';
-
 interface Deliberation {
   id: string;
   title: string;
@@ -24,17 +23,34 @@ interface Deliberation {
   created_at: string;
   updated_at: string;
 }
-
 const AGENTS = {
-  bill_agent: { name: 'Bill', icon: FileText, color: 'bg-blue-500' },
-  flow_agent: { name: 'Flo', icon: Workflow, color: 'bg-green-500' },
-  peer_agent: { name: 'Pia', icon: Users, color: 'bg-purple-500' },
-  default: { name: 'AI Assistant', icon: Bot, color: 'bg-gray-500' }
+  bill_agent: {
+    name: 'Bill',
+    icon: FileText,
+    color: 'bg-blue-500'
+  },
+  flow_agent: {
+    name: 'Flo',
+    icon: Workflow,
+    color: 'bg-green-500'
+  },
+  peer_agent: {
+    name: 'Pia',
+    icon: Users,
+    color: 'bg-purple-500'
+  },
+  default: {
+    name: 'AI Assistant',
+    icon: Bot,
+    color: 'bg-gray-500'
+  }
 } as const;
-
 export const AdminDeliberationView = () => {
-  const { deliberationId } = useParams<{ deliberationId: string }>();
-  
+  const {
+    deliberationId
+  } = useParams<{
+    deliberationId: string;
+  }>();
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
@@ -42,59 +58,33 @@ export const AdminDeliberationView = () => {
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   useEffect(() => {
     const loadData = async () => {
       if (!deliberationId) return;
-      
       try {
         setLoading(true);
         setMessagesLoading(true);
-        
-        // Load deliberation and participants separately for better control
-        const [deliberationResult, participantsResult] = await Promise.all([
-          supabase
-            .from('deliberations')
-            .select('*')
-            .eq('id', deliberationId)
-            .single(),
-          supabase
-            .from('participants')
-            .select('user_id, role, joined_at')
-            .eq('deliberation_id', deliberationId)
-        ]);
 
+        // Load deliberation and participants separately for better control
+        const [deliberationResult, participantsResult] = await Promise.all([supabase.from('deliberations').select('*').eq('id', deliberationId).single(), supabase.from('participants').select('user_id, role, joined_at').eq('deliberation_id', deliberationId)]);
         if (deliberationResult.error) {
           throw deliberationResult.error;
         }
 
         // Get messages
-        const messagesResult = await supabase
-          .from('messages')
-          .select('*')
-          .eq('deliberation_id', deliberationId)
-          .order('created_at', { ascending: true });
-
+        const messagesResult = await supabase.from('messages').select('*').eq('deliberation_id', deliberationId).order('created_at', {
+          ascending: true
+        });
         if (messagesResult.error) {
           throw messagesResult.error;
         }
-
         if (deliberationResult.data) {
           // Calculate unique participants from messages since formal participants may not be recorded
-          const uniqueMessageSenders = new Set(
-            messagesResult.data
-              ?.filter(msg => msg.message_type === 'user')
-              ?.map(msg => msg.user_id)
-              ?.filter(Boolean)
-          );
-          
+          const uniqueMessageSenders = new Set(messagesResult.data?.filter(msg => msg.message_type === 'user')?.map(msg => msg.user_id)?.filter(Boolean));
           setDeliberation({
             ...deliberationResult.data,
             participants: participantsResult.data || [],
-            participant_count: Math.max(
-              participantsResult.data?.length || 0, 
-              uniqueMessageSenders.size
-            )
+            participant_count: Math.max(participantsResult.data?.length || 0, uniqueMessageSenders.size)
           });
         }
 
@@ -108,7 +98,6 @@ export const AdminDeliberationView = () => {
           submitted_to_ibis: msg.submitted_to_ibis || false,
           agent_context: msg.agent_context
         }));
-
         setMessages(chatMessages);
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -118,7 +107,6 @@ export const AdminDeliberationView = () => {
         setMessagesLoading(false);
       }
     };
-
     loadData();
   }, [deliberationId]);
 
@@ -128,9 +116,10 @@ export const AdminDeliberationView = () => {
       userMessage: ChatMessage;
       agentResponses: ChatMessage[];
     }> = [];
-    
-    let currentGroup: { userMessage: ChatMessage; agentResponses: ChatMessage[] } | null = null;
-    
+    let currentGroup: {
+      userMessage: ChatMessage;
+      agentResponses: ChatMessage[];
+    } | null = null;
     messages.forEach(message => {
       if (message.message_type === 'user') {
         // Start a new group
@@ -146,15 +135,13 @@ export const AdminDeliberationView = () => {
         currentGroup.agentResponses.push(message);
       }
     });
-    
+
     // Don't forget the last group
     if (currentGroup) {
       groups.push(currentGroup);
     }
-    
     return groups;
   };
-
   const toggleExpanded = (messageId: string) => {
     const newExpanded = new Set(expandedMessages);
     if (newExpanded.has(messageId)) {
@@ -164,40 +151,30 @@ export const AdminDeliberationView = () => {
     }
     setExpandedMessages(newExpanded);
   };
-
   const messageGroups = groupMessages(messages);
-
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
+    return <div className="flex items-center justify-center min-h-screen">
         <LoadingSpinner />
-      </div>
-    );
+      </div>;
   }
-
   if (error || !deliberation) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
+    return <div className="flex items-center justify-center min-h-screen">
         <Card className="w-full max-w-md">
           <CardContent className="p-6 text-center">
             <p className="text-destructive">{error || 'Deliberation not found'}</p>
           </CardContent>
         </Card>
-      </div>
-    );
+      </div>;
   }
-
   const statusColor = {
     draft: 'secondary',
     active: 'default',
     completed: 'outline'
   } as const;
-
-  return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
+  return <div className="container mx-auto px-4 py-6 max-w-4xl">
       {/* Header */}
       <Card className="mb-4">
-        <CardHeader>
+        <CardHeader className="py-[2px]">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <CardTitle className="text-2xl mb-2">{deliberation.title}</CardTitle>
@@ -222,21 +199,14 @@ export const AdminDeliberationView = () => {
           </div>
         </CardHeader>
         
-        {deliberation.description && (
-          <CardContent>
+        {deliberation.description && <CardContent>
             <Collapsible open={descriptionExpanded} onOpenChange={setDescriptionExpanded}>
               <CollapsibleTrigger className="flex items-center gap-2 w-full text-left hover:text-primary transition-colors">
-                {descriptionExpanded ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
+                {descriptionExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 <span className="text-sm font-medium">Description</span>
-                {!descriptionExpanded && (
-                  <span className="text-xs text-muted-foreground truncate flex-1">
+                {!descriptionExpanded && <span className="text-xs text-muted-foreground truncate flex-1">
                     {deliberation.description.slice(0, 100)}...
-                  </span>
-                )}
+                  </span>}
               </CollapsibleTrigger>
               <CollapsibleContent className="mt-3">
                 <div className="prose prose-sm max-w-none">
@@ -246,8 +216,7 @@ export const AdminDeliberationView = () => {
                 </div>
               </CollapsibleContent>
             </Collapsible>
-          </CardContent>
-        )}
+          </CardContent>}
       </Card>
 
       {/* Messages */}
@@ -264,27 +233,17 @@ export const AdminDeliberationView = () => {
           </p>
         </CardHeader>
         <CardContent>
-          {messagesLoading ? (
-            <div className="flex justify-center py-8">
+          {messagesLoading ? <div className="flex justify-center py-8">
               <LoadingSpinner />
-            </div>
-          ) : messages.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            </div> : messages.length === 0 ? <div className="text-center py-8 text-muted-foreground">
               No messages in this deliberation yet.
-            </div>
-          ) : (
-            <div className="max-h-[600px] overflow-y-auto space-y-4">
+            </div> : <div className="max-h-[600px] overflow-y-auto space-y-4">
               {messageGroups.map((group, groupIndex) => {
-                const isExpanded = expandedMessages.has(group.userMessage.id);
-                const hasAgentResponses = group.agentResponses.length > 0;
-
-                return (
-                  <div key={group.userMessage.id} className="space-y-2">
+            const isExpanded = expandedMessages.has(group.userMessage.id);
+            const hasAgentResponses = group.agentResponses.length > 0;
+            return <div key={group.userMessage.id} className="space-y-2">
                     {/* User Message */}
-                    <div 
-                      className={`flex gap-3 ${hasAgentResponses ? 'cursor-pointer' : ''}`}
-                      onClick={() => hasAgentResponses && toggleExpanded(group.userMessage.id)}
-                    >
+                    <div className={`flex gap-3 ${hasAgentResponses ? 'cursor-pointer' : ''}`} onClick={() => hasAgentResponses && toggleExpanded(group.userMessage.id)}>
                       <Avatar className="h-8 w-8 flex-shrink-0">
                         <AvatarFallback className="bg-primary">
                           <User className="h-4 w-4 text-white" />
@@ -297,47 +256,32 @@ export const AdminDeliberationView = () => {
                           <span className="text-xs text-muted-foreground">
                             {formatToUKTime(group.userMessage.created_at)}
                           </span>
-                          {group.userMessage.submitted_to_ibis && (
-                            <Badge variant="default" className="text-xs bg-blue-500 hover:bg-blue-600">
+                          {group.userMessage.submitted_to_ibis && <Badge variant="default" className="text-xs bg-blue-500 hover:bg-blue-600">
                               Submitted to IBIS
-                            </Badge>
-                          )}
+                            </Badge>}
                         </div>
 
-                        <Card className={`p-3 ${
-                          group.userMessage.submitted_to_ibis 
-                            ? 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800' 
-                            : 'bg-muted'
-                        }`}>
+                        <Card className={`p-3 ${group.userMessage.submitted_to_ibis ? 'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800' : 'bg-muted'}`}>
                           <div className="text-sm leading-relaxed">
                             <MarkdownMessage content={group.userMessage.content} />
                           </div>
                         </Card>
 
-                        {hasAgentResponses && (
-                          <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
+                        {hasAgentResponses && <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                             <span>
                               {group.agentResponses.length} agent response{group.agentResponses.length !== 1 ? 's' : ''}
                             </span>
-                          </div>
-                        )}
+                          </div>}
                       </div>
                     </div>
                     
                     {/* Agent Responses (expandable) */}
-                    {isExpanded && hasAgentResponses && (
-                      <div className="ml-11 space-y-3">
-                        {group.agentResponses.map((response) => {
-                          const agentInfo = (AGENTS as any)[response.message_type] ?? AGENTS.default;
-                          const AgentIcon = agentInfo.icon;
-
-                          return (
-                            <div key={response.id} className="flex gap-3">
+                    {isExpanded && hasAgentResponses && <div className="ml-11 space-y-3">
+                        {group.agentResponses.map(response => {
+                  const agentInfo = (AGENTS as any)[response.message_type] ?? AGENTS.default;
+                  const AgentIcon = agentInfo.icon;
+                  return <div key={response.id} className="flex gap-3">
                               <Avatar className="h-6 w-6 flex-shrink-0">
                                 <AvatarFallback className={agentInfo.color}>
                                   <AgentIcon className="h-3 w-3 text-white" />
@@ -358,18 +302,13 @@ export const AdminDeliberationView = () => {
                                   </div>
                                 </Card>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                            </div>;
+                })}
+                      </div>}
+                  </div>;
+          })}
+            </div>}
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 };
