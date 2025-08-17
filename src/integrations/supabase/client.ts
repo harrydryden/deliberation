@@ -11,11 +11,16 @@ const getCurrentUserId = (): string | null => {
   if (typeof localStorage === 'undefined') return null;
   
   const storedUser = localStorage.getItem('simple_auth_user');
+  console.log('StoredUser from localStorage:', storedUser);
+  
   if (storedUser) {
     try {
       const user = JSON.parse(storedUser);
+      console.log('Parsed user:', user);
+      console.log('User ID extracted:', user.id);
       return user.id || null;
-    } catch {
+    } catch (error) {
+      console.error('Error parsing stored user:', error);
       return null;
     }
   }
