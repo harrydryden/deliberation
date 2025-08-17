@@ -77,23 +77,7 @@ class SupabaseDeliberationService implements DeliberationService {
     }
     
     const user = JSON.parse(storedUser);
-    
-    // Generate a deterministic UUID for the user
-    const crypto = window.crypto || (window as any).msCrypto;
-    const encoder = new TextEncoder();
-    const data = encoder.encode(user.id);
-    const hashArray = await crypto.subtle.digest('SHA-256', data);
-    const hashHex = Array.from(new Uint8Array(hashArray))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-    
-    const facilitatorId = [
-      hashHex.slice(0, 8),
-      hashHex.slice(8, 12),
-      hashHex.slice(12, 16),
-      hashHex.slice(16, 20),
-      hashHex.slice(20, 32)
-    ].join('-');
+    const facilitatorId = user.id; // Use the actual user UUID
 
     // Create deliberation
     const { data: deliberation, error: deliberationError } = await supabase
@@ -115,7 +99,7 @@ class SupabaseDeliberationService implements DeliberationService {
   }
 
   async joinDeliberation(deliberationId: string): Promise<void> {
-    logger.info('Starting joinDeliberation with simplified auth', { deliberationId });
+    logger.info('Starting joinDeliberation with access code auth', { deliberationId });
     
     // Get the current authenticated user from localStorage
     const storedUser = localStorage.getItem('simple_auth_user');
@@ -124,43 +108,16 @@ class SupabaseDeliberationService implements DeliberationService {
     }
     
     const user = JSON.parse(storedUser);
-    const userId = user.id; // This should be in format "access_ACCESSCODE"
+    const userId = user.id; // This is the proper UUID from authentication
     
     logger.info('Using authenticated user for join', { userId });
-    
-    // Generate a deterministic UUID that's always the same for the same access code
-    const generateDeterministicUUID = (input: string): string => {
-      // Simple hash function to convert string to pseudo-random but deterministic values
-      let hash = 0;
-      for (let i = 0; i < input.length; i++) {
-        const char = input.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
-      }
-      
-      // Convert to positive number and pad
-      const positiveHash = Math.abs(hash).toString(16).padStart(8, '0');
-      
-      // Create UUID v4 format using deterministic values
-      return [
-        positiveHash.slice(0, 8),
-        positiveHash.slice(0, 4),
-        '4' + positiveHash.slice(1, 4), // v4 UUID starts with '4'
-        ((parseInt(positiveHash.slice(0, 1), 16) & 0x3) | 0x8).toString(16) + positiveHash.slice(1, 4),
-        positiveHash.slice(0, 8) + positiveHash.slice(0, 4)
-      ].join('-');
-    };
-    
-    const participantUUID = generateDeterministicUUID(userId);
-    
-    logger.info('Generated UUID for participant', { originalId: userId, uuid: participantUUID });
     
     // Check if already a participant
     const { data: existing } = await supabase
       .from('participants')
       .select('id')
       .eq('deliberation_id', deliberationId)
-      .eq('user_id', participantUUID)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (existing) {
@@ -173,7 +130,7 @@ class SupabaseDeliberationService implements DeliberationService {
       .from('participants')
       .insert({
         deliberation_id: deliberationId,
-        user_id: participantUUID,
+        user_id: userId,
         role: 'participant'
       });
 
@@ -227,23 +184,7 @@ class SupabaseDeliberationService implements DeliberationService {
     }
     
     const user = JSON.parse(storedUser);
-    
-    // Generate the same deterministic UUID we used for joining
-    const crypto = window.crypto || (window as any).msCrypto;
-    const encoder = new TextEncoder();
-    const data = encoder.encode(user.id);
-    const hashArray = await crypto.subtle.digest('SHA-256', data);
-    const hashHex = Array.from(new Uint8Array(hashArray))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-    
-    const userId = [
-      hashHex.slice(0, 8),
-      hashHex.slice(8, 12),
-      hashHex.slice(12, 16),
-      hashHex.slice(16, 20),
-      hashHex.slice(20, 32)
-    ].join('-');
+    const userId = user.id; // Use the actual user UUID
 
     const { error } = await supabase
       .from('participants')
