@@ -5,6 +5,7 @@ import { AccessCode } from '@/repositories/implementations/access-code.repositor
 import { toast } from 'sonner';
 import { useErrorHandler } from './useErrorHandler';
 import { logger } from '@/utils/logger';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useAdminData = () => {
   const services = useServices();
@@ -226,8 +227,31 @@ export const useAdminData = () => {
   // Local agent operations
   const updateLocalAgent = async (id: string, updates: Partial<Agent>) => {
     try {
-      await services.agentService.updateAgent(id, updates);
+      // Get access code from localStorage for admin operations
+      const accessCode = localStorage.getItem('accessCode');
       
+      if (!accessCode) {
+        throw new Error('Access code required for agent updates');
+      }
+
+      // Use admin edge function for updates to bypass RLS properly
+      const { data, error } = await supabase.functions.invoke('admin-agent-operations', {
+        body: {
+          agentId: id,
+          accessCode,
+          updates
+        }
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(`Failed to update agent: ${error.message}`);
+      }
+
+      if (!data?.data) {
+        throw new Error(`No agent found with id: ${id}`);
+      }
+
       // Update local state for local agents
       setLocalAgents(prevAgents => 
         prevAgents.map(agent => 

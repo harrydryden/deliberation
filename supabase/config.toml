@@ -30,3 +30,6 @@ verify_jwt = false
 
 [functions.realtime-session]
 verify_jwt = false
+
+[functions.admin-agent-operations]
+verify_jwt = false
