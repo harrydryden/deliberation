@@ -1462,6 +1462,10 @@ export type Database = {
         Args: { "": unknown[] }
         Returns: number
       }
+      user_participates_in_deliberation: {
+        Args: { deliberation_uuid: string; user_uuid: string }
+        Returns: boolean
+      }
       validate_access_code: {
         Args: { input_code: string }
         Returns: {
