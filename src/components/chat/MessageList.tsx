@@ -74,6 +74,15 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
       name: agentConfig?.name || fallbackAgentInfo.name,
       description: agentConfig?.description || fallbackAgentInfo.description
     };
+    
+    // Debug logging to see what's happening
+    if (!isUser && agentConfig) {
+      console.log('Agent config found:', { 
+        messageType: message.message_type, 
+        agentConfig, 
+        description: agentConfig.description 
+      });
+    }
     const AgentIcon = (agentInfo?.icon as any) || Bot;
 
     return (
