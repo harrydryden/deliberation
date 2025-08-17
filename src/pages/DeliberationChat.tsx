@@ -322,7 +322,7 @@ const DeliberationChat = () => {
 
               {/* Modes */}
               <div className="shrink-0">
-                <div className="rounded-lg border bg-muted/40 p-3 space-y-3">
+                <div className="rounded-lg border bg-muted/40 px-3 py-2 space-y-3">
                   <div>
                     <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
                     <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
