@@ -176,7 +176,7 @@ const Index = () => {
                   </div>
                   <div>
                     <p className="font-medium text-green-600">Flo:</p>
-                    <p className="text-sm">Manages conversation flow, ensures balanced participation, and guides discussion structure.</p>
+                    <p className="text-sm">Mediates the conversations, encourages participation, and guides the conversation.</p>
                   </div>
                   <div>
                     <p className="font-medium text-purple-600">Pia:</p>
