@@ -40,6 +40,7 @@ class SupabaseDeliberationService implements DeliberationService {
     // Get current user from localStorage
     const storedUser = localStorage.getItem('simple_auth_user');
     const currentUserId = storedUser ? JSON.parse(storedUser).id : null;
+    logger.info('Current user ID for participation check', { currentUserId });
 
     // Get participant counts for each deliberation (simplified)
     const deliberationsWithCounts = await Promise.all(
