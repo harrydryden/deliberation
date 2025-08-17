@@ -15,7 +15,7 @@ import { AdminDeliberationView } from "@/components/admin/AdminDeliberationView"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ViewModeSelector } from "@/components/chat/ViewModeSelector";
-import { Users } from "lucide-react";
+import { Users, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
@@ -66,6 +66,7 @@ const DeliberationChat = () => {
   const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<'chat' | 'ibis'>('chat');
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
   // Scoring state - these would be tracked from actual user activity
   const [userScores, setUserScores] = useState({
@@ -216,95 +217,155 @@ const DeliberationChat = () => {
   return <Layout>
       <div className="flex flex-col bg-background rounded-lg border h-[calc(100vh-120px)] min-h-0">
         {/* Deliberation Header - Sticky below main header */}
-        <div className="border-b p-4 bg-card backdrop-blur-sm" style={{
+        <div className="border-b bg-card backdrop-blur-sm" style={{
         position: 'sticky',
         top: '64px',
         zIndex: 40,
         backgroundColor: 'hsl(var(--card) / 0.95)'
       }}>
-          <div className="flex flex-col gap-4">
-            {/* Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              
-              {/* Title Section - Takes most space on large screens */}
-              <div className="lg:col-span-3 xl:col-span-3">
-                <div className="rounded-lg border bg-muted/40 p-3 h-full lg:h-auto">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-democratic-blue truncate">
-                        {deliberation.title}
-                      </h1>
-                      <Badge className={`${getStatusColor(deliberation.status)} text-white text-xs sm:text-sm shrink-0`}>
-                        {deliberation.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground shrink-0">
-                      <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>{deliberation.participants?.length || deliberation.participant_count || 0}/{deliberation.max_participants}</span>
-                    </div>
-                  </div>
-                  {deliberation.description && (
-                    <>
-                      <p className="text-xs sm:text-sm text-muted-foreground mt-2 line-clamp-2 sm:line-clamp-3 cursor-pointer" 
-                         onClick={() => setIsDescriptionOpen(true)} 
-                         title="Click to view full description">
-                        {deliberation.description}
-                      </p>
-                      <Dialog open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen}>
-                        <DialogContent className="max-w-none w-screen h-screen p-6 sm:p-10 overflow-hidden">
-                          <div className="w-full h-full flex items-center justify-center">
-                            <article className="max-w-3xl text-center text-foreground whitespace-pre-wrap break-words">
-                              {deliberation.description}
-                            </article>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </>
-                  )}
-                </div>
+          {/* Mobile Header - Collapsible */}
+          <div className="lg:hidden">
+            <div className="p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <h1 className="text-lg font-semibold text-democratic-blue truncate">
+                  {deliberation.title}
+                </h1>
+                <Badge className={`${getStatusColor(deliberation.status)} text-white text-xs shrink-0`}>
+                  {deliberation.status}
+                </Badge>
               </div>
-
-              {/* Controls Section - Responsive layout */}
-              <div className="lg:col-span-4 xl:col-span-3">
-                <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 h-full">
-                  
-                  {/* Mode Controls */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
-                    {/* Text Mode */}
-                    <div className="rounded-lg border bg-muted/40 p-2">
-                      <div className="text-xs font-medium text-muted-foreground mb-1">Text Mode</div>
-                      <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
-                    </div>
-                    
-                    {/* View Mode */}
-                    <div className="rounded-lg border bg-muted/40 p-2">
-                      <div className="text-xs font-medium text-muted-foreground mb-1">View Mode</div>
-                      <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
-                    </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
+                className="shrink-0"
+              >
+                {isHeaderCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              </Button>
+            </div>
+            
+            {!isHeaderCollapsed && (
+              <div className="px-3 pb-3 space-y-3">
+                {/* Mobile Controls */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border bg-muted/40 p-2">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">Text Mode</div>
+                    <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
                   </div>
-
-                  {/* Voice Interface */}
-                  <div className="rounded-lg border bg-muted/40 p-2 flex items-center justify-center">
+                  <div className="rounded-lg border bg-muted/40 p-2">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">View Mode</div>
+                    <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  <div className="rounded-lg border bg-muted/40 p-2 flex-1">
                     <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
                       <VoiceInterfaceLazy deliberationId={deliberation.id} variant="panel" />
                     </Suspense>
                   </div>
+                  <div className="shrink-0">
+                    <ParticipantScoring 
+                      engagement={userScores.engagement} 
+                      shares={userScores.shares} 
+                      sessions={userScores.sessions} 
+                      target={10} 
+                    />
+                  </div>
+                </div>
+                
+                {deliberation.description && (
+                  <div className="rounded-lg border bg-muted/40 p-2">
+                    <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
+                       onClick={() => setIsDescriptionOpen(true)} 
+                       title="Click to view full description">
+                      {deliberation.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Header - Single Row */}
+          <div className="hidden lg:block p-4">
+            <div className="flex items-center gap-4">
+              {/* Title Section */}
+              <div className="flex-1 min-w-0">
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <h1 className="text-xl font-semibold text-democratic-blue truncate">
+                        {deliberation.title}
+                      </h1>
+                      <Badge className={`${getStatusColor(deliberation.status)} text-white text-sm shrink-0`}>
+                        {deliberation.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
+                      <Users className="h-4 w-4" />
+                      <span>{deliberation.participants?.length || deliberation.participant_count || 0}/{deliberation.max_participants}</span>
+                    </div>
+                  </div>
+                  {deliberation.description && (
+                    <p className="text-sm text-muted-foreground mt-2 line-clamp-2 cursor-pointer" 
+                       onClick={() => setIsDescriptionOpen(true)} 
+                       title="Click to view full description">
+                      {deliberation.description}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Scoring Section - Right side on large screens */}
-              <div className="lg:col-span-2">
-                <div className="h-full flex items-center">
-                  <ParticipantScoring 
-                    engagement={userScores.engagement} 
-                    shares={userScores.shares} 
-                    sessions={userScores.sessions} 
-                    target={10} 
-                  />
+              {/* Text Mode */}
+              <div className="shrink-0">
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
+                  <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
                 </div>
+              </div>
+
+              {/* View Mode */}
+              <div className="shrink-0">
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <div className="text-xs font-medium text-muted-foreground mb-2">View Mode</div>
+                  <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
+                </div>
+              </div>
+
+              {/* Voice Interface */}
+              <div className="shrink-0">
+                <div className="rounded-lg border bg-muted/40 p-3">
+                  <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
+                    <VoiceInterfaceLazy deliberationId={deliberation.id} variant="panel" />
+                  </Suspense>
+                </div>
+              </div>
+
+              {/* Scores */}
+              <div className="shrink-0">
+                <ParticipantScoring 
+                  engagement={userScores.engagement} 
+                  shares={userScores.shares} 
+                  sessions={userScores.sessions} 
+                  target={10} 
+                />
               </div>
             </div>
           </div>
+
+          {/* Description Modal */}
+          {deliberation.description && (
+            <Dialog open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen}>
+              <DialogContent className="max-w-none w-screen h-screen p-6 sm:p-10 overflow-hidden">
+                <div className="w-full h-full flex items-center justify-center">
+                  <article className="max-w-3xl text-center text-foreground whitespace-pre-wrap break-words">
+                    {deliberation.description}
+                  </article>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
         
         {/* Main Content */}
