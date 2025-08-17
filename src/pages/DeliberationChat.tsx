@@ -265,7 +265,7 @@ const DeliberationChat = () => {
                     <div className="text-xs font-medium text-muted-foreground mb-1">Text Mode</div>
                     <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
                   </div>
-                  <div className="rounded-lg border bg-muted/40 p-1.5 flex-1">
+                  <div className="rounded-lg border bg-muted/40 p-1.5">
                     <div className="text-xs font-medium text-muted-foreground mb-1">View Mode</div>
                     <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
                   </div>
