@@ -11,13 +11,13 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
 
   async findByDeliberation(deliberationId: string): Promise<Message[]> {
     try {
-      // Set user context for RLS policies
-      await setUserContext();
+      // Ensure user context is properly set for RLS policies
+      const contextSet = await this.ensureUserContextWithRetry();
+      if (!contextSet) {
+        logger.warn('Could not set user context for RLS, may return empty results', { deliberationId });
+      }
       
-      // Add a small delay to ensure context is set
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      logger.info('Loading messages for deliberation with user context', { deliberationId });
+      logger.info('Loading messages for deliberation', { deliberationId, contextSet });
       
       const { data, error } = await supabase
         .from('messages')
@@ -30,6 +30,12 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
         throw error;
       }
 
+      logger.info('Messages loaded successfully', { 
+        deliberationId, 
+        messageCount: data?.length || 0,
+        contextSet
+      });
+
       return data as Message[];
     } catch (error) {
       logger.error('Message repository findByDeliberation failed', error, { deliberationId });
@@ -37,10 +43,25 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
     }
   }
 
+  private async ensureUserContextWithRetry(): Promise<boolean> {
+    try {
+      // Import ensureUserContext dynamically to avoid circular imports
+      const { ensureUserContext } = await import('@/integrations/supabase/client');
+      return await ensureUserContext();
+    } catch (error) {
+      // Fallback to setUserContext if ensureUserContext is not available
+      const { setUserContext } = await import('@/integrations/supabase/client');
+      return await setUserContext();
+    }
+  }
+
   async findByUser(userId: string): Promise<Message[]> {
     try {
-      // Set user context for RLS policies
-      await setUserContext();
+      // Ensure user context is properly set for RLS policies
+      const contextSet = await this.ensureUserContextWithRetry();
+      if (!contextSet) {
+        logger.warn('Could not set user context for RLS, may return empty results', { userId });
+      }
       
       const { data, error } = await supabase
         .from('messages')
@@ -62,8 +83,11 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
 
   async create(data: Omit<Message, 'id' | 'createdAt' | 'updatedAt'>): Promise<Message> {
     try {
-      // Set user context for RLS policies
-      await setUserContext();
+      // Ensure user context is properly set for RLS policies
+      const contextSet = await this.ensureUserContextWithRetry();
+      if (!contextSet) {
+        logger.warn('Could not set user context for RLS, message creation may fail', { userId: data.userId });
+      }
       
       // Map the data to database column names
       const dbData = {

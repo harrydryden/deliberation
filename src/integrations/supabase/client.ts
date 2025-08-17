@@ -7,39 +7,84 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Helper function to set user context for access code authentication
-export const setUserContext = async (): Promise<void> => {
-  if (typeof localStorage === 'undefined') return;
+export const setUserContext = async (): Promise<boolean> => {
+  if (typeof localStorage === 'undefined') return false;
   
   const storedUser = localStorage.getItem('simple_auth_user');
-  console.log('StoredUser from localStorage:', storedUser);
   
   if (storedUser) {
     try {
       const user = JSON.parse(storedUser);
-      console.log('Parsed user:', user);
-      console.log('User ID extracted:', user.id);
       
       if (user.id) {
-        console.log('Setting user context for RLS:', user.id);
-        // Set the user context for RLS policies
-        try {
-          const { data, error } = await supabase.rpc('set_config', {
-            setting_name: 'app.current_user_id',
-            new_value: user.id,
-            is_local: false
-          });
-          
-          if (error) {
-            console.error('Failed to set user context - RPC error:', error);
-          } else {
-            console.log('User context set successfully:', { userId: user.id, rpcResult: data });
+        // Set the user context for RLS policies with retry logic
+        let retries = 3;
+        while (retries > 0) {
+          try {
+            const { data, error } = await supabase.rpc('set_config', {
+              setting_name: 'app.current_user_id',
+              new_value: user.id,
+              is_local: false
+            });
+            
+            if (error) {
+              console.error('Failed to set user context - RPC error:', error);
+              retries--;
+              if (retries > 0) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                continue;
+              }
+              return false;
+            } else {
+              console.log('User context set successfully:', { userId: user.id });
+              return true;
+            }
+          } catch (error) {
+            console.warn('Failed to set user context - Exception:', error);
+            retries--;
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+              continue;
+            }
+            return false;
           }
-        } catch (error) {
-          console.warn('Failed to set user context - Exception:', error);
         }
       }
     } catch (error) {
       console.error('Error parsing stored user:', error);
     }
   }
+  return false;
+};
+
+// Enhanced function to ensure user context is properly set and verified
+export const ensureUserContext = async (): Promise<boolean> => {
+  // First try to set the context
+  const contextSet = await setUserContext();
+  if (!contextSet) return false;
+  
+  // Verify the context was actually set
+  try {
+    const { data, error } = await supabase.rpc('debug_current_user_settings');
+    if (error) {
+      console.error('Failed to verify user context:', error);
+      return false;
+    }
+    
+    const storedUser = localStorage.getItem('simple_auth_user');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      const isContextValid = data?.config_value === user.id;
+      console.log('User context verification:', { 
+        expected: user.id, 
+        actual: data?.config_value, 
+        valid: isContextValid 
+      });
+      return isContextValid;
+    }
+  } catch (error) {
+    console.warn('Context verification failed:', error);
+  }
+  
+  return false;
 };
