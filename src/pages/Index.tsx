@@ -156,7 +156,7 @@ const Index = () => {
                   </div>
                   <div>
                     <p className="font-medium text-foreground">View Mode Switch:</p>
-                    <p className="text-sm">Switch between "Message" view (see conversation flow) and "Map" view (visualize the discussion structure using IBIS methodology).</p>
+                    <p className="text-sm">Switch between "Message" view (see conversation flow) and "Map" view (visualise the discussion structure using IBIS methodology).</p>
                   </div>
                 </CardDescription>
               </CardHeader>
