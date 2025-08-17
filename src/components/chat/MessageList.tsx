@@ -63,7 +63,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
     const AgentIcon = (agentInfo?.icon as any) || Bot;
 
     return (
-      <div>
+      <div className="pb-4" style={{ minHeight: '80px' }}>
         {unreadIndex !== null && index === unreadIndex && (
           <div className="my-3 flex items-center gap-2">
             <div className="h-px flex-1 bg-border" />
@@ -94,9 +94,9 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
               </span>
             </div>
 
-            <Card className={`p-3 ${isUser ? 'bg-user-message text-white' : agentInfo?.bgColor || 'bg-muted'}`}>
+            <Card className={`p-3 transition-all duration-200 ${isUser ? 'bg-user-message text-white' : agentInfo?.bgColor || 'bg-muted'}`}>
               <div className="text-sm leading-relaxed">
-                <Suspense fallback={<div className="h-4 w-20 bg-muted rounded animate-pulse" />}> 
+                <Suspense fallback={<div className="h-6 w-32 bg-muted rounded animate-pulse" />}> 
                   <LazyMarkdownMessage 
                     content={message.content} 
                     className={isUser ? 'prose-invert' : ''}
@@ -224,6 +224,8 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
           followOutput={"smooth"}
           atBottomStateChange={setAtBottom}
           itemContent={renderItem}
+          increaseViewportBy={200}
+          overscan={5}
           components={{
             Footer: () => (
               isTyping ? (

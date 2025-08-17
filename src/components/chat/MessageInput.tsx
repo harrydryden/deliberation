@@ -4,33 +4,40 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
 
 interface MessageInputProps {
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string) => Promise<void> | void;
   disabled?: boolean;
 }
 
 export const MessageInput = memo(({ onSendMessage, disabled }: MessageInputProps) => {
   const [message, setMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim() && !disabled) {
-      onSendMessage(message);
-      setMessage("");
-      textareaRef.current?.focus();
+    if (message.trim() && !disabled && !isSubmitting) {
+      setIsSubmitting(true);
+      try {
+        await onSendMessage(message);
+        setMessage("");
+        // Use requestAnimationFrame to ensure smooth transition
+        requestAnimationFrame(() => {
+          textareaRef.current?.focus();
+        });
+      } finally {
+        setIsSubmitting(false);
+      }
     }
-  }, [message, disabled, onSendMessage]);
+  }, [message, disabled, onSendMessage, isSubmitting]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (message.trim() && !disabled) {
-        onSendMessage(message);
-        setMessage("");
-        textareaRef.current?.focus();
+      if (message.trim() && !disabled && !isSubmitting) {
+        handleSubmit(e);
       }
     }
-  }, [message, disabled, onSendMessage]);
+  }, [message, disabled, isSubmitting, handleSubmit]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -57,11 +64,15 @@ export const MessageInput = memo(({ onSendMessage, disabled }: MessageInputProps
         </div>
         <Button 
           type="submit" 
-          disabled={!message.trim() || disabled}
-          className="bg-democratic-blue hover:bg-democratic-blue/90"
+          disabled={!message.trim() || disabled || isSubmitting}
+          className="bg-democratic-blue hover:bg-democratic-blue/90 transition-all duration-200"
           size="icon"
         >
-          <Send className="h-4 w-4" />
+          {isSubmitting ? (
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
         </Button>
       </form>
     </div>
