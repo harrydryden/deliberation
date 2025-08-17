@@ -228,7 +228,7 @@ const DeliberationChat = () => {
             {/* Sub-header with three boxes */}
             <div className="flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <div className="rounded-lg border bg-muted/40 p-2 sm:p-3 lg:p-4 h-full">
+                <div className="rounded-lg border bg-muted/40 p-2 sm:p-3 lg:p-4 h-full w-[75%]">
                     <div className="flex items-start justify-between gap-2 sm:gap-3">
                       <div className="flex items-center gap-1 sm:gap-2 min-w-0">
                         <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-democratic-blue truncate">{deliberation.title}</h1>
