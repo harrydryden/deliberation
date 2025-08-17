@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./useAuth";
 import { useServices } from '@/hooks/useServices';
@@ -11,6 +12,7 @@ import { performanceMonitor } from '@/utils/performanceUtils';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 import { useToast } from '@/hooks/use-toast';
 import { useResponseStreaming } from '@/hooks/useResponseStreaming';
+import { setUserContext } from '@/integrations/supabase/client';
 
 export const useChat = (deliberationId?: string) => {
   const { user, isLoading: authLoading } = useAuth();
@@ -19,6 +21,7 @@ export const useChat = (deliberationId?: string) => {
   const [messages, setMessages] = useOptimizedArray<ChatMessage>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [userContextSet, setUserContextSet] = useState(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const { streamingState, startStreaming, stopStreaming } = useResponseStreaming();
   
@@ -26,9 +29,30 @@ export const useChat = (deliberationId?: string) => {
 
   const { toast } = useToast();
 
-  // Load chat history when user is authenticated or deliberationId changes
+  // Ensure user context is set before loading data
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && !userContextSet) {
+      const setupUserContext = async () => {
+        try {
+          await setUserContext();
+          console.log('User context set successfully for chat loading');
+          setUserContextSet(true);
+        } catch (error) {
+          console.error('Failed to set user context:', error);
+          // Still allow loading to proceed, but log the error
+          setUserContextSet(true);
+        }
+      };
+      setupUserContext();
+    } else if (!user) {
+      setUserContextSet(false);
+    }
+  }, [user, authLoading, userContextSet]);
+
+  // Load chat history when user is authenticated and context is set
+  useEffect(() => {
+    if (!authLoading && user && userContextSet) {
+      console.log('Loading chat history for deliberation:', deliberationId);
       loadChatHistory();
       setupRealTimeUpdates();
     }
@@ -39,9 +63,7 @@ export const useChat = (deliberationId?: string) => {
         unsubscribeRef.current = null;
       }
     };
-  }, [user, authLoading, deliberationId]);
-
-  // Remove redundant reload - realtime updates should handle missed messages
+  }, [user, authLoading, userContextSet, deliberationId]);
 
   // Listen for agent failure events (e.g., OpenAI quota exceeded)
   useEffect(() => {
@@ -94,18 +116,33 @@ export const useChat = (deliberationId?: string) => {
   };
 
   const loadChatHistory = useCallback(async () => {
-    if (!user) return;
+    if (!user || !userContextSet) {
+      console.log('Skipping chat history load - user or context not ready');
+      return;
+    }
 
     setIsLoading(true);
     await handleAsyncError(async () => {
+      console.log('Loading chat history for user:', user.id, 'deliberation:', deliberationId);
+      
+      // Ensure user context is set again before API call
+      await setUserContext();
+      
       const timer = performanceMonitor.startTimer('loadChatHistory');
       const data = await messageService.getMessages(deliberationId);
+      
+      console.log('Chat history loaded:', data?.length || 0, 'messages');
       setMessages(convertApiMessagesToChatMessages(data || []));
       timer();
       logger.api.response('GET', '/messages', 200, { deliberationId, messageCount: data?.length || 0 });
+      
+      // If no messages were loaded and this is a specific deliberation, show a subtle indication
+      if ((!data || data.length === 0) && deliberationId) {
+        console.log('No messages found for deliberation:', deliberationId);
+      }
     }, 'loading chat history');
     setIsLoading(false);
-  }, [user, deliberationId, handleAsyncError, setMessages, messageService]);
+  }, [user, userContextSet, deliberationId, handleAsyncError, setMessages, messageService]);
 
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!user || !content.trim()) return;
