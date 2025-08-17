@@ -52,9 +52,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const authenticateWithAccessCode = async (accessCode: string, userRole: string) => {
+    // Generate a proper UUID for the user ID instead of using access code
+    const userId = crypto.randomUUID();
+    
     // Create a simple user for access code authentication
     const simpleUser: User = {
-      id: `access_${accessCode}`,
+      id: userId, // Use proper UUID
       accessCode: accessCode,
       role: userRole,
       profile: {
