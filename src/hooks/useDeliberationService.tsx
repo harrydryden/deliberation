@@ -17,14 +17,11 @@ class SupabaseDeliberationService implements DeliberationService {
     // Set user context for RLS policies
     await setUserContext();
     
-    // Since we're using simplified access code authentication,
-    // we don't need to check Supabase auth - just fetch public deliberations
-    // and let the RLS policies handle access control
-    
+    // Query ALL deliberations - the RLS policies will automatically filter
+    // to only show deliberations the user can access (public + participated)
     const { data: deliberations, error: deliberationsError } = await supabase
       .from('deliberations')
       .select('*')
-      .eq('is_public', true)
       .order('created_at', { ascending: false });
 
     logger.info('Deliberations query result', { count: deliberations?.length || 0, hasError: Boolean(deliberationsError) });
