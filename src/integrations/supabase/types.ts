@@ -114,15 +114,7 @@ export type Database = {
           system_prompt?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "agent_configurations_deliberation_id_fkey"
-            columns: ["deliberation_id"]
-            isOneToOne: false
-            referencedRelation: "deliberations"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       agent_interactions: {
         Row: {
@@ -554,13 +546,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "ibis_nodes_deliberation_id_fkey"
-            columns: ["deliberation_id"]
-            isOneToOne: false
-            referencedRelation: "deliberations"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "ibis_nodes_message_id_fkey"
             columns: ["message_id"]
             isOneToOne: false
@@ -833,13 +818,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "messages_deliberation_id_fkey"
-            columns: ["deliberation_id"]
-            isOneToOne: false
-            referencedRelation: "deliberations"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "messages_parent_message_id_fkey"
             columns: ["parent_message_id"]
             isOneToOne: false
@@ -873,15 +851,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["participant_role"] | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "participants_deliberation_id_fkey"
-            columns: ["deliberation_id"]
-            isOneToOne: false
-            referencedRelation: "deliberations"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       profiles: {
         Row: {
