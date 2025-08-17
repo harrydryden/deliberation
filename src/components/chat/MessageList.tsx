@@ -251,7 +251,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
       )}
 
       {!atBottom && messages.length > 0 && (
-        <div className="absolute right-4 bottom-24 md:bottom-20 lg:bottom-16 z-20">
+        <div className="absolute right-4 bottom-4 z-20">
           <Button
             variant="secondary"
             className="bg-muted text-foreground hover:bg-muted/80"
