@@ -169,11 +169,6 @@ class ApiClient {
     });
   }
 
-  async adminDeleteUser(userId: string): Promise<void> {
-    return this.request<void>(`/admin/users/${userId}`, {
-      method: 'DELETE',
-    });
-  }
 
   async adminGetAccessCodes(): Promise<any[]> {
     return this.request<any[]>('/admin/access-codes');

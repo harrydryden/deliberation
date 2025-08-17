@@ -60,11 +60,6 @@ export class UserService implements IUserService {
     }
   }
 
-  async deleteUser(id: string): Promise<void> {
-    // Deprecated method - redirect to archiving
-    console.warn('UserService.deleteUser() is deprecated. Use archiveUser() instead.');
-    throw new Error('Direct user deletion is not allowed. Use archiveUser() instead.');
-  }
 
   async archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void> {
     try {

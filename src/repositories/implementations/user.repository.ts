@@ -214,9 +214,4 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
     }
   }
 
-  async delete(id: string): Promise<void> {
-    // Keep delete method but make it clear it's deprecated
-    console.warn('UserRepository.delete() is deprecated. Use archiveUser() instead.');
-    throw new Error('Direct user deletion is not allowed. Use archiveUser() instead.');
-  }
 }

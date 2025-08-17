@@ -91,11 +91,6 @@ export const useAdminData = () => {
     }
   };
 
-  const deleteUser = async (userId: string) => {
-    // Deprecated - redirect to archiving
-    console.warn('deleteUser is deprecated. Use archiveUser instead.');
-    await archiveUser(userId, 'User deletion requested - converted to archive');
-  };
 
   // Access Code operations
   const fetchAccessCodes = async () => {
@@ -342,7 +337,6 @@ export const useAdminData = () => {
     // Operations
     fetchUsers,
     updateUserRole,
-    deleteUser, // Deprecated
     archiveUser,
     unarchiveUser,
     fetchAccessCodes,

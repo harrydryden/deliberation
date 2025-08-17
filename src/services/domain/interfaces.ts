@@ -40,7 +40,7 @@ export interface IUserService {
   getUserByEmail(email: string): Promise<User | null>;
   updateUser(id: string, user: Partial<User>): Promise<User>;
   updateUserRole(userId: string, role: string): Promise<void>;
-  deleteUser(id: string): Promise<void>; // Deprecated - use archiveUser instead
+  
   archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void>;
   unarchiveUser(userId: string): Promise<void>;
   getAllUsersIncludingArchived(filter?: Record<string, any>): Promise<User[]>;
