@@ -189,16 +189,24 @@ async function processStreamingOrchestration(
 // Fast path pattern matching
 function checkFastPath(content: string): { agent: string; confidence: number; template?: string } | null {
   const patterns = [
+    // Bill agent - legislation, policy, legal questions (higher priority)
     {
-      regex: /\b(bill|legislation|law|legal|policy|regulation|government|official)\b.*(what|how|step|process)/i,
+      regex: /\b(bill|legislation|law|legal|policy|regulation|government|official|countries|legalised|legalized|dying|assisted|safeguards)\b.*(what|how|step|process|place|ensure)/i,
       agent: 'bill_agent',
-      confidence: 0.9
+      confidence: 0.95
     },
     {
-      regex: /what.+(other|people|said|mentioned|participants)/i,
+      regex: /what.+(countries|legislation|laws|regulations|policies).*(place|ensure|safeguards|protections)/i,
+      agent: 'bill_agent', 
+      confidence: 0.9
+    },
+    // Peer agent - participant responses (lower priority to avoid conflicts)
+    {
+      regex: /what.+(participants|people said|mentioned by others|participants think)/i,
       agent: 'peer_agent',
       confidence: 0.85
     },
+    // Flow agent - clarification requests
     {
       regex: /\b(clarify|explain|help|understand|confused)\b/i,
       agent: 'flow_agent',
@@ -208,6 +216,7 @@ function checkFastPath(content: string): { agent: string; confidence: number; te
 
   for (const pattern of patterns) {
     if (pattern.regex.test(content)) {
+      console.log(`🎯 Fast path matched: "${content}" -> ${pattern.agent} (confidence: ${pattern.confidence})`);
       return {
         agent: pattern.agent,
         confidence: pattern.confidence
