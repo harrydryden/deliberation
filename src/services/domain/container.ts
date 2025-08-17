@@ -112,24 +112,93 @@ class ServiceContainer {
   // Service getters with dependency injection
   get simpleAuthService(): ISimpleAuthService {
     if (!this._simpleAuthService) {
-      // Simple implementation that works with access codes
+      // Proper implementation that validates access codes and creates users
       this._simpleAuthService = {
         authenticateWithAccessCode: async (accessCode: string) => {
-          // Generate proper UUID instead of using access code as ID
-          const userId = crypto.randomUUID();
+          // Import supabase here to avoid circular dependencies
+          const { supabase } = await import('@/integrations/supabase/client');
           
-          const simpleUser = {
-            id: userId, // Use proper UUID
+          // Validate access code with the database
+          const { data: validationResult, error: validationError } = await supabase
+            .rpc('validate_access_code_simple', { input_code: accessCode });
+            
+          if (validationError || !validationResult?.valid) {
+            throw new Error('Invalid access code');
+          }
+          
+          // Get or create user based on access code
+          const { data: existingCode, error: codeError } = await supabase
+            .from('access_codes')
+            .select('id, code_type, used_by')
+            .eq('code', accessCode)
+            .eq('is_active', true)
+            .single();
+            
+          if (codeError || !existingCode) {
+            throw new Error('Access code not found');
+          }
+          
+          let userId = existingCode.used_by;
+          let userRole = existingCode.code_type;
+          
+          // If access code hasn't been used, create a new user profile
+          if (!userId) {
+            userId = crypto.randomUUID();
+            
+            // Create user profile
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .insert({
+                id: userId,
+                display_name: userRole === 'admin' ? 'Administrator' : 'User',
+                user_role: userRole,
+                role: userRole
+              });
+              
+            if (profileError) {
+              console.error('Failed to create user profile:', profileError);
+              throw new Error('Failed to create user profile');
+            }
+            
+            // Mark access code as used
+            const { error: updateError } = await supabase
+              .from('access_codes')
+              .update({ 
+                used_by: userId, 
+                is_used: true, 
+                used_at: new Date().toISOString()
+              })
+              .eq('id', existingCode.id);
+              
+            if (updateError) {
+              console.error('Failed to update access code:', updateError);
+            }
+          }
+          
+          // Get the user profile
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+            
+          if (profileError || !profile) {
+            throw new Error('Failed to get user profile');
+          }
+          
+          const user = {
+            id: userId,
             accessCode: accessCode,
-            role: 'user',
+            role: profile.user_role || userRole,
             profile: {
-              displayName: 'User',
-              bio: '',
-              avatarUrl: '',
-              expertiseAreas: []
+              displayName: profile.display_name || (userRole === 'admin' ? 'Administrator' : 'User'),
+              bio: profile.bio || '',
+              avatarUrl: profile.avatar_url || '',
+              expertiseAreas: profile.expertise_areas || []
             }
           };
-          return { user: simpleUser, session: { token: 'simple_token' } };
+          
+          return { user, session: { token: 'simple_token' } };
         },
         signOut: async () => {},
         getCurrentUser: async () => null

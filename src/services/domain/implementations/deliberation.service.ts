@@ -75,4 +75,25 @@ export class DeliberationService implements IDeliberationService {
       throw error;
     }
   }
+
+  async joinDeliberation(deliberationId: string): Promise<void> {
+    try {
+      // Get current user from localStorage
+      const storedUser = localStorage.getItem('simple_auth_user');
+      if (!storedUser) {
+        throw new Error('User not authenticated');
+      }
+      
+      const user = JSON.parse(storedUser);
+      await this.deliberationRepository.joinDeliberation(deliberationId, user.id);
+      
+      logger.info('User joined deliberation successfully', { 
+        deliberationId, 
+        userId: user.id 
+      });
+    } catch (error) {
+      logger.error('Deliberation service joinDeliberation failed', { error, deliberationId });
+      throw error;
+    }
+  }
 }

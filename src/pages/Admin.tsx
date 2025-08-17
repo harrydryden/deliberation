@@ -9,9 +9,12 @@ const Admin = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('Admin page - user state:', { user, isLoading, role: user?.role });
     if (!isLoading && !user) {
+      console.log('Admin page - redirecting to auth (no user)');
       navigate("/auth");
     } else if (!isLoading && user && user.role !== 'admin') {
+      console.log('Admin page - redirecting to home (not admin):', user.role);
       navigate("/");
     }
   }, [user, isLoading, navigate]);

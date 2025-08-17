@@ -39,6 +39,7 @@ export const AuthForm = () => {
       if (error) throw error;
 
       if (data?.valid) {
+        console.log('Access code validation successful:', data);
         // Set the user in the auth context
         await authenticateWithAccessCode(accessCode, data.code_type);
         

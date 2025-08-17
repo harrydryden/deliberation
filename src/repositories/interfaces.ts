@@ -32,6 +32,7 @@ export interface IDeliberationRepository extends IRepository<Deliberation> {
   findByStatus(status: string): Promise<Deliberation[]>;
   findByFacilitator(facilitatorId: string): Promise<Deliberation[]>;
   findPublic(): Promise<Deliberation[]>;
+  joinDeliberation(deliberationId: string, userId: string): Promise<void>;
 }
 
 export interface IAccessCodeRepository {

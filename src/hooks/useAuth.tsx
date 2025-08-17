@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       const result = await simpleAuthService.authenticateWithAccessCode(accessCode);
       
-      console.log('Authentication successful:', result.user.id);
+      console.log('Authentication successful:', result.user.id, 'Role:', result.user.role);
       
       // Store user and set context
       localStorage.setItem('simple_auth_user', JSON.stringify(result.user));
@@ -75,7 +75,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       setUser(result.user);
       
-      logger.info('User authenticated successfully', { userId: result.user.id });
+      logger.info('User authenticated successfully', { 
+        userId: result.user.id, 
+        role: result.user.role 
+      });
       
       // Check for last deliberation and redirect
       const lastDeliberationId = localStorage.getItem('last_deliberation_id');
@@ -83,10 +86,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('Redirecting to last deliberation after auth:', lastDeliberationId);
         // Add delay to ensure all context is set
         setTimeout(() => {
-          navigate(`/deliberations/${lastDeliberationId}`);
+          navigate(`/deliberations/${lastDeliberationId}`, { replace: true });
         }, 200);
       } else {
-        navigate('/deliberations');
+        navigate('/deliberations', { replace: true });
       }
     } catch (error) {
       logger.error('Authentication failed', { error });
