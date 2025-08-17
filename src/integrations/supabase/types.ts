@@ -1130,10 +1130,6 @@ export type Database = {
         Args: { access_code: string }
         Returns: string
       }
-      get_current_access_code_user: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1192,10 +1188,6 @@ export type Database = {
       }
       increment_access_code_usage: {
         Args: { input_code: string }
-        Returns: boolean
-      }
-      is_admin_access_code_user: {
-        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       is_admin_user: {
