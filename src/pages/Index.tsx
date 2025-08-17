@@ -39,9 +39,9 @@ const Index = () => {
           <h1 className="text-4xl font-bold text-democratic-blue">
             Participant Guide
           </h1>
-          <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-            Learn how to participate effectively in structured deliberations and what to expect during your session
-          </p>
+          <p className="text-lg text-muted-foreground max-w-3xl mx-auto">Important note: topics may be sensitive, you are able to stop participating at any time. 
+Third party tools may access information you share during the deliberation, do not share personal information. 
+The agents use OpenAI LLMs (AI) and may provide inaccurate information. </p>
         </div>
 
         {/* How to Participate */}
