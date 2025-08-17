@@ -5,13 +5,17 @@ import { useServices } from "@/hooks/useServices";
 import { useChat } from "@/hooks/useChat";
 import { useUserAgents } from "@/hooks/useUserAgents";
 import { MessageList } from "@/components/chat/MessageList";
-import { MessageInput } from "@/components/chat/MessageInput";
+import { EnhancedMessageInput } from "@/components/chat/EnhancedMessageInput";
+import { ViewModeSelector, type ViewMode } from "@/components/chat/ViewModeSelector";
+import { ChatModeSelector, type ChatMode } from "@/components/chat/ChatModeSelector";
+import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Users, MessageSquare } from "lucide-react";
+import { ArrowLeft, Users, MessageSquare, GitBranch } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
+import { IbisMapVisualization } from "@/components/ibis/IbisMapVisualization";
 import type { Deliberation } from "@/types/api";
 
 const DeliberationChat = () => {
@@ -27,6 +31,8 @@ const DeliberationChat = () => {
   const [isLoadingDeliberation, setIsLoadingDeliberation] = useState(true);
   const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<{ id: string; content: string } | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('chat');
+  const [chatMode, setChatMode] = useState<ChatMode>('chat');
 
   // Store the current deliberation as the last visited one
   useEffect(() => {
@@ -84,6 +90,11 @@ const DeliberationChat = () => {
     });
   };
 
+  const handleEnhancedSendMessage = async (message: string, type: 'QUESTION' | 'STATEMENT' | 'OTHER') => {
+    // Use the existing sendMessage but we could extend it to handle message types in the future
+    await sendMessage(message);
+  };
+
   if (isLoadingDeliberation) {
     return (
       <div className="container mx-auto p-6 space-y-6">
@@ -134,31 +145,118 @@ const DeliberationChat = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        <Card className="flex-1 flex flex-col h-[calc(100vh-12rem)]">
-          <CardHeader className="pb-4">
-            <CardTitle>Discussion</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col p-0">
-            <div className="flex-1 overflow-hidden">
-              <MessageList
-                messages={messages}
-                isLoading={isLoading}
-                isTyping={isTyping}
-                onAddToIbis={handleAddToIbis}
-                onRetry={retryMessage}
-                deliberationId={deliberationId}
-                agentConfigs={localAgents}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Sidebar with controls and participant info */}
+        <div className="lg:col-span-1 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">View Mode</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ViewModeSelector 
+                mode={viewMode} 
+                onModeChange={setViewMode}
               />
-            </div>
-            <div className="border-t p-4">
-              <MessageInput
-                onSendMessage={sendMessage}
-                disabled={isTyping}
+            </CardContent>
+          </Card>
+
+          {viewMode === 'chat' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Discussion Mode</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChatModeSelector 
+                  mode={chatMode} 
+                  onModeChange={setChatMode}
+                  variant="bare"
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Your Participation</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ParticipantScoring
+                engagement={messages.filter(m => m.message_type === 'user').length}
+                shares={messages.filter(m => m.submitted_to_ibis).length}
+                sessions={1} // Could be enhanced to track actual sessions
+                helpfulness={3} // Could be enhanced with actual ratings
               />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {deliberation.description && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">About This Discussion</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  {deliberation.description}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Main content area */}
+        <div className="lg:col-span-3">
+          <Card className="flex-1 flex flex-col h-[calc(100vh-12rem)]">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  {viewMode === 'chat' ? (
+                    <>
+                      <MessageSquare className="h-5 w-5" />
+                      Discussion
+                    </>
+                  ) : (
+                    <>
+                      <GitBranch className="h-5 w-5" />
+                      Knowledge Map
+                    </>
+                  )}
+                </CardTitle>
+                {viewMode === 'chat' && (
+                  <div className="text-sm text-muted-foreground">
+                    {chatMode === 'chat' ? 'Deliberation Mode' : 'Policy Q&A Mode'}
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col p-0">
+              {viewMode === 'chat' ? (
+                <>
+                  <div className="flex-1 overflow-hidden">
+                    <MessageList
+                      messages={messages}
+                      isLoading={isLoading}
+                      isTyping={isTyping}
+                      onAddToIbis={handleAddToIbis}
+                      onRetry={retryMessage}
+                      deliberationId={deliberationId}
+                      agentConfigs={localAgents}
+                    />
+                  </div>
+                  <div className="border-t">
+                    <EnhancedMessageInput
+                      onSendMessage={handleEnhancedSendMessage}
+                      disabled={isTyping}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 p-4">
+                  <IbisMapVisualization deliberationId={deliberationId || ''} />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <IbisSubmissionModal
