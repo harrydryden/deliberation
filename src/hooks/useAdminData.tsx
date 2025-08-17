@@ -240,6 +240,20 @@ export const useAdminData = () => {
         throw new Error('Access code not found in user session');
       }
 
+      // Validate access code is admin before attempting update
+      const { data: codeValidation, error: codeError } = await supabase
+        .from('access_codes')
+        .select('code_type, is_active')
+        .eq('code', accessCode)
+        .eq('is_active', true)
+        .single();
+
+      if (codeError || !codeValidation || codeValidation.code_type !== 'admin') {
+        throw new Error('Admin access required for agent updates');
+      }
+
+      console.log('Calling admin-agent-operations edge function...');
+      
       // Use admin edge function for updates to bypass RLS properly
       const { data, error } = await supabase.functions.invoke('admin-agent-operations', {
         body: {
@@ -248,6 +262,8 @@ export const useAdminData = () => {
           updates
         }
       });
+
+      console.log('Edge function response:', { data, error });
 
       if (error) {
         console.error('Edge function error:', error);
