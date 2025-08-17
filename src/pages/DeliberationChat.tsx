@@ -282,7 +282,6 @@ const DeliberationChat = () => {
                       engagement={userScores.engagement} 
                       shares={userScores.shares} 
                       sessions={userScores.sessions} 
-                      target={10} 
                     />
                   </div>
                 </div>
@@ -350,7 +349,6 @@ const DeliberationChat = () => {
                     engagement={userScores.engagement} 
                     shares={userScores.shares} 
                     sessions={userScores.sessions} 
-                    target={10} 
                   />
                 </div>
               </div>

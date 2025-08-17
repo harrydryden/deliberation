@@ -1,40 +1,54 @@
-import { MessageSquare, Share2, Clock } from "lucide-react";
+import { MessageSquare, Share2, Clock, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+
 interface ParticipantScoringProps {
   engagement: number;
   shares: number;
   sessions: number;
-  target?: number;
 }
 export const ParticipantScoring = ({
   engagement,
   shares,
   sessions,
-  target = 10
 }: ParticipantScoringProps) => {
-  const getScoreColor = (score: number, target: number) => {
-    const percentage = score / target * 100;
-    if (percentage >= 100) return 'bg-democratic-green text-white';
-    if (percentage >= 70) return 'bg-civic-gold text-white';
-    if (percentage >= 30) return 'bg-muted-foreground text-white';
-    return 'bg-muted text-muted-foreground';
+  // Convert raw values to star ratings (1-5)
+  const calculateStars = (value: number, threshold: number): number => {
+    return Math.min(5, Math.floor(value / threshold));
   };
+
+  const renderStars = (filledStars: number) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <Star
+        key={i}
+        className={`h-3 w-3 ${
+          i < filledStars 
+            ? 'fill-civic-gold text-civic-gold' 
+            : 'text-muted-foreground'
+        }`}
+      />
+    ));
+  };
+
   const scores = [{
     label: 'Engagement',
-    value: engagement,
+    rawValue: engagement,
+    stars: calculateStars(engagement, 10),
     icon: MessageSquare,
-    description: 'Messages sent'
+    description: `${engagement} messages`
   }, {
     label: 'Shares',
-    value: shares,
+    rawValue: shares,
+    stars: calculateStars(shares, 5),
     icon: Share2,
-    description: 'IBIS submissions'
+    description: `${shares} IBIS contributions`
   }, {
     label: 'Sessions',
-    value: sessions,
+    rawValue: sessions,
+    stars: calculateStars(sessions, 2),
     icon: Clock,
-    description: 'Login sessions'
+    description: `${sessions} login sessions`
   }];
+
   return (
     <div className="flex flex-col gap-2 w-full p-3 bg-card border border-border rounded-lg">
       {scores.map(score => (
@@ -43,9 +57,9 @@ export const ParticipantScoring = ({
             <score.icon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
             <span className="text-xs font-medium text-foreground">{score.label}</span>
           </div>
-          <span className="text-xs text-muted-foreground font-mono">
-            {score.value}/{target}
-          </span>
+          <div className="flex items-center gap-1">
+            {renderStars(score.stars)}
+          </div>
         </div>
       ))}
     </div>
