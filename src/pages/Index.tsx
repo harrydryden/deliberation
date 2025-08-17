@@ -100,7 +100,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Brain className="h-5 w-5 text-democratic-green" />
-                  <span>AI Assistance</span>
+                  <span>Three AI agents help guide the conversation: Bill provides facts particularly policy information, Flo mediates the discussion, and most importantly Pia facilitates the exchange of views between participants</span>
                 </CardTitle>
                 <CardDescription>
                   Three AI agents help guide the conversation: Bill provides policy analysis, Flo manages discussion flow, and Pia offers peer perspectives.
@@ -112,7 +112,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Users className="h-5 w-5 text-civic-gold" />
-                  <span>Structured Framework</span>
+                  <span>Discussions follow the IBIS method - identifying Issues, related Positions, and associated Arguments. This helps to organise the discussion - which you can see in the map view, or ask Pia</span>
                 </CardTitle>
                 <CardDescription>
                   Discussions follow the IBIS method - identifying Issues, exploring Positions, and examining Arguments. This keeps conversations focused and productive.
