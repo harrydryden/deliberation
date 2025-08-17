@@ -37,6 +37,10 @@ class SupabaseDeliberationService implements DeliberationService {
 
     logger.info('Found deliberations', { count: deliberations.length });
 
+    // Get current user from localStorage
+    const storedUser = localStorage.getItem('simple_auth_user');
+    const currentUserId = storedUser ? JSON.parse(storedUser).id : null;
+
     // Get participant counts for each deliberation (simplified)
     const deliberationsWithCounts = await Promise.all(
       deliberations.map(async (deliberation) => {
@@ -52,15 +56,29 @@ class SupabaseDeliberationService implements DeliberationService {
           logger.warn(`Error getting participant count for ${deliberation.id}`, countError as any);
         }
 
+        // Check if current user is a participant
+        let isUserParticipant = false;
+        if (currentUserId) {
+          const { data: userParticipation } = await supabase
+            .from('participants')
+            .select('id')
+            .eq('deliberation_id', deliberation.id)
+            .eq('user_id', currentUserId)
+            .maybeSingle();
+          
+          isUserParticipant = !!userParticipation;
+        }
+
         logger.info('Participant count', { 
           deliberationId: deliberation.id, 
-          count
+          count,
+          isUserParticipant
         });
 
         return {
           ...deliberation,
           participant_count: count || 0,
-          is_user_participant: false // Simplified - user can always join
+          is_user_participant: isUserParticipant
         };
       })
     );
