@@ -228,7 +228,7 @@ const DeliberationChat = () => {
               
               {/* Title Section - Takes most space on large screens */}
               <div className="lg:col-span-3 xl:col-span-3">
-                <div className="rounded-lg border bg-muted/40 p-3 h-full">
+                <div className="rounded-lg border bg-muted/40 p-3 h-full lg:h-auto">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-democratic-blue truncate">
