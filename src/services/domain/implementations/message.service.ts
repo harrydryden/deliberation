@@ -45,11 +45,40 @@ export class MessageService implements IMessageService {
         deliberationId,
         userId 
       });
+
+      // Trigger agent orchestration for user messages
+      if (messageType === 'user' && deliberationId) {
+        this.triggerAgentOrchestration(message.id, deliberationId, mode).catch(error => {
+          logger.error('Agent orchestration failed', { error, messageId: message.id });
+        });
+      }
       
       return message;
     } catch (error) {
       logger.error('Message service sendMessage failed', { error, content: content.slice(0, 50) });
       throw error;
+    }
+  }
+
+  private async triggerAgentOrchestration(messageId: string, deliberationId: string, mode: 'chat' | 'learn') {
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { data, error } = await supabase.functions.invoke('agent-orchestration', {
+        body: {
+          messageId,
+          deliberationId,
+          mode
+        }
+      });
+
+      if (error) {
+        logger.error('Agent orchestration edge function error', { error, messageId, deliberationId });
+      } else {
+        logger.info('Agent orchestration triggered successfully', { messageId, deliberationId, response: data });
+      }
+    } catch (error) {
+      logger.error('Failed to trigger agent orchestration', { error, messageId, deliberationId });
     }
   }
 
