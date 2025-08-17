@@ -99,8 +99,8 @@ export const AdminDashboard = () => {
                 agents={adminData.agents}
                 loading={adminData.loadingAgents}
                 onLoad={adminData.fetchAgents}
-                onUpdate={async () => {}} // TODO: implement
-                onCreate={async () => {}} // TODO: implement
+                onUpdate={adminData.updateAgent}
+                onCreate={adminData.createAgent}
               />
             </div>
             

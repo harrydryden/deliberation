@@ -181,6 +181,48 @@ export const useAdminData = () => {
     }
   };
 
+  // Agent update and creation operations
+  const updateAgent = async (id: string, updates: Partial<Agent>) => {
+    try {
+      await services.agentService.updateAgent(id, updates);
+      
+      // Update local state
+      setAgents(prevAgents => 
+        prevAgents.map(agent => 
+          agent.id === id ? { ...agent, ...updates } : agent
+        )
+      );
+      
+      toast.success('Agent updated successfully');
+      logger.info('Agent updated', { agentId: id, updates });
+    } catch (error) {
+      handleError(error, 'update agent');
+      throw error;
+    }
+  };
+
+  const createAgent = async (agentData: Omit<Agent, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      // Convert camelCase to snake_case for the API
+      const apiAgentData = {
+        ...agentData,
+        // Remove camelCase fields that don't exist in the API
+      } as Omit<Agent, 'id' | 'created_at' | 'updated_at'>;
+      
+      const newAgent = await services.agentService.createAgent(apiAgentData);
+      
+      // Add to local state
+      setAgents(prevAgents => [...prevAgents, newAgent]);
+      
+      toast.success('Agent created successfully');
+      logger.info('Agent created', { agentId: newAgent.id });
+      return newAgent;
+    } catch (error) {
+      handleError(error, 'create agent');
+      throw error;
+    }
+  };
+
   return {
     // States
     users,
@@ -208,6 +250,8 @@ export const useAdminData = () => {
     createAccessCode,
     deleteAccessCode,
     fetchAgents,
+    updateAgent,
+    createAgent,
     fetchLocalAgents,
     fetchDeliberations,
     fetchStats,
