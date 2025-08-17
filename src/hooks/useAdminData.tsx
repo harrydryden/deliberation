@@ -147,8 +147,10 @@ export const useAdminData = () => {
     setLoadingLocalAgents(true);
     try {
       const data = await services.agentService.getLocalAgents();
+      console.log('🔍 Local agents fetched:', data);
       setLocalAgents(data);
     } catch (error) {
+      console.error('❌ Failed to fetch local agents:', error);
       handleError(error, 'fetch local agents');
     } finally {
       setLoadingLocalAgents(false);
