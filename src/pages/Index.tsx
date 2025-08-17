@@ -180,7 +180,7 @@ const Index = () => {
                   </div>
                   <div>
                     <p className="font-medium text-purple-600">Pia:</p>
-                    <p className="text-sm">Offers peer perspectives and helps synthesize different viewpoints in the conversation.</p>
+                    <p className="text-sm">Facilitates the sharing of views between participants - this is the most important agent.</p>
                   </div>
                 </CardDescription>
               </CardHeader>
