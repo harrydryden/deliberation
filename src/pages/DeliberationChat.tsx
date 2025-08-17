@@ -295,7 +295,7 @@ const DeliberationChat = () => {
             <div className="flex items-start gap-4">
               {/* Title Section */}
               <div className="flex-1 min-w-0">
-                <div className="rounded-lg border bg-muted/40 p-3 py-5">
+                <div className="rounded-lg border bg-muted/40 p-3 h-20 flex flex-col justify-center">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <h1 className="text-xl font-semibold text-democratic-blue truncate">
@@ -311,7 +311,7 @@ const DeliberationChat = () => {
                     </div>
                   </div>
                   {deliberation.description && (
-                    <p className="text-sm text-muted-foreground mt-2 line-clamp-2 cursor-pointer" 
+                    <p className="text-sm text-muted-foreground mt-2 line-clamp-1 cursor-pointer" 
                        onClick={() => setIsDescriptionOpen(true)} 
                        title="Click to view full description">
                       {deliberation.description}
@@ -322,13 +322,13 @@ const DeliberationChat = () => {
 
               {/* Modes */}
               <div className="shrink-0">
-                <div className="rounded-lg border bg-muted/40 px-3 py-2 space-y-3">
+                <div className="rounded-lg border bg-muted/40 px-3 py-2 h-20 flex flex-col justify-center space-y-2">
                   <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-2">Text Mode</div>
+                    <div className="text-xs font-medium text-muted-foreground mb-1">Text Mode</div>
                     <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
                   </div>
                   <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-2">View Mode</div>
+                    <div className="text-xs font-medium text-muted-foreground mb-1">View Mode</div>
                     <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
                   </div>
                 </div>
@@ -336,7 +336,7 @@ const DeliberationChat = () => {
 
               {/* Voice Interface */}
               <div className="shrink-0">
-                <div className="rounded-lg border bg-muted/40 px-3 py-2">
+                <div className="rounded-lg border bg-muted/40 px-3 py-2 h-20 flex flex-col justify-center">
                   <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
                     <VoiceInterfaceLazy deliberationId={deliberation.id} variant="panel" />
                   </Suspense>
