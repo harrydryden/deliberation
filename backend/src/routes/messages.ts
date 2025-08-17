@@ -112,16 +112,36 @@ export async function messageRoutes(fastify: FastifyInstance) {
       // Get or initialize session state
       const sessionState = await getSessionState(userId);
 
-      // Process message through orchestration service asynchronously
-      orchestrationService.processMessage({
-        messageId: userMessage.id,
-        userId,
-        content: content.trim(),
-        sessionState,
-        traceId,
-        deliberationId,
+      // Call the new Supabase edge function for agent orchestration
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.SUPABASE_URL || '',
+        process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+      );
+
+      // Process message through Supabase edge function asynchronously
+      supabase.functions.invoke('agent-orchestration', {
+        body: {
+          messageId: userMessage.id,
+          deliberationId,
+          mode: 'chat'
+        }
+      }).then(response => {
+        if (response.error) {
+          fastify.log.error({ 
+            error: response.error, 
+            userId, 
+            messageId: userMessage.id 
+          }, 'Edge function orchestration failed');
+        } else {
+          fastify.log.info({ 
+            userId, 
+            messageId: userMessage.id,
+            response: response.data 
+          }, 'Edge function orchestration completed');
+        }
       }).catch(error => {
-        fastify.log.error({ error, userId, messageId: userMessage.id }, 'Async message processing failed');
+        fastify.log.error({ error, userId, messageId: userMessage.id }, 'Edge function call failed');
       });
 
       // Return user message immediately
