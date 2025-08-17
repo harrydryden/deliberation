@@ -230,7 +230,13 @@ const DeliberationChat = () => {
     
     try {
       const agents = await agentService.getAgentsByDeliberation(deliberationId);
+      console.log('Loaded agent configs:', agents);
       setAgentConfigs(agents.map(agent => ({
+        agent_type: agent.agent_type,
+        name: agent.name,
+        description: agent.description
+      })));
+      console.log('Mapped agent configs:', agents.map(agent => ({
         agent_type: agent.agent_type,
         name: agent.name,
         description: agent.description
