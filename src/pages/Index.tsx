@@ -137,53 +137,7 @@ const Index = () => {
         </div>
 
         {/* Participation Tips */}
-        <div className="bg-muted/30 rounded-lg p-6 space-y-4">
-          <h2 className="text-2xl font-semibold text-foreground">Tips for Effective Participation</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <h3 className="text-lg font-medium text-democratic-blue">During Discussion</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-start space-x-2">
-                  <span className="text-democratic-blue mt-1">•</span>
-                  <span>Share your genuine thoughts and experiences</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <span className="text-democratic-blue mt-1">•</span>
-                  <span>Ask questions when you need clarification</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <span className="text-democratic-blue mt-1">•</span>
-                  <span>Build on what others have said</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <span className="text-democratic-blue mt-1">•</span>
-                  <span>Stay focused on the topic at hand</span>
-                </li>
-              </ul>
-            </div>
-            <div className="space-y-3">
-              <h3 className="text-lg font-medium text-democratic-green">Interaction Guidelines</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-start space-x-2">
-                  <span className="text-democratic-green mt-1">•</span>
-                  <span>Listen respectfully to different viewpoints</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <span className="text-democratic-green mt-1">•</span>
-                  <span>Support your opinions with reasoning</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <span className="text-democratic-green mt-1">•</span>
-                  <span>Be open to changing your mind</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <span className="text-democratic-green mt-1">•</span>
-                  <span>Help identify areas of agreement</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
+        
 
         {/* Interface Features */}
         <div className="space-y-6">
