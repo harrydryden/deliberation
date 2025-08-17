@@ -11,7 +11,6 @@ import { useToast } from "@/hooks/use-toast";
 import { formatToUKDate } from "@/utils/timeUtils";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 import { logger } from "@/utils/logger";
-
 interface Deliberation {
   id: string;
   title: string;
@@ -26,36 +25,41 @@ interface Deliberation {
   participant_count?: number;
   is_user_participant?: boolean;
 }
-
 const Deliberations = () => {
-  const { user, isLoading } = useAuth();
+  const {
+    user,
+    isLoading
+  } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const deliberationService = useDeliberationService();
-  
   const [deliberations, setDeliberations] = useState<Deliberation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDescription, setSelectedDescription] = useState<{ title: string; description: string } | null>(null);
-
+  const [selectedDescription, setSelectedDescription] = useState<{
+    title: string;
+    description: string;
+  } | null>(null);
   useEffect(() => {
     if (!isLoading && !user) {
       navigate("/auth");
       return;
     }
-    
     if (user) {
       loadDeliberations();
     }
   }, [user, isLoading, navigate]);
-
-
   const loadDeliberations = async () => {
     try {
       logger.info('Loading deliberations...');
       setLoading(true);
       logger.info('About to call deliberationService.getDeliberations()');
       const data = await deliberationService.getDeliberations();
-      logger.info('Deliberations loaded successfully', { count: data?.length || 0, data });
+      logger.info('Deliberations loaded successfully', {
+        count: data?.length || 0,
+        data
+      });
       setDeliberations(data);
     } catch (error) {
       logger.error('Failed to load deliberations', error as any);
@@ -69,17 +73,16 @@ const Deliberations = () => {
       logger.info('Loading deliberations completed');
     }
   };
-
-
   const handleJoinDeliberation = async (deliberationId: string) => {
     try {
-      logger.info('Attempting to join deliberation', { deliberationId });
+      logger.info('Attempting to join deliberation', {
+        deliberationId
+      });
       const deliberation = deliberations.find(d => d.id === deliberationId);
       const isRejoining = deliberation?.is_user_participant;
-      
       await deliberationService.joinDeliberation(deliberationId);
       logger.info('Join deliberation successful');
-      
+
       // Only show success toast if user is joining for the first time
       if (!isRejoining) {
         toast({
@@ -87,8 +90,9 @@ const Deliberations = () => {
           description: "Joined deliberation successfully"
         });
       }
-      
-      logger.info('Navigating to deliberation', { deliberationId });
+      logger.info('Navigating to deliberation', {
+        deliberationId
+      });
       navigate(`/deliberations/${deliberationId}`);
     } catch (error) {
       logger.error('Failed to join deliberation', error as any);
@@ -99,36 +103,30 @@ const Deliberations = () => {
       });
     }
   };
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-500';
-      case 'completed': return 'bg-gray-500';
-      default: return 'bg-yellow-500';
+      case 'active':
+        return 'bg-green-500';
+      case 'completed':
+        return 'bg-gray-500';
+      default:
+        return 'bg-yellow-500';
     }
   };
-
   if (isLoading || loading) {
-    return (
-      <Layout>
+    return <Layout>
         <div className="max-w-6xl mx-auto p-6">
           <div className="animate-pulse space-y-4">
             <div className="h-8 bg-muted rounded w-1/3"></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-48 bg-muted rounded-lg"></div>
-              ))}
+              {[1, 2, 3].map(i => <div key={i} className="h-48 bg-muted rounded-lg"></div>)}
             </div>
           </div>
         </div>
-      </Layout>
-    );
+      </Layout>;
   }
-
   if (!user) return null;
-
-  return (
-    <Layout>
+  return <Layout>
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -139,8 +137,7 @@ const Deliberations = () => {
         </div>
 
         {/* Deliberations Grid */}
-        {deliberations.length === 0 ? (
-          <Card>
+        {deliberations.length === 0 ? <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No deliberations available</h3>
@@ -148,11 +145,8 @@ const Deliberations = () => {
                 No deliberations have been created yet. Please contact an administrator to set up new discussions.
               </p>
             </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {deliberations.map((deliberation) => (
-              <Card key={deliberation.id} className="hover:shadow-lg transition-shadow flex flex-col h-full">
+          </Card> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {deliberations.map(deliberation => <Card key={deliberation.id} className="hover:shadow-lg transition-shadow flex flex-col h-full">
                 <CardHeader className="flex-1">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg line-clamp-2">{deliberation.title}</CardTitle>
@@ -160,14 +154,12 @@ const Deliberations = () => {
                       {deliberation.status}
                     </Badge>
                   </div>
-                  {deliberation.description && (
-                    <CardDescription 
-                      className="line-clamp-3 cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => setSelectedDescription({ title: deliberation.title, description: deliberation.description! })}
-                    >
+                  {deliberation.description && <CardDescription className="line-clamp-3 cursor-pointer hover:text-primary transition-colors" onClick={() => setSelectedDescription({
+              title: deliberation.title,
+              description: deliberation.description!
+            })}>
                       {deliberation.description}
-                    </CardDescription>
-                  )}
+                    </CardDescription>}
                 </CardHeader>
                 
                 <CardContent className="space-y-4 mt-auto">
@@ -183,25 +175,14 @@ const Deliberations = () => {
                   </div>
                   
                   <div className="flex gap-2">
-                    <Button 
-                      className="flex-1 bg-democratic-blue hover:bg-democratic-blue/90"
-                      onClick={() => handleJoinDeliberation(deliberation.id)}
-                    >
+                    <Button className="flex-1 bg-democratic-blue hover:bg-democratic-blue/90" onClick={() => handleJoinDeliberation(deliberation.id)}>
                       {deliberation.is_user_participant ? "Rejoin Discussion" : "Join Discussion"}
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => navigate(`/deliberations/${deliberation.id}/details`)}
-                    >
-                      Details
-                    </Button>
+                    
                   </div>
                 </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+              </Card>)}
+          </div>}
 
         {/* Description Preview Dialog */}
         <Dialog open={!!selectedDescription} onOpenChange={() => setSelectedDescription(null)}>
@@ -215,8 +196,6 @@ const Deliberations = () => {
           </DialogContent>
         </Dialog>
       </div>
-    </Layout>
-  );
+    </Layout>;
 };
-
 export default Deliberations;
