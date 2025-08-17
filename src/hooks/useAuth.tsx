@@ -34,20 +34,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await setUserContext();
           
           setUser(parsedUser);
-          
-          // If user is on auth page and has valid session, redirect to their last deliberation
-          if (location.pathname === '/auth' || location.pathname === '/') {
-            const lastDeliberationId = localStorage.getItem('last_deliberation_id');
-            if (lastDeliberationId) {
-              console.log('Redirecting to last deliberation:', lastDeliberationId);
-              // Add a small delay to ensure user context is fully established
-              setTimeout(() => {
-                navigate(`/deliberations/${lastDeliberationId}`);
-              }, 100);
-            } else {
-              navigate('/deliberations');
-            }
-          }
         }
       } catch (error) {
         console.error('Failed to initialize auth:', error);
@@ -58,7 +44,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     initAuth();
-  }, [navigate, location.pathname]);
+  }, []); // Remove location dependency to prevent re-runs
+
+  // Handle redirects separately when user state changes
+  useEffect(() => {
+    if (!isLoading && user) {
+      // If user is on auth page and has valid session, redirect to their last deliberation
+      if (location.pathname === '/auth' || location.pathname === '/') {
+        const lastDeliberationId = localStorage.getItem('last_deliberation_id');
+        if (lastDeliberationId) {
+          console.log('Redirecting to last deliberation:', lastDeliberationId);
+          navigate(`/deliberations/${lastDeliberationId}`, { replace: true });
+        } else {
+          navigate('/deliberations', { replace: true });
+        }
+      }
+    }
+  }, [user, isLoading, location.pathname, navigate]);
 
   const authenticate = async (accessCode: string): Promise<void> => {
     try {
