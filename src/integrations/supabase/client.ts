@@ -32,22 +32,49 @@ const enhancedSupabase = {
     const queryBuilder = baseSupabase.from(table);
     
     if (userId) {
-      // Set context immediately when building query
-      const setUserContext = async () => {
-        try {
-          await baseSupabase.rpc('set_config', {
-            setting_name: 'app.current_user_id',
-            new_value: userId,
-            is_local: true
-          });
-        } catch (error) {
-          console.warn('Failed to set user context:', error);
+      // Create a proxy to intercept query execution methods
+      return new Proxy(queryBuilder, {
+        get(target, prop) {
+          const value = target[prop as keyof typeof target];
+          
+          // Intercept execution methods to set context first
+          if (typeof value === 'function' && 
+              ['select', 'insert', 'update', 'delete', 'upsert'].includes(prop as string)) {
+            return function(...args: any[]) {
+              const result = (value as Function).apply(target, args);
+              
+              // Create proxy for the query result to set context before execution
+              return new Proxy(result, {
+                get(resultTarget, resultProp) {
+                  const resultValue = resultTarget[resultProp as keyof typeof resultTarget];
+                  
+                  if (typeof resultValue === 'function' && 
+                      ['then', 'catch', 'finally'].includes(resultProp as string)) {
+                    return function(...execArgs: any[]) {
+                      // Set context before executing the query
+                      return Promise.resolve(baseSupabase.rpc('set_config', {
+                        setting_name: 'app.current_user_id',
+                        new_value: userId,
+                        is_local: true
+                      })).then(() => {
+                        return (resultValue as Function).apply(resultTarget, execArgs);
+                      }).catch((contextError) => {
+                        console.warn('Failed to set user context:', contextError);
+                        // Execute query anyway even if context setting fails
+                        return (resultValue as Function).apply(resultTarget, execArgs);
+                      });
+                    };
+                  }
+                  
+                  return typeof resultValue === 'function' ? resultValue.bind(resultTarget) : resultValue;
+                }
+              });
+            };
+          }
+          
+          return typeof value === 'function' ? value.bind(target) : value;
         }
-      };
-      
-      // Set context and return the regular query builder
-      setUserContext();
-      return queryBuilder;
+      });
     }
     
     return queryBuilder;
@@ -58,29 +85,17 @@ const enhancedSupabase = {
     const userId = getCurrentUserId();
     
     if (userId && functionName !== 'set_config') {
-      // For RPC calls, we need to set context differently
-      return new Proxy(baseSupabase.rpc(functionName, params), {
-        get(target, prop) {
-          const value = target[prop as keyof typeof target];
-          
-          if (prop === 'single' || prop === 'maybeSingle') {
-            return async () => {
-              try {
-                await baseSupabase.rpc('set_config', {
-                  setting_name: 'app.current_user_id',
-                  new_value: userId,
-                  is_local: true
-                });
-              } catch (error) {
-                console.warn('Failed to set user context for RPC:', error);
-              }
-              
-              return (value as Function).apply(target);
-            };
-          }
-          
-          return typeof value === 'function' ? value.bind(target) : value;
-        }
+      // Set context first, then execute RPC
+      return Promise.resolve(baseSupabase.rpc('set_config', {
+        setting_name: 'app.current_user_id',
+        new_value: userId,
+        is_local: true
+      })).then(() => {
+        return baseSupabase.rpc(functionName, params);
+      }).catch((contextError) => {
+        console.warn('Failed to set user context for RPC:', contextError);
+        // Execute RPC anyway even if context setting fails
+        return baseSupabase.rpc(functionName, params);
       });
     }
     
