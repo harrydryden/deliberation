@@ -80,12 +80,12 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
           </Avatar>
 
           <div className={`flex-1 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-medium">
+            <div className={`flex items-center gap-2 mb-1 ${isUser ? 'justify-end' : ''}`}>
+              <span className={`text-sm font-semibold ${isUser ? 'text-muted-foreground' : 'text-foreground'}`}>
                 {isUser ? 'You' : agentInfo?.name}
               </span>
               {!isUser && agentInfo?.description && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                   {agentInfo.description}
                 </span>
               )}
