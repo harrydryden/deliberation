@@ -1,6 +1,6 @@
 import { MessageSquare, Share2, Clock, Star, ThumbsUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface ParticipantScoringProps {
   engagement: number;
@@ -85,17 +85,17 @@ export const ParticipantScoring = ({
         <div key={score.label} className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <score.icon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-xs font-medium text-foreground cursor-help">{score.label}</span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="z-[60] max-w-xs">
-                <div className="text-xs">
+            <Popover>
+              <PopoverTrigger asChild>
+                <span className="text-xs font-medium text-foreground cursor-help hover:text-primary">{score.label}</span>
+              </PopoverTrigger>
+              <PopoverContent side="top" className="w-auto p-2 text-xs">
+                <div>
                   <p className="font-medium">{score.description}</p>
                   <p className="text-muted-foreground">{score.tooltip}</p>
                 </div>
-              </TooltipContent>
-            </Tooltip>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="flex items-center gap-1">
             {score.renderMethod === 'thumbs' ? renderThumbs(score.stars) : renderStars(score.stars)}
