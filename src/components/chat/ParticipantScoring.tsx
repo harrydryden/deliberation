@@ -24,7 +24,7 @@ export const ParticipantScoring = ({
 
   const scores = [
     {
-      label: 'Engagement',
+      label: 'Messages',
       value: engagement,
       icon: MessageSquare,
       description: 'Messages sent'
