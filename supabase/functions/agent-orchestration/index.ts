@@ -802,10 +802,20 @@ You MUST mention these similar contributions in your response using this exact f
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      console.error('❌ OpenAI API error status:', response.status);
+      const errorText = await response.text();
+      console.error('❌ OpenAI API error details:', errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('✅ OpenAI API response received, choices:', data.choices?.length || 0);
+    
+    if (!data.choices?.[0]?.message?.content) {
+      console.error('❌ No content in OpenAI response:', data);
+      throw new Error('No response content from OpenAI');
+    }
+    
     let agentResponse = data.choices[0].message.content;
 
     console.log(`💬 ${agentType} response: ${agentResponse.substring(0, 100)}...`);

@@ -336,16 +336,22 @@ async function generateResponseWithKnowledge(query: string, knowledgeContext: st
       })
     })
 
+    console.log('🤖 Calling OpenAI for response generation...');
+
     if (response.ok) {
       const data = await response.json()
-      return data.choices[0].message.content
+      console.log('✅ OpenAI response successful');
+      const responseContent = data.choices[0].message.content;
+      console.log('📝 Generated response length:', responseContent?.length || 0);
+      return responseContent;
     } else {
       const errorData = await response.text()
-      console.error('OpenAI API error:', errorData)
+      console.error('❌ OpenAI API error status:', response.status);
+      console.error('❌ OpenAI API error:', errorData)
       return `I found relevant information but encountered an error generating the response. Here's the raw knowledge: ${knowledgeContext.substring(0, 1000)}...`
     }
   } catch (error) {
-    console.error('Error generating response:', error)
+    console.error('💥 Error generating response:', error)
     return `I found relevant information: ${knowledgeContext.substring(0, 1000)}...`
   }
 }

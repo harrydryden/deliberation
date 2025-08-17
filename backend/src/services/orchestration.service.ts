@@ -191,16 +191,30 @@ export class AIOrchestrationService {
 
         const billAgent = agents ? agents.billAgent : new BillAgentService(this.prisma);
         
-        // Stream Bill Agent response
-        const responseStream = billAgent.streamResponse(context);
-        
-        for await (const chunk of responseStream) {
+        try {
+          // Stream Bill Agent response
+          const responseStream = billAgent.streamResponse(context);
+          
+          for await (const chunk of responseStream) {
+            sendSSEMessage(userId, 'agent_response', {
+              agent: 'bill_agent',
+              content: chunk.content,
+              done: chunk.done,
+              confidence: chunk.confidence,
+              relevance: chunk.relevance,
+            });
+          }
+        } catch (streamError) {
+          logger.error({ error: streamError, userId, agentType, traceId }, 'Agent streaming failed, falling back to simple response');
+          
+          // Fallback to simple response generation
+          const response = await billAgent.generateResponse(context);
           sendSSEMessage(userId, 'agent_response', {
             agent: 'bill_agent',
-            content: chunk.content,
-            done: chunk.done,
-            confidence: chunk.confidence,
-            relevance: chunk.relevance,
+            content: response.content,
+            done: true,
+            confidence: response.confidence,
+            relevance: response.relevance,
           });
         }
       } else if (agentType === 'peer_agent') {
@@ -211,14 +225,30 @@ export class AIOrchestrationService {
 
         const peerAgent = agents ? agents.peerAgent : new PeerAgentService(this.prisma);
         
-        // Stream Peer Agent response
-        const responseStream = peerAgent.streamResponse(context);
-        
-        for await (const chunk of responseStream) {
+        try {
+          // Stream Peer Agent response
+          const responseStream = peerAgent.streamResponse(context);
+          
+          for await (const chunk of responseStream) {
+            sendSSEMessage(userId, 'agent_response', {
+              agent: 'peer_agent',
+              content: chunk.content,
+              done: chunk.done,
+              confidence: chunk.confidence,
+              relevance: chunk.relevance,
+            });
+          }
+        } catch (streamError) {
+          logger.error({ error: streamError, userId, agentType, traceId }, 'Agent streaming failed, falling back to simple response');
+          
+          // Fallback to simple response generation
+          const response = await peerAgent.generateResponse(context);
           sendSSEMessage(userId, 'agent_response', {
             agent: 'peer_agent',
-            content: chunk.content,
-            done: chunk.done,
+            content: response.content,
+            done: true,
+            confidence: response.confidence,
+            relevance: response.relevance,
           });
         }
       } else if (agentType === 'flow_agent') {
