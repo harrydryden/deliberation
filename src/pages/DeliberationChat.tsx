@@ -244,6 +244,19 @@ const DeliberationChat = () => {
               </Button>
             </div>
             
+            {/* Description - Always visible under title */}
+            {deliberation.description && (
+              <div className="px-3 pb-3">
+                <div className="rounded-lg border bg-muted/40 p-2">
+                  <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
+                     onClick={() => setIsDescriptionOpen(true)} 
+                     title="Click to view full description">
+                    {deliberation.description}
+                  </p>
+                </div>
+              </div>
+            )}
+            
             {!isHeaderCollapsed && (
               <div className="px-3 pb-3 space-y-3">
                 {/* Mobile Controls */}
@@ -273,16 +286,6 @@ const DeliberationChat = () => {
                     />
                   </div>
                 </div>
-                
-                {deliberation.description && (
-                  <div className="rounded-lg border bg-muted/40 p-2">
-                    <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
-                       onClick={() => setIsDescriptionOpen(true)} 
-                       title="Click to view full description">
-                      {deliberation.description}
-                    </p>
-                  </div>
-                )}
               </div>
             )}
           </div>
