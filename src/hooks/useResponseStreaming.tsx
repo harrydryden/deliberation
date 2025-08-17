@@ -102,6 +102,7 @@ export const useResponseStreaming = () => {
             const parsed: StreamingResponse = JSON.parse(dataLine);
 
             if (parsed.error) {
+              console.error('❌ Streaming error received:', parsed.error);
               onError(parsed.error);
               return;
             }
@@ -129,6 +130,7 @@ export const useResponseStreaming = () => {
                 messageId: null,
                 agentType: null,
               });
+              console.log('✅ Streaming completed successfully');
               return;
             }
           } catch (parseError) {

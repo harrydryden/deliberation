@@ -64,6 +64,8 @@ export class MessageService implements IMessageService {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
+      // Note: Streaming responses are now handled in the frontend via useResponseStreaming hook
+      // This call is kept for backward compatibility and non-streaming scenarios
       const { data, error } = await supabase.functions.invoke('agent-orchestration', {
         body: {
           messageId,

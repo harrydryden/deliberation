@@ -79,6 +79,20 @@ async function processStreamingOrchestration(
 
     console.log('📨 Processing message:', message.content);
 
+    // Check response cache first
+    const cachedResponse = checkResponseCache(message.content, deliberationId);
+    if (cachedResponse) {
+      console.log('🚀 Using cached response');
+      
+      sendData({ 
+        agentType: cachedResponse.agentType,
+        content: cachedResponse.response,
+        done: true,
+        cached: true
+      });
+      return;
+    }
+
     // Fast path pattern matching
     const fastPath = checkFastPath(message.content);
     if (fastPath) {
@@ -90,6 +104,9 @@ async function processStreamingOrchestration(
         openAIApiKey,
         sendData
       );
+
+      // Cache the response
+      cacheResponse(message.content, response, fastPath.agent, deliberationId);
 
       // Store response
       await supabase.from('messages').insert({
@@ -144,6 +161,9 @@ async function processStreamingOrchestration(
       openAIApiKey,
       sendData
     );
+
+    // Cache the final response
+    cacheResponse(message.content, response, selectedAgent, deliberationId);
 
     // Store final response
     await supabase.from('messages').insert({
@@ -434,4 +454,30 @@ function buildSystemPrompt(agentType: string, analysis: any, conversationState: 
   }
 
   return prompt;
+}
+
+// Integrated response cache functionality
+const responseCache = new Map();
+const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
+
+function checkResponseCache(content: string, deliberationId?: string): any | null {
+  const key = `${deliberationId || 'global'}:${content.toLowerCase().trim()}`;
+  const cached = responseCache.get(key);
+  
+  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+    cached.hits++;
+    return cached;
+  }
+  
+  return null;
+}
+
+function cacheResponse(content: string, response: string, agentType: string, deliberationId?: string): void {
+  const key = `${deliberationId || 'global'}:${content.toLowerCase().trim()}`;
+  responseCache.set(key, {
+    response,
+    agentType,
+    timestamp: Date.now(),
+    hits: 0
+  });
 }
