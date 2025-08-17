@@ -69,8 +69,6 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
     const agentConfig = agentConfigs?.find(config => config.agent_type === message.message_type);
     const fallbackAgentInfo = (AGENTS as any)[message.message_type] ?? AGENTS.default;
     
-    console.log('Message type:', message.message_type, 'Agent config found:', agentConfig, 'AgentConfigs array:', agentConfigs);
-    
     const agentInfo = isUser ? null : {
       ...fallbackAgentInfo,
       name: agentConfig?.name || fallbackAgentInfo.name,

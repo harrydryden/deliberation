@@ -227,22 +227,17 @@ const DeliberationChat = () => {
 
   const loadAgentConfigs = async () => {
     if (!deliberationId) {
-      console.log('No deliberationId, skipping agent config load');
       return;
     }
     
     try {
-      console.log('Loading agent configs for deliberation:', deliberationId);
       const agents = await agentService.getAgentsByDeliberation(deliberationId);
-      console.log('Loaded agent configs from service:', agents);
-      
       const mappedConfigs = agents.map(agent => ({
         agent_type: agent.agent_type,
         name: agent.name,
         description: agent.description
       }));
       
-      console.log('Setting mapped agent configs:', mappedConfigs);
       setAgentConfigs(mappedConfigs);
     } catch (error) {
       console.error('Failed to load agent configurations:', error);

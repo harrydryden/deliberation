@@ -11,33 +11,44 @@ export class AgentRepository extends BaseRepository<Agent> implements IAgentRepo
 
   async findByDeliberation(deliberationId: string): Promise<Agent[]> {
     try {
-      const { data, error } = await supabase
-        .from('agent_configurations')
-        .select('*')
-        .eq('deliberation_id', deliberationId)
-        .eq('is_active', true);
+      // Use admin function to get local agents (bypasses RLS for admin users)
+      const { data: agentData, error: agentError } = await supabase
+        .rpc('get_local_agents_admin');
 
-      if (error) {
-        logger.error({ error, deliberationId }, 'Agent repository findByDeliberation error');
-        throw error;
+      if (agentError) {
+        logger.error({ error: agentError, deliberationId }, 'Agent repository findByDeliberation RPC error');
+        throw agentError;
       }
 
-      // Map database format to API format
-      return data.map(item => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        system_prompt: item.system_prompt,
-        response_style: item.response_style,
-        goals: item.goals,
-        agent_type: item.agent_type,
-        facilitator_config: item.facilitator_config,
-        is_default: item.is_default,
-        isActive: item.is_active,
-        deliberation_id: item.deliberation_id,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
-      })) as Agent[];
+      if (!agentData || agentData.length === 0) {
+        return [];
+      }
+
+      // Filter for the specific deliberation and map to Agent format
+      const filteredAgents = agentData
+        .filter((item: any) => item.deliberation_id === deliberationId && item.is_active)
+        .map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          system_prompt: item.system_prompt,
+          response_style: item.response_style,
+          goals: item.goals,
+          agent_type: item.agent_type,
+          facilitator_config: item.facilitator_config,
+          is_default: item.is_default,
+          isActive: item.is_active,
+          deliberation_id: item.deliberation_id,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+        })) as Agent[];
+
+      logger.info(`Agent repository findByDeliberation found ${filteredAgents.length} agents`, { 
+        deliberationId, 
+        agentTypes: filteredAgents.map(a => a.agent_type) 
+      });
+
+      return filteredAgents;
     } catch (error) {
       logger.error({ error, deliberationId }, 'Agent repository findByDeliberation failed');
       throw error;
