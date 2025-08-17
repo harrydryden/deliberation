@@ -60,14 +60,30 @@ class SupabaseDeliberationService implements DeliberationService {
         // Check if current user is a participant
         let isUserParticipant = false;
         if (currentUserId) {
-          const { data: userParticipation } = await supabase
+          logger.info('Checking participation for user', { 
+            currentUserId, 
+            deliberationId: deliberation.id 
+          });
+          
+          const { data: userParticipation, error: participationError } = await supabase
             .from('participants')
             .select('id')
             .eq('deliberation_id', deliberation.id)
             .eq('user_id', currentUserId)
             .maybeSingle();
           
+          if (participationError) {
+            logger.error('Error checking user participation', participationError as any);
+          }
+          
           isUserParticipant = !!userParticipation;
+          
+          logger.info('Participation check result', { 
+            deliberationId: deliberation.id, 
+            currentUserId,
+            userParticipation,
+            isUserParticipant
+          });
         }
 
         logger.info('Participant count', { 
