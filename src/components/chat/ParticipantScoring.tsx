@@ -45,7 +45,7 @@ export const ParticipantScoring = ({
   };
 
   const scores = [{
-    label: 'Engagement',
+    label: 'Engaging',
     rawValue: engagement,
     stars: calculateStars(engagement, 10),
     icon: MessageSquare,
