@@ -1,3 +1,4 @@
+
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 
@@ -38,7 +39,7 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         }}
       >
         <span style={{ 
-          fontSize: '8px', // 50% smaller: 16px -> 8px
+          fontSize: '8px',
           fontWeight: 'bold',
           color: 'hsl(var(--foreground))',
           opacity: 0.7 
@@ -60,13 +61,13 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         border: '2px solid white',
         borderRadius: nodeType === 'issue' ? '50%' : 
                     nodeType === 'argument' ? '0' : '8px',
-        width: 60 * scaleFactor, // 50% smaller: 120 -> 60
-        height: nodeType === 'argument' ? 60 * scaleFactor : 40 * scaleFactor, // 50% smaller: 120->60, 80->40
+        width: 60 * scaleFactor,
+        height: nodeType === 'argument' ? 60 * scaleFactor : 40 * scaleFactor,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '4px', // 50% smaller: 8px -> 4px
-        fontSize: '6px', // 50% smaller: 11px -> 6px
+        padding: '4px',
+        fontSize: '6px',
         textAlign: 'center',
         fontWeight: 'bold',
         cursor: 'grab',
@@ -74,19 +75,19 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position: 'relative',
       }}
     >
-      {/* Source handles for outgoing connections */}
+      {/* Source handles for outgoing connections - smaller size */}
       <Handle
         id="top"
         type="source"
         position={Position.Top}
         style={{
           background: '#3b82f6',
-          border: '2px solid #1d4ed8',
-          width: '12px',
-          height: '12px',
+          border: '1px solid #1d4ed8',
+          width: '6px',
+          height: '6px',
           borderRadius: '50%',
           zIndex: 10,
-          top: '-6px',
+          top: '-3px',
           left: '50%',
           transform: 'translateX(-50%)',
         }}
@@ -98,12 +99,12 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position={Position.Bottom}
         style={{
           background: '#3b82f6',
-          border: '2px solid #1d4ed8',
-          width: '12px',
-          height: '12px',
+          border: '1px solid #1d4ed8',
+          width: '6px',
+          height: '6px',
           borderRadius: '50%',
           zIndex: 10,
-          bottom: '-6px',
+          bottom: '-3px',
           left: '50%',
           transform: 'translateX(-50%)',
         }}
@@ -115,12 +116,12 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position={Position.Left}
         style={{
           background: '#3b82f6',
-          border: '2px solid #1d4ed8',
-          width: '12px',
-          height: '12px',
+          border: '1px solid #1d4ed8',
+          width: '6px',
+          height: '6px',
           borderRadius: '50%',
           zIndex: 10,
-          left: '-6px',
+          left: '-3px',
           top: '50%',
           transform: 'translateY(-50%)',
         }}
@@ -132,30 +133,30 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position={Position.Right}
         style={{
           background: '#3b82f6',
-          border: '2px solid #1d4ed8',
-          width: '12px',
-          height: '12px',
+          border: '1px solid #1d4ed8',
+          width: '6px',
+          height: '6px',
           borderRadius: '50%',
           zIndex: 10,
-          right: '-6px',
+          right: '-3px',
           top: '50%',
           transform: 'translateY(-50%)',
         }}
       />
 
-      {/* Target handles for incoming connections - offset slightly */}
+      {/* Target handles for incoming connections - smaller size and offset */}
       <Handle
         id="top-target"
         type="target"
         position={Position.Top}
         style={{
           background: '#10b981',
-          border: '2px solid #059669',
-          width: '8px',
-          height: '8px',
+          border: '1px solid #059669',
+          width: '4px',
+          height: '4px',
           borderRadius: '50%',
           zIndex: 9,
-          top: '-4px',
+          top: '-2px',
           left: '40%',
           transform: 'translateX(-50%)',
         }}
@@ -167,12 +168,12 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position={Position.Bottom}
         style={{
           background: '#10b981',
-          border: '2px solid #059669',
-          width: '8px',
-          height: '8px',
+          border: '1px solid #059669',
+          width: '4px',
+          height: '4px',
           borderRadius: '50%',
           zIndex: 9,
-          bottom: '-4px',
+          bottom: '-2px',
           left: '60%',
           transform: 'translateX(-50%)',
         }}
@@ -184,12 +185,12 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position={Position.Left}
         style={{
           background: '#10b981',
-          border: '2px solid #059669',
-          width: '8px',
-          height: '8px',
+          border: '1px solid #059669',
+          width: '4px',
+          height: '4px',
           borderRadius: '50%',
           zIndex: 9,
-          left: '-4px',
+          left: '-2px',
           top: '40%',
           transform: 'translateY(-50%)',
         }}
@@ -201,12 +202,12 @@ const CustomIbisNode = ({ data }: NodeProps) => {
         position={Position.Right}
         style={{
           background: '#10b981',
-          border: '2px solid #059669',
-          width: '8px',
-          height: '8px',
+          border: '1px solid #059669',
+          width: '4px',
+          height: '4px',
           borderRadius: '50%',
           zIndex: 9,
-          right: '-4px',
+          right: '-2px',
           top: '60%',
           transform: 'translateY(-50%)',
         }}

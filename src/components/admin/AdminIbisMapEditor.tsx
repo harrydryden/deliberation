@@ -122,6 +122,32 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     argument: { innerRadius: 300, outerRadius: 450, centerX: 0, centerY: 0 }
   }), []);
   
+  // Calculate optimal handle positions for edge routing
+  const calculateOptimalEdgeHandles = useCallback((sourceId: string, targetId: string) => {
+    const sourceNode = nodes.find(n => n.id === sourceId);
+    const targetNode = nodes.find(n => n.id === targetId);
+    
+    if (!sourceNode || !targetNode) {
+      return { sourceHandle: 'right', targetHandle: 'left-target' };
+    }
+    
+    const sourceDimensions: NodeDimensions = {
+      x: sourceNode.position.x,
+      y: sourceNode.position.y,
+      width: 60, // Based on our CustomIbisNode dimensions
+      height: 40
+    };
+    
+    const targetDimensions: NodeDimensions = {
+      x: targetNode.position.x,
+      y: targetNode.position.y,
+      width: 60,
+      height: 40
+    };
+    
+    return calculateOptimalHandles(sourceDimensions, targetDimensions);
+  }, [nodes]);
+  
   // Constrain node center position to its appropriate zone with both inner and outer radius enforcement
   const constrainNodeToZone = useCallback((nodeId: string, position: { x: number; y: number }) => {
     const node = ibisNodes.find(n => n.id === nodeId);
@@ -282,18 +308,28 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     }
   }, [onEdgesChange, handleEdgeDelete]);
 
-  // Handle new connections with proper ID management
+  // Handle new connections with optimal handle routing
   const handleConnect = useCallback(async (connection: Connection) => {
     console.log('🔍 Connection attempt:', connection);
     
     if (!connection.source || !connection.target) return;
 
+    // Calculate optimal handles for the connection
+    const optimalHandles = calculateOptimalEdgeHandles(connection.source, connection.target);
+    
+    // Override the connection handles with optimal ones
+    const optimizedConnection = {
+      ...connection,
+      sourceHandle: optimalHandles.sourceHandle,
+      targetHandle: optimalHandles.targetHandle
+    };
+
     const adminUserId = '1754a99d-2308-4b9c-ad02-bf943018237d';
     const tempId = `temp_${Date.now()}`;
 
     const newRelationship = {
-      source_node_id: connection.source,
-      target_node_id: connection.target,
+      source_node_id: optimizedConnection.source,
+      target_node_id: optimizedConnection.target,
       relationship_type: selectedEdgeType,
       deliberation_id: deliberationId,
       created_by: adminUserId,
@@ -338,7 +374,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
       toast({
         title: "Connection Created",
-        description: `New ${selectedEdgeType.replace('_', ' ')} relationship added between nodes`,
+        description: `New ${selectedEdgeType.replace('_', ' ')} relationship added with optimal routing`,
       });
 
     } catch (error) {
@@ -354,7 +390,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
         variant: "destructive",
       });
     }
-  }, [deliberationId, selectedEdgeType, toast]);
+  }, [deliberationId, selectedEdgeType, toast, calculateOptimalEdgeHandles]);
 
   // Save all changes to database
   const saveChanges = useCallback(async () => {
@@ -434,9 +470,9 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
     if (deliberationId) {
       fetchData();
     }
-  }, [deliberationId]); // Removed fetchData from dependencies to prevent loops
+  }, [deliberationId]);
 
-  // Convert data to React Flow format - memoized to prevent re-calculation
+  // Convert data to React Flow format with optimal edge routing
   const { flowNodes, flowEdges } = useMemo(() => {
     const flowNodes: Node[] = ibisNodes.map(node => ({
       id: node.id,
@@ -453,21 +489,28 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       connectable: true,
     }));
 
-    const flowEdges: Edge[] = ibisRelationships.map(rel => ({
-      id: rel.id,
-      source: rel.source_node_id,
-      target: rel.target_node_id,
-      type: 'smoothstep',
-      style: { 
-        stroke: relationshipConfig[rel.relationship_type]?.color || '#374151',
-        strokeWidth: 2,
-      },
-      markerEnd: { type: MarkerType.ArrowClosed },
-      data: { relationshipType: rel.relationship_type },
-    }));
+    const flowEdges: Edge[] = ibisRelationships.map(rel => {
+      // Calculate optimal handles for each existing edge
+      const optimalHandles = calculateOptimalEdgeHandles(rel.source_node_id, rel.target_node_id);
+      
+      return {
+        id: rel.id,
+        source: rel.source_node_id,
+        target: rel.target_node_id,
+        sourceHandle: optimalHandles.sourceHandle,
+        targetHandle: optimalHandles.targetHandle,
+        type: 'smoothstep',
+        style: { 
+          stroke: relationshipConfig[rel.relationship_type]?.color || '#374151',
+          strokeWidth: 2,
+        },
+        markerEnd: { type: MarkerType.ArrowClosed },
+        data: { relationshipType: rel.relationship_type },
+      };
+    });
 
     return { flowNodes, flowEdges };
-  }, [ibisNodes, ibisRelationships]);
+  }, [ibisNodes, ibisRelationships, calculateOptimalEdgeHandles]);
 
   // Update nodes and edges when data changes
   useEffect(() => {
@@ -616,8 +659,8 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                   
                   <div className="pt-2 mt-2 border-t text-xs text-muted-foreground">
                     <div>• Drag nodes within their designated zones</div>
-                    <div>• Nodes auto-constrain to zone boundaries</div>
-                    <div>• Click "Save Changes" to persist modifications</div>
+                    <div>• Edges auto-route to shortest path</div>
+                    <div>• Smaller handles for cleaner appearance</div>
                   </div>
                 </div>
               </Panel>
