@@ -270,7 +270,7 @@ const DeliberationChat = () => {
                     <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
                   </div>
                 </div>
-                <div className="rounded-lg border bg-muted/40 p-3 h-full">
+                <div className="rounded-lg border bg-muted/40 p-1.5 h-full">
                   <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
                     <VoiceInterfaceLazy deliberationId={deliberation.id} variant="panel" />
                   </Suspense>
