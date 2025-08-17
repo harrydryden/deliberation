@@ -6,13 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MessageSquare, Users, Vote, Brain, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
-
 const Index = () => {
-  const { user } = useAuth();
+  const {
+    user
+  } = useAuth();
   const navigate = useNavigate();
   const deliberationService = useDeliberationService();
   const [deliberations, setDeliberations] = useState<any[]>([]);
-
   useEffect(() => {
     if (!user) {
       navigate("/auth");
@@ -20,7 +20,6 @@ const Index = () => {
       loadDeliberations();
     }
   }, [user, navigate]);
-
   const loadDeliberations = async () => {
     try {
       const data = await deliberationService.getDeliberations();
@@ -30,13 +29,10 @@ const Index = () => {
       setDeliberations([]);
     }
   };
-
   if (!user) {
     return null;
   }
-
-  return (
-    <Layout>
+  return <Layout>
       <div className="max-w-5xl mx-auto space-y-10">
         {/* Welcome Section */}
         <div className="text-center space-y-4">
@@ -58,9 +54,7 @@ const Index = () => {
                   <MessageSquare className="h-6 w-6 text-democratic-blue" />
                 </div>
                 <CardTitle className="text-lg">1. Join Your Session</CardTitle>
-                <CardDescription>
-                  When you enter a deliberation, you'll see the topic and other participants. Take a moment to read the background information provided.
-                </CardDescription>
+                <CardDescription>When you enter a deliberation, you'll see the topic and note the number of other participants. Take a moment to read the background information provided.</CardDescription>
               </CardHeader>
             </Card>
 
@@ -70,9 +64,7 @@ const Index = () => {
                   <Brain className="h-6 w-6 text-democratic-green" />
                 </div>
                 <CardTitle className="text-lg">2. Share Your Thoughts</CardTitle>
-                <CardDescription>
-                  Type your messages or use voice input. AI facilitators will help organize the discussion and ask clarifying questions when needed.
-                </CardDescription>
+                <CardDescription>Learn about the topic and engage with other participants through agents. The agents help organise and structure information, helping the discourse. </CardDescription>
               </CardHeader>
             </Card>
 
@@ -200,23 +192,14 @@ const Index = () => {
             Choose from available deliberations below, or check back later for new discussion topics.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            {deliberations.length > 0 ? (
-              <Button 
-                className="bg-democratic-blue hover:bg-democratic-blue/90 text-white" 
-                onClick={() => navigate("/deliberations")}
-              >
+            {deliberations.length > 0 ? <Button className="bg-democratic-blue hover:bg-democratic-blue/90 text-white" onClick={() => navigate("/deliberations")}>
                 Join a Deliberation
-              </Button>
-            ) : (
-              <p className="text-muted-foreground">
+              </Button> : <p className="text-muted-foreground">
                 No deliberations are currently available. Check back later for new discussion sessions.
-              </p>
-            )}
+              </p>}
           </div>
         </div>
       </div>
-    </Layout>
-  );
+    </Layout>;
 };
-
 export default Index;
