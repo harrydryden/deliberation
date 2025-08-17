@@ -60,7 +60,7 @@ const enhancedSupabase = {
                       return Promise.resolve(baseSupabase.rpc('set_config', {
                         setting_name: 'app.current_user_id',
                         new_value: userId,
-                        is_local: true
+                        is_local: false  // Use session-level configuration instead of local
                       })).then(() => {
                         return (resultValue as Function).apply(resultTarget, execArgs);
                       }).catch((contextError) => {
@@ -94,7 +94,7 @@ const enhancedSupabase = {
       return Promise.resolve(baseSupabase.rpc('set_config', {
         setting_name: 'app.current_user_id',
         new_value: userId,
-        is_local: true
+        is_local: false  // Use session-level configuration instead of local
       })).then(() => {
         return baseSupabase.rpc(functionName, params);
       }).catch((contextError) => {
