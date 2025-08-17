@@ -331,10 +331,81 @@ export function SecurityDashboard() {
             </TabsContent>
 
             <TabsContent value="users" className="space-y-3">
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>User activity analysis coming soon</p>
-              </div>
+              {events.filter(e => e.user_id).length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No user-related security events in the selected timeframe</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* User activity summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Unique Users</p>
+                          <p className="text-xl font-bold">
+                            {new Set(events.filter(e => e.user_id).map(e => e.user_id)).size}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Auth Events</p>
+                          <p className="text-xl font-bold">
+                            {events.filter(e => e.event_type.includes('auth')).length}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Failed Attempts</p>
+                          <p className="text-xl font-bold text-destructive">
+                            {events.filter(e => e.event_type.includes('failed') || e.event_type.includes('blocked')).length}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Recent user events */}
+                  <div className="space-y-3">
+                    {events.filter(e => e.user_id).slice(0, 10).map(event => (
+                      <div key={event.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={getRiskBadgeVariant(event.risk_level)}>
+                              {event.risk_level}
+                            </Badge>
+                            <span className="font-medium">{formatEventType(event.event_type)}</span>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(event.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        
+                        <div className="text-sm text-muted-foreground">
+                          <span>User: {event.user_id?.slice(0, 8)}...</span>
+                          {event.ip_address && <span> • IP: {event.ip_address}</span>}
+                          {Object.keys(event.details).length > 0 && (
+                            <div className="mt-1 p-2 bg-muted rounded text-xs">
+                              {Object.entries(event.details).map(([key, value]) => (
+                                <div key={key}>
+                                  <strong>{key}:</strong> {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>
