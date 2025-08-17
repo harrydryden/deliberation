@@ -282,12 +282,13 @@ Provide analysis in the following JSON format:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'gpt-4o-mini', // Faster model for analysis
         messages: [
           { role: 'system', content: 'You are a semantic analyzer for a multi-agent deliberation system. Analyze the message and respond with ONLY valid JSON.' },
           { role: 'user', content: prompt }
         ],
-        max_completion_tokens: 200
+        max_tokens: 150, // Reduced for faster analysis
+        temperature: 0.3 // Lower temperature for consistent analysis
       })
     });
 
@@ -805,9 +806,10 @@ You MUST mention these similar contributions in your response using this exact f
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'gpt-4o-mini', // Faster, more cost-efficient model
         messages,
-        max_completion_tokens: 2000,
+        max_tokens: 1500, // Use max_tokens for legacy model
+        temperature: 0.7, // Slightly faster with controlled creativity
       }),
     });
 
@@ -1028,12 +1030,12 @@ Respond with only a number between 0.0 and 1.0:`;
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              model: 'gpt-5-2025-08-07',
+              model: 'gpt-4o-mini', // Faster model for similarity analysis
               messages: [
                 { role: 'system', content: 'You are a semantic similarity analyzer. Respond only with a decimal number between 0.0 and 1.0.' },
                 { role: 'user', content: relevancePrompt }
               ],
-              max_completion_tokens: 10
+              max_tokens: 10, // Use max_tokens for legacy model
             })
           });
 
