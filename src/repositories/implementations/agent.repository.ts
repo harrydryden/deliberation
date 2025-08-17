@@ -46,7 +46,8 @@ export class AgentRepository extends BaseRepository<Agent> implements IAgentRepo
 
   async findLocalAgents(): Promise<Agent[]> {
     try {
-      const { data, error } = await supabase
+      // First get the agent configurations
+      const { data: agentData, error: agentError } = await supabase
         .from('agent_configurations')
         .select(`
           id,
@@ -67,15 +68,35 @@ export class AgentRepository extends BaseRepository<Agent> implements IAgentRepo
         `)
         .not('deliberation_id', 'is', null);
 
-      if (error) {
-        logger.error({ error }, 'Agent repository findLocalAgents error');
-        throw error;
+      if (agentError) {
+        logger.error({ error: agentError }, 'Agent repository findLocalAgents error');
+        throw agentError;
       }
 
-      console.log('🔍 Raw local agents from DB:', data);
+      console.log('🔍 Raw local agents from DB:', agentData);
+
+      if (!agentData || agentData.length === 0) {
+        return [];
+      }
+
+      // Get deliberation details for each agent
+      const deliberationIds = agentData.map(agent => agent.deliberation_id).filter(Boolean);
+      const { data: deliberationData, error: deliberationError } = await supabase
+        .from('deliberations')
+        .select('id, title, status')
+        .in('id', deliberationIds);
+
+      if (deliberationError) {
+        logger.error({ error: deliberationError }, 'Agent repository findLocalAgents deliberation error');
+        // Continue without deliberation data rather than failing completely
+      }
+
+      const deliberationMap = new Map(
+        (deliberationData || []).map(d => [d.id, d])
+      );
 
       // Map database format to API format
-      return data.map(item => ({
+      return agentData.map(item => ({
         id: item.id,
         name: item.name,
         description: item.description,
@@ -89,6 +110,9 @@ export class AgentRepository extends BaseRepository<Agent> implements IAgentRepo
         deliberation_id: item.deliberation_id,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
+        deliberation: item.deliberation_id && deliberationMap.has(item.deliberation_id) 
+          ? deliberationMap.get(item.deliberation_id)
+          : undefined
       })) as Agent[];
     } catch (error) {
       logger.error({ error }, 'Agent repository findLocalAgents failed');
