@@ -289,7 +289,7 @@ const DeliberationChat = () => {
 
           {/* Desktop Header - Single Row */}
           <div className="hidden lg:block p-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-start gap-4">
               {/* Title Section */}
               <div className="flex-1 min-w-0">
                 <div className="rounded-lg border bg-muted/40 p-3">
