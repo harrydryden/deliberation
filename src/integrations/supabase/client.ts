@@ -37,27 +37,41 @@ const enhancedSupabase = {
         get(target, prop) {
           const value = target[prop as keyof typeof target];
           
-          if (typeof value === 'function' && 
-              ['select', 'insert', 'update', 'delete', 'upsert'].includes(prop as string)) {
-            return async (...args: any[]) => {
-              try {
-                // Set the PostgreSQL context variable before executing query
-                await baseSupabase.rpc('set_config', {
-                  setting_name: 'app.current_user_id',
-                  new_value: userId,
-                  is_local: true
-                });
-              } catch (error) {
-                // If set_config fails, continue with query (for backwards compatibility)
-                console.warn('Failed to set user context:', error);
+          if (typeof value === 'function') {
+            // Handle execution methods that need user context
+            if (['single', 'maybeSingle', 'then'].includes(prop as string)) {
+              return async (...args: any[]) => {
+                try {
+                  // Set the PostgreSQL context variable before executing query
+                  await baseSupabase.rpc('set_config', {
+                    setting_name: 'app.current_user_id',
+                    new_value: userId,
+                    is_local: true
+                  });
+                } catch (error) {
+                  // If set_config fails, continue with query (for backwards compatibility)
+                  console.warn('Failed to set user context:', error);
+                }
+                
+                // Execute the original query
+                return (value as Function).apply(target, args);
+              };
+            }
+            
+            // For all other methods, return a new proxy to maintain the chain
+            return (...args: any[]) => {
+              const result = (value as Function).apply(target, args);
+              
+              // If result is chainable, wrap it in a proxy too
+              if (result && typeof result === 'object' && result.constructor === target.constructor) {
+                return new Proxy(result, this);
               }
               
-              // Execute the original query
-              return (value as Function).apply(target, args);
+              return result;
             };
           }
           
-          return typeof value === 'function' ? value.bind(target) : value;
+          return value;
         }
       });
     }
