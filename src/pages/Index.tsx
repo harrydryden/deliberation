@@ -37,71 +37,71 @@ const Index = () => {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto space-y-12">
-        {/* Hero Section */}
-        <div className="text-center space-y-6">
-          <h1 className="text-5xl font-bold text-democratic-blue">
-            Welcome to Deliberation
+      <div className="max-w-5xl mx-auto space-y-10">
+        {/* Welcome Section */}
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-bold text-democratic-blue">
+            Participant Guide
           </h1>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            A revolutionary platform that combines AI-assisted facilitation with structured democratic discourse to transform how communities engage with complex issues
+          <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+            Learn how to participate effectively in structured deliberations and what to expect during your session
           </p>
         </div>
 
-        {/* How It Works Section */}
-        <div className="space-y-8">
-          <h2 className="text-3xl font-bold text-center text-foreground">How Deliberation Works</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="text-center">
+        {/* How to Participate */}
+        <div className="space-y-6">
+          <h2 className="text-2xl font-semibold text-foreground">How Deliberations Work</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
               <CardHeader>
-                <div className="mx-auto w-16 h-16 bg-democratic-blue/10 rounded-full flex items-center justify-center mb-4">
-                  <MessageSquare className="h-8 w-8 text-democratic-blue" />
+                <div className="w-12 h-12 bg-democratic-blue/10 rounded-lg flex items-center justify-center mb-3">
+                  <MessageSquare className="h-6 w-6 text-democratic-blue" />
                 </div>
-                <CardTitle>Join a Discussion</CardTitle>
+                <CardTitle className="text-lg">1. Join Your Session</CardTitle>
                 <CardDescription>
-                  Enter a deliberation room focused on a specific topic or policy issue where you'll engage with other participants
+                  When you enter a deliberation, you'll see the topic and other participants. Take a moment to read the background information provided.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            <Card className="text-center">
+            <Card>
               <CardHeader>
-                <div className="mx-auto w-16 h-16 bg-democratic-green/10 rounded-full flex items-center justify-center mb-4">
-                  <Brain className="h-8 w-8 text-democratic-green" />
+                <div className="w-12 h-12 bg-democratic-green/10 rounded-lg flex items-center justify-center mb-3">
+                  <Brain className="h-6 w-6 text-democratic-green" />
                 </div>
-                <CardTitle>AI-Guided Conversation</CardTitle>
+                <CardTitle className="text-lg">2. Share Your Thoughts</CardTitle>
                 <CardDescription>
-                  Specialized AI agents facilitate the discussion, provide relevant information, and help structure your thoughts using the IBIS framework
+                  Type your messages or use voice input. AI facilitators will help organize the discussion and ask clarifying questions when needed.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            <Card className="text-center">
+            <Card>
               <CardHeader>
-                <div className="mx-auto w-16 h-16 bg-civic-gold/10 rounded-full flex items-center justify-center mb-4">
-                  <Vote className="h-8 w-8 text-civic-gold" />
+                <div className="w-12 h-12 bg-civic-gold/10 rounded-lg flex items-center justify-center mb-3">
+                  <Vote className="h-6 w-6 text-civic-gold" />
                 </div>
-                <CardTitle>Build Understanding</CardTitle>
+                <CardTitle className="text-lg">3. Build Together</CardTitle>
                 <CardDescription>
-                  Collaborate to identify key issues, explore different positions, and examine supporting arguments in a structured way
+                  Work with others to identify issues, explore different viewpoints, and understand the reasoning behind various positions.
                 </CardDescription>
               </CardHeader>
             </Card>
           </div>
         </div>
 
-        {/* Key Features Section */}
-        <div className="space-y-8">
-          <h2 className="text-3xl font-bold text-center text-foreground">Platform Features</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* What to Expect */}
+        <div className="space-y-6">
+          <h2 className="text-2xl font-semibold text-foreground">What You'll Experience</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="border-l-4 border-l-democratic-blue">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <MessageSquare className="h-5 w-5 text-democratic-blue" />
-                  <span>Real-time Collaboration</span>
+                  <span>Live Discussion</span>
                 </CardTitle>
                 <CardDescription>
-                  Engage in live discussions with participants from around the world, with messages instantly shared and organized
+                  Your messages appear instantly for all participants. You'll see responses from both other participants and AI facilitators in real-time.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -110,10 +110,10 @@ const Index = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Brain className="h-5 w-5 text-democratic-green" />
-                  <span>AI Facilitation</span>
+                  <span>AI Assistance</span>
                 </CardTitle>
                 <CardDescription>
-                  Three specialized agents work together: Bill analyzes policies, Flo manages conversation flow, and Pia provides peer insights
+                  Three AI agents help guide the conversation: Bill provides policy analysis, Flo manages discussion flow, and Pia offers peer perspectives.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -122,10 +122,10 @@ const Index = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Users className="h-5 w-5 text-civic-gold" />
-                  <span>IBIS Framework</span>
+                  <span>Structured Framework</span>
                 </CardTitle>
                 <CardDescription>
-                  Structure discussions using Issues, Positions, and Arguments - a proven methodology for complex decision-making
+                  Discussions follow the IBIS method - identifying Issues, exploring Positions, and examining Arguments. This keeps conversations focused and productive.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -134,116 +134,83 @@ const Index = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Vote className="h-5 w-5 text-primary" />
-                  <span>Voice Integration</span>
+                  <span>Multiple Input Methods</span>
                 </CardTitle>
                 <CardDescription>
-                  Participate using voice input for more natural conversations, with real-time transcription and audio responses
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-l-4 border-l-muted-foreground">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Clock className="h-5 w-5 text-muted-foreground" />
-                  <span>Knowledge Integration</span>
-                </CardTitle>
-                <CardDescription>
-                  Access verified information and research documents that inform the discussion with evidence-based insights
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            <Card className="border-l-4 border-l-accent">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Brain className="h-5 w-5 text-accent" />
-                  <span>Structured Output</span>
-                </CardTitle>
-                <CardDescription>
-                  Generate clear summaries and visual maps of the discussion that capture key insights and areas of consensus
+                  You can participate by typing messages or speaking aloud. Voice messages are transcribed automatically, making participation accessible.
                 </CardDescription>
               </CardHeader>
             </Card>
           </div>
         </div>
 
-        {/* Benefits Section */}
-        <div className="bg-muted/30 rounded-lg p-8 space-y-6">
-          <h2 className="text-3xl font-bold text-center text-foreground">Why Use Deliberation?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-democratic-blue">For Citizens</h3>
-              <ul className="space-y-2 text-muted-foreground">
+        {/* Participation Tips */}
+        <div className="bg-muted/30 rounded-lg p-6 space-y-4">
+          <h2 className="text-2xl font-semibold text-foreground">Tips for Effective Participation</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <h3 className="text-lg font-medium text-democratic-blue">During Discussion</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start space-x-2">
                   <span className="text-democratic-blue mt-1">•</span>
-                  <span>Engage with complex policy issues in an accessible format</span>
+                  <span>Share your genuine thoughts and experiences</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <span className="text-democratic-blue mt-1">•</span>
-                  <span>Learn from diverse perspectives and evidence-based information</span>
+                  <span>Ask questions when you need clarification</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <span className="text-democratic-blue mt-1">•</span>
-                  <span>Contribute meaningfully to democratic discourse</span>
+                  <span>Build on what others have said</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <span className="text-democratic-blue mt-1">•</span>
-                  <span>Develop critical thinking and deliberation skills</span>
+                  <span>Stay focused on the topic at hand</span>
                 </li>
               </ul>
             </div>
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold text-democratic-green">For Organizations</h3>
-              <ul className="space-y-2 text-muted-foreground">
+            <div className="space-y-3">
+              <h3 className="text-lg font-medium text-democratic-green">Interaction Guidelines</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
                 <li className="flex items-start space-x-2">
                   <span className="text-democratic-green mt-1">•</span>
-                  <span>Gather structured public input on policy proposals</span>
+                  <span>Listen respectfully to different viewpoints</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <span className="text-democratic-green mt-1">•</span>
-                  <span>Facilitate productive stakeholder consultations</span>
+                  <span>Support your opinions with reasoning</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <span className="text-democratic-green mt-1">•</span>
-                  <span>Generate actionable insights from community discussions</span>
+                  <span>Be open to changing your mind</span>
                 </li>
                 <li className="flex items-start space-x-2">
                   <span className="text-democratic-green mt-1">•</span>
-                  <span>Build transparency and trust in decision-making processes</span>
+                  <span>Help identify areas of agreement</span>
                 </li>
               </ul>
             </div>
           </div>
         </div>
 
-        {/* Call to Action */}
-        <div className="text-center space-y-6 bg-gradient-to-r from-democratic-blue/5 to-democratic-green/5 rounded-lg p-8">
-          <h2 className="text-3xl font-semibold text-foreground">Ready to Start Deliberating?</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Join ongoing discussions or contact an administrator to set up deliberations for your community or organization
+        {/* Getting Started */}
+        <div className="text-center space-y-4 bg-gradient-to-r from-democratic-blue/5 to-democratic-green/5 rounded-lg p-6">
+          <h2 className="text-2xl font-semibold text-foreground">Ready to Begin?</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Choose from available deliberations below, or check back later for new discussion topics.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {deliberations.length > 0 ? (
               <Button 
-                className="bg-democratic-blue hover:bg-democratic-blue/90 text-white px-8 py-3 text-lg" 
+                className="bg-democratic-blue hover:bg-democratic-blue/90 text-white" 
                 onClick={() => navigate("/deliberations")}
               >
-                View Available Deliberations
+                Join a Deliberation
               </Button>
             ) : (
-              <div className="text-center space-y-4">
-                <p className="text-muted-foreground">
-                  No deliberations are currently available. Contact an administrator to set up new discussions.
-                </p>
-                <Button 
-                  variant="outline" 
-                  className="border-democratic-blue text-democratic-blue hover:bg-democratic-blue/10"
-                  onClick={() => navigate("/auth")}
-                >
-                  Sign In to Get Notified
-                </Button>
-              </div>
+              <p className="text-muted-foreground">
+                No deliberations are currently available. Check back later for new discussion sessions.
+              </p>
             )}
           </div>
         </div>
