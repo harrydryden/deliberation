@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,7 +20,7 @@ const DeliberationChat = () => {
   const { user } = useAuth();
   const { deliberationService } = useServices();
   const { messages, isLoading, isTyping, sendMessage, retryMessage } = useChat(deliberationId);
-  const { agentConfigs } = useUserAgents(deliberationId);
+  const { localAgents, loading: agentsLoading } = useUserAgents();
   const { toast } = useToast();
   
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
@@ -149,14 +148,13 @@ const DeliberationChat = () => {
                 onAddToIbis={handleAddToIbis}
                 onRetry={retryMessage}
                 deliberationId={deliberationId}
-                agentConfigs={agentConfigs}
+                agentConfigs={localAgents}
               />
             </div>
             <div className="border-t p-4">
               <MessageInput
                 onSendMessage={sendMessage}
                 disabled={isTyping}
-                placeholder="Share your thoughts on this topic..."
               />
             </div>
           </CardContent>

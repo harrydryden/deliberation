@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContextType, User } from '@/types/auth';
@@ -95,6 +94,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const authenticateWithAccessCode = async (accessCode: string, codeType?: string): Promise<void> => {
+    return authenticate(accessCode);
+  };
+
   const signOut = async (): Promise<void> => {
     try {
       await simpleAuthService.signOut();
@@ -109,6 +112,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const logout = async (): Promise<void> => {
+    return signOut();
+  };
+
   const refreshToken = async (): Promise<void> => {
     // Simple auth doesn't use refresh tokens
     // Just ensure user context is set
@@ -121,7 +128,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user,
     isLoading,
     authenticate,
+    authenticateWithAccessCode,
     signOut,
+    logout,
     isAuthenticated: !!user,
     refreshToken
   };
