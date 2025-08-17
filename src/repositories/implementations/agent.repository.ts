@@ -216,4 +216,30 @@ export class AgentRepository extends BaseRepository<Agent> implements IAgentRepo
       throw error;
     }
   }
+
+  // Override update to handle field mapping from camelCase to snake_case
+  async update(id: string, data: Partial<Agent>): Promise<Agent> {
+    try {
+      // Convert camelCase fields to snake_case for database
+      const dbData: any = { ...data };
+      
+      // Map camelCase to snake_case
+      if (data.isActive !== undefined) {
+        dbData.is_active = data.isActive;
+        delete dbData.isActive;
+      }
+      
+      // Use parent update method with mapped data
+      const result = await super.update(id, dbData);
+      
+      // Map result back to camelCase for API consistency
+      return {
+        ...result,
+        isActive: (result as any).is_active,
+      } as Agent;
+    } catch (error) {
+      logger.error({ error, id, data }, 'Agent repository update failed');
+      throw error;
+    }
+  }
 }
