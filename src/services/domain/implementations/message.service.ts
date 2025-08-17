@@ -56,29 +56,6 @@ export class MessageService implements IMessageService {
     }
   }
 
-  private async triggerAgentOrchestration(messageId: string, deliberationId: string, mode: 'chat' | 'learn') {
-    try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      
-      // Note: Streaming responses are now handled in the frontend via useResponseStreaming hook
-      // This call is kept for backward compatibility and non-streaming scenarios
-      const { data, error } = await supabase.functions.invoke('agent-orchestration', {
-        body: {
-          messageId,
-          deliberationId,
-          mode
-        }
-      });
-
-      if (error) {
-        logger.error('Agent orchestration edge function error', { error, messageId, deliberationId });
-      } else {
-        logger.info('Agent orchestration triggered successfully', { messageId, deliberationId, response: data });
-      }
-    } catch (error) {
-      logger.error('Failed to trigger agent orchestration', { error, messageId, deliberationId });
-    }
-  }
 
   async getUserMessages(userId: string): Promise<Message[]> {
     try {
