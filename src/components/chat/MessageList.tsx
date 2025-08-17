@@ -17,6 +17,11 @@ interface MessageListProps {
   onAddToIbis?: (messageId: string, content: string) => void;
   onRetry?: (id: string, content: string) => void;
   deliberationId?: string;
+  agentConfigs?: Array<{
+    agent_type: string;
+    name: string;
+    description?: string;
+  }>;
 }
 
 const AGENTS = {
@@ -50,7 +55,7 @@ const AGENTS = {
   }
 } as const;
 
-export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetry, deliberationId }: MessageListProps) => {
+export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetry, deliberationId, agentConfigs }: MessageListProps) => {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [unreadIndex, setUnreadIndex] = useState<number | null>(null);
@@ -59,7 +64,16 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
 
   const renderItem = useCallback((index: number, message: ChatMessage) => {
     const isUser = message.message_type === 'user';
-    const agentInfo = isUser ? null : ((AGENTS as any)[message.message_type] ?? AGENTS.default);
+    
+    // Get agent info from props first, fallback to hardcoded AGENTS
+    const agentConfig = agentConfigs?.find(config => config.agent_type === message.message_type);
+    const fallbackAgentInfo = (AGENTS as any)[message.message_type] ?? AGENTS.default;
+    
+    const agentInfo = isUser ? null : {
+      ...fallbackAgentInfo,
+      name: agentConfig?.name || fallbackAgentInfo.name,
+      description: agentConfig?.description || fallbackAgentInfo.description
+    };
     const AgentIcon = (agentInfo?.icon as any) || Bot;
 
     return (
@@ -171,7 +185,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
         </div>
       </div>
     );
-  }, [unreadIndex, onAddToIbis, onRetry]);
+  }, [unreadIndex, onAddToIbis, onRetry, agentConfigs]);
 
   useEffect(() => {
     if (!atBottom && messages.length > prevCountRef.current) {

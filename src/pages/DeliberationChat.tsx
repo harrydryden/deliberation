@@ -2,6 +2,7 @@ import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
+import { useAgentService } from "@/hooks/useServices";
 import { Layout } from "@/components/layout/Layout";
 import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
@@ -102,7 +103,9 @@ const DeliberationChat = () => {
     toast
   } = useToast();
   const deliberationService = useDeliberationService();
+  const agentService = useAgentService();
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
+  const [agentConfigs, setAgentConfigs] = useState<Array<{agent_type: string; name: string; description?: string;}>>([]);
   const [loading, setLoading] = useState(true);
   const [isParticipant, setIsParticipant] = useState(false);
   const [joiningDeliberation, setJoiningDeliberation] = useState(false);
@@ -178,6 +181,7 @@ const DeliberationChat = () => {
     if (user && deliberationId) {
       loadDeliberation();
       loadUserScores();
+      loadAgentConfigs();
     }
   }, [user, isLoading, deliberationId, navigate]);
 
@@ -218,6 +222,21 @@ const DeliberationChat = () => {
       logger.info('User scores loaded', { engagement: userMessages, shares: ibisSubmissions });
     } catch (error) {
       console.error('Failed to load user scores:', error);
+    }
+  };
+
+  const loadAgentConfigs = async () => {
+    if (!deliberationId) return;
+    
+    try {
+      const agents = await agentService.getAgentsByDeliberation(deliberationId);
+      setAgentConfigs(agents.map(agent => ({
+        agent_type: agent.agent_type,
+        name: agent.name,
+        description: agent.description
+      })));
+    } catch (error) {
+      console.error('Failed to load agent configurations:', error);
     }
   };
 
@@ -286,7 +305,7 @@ const DeliberationChat = () => {
   };
   const ChatPanel = () => <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-hidden min-h-0">
-        <MessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} deliberationId={deliberationId} />
+        <MessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} deliberationId={deliberationId} agentConfigs={agentConfigs} />
       </div>
       <MessageInput onSendMessage={sendMessage} disabled={chatLoading} />
     </div>;
