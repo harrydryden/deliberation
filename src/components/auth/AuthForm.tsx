@@ -43,8 +43,9 @@ export const AuthForm = () => {
         await authenticateWithAccessCode(accessCode, data.code_type);
         
         toast({
-          title: "Welcome - login successful",
-          description: ""
+          title: "welcome",
+          description: "",
+          className: "w-32"
         });
       } else {
         toast({
