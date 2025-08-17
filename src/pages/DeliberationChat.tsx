@@ -228,19 +228,19 @@ const DeliberationChat = () => {
             {/* Sub-header with three boxes */}
             <div className="flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <div className="rounded-lg border bg-muted/40 p-3 h-full">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <h1 className="text-xl font-semibold text-democratic-blue truncate">{deliberation.title}</h1>
-                        <Badge className={`${getStatusColor(deliberation.status)} text-white`}>{deliberation.status}</Badge>
+                <div className="rounded-lg border bg-muted/40 p-2 sm:p-3 lg:p-4 h-full">
+                    <div className="flex items-start justify-between gap-2 sm:gap-3">
+                      <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+                        <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-democratic-blue truncate">{deliberation.title}</h1>
+                        <Badge className={`${getStatusColor(deliberation.status)} text-white text-xs sm:text-sm`}>{deliberation.status}</Badge>
                       </div>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
-                        <Users className="h-4 w-4" />
+                      <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground shrink-0">
+                        <Users className="h-3 w-3 sm:h-4 sm:w-4" />
                         <span>{deliberation.participants?.length || deliberation.participant_count || 0}/{deliberation.max_participants}</span>
                       </div>
                     </div>
                   {deliberation.description && <>
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-3 cursor-pointer" onClick={() => setIsDescriptionOpen(true)} title="Click to view full description">
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1 sm:mt-2 line-clamp-2 sm:line-clamp-3 lg:line-clamp-4 cursor-pointer" onClick={() => setIsDescriptionOpen(true)} title="Click to view full description">
                         {deliberation.description}
                       </p>
                       <Dialog open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen}>
