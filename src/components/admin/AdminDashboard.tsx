@@ -31,7 +31,9 @@ export const AdminDashboard = () => {
       await handleAsyncError(async () => {
         await Promise.all([
           adminData.fetchStats(),
-          adminData.fetchDeliberations()
+          adminData.fetchDeliberations(),
+          adminData.fetchLocalAgents(),
+          adminData.fetchAgents()
         ]);
         logger.component.mount('AdminDashboard', { message: 'Admin dashboard initialized successfully' });
       }, 'admin dashboard initialization');
