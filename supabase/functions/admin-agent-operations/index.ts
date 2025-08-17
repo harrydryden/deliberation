@@ -29,8 +29,27 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    console.log('Edge function called:', req.method);
+    
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    console.log('Environment check:', { 
+      hasUrl: !!supabaseUrl, 
+      hasServiceKey: !!serviceRoleKey,
+      url: supabaseUrl 
+    });
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('Missing environment variables');
+      return new Response(
+        JSON.stringify({ error: 'Server configuration error' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
     
     // Create admin client with service role key
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
