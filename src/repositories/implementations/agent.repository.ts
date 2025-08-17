@@ -22,7 +22,22 @@ export class AgentRepository extends BaseRepository<Agent> implements IAgentRepo
         throw error;
       }
 
-      return data as Agent[];
+      // Map database format to API format
+      return data.map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        system_prompt: item.system_prompt,
+        response_style: item.response_style,
+        goals: item.goals,
+        agent_type: item.agent_type,
+        facilitator_config: item.facilitator_config,
+        is_default: item.is_default,
+        isActive: item.is_active,
+        deliberation_id: item.deliberation_id,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      })) as Agent[];
     } catch (error) {
       logger.error({ error, deliberationId }, 'Agent repository findByDeliberation failed');
       throw error;
@@ -85,16 +100,46 @@ export class AgentRepository extends BaseRepository<Agent> implements IAgentRepo
     try {
       const { data, error } = await supabase
         .from('agent_configurations')
-        .select('*')
-        .is('deliberation_id', null)
-        .eq('is_active', true);
+        .select(`
+          id,
+          name,
+          description,
+          agent_type,
+          system_prompt,
+          goals,
+          response_style,
+          is_active,
+          is_default,
+          deliberation_id,
+          created_by,
+          created_at,
+          updated_at,
+          preset_questions,
+          facilitator_config
+        `)
+        .is('deliberation_id', null);
 
       if (error) {
         logger.error({ error }, 'Agent repository findGlobalAgents error');
         throw error;
       }
 
-      return data as Agent[];
+      // Map database format to API format
+      return data.map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        system_prompt: item.system_prompt,
+        response_style: item.response_style,
+        goals: item.goals,
+        agent_type: item.agent_type,
+        facilitator_config: item.facilitator_config,
+        is_default: item.is_default,
+        isActive: item.is_active,
+        deliberation_id: item.deliberation_id,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      })) as Agent[];
     } catch (error) {
       logger.error({ error }, 'Agent repository findGlobalAgents failed');
       throw error;
