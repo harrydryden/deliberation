@@ -46,7 +46,7 @@ export class AgentRepository extends BaseRepository<Agent> implements IAgentRepo
 
   async findLocalAgents(): Promise<Agent[]> {
     try {
-      // Use the admin function to bypass RLS
+      // Use admin function to get local agents (bypasses RLS for admin users)
       const { data: agentData, error: agentError } = await supabase
         .rpc('get_local_agents_admin');
 
@@ -55,29 +55,31 @@ export class AgentRepository extends BaseRepository<Agent> implements IAgentRepo
         throw agentError;
       }
 
-      console.log('🔍 Raw local agents from DB via RPC:', agentData);
-
       if (!agentData || agentData.length === 0) {
         return [];
       }
 
       // Get deliberation details for each agent
       const deliberationIds = agentData.map(agent => agent.deliberation_id).filter(Boolean);
-      const { data: deliberationData, error: deliberationError } = await supabase
-        .from('deliberations')
-        .select('id, title, status')
-        .in('id', deliberationIds);
+      let deliberationMap = new Map();
 
-      if (deliberationError) {
-        logger.error({ error: deliberationError }, 'Agent repository findLocalAgents deliberation error');
-        // Continue without deliberation data rather than failing completely
+      if (deliberationIds.length > 0) {
+        const { data: deliberationData, error: deliberationError } = await supabase
+          .from('deliberations')
+          .select('id, title, status')
+          .in('id', deliberationIds);
+
+        if (deliberationError) {
+          logger.error({ error: deliberationError }, 'Agent repository findLocalAgents deliberation error');
+          // Continue without deliberation data rather than failing completely
+        } else {
+          deliberationMap = new Map(
+            (deliberationData || []).map(d => [d.id, d])
+          );
+        }
       }
 
-      const deliberationMap = new Map(
-        (deliberationData || []).map(d => [d.id, d])
-      );
-
-      // Map database format to API format
+      // Map database format to API format with consistent field mapping
       return agentData.map(item => ({
         id: item.id,
         name: item.name,
