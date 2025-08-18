@@ -66,10 +66,6 @@ The application follows **Clean Architecture** principles with a **Supabase-only
 - **Monitoring**: Structured logging, comprehensive health checks
 - **Scalability**: Designed for horizontal scaling and high availability
 
-## Project URL
-
-**Lovable Project**: https://lovable.dev/projects/95847591-350e-48fd-8530-0c2bb5de6650
-
 ## Quick Start
 
 ### Prerequisites
@@ -157,9 +153,6 @@ The application uses a clean architecture with:
 
 ## How to Edit This Code
 
-### Use Lovable (Recommended)
-Visit the [Lovable Project](https://lovable.dev/projects/95847591-350e-48fd-8530-0c2bb5de6650) and start prompting. Changes are automatically committed.
-
 ### Local Development
 ```bash
 # Clone the repository
@@ -241,9 +234,6 @@ npm run test:e2e:headed
 
 ## Deployment
 
-### Lovable Platform
-Simply open [Lovable](https://lovable.dev/projects/95847591-350e-48fd-8530-0c2bb5de6650) and click on Share -> Publish.
-
 ### Custom Deployment
 The application can be deployed to any static hosting provider:
 
@@ -255,14 +245,6 @@ The application can be deployed to any static hosting provider:
 2. **Deploy the `dist` folder** to your hosting provider
 
 3. **Configure environment variables** in your hosting platform
-
-### Custom Domain
-To connect a custom domain:
-1. Navigate to Project > Settings > Domains in Lovable
-2. Click Connect Domain
-3. Follow the DNS configuration steps
-
-Read more: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
 
 ## API Documentation
 
