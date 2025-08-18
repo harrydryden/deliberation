@@ -16,32 +16,54 @@ export const setUserContext = async (): Promise<boolean> => {
     try {
       const user = JSON.parse(storedUser);
       
-      if (user.id) {
+      if (user.id && user.accessCode) {
         // User ID is now a proper UUID from authentication
         const userIdForContext = user.id;
+        const accessCodeForContext = user.accessCode;
         
-        // Set the user context for RLS policies with retry logic
+        // Set both user ID and access code for RLS policies with retry logic
         let retries = 3;
         while (retries > 0) {
           try {
-            const { data, error } = await supabase.rpc('set_config', {
+            // Set user ID
+            const { error: userIdError } = await supabase.rpc('set_config', {
               setting_name: 'app.current_user_id',
               new_value: userIdForContext,
               is_local: false
             });
             
-            if (error) {
-              console.error('Failed to set user context - RPC error:', error);
+            if (userIdError) {
+              console.error('Failed to set user ID context:', userIdError);
               retries--;
               if (retries > 0) {
                 await new Promise(resolve => setTimeout(resolve, 100));
                 continue;
               }
               return false;
-            } else {
-              console.log('User context set successfully:', { userId: userIdForContext });
-              return true;
             }
+            
+            // Set access code
+            const { error: accessCodeError } = await supabase.rpc('set_config', {
+              setting_name: 'app.current_access_code',
+              new_value: accessCodeForContext,
+              is_local: false
+            });
+            
+            if (accessCodeError) {
+              console.error('Failed to set access code context:', accessCodeError);
+              retries--;
+              if (retries > 0) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                continue;
+              }
+              return false;
+            }
+            
+            console.log('User context set successfully:', { 
+              userId: userIdForContext, 
+              accessCode: accessCodeForContext.substring(0, 4) + '...' // Log partial for security
+            });
+            return true;
           } catch (error) {
             console.warn('Failed to set user context - Exception:', error);
             retries--;
@@ -52,6 +74,8 @@ export const setUserContext = async (): Promise<boolean> => {
             return false;
           }
         }
+      } else {
+        console.error('User missing required fields:', { hasId: !!user.id, hasAccessCode: !!user.accessCode });
       }
     } catch (error) {
       console.error('Error parsing stored user:', error);
