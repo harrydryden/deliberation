@@ -1136,6 +1136,10 @@ export type Database = {
         Args: { access_code: string }
         Returns: string
       }
+      get_current_access_code_user: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_current_user_access_code: {
         Args: Record<PropertyKey, never>
         Returns: string
