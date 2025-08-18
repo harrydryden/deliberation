@@ -11,7 +11,7 @@ import { User } from '@/types/api';
 import { AccessCode } from '@/repositories/implementations/access-code.repository';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { toast } from 'sonner';
-import { UserCreation } from './UserCreation';
+import { BulkUserCreation } from './BulkUserCreation';
 
 interface UserAccessManagementProps {
   users: User[];
@@ -134,9 +134,6 @@ export const UserAccessManagement = ({
 
   return (
     <div className="space-y-6">
-      {/* User Creation */}
-      <UserCreation onUserCreated={onLoadUsers} />
-
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2">
