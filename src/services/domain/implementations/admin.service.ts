@@ -1,7 +1,6 @@
 import { IAdminService, IUserService, IAgentService, IDeliberationService, IAccessCodeService } from '../interfaces';
 import { IAdminRepository } from '@/repositories/interfaces';
 import { User, Agent, Deliberation } from '@/types/api';
-import { AccessCode } from '@/repositories/implementations/access-code.repository';
 import { logger } from '@/utils/logger';
 
 export class AdminService implements IAdminService {
@@ -85,13 +84,9 @@ export class AdminService implements IAdminService {
     }
   }
 
-  async getAllAccessCodes(): Promise<AccessCode[]> {
-    try {
-      return await this.accessCodeService.getAccessCodes();
-    } catch (error) {
-      logger.error('Admin service getAllAccessCodes failed', { error });
-      throw error;
-    }
+  async getAllAccessCodes(): Promise<any[]> {
+    // Access codes are deprecated - return empty array
+    return [];
   }
 
   async clearDeliberationMessages(deliberationId: string): Promise<void> {

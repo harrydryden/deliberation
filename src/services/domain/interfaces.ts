@@ -1,6 +1,5 @@
 // Domain service interfaces following Clean Architecture principles
 import { User, Message, Agent, Deliberation } from '@/types/api';
-import { AccessCode } from '@/repositories/implementations/access-code.repository';
 
 // Simple access code authentication service
 export interface ISimpleAuthService {
@@ -47,10 +46,10 @@ export interface IUserService {
 }
 
 export interface IAccessCodeService {
-  getAccessCodes(): Promise<AccessCode[]>;
-  getUnusedAccessCodes(): Promise<AccessCode[]>;
-  validateAccessCode(code: string): Promise<AccessCode | null>;
-  createAccessCode(codeType: string): Promise<AccessCode>;
+  getAccessCodes(): Promise<any[]>;
+  getUnusedAccessCodes(): Promise<any[]>;
+  validateAccessCode(code: string): Promise<any | null>;
+  createAccessCode(codeType: string): Promise<any>;
   deleteAccessCode(id: string): Promise<void>;
 }
 
@@ -68,7 +67,7 @@ export interface IAdminService {
   getAllUsersIncludingArchived(): Promise<User[]>;
   getAllAgents(): Promise<Agent[]>;
   getAllDeliberations(): Promise<Deliberation[]>;
-  getAllAccessCodes(): Promise<AccessCode[]>;
+  getAllAccessCodes(): Promise<any[]>;
   // User management
   archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void>;
   unarchiveUser(userId: string): Promise<void>;

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useServices } from '@/hooks/useServices';
 import { User, Agent, Deliberation, LocalAgentCreate } from '@/types/api';
-import { AccessCode } from '@/repositories/implementations/access-code.repository';
 import { toast } from 'sonner';
 import { useErrorHandler } from './useErrorHandler';
 import { logger } from '@/utils/logger';
@@ -16,8 +15,8 @@ export const useAdminData = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
-  // Access Codes  
-  const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
+  // Access Codes (deprecated)
+  const [accessCodes, setAccessCodes] = useState<any[]>([]);
   const [loadingAccessCodes, setLoadingAccessCodes] = useState(false);
 
   // Agents

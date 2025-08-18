@@ -97,9 +97,9 @@ export const UserAccessManagement = ({
               <Table>
                 <TableHeader>
                   <TableRow>
-                     <TableHead>Access Code 1</TableHead>
-                     <TableHead>Access Code 2</TableHead>
-                    <TableHead>Last Sign In</TableHead>
+                    <TableHead>User ID</TableHead>
+                    <TableHead>Access Code 1</TableHead>
+                    <TableHead>Access Code 2</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Deliberations</TableHead>
                     <TableHead>Actions</TableHead>
@@ -107,51 +107,39 @@ export const UserAccessManagement = ({
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
-                     <TableRow key={user.id}>
-                       <TableCell>
-                         <div className="flex items-center gap-2">
-                           <code className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                             {(() => {
-                               // Extract access code 1 from email (part before @)
-                               const emailPrefix = user.email.split('@')[0];
-                               // If it's a generated fallback email like "user-abc12345", show "N/A"
-                               if (emailPrefix.startsWith('user-')) {
-                                 return 'N/A';
-                               }
-                               return emailPrefix;
-                             })()}
-                           </code>
-                           <Button
-                             variant="ghost"
-                             size="sm"
-                             onClick={() => copyToClipboard(user.email.split('@')[0])}
-                           >
-                             <Copy className="h-4 w-4" />
-                           </Button>
-                         </div>
-                       </TableCell>
-                       <TableCell>
-                         <div className="flex items-center gap-2">
-                           <code className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                             {(() => {
-                               // For Supabase Auth users, we don't have access code 2
-                               // You might need to store this separately or derive it differently
-                               return '******';
-                             })()}
-                           </code>
-                           <Button
-                             variant="ghost"
-                             size="sm"
-                             onClick={() => copyToClipboard('Access code 2 not available')}
-                           >
-                             <Copy className="h-4 w-4" />
-                           </Button>
-                         </div>
-                       </TableCell>
+                    <TableRow key={user.id}>
                       <TableCell>
-                        <span className="text-sm text-muted-foreground">
-                          {user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString() : 'Never'}
-                        </span>
+                        <code className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                          {user.id.slice(0, 8)}...
+                        </code>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <code className="font-mono text-sm bg-muted px-2 py-1 rounded">
+                            {user.email.split('@')[0] || 'N/A'}
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard(user.email.split('@')[0] || 'N/A')}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <code className="font-mono text-sm bg-muted px-2 py-1 rounded">
+                            N/A
+                          </code>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard('N/A')}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Select
