@@ -1,4 +1,5 @@
-import { supabase, ensureUserContext } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
+import { userContextManager } from '@/utils/userContextManager';
 import { IAccessCodeRepository } from '../interfaces';
 import { logger } from '@/utils/logger';
 
@@ -20,7 +21,7 @@ export class AccessCodeRepository implements IAccessCodeRepository {
   async findAll(): Promise<AccessCode[]> {
     try {
       // Ensure user context is set for RLS policies
-      await ensureUserContext();
+      await userContextManager.ensureUserContext();
       
       const { data, error } = await supabase
         .from('access_codes')
@@ -62,7 +63,7 @@ export class AccessCodeRepository implements IAccessCodeRepository {
   async create(codeType: string): Promise<AccessCode> {
     try {
       // Ensure user context is set for RLS policies
-      await ensureUserContext();
+      await userContextManager.ensureUserContext();
       
       // Generate a new access code using Supabase function
       const generatedCode = await this.generateSecureCode();
@@ -98,7 +99,7 @@ export class AccessCodeRepository implements IAccessCodeRepository {
   async delete(id: string): Promise<void> {
     try {
       // Ensure user context is set for RLS policies
-      await ensureUserContext();
+      await userContextManager.ensureUserContext();
       
       const { error } = await supabase
         .from('access_codes')

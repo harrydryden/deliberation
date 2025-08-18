@@ -15,7 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { logger } from '@/utils/logger';
-import { ensureUserContext } from '@/utils/authHelpers';
+import { userContextManager } from '@/utils/userContextManager';
 
 interface KnowledgeItem {
   id: string;
@@ -90,7 +90,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
     setUploading(true);
     try {
       // Get current user and set context
-      const user = await ensureUserContext();
+      const user = userContextManager.getCurrentUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
