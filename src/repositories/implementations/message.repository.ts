@@ -1,4 +1,4 @@
-import { supabase, setUserContext } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { BaseRepository } from './base.repository';
 import { IMessageRepository } from '../interfaces';
 import { Message } from '@/types/api';
