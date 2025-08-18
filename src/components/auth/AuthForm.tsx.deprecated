@@ -1,0 +1,8 @@
+// DEPRECATED: This component is no longer used with Supabase authentication
+// The new authentication form is in src/components/auth/SupabaseAuthForm.tsx
+
+import { SupabaseAuthForm } from "./SupabaseAuthForm";
+
+export const AuthForm = () => {
+  return <SupabaseAuthForm />;
+};

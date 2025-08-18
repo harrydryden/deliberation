@@ -1,13 +1,25 @@
 import { supabase } from '@/integrations/supabase/client';
-// Legacy import removed - using header-based auth
-import { BaseRepository } from './base.repository';
+import { SupabaseBaseRepository } from './supabase-base.repository';
 import { IMessageRepository } from '../interfaces';
 import { Message } from '@/types/api';
 import { logger } from '@/utils/logger';
 
-export class MessageRepository extends BaseRepository<Message> implements IMessageRepository {
-  constructor() {
-    super('messages');
+export class MessageRepository extends SupabaseBaseRepository implements IMessageRepository {
+  
+  async findAll(filter?: Record<string, any>): Promise<Message[]> {
+    return super.findAll('messages');
+  }
+
+  async findById(id: string): Promise<Message> {
+    return super.findById('messages', id);
+  }
+
+  async update(id: string, data: any): Promise<Message> {
+    return super.update('messages', id, data);
+  }
+
+  async delete(id: string): Promise<void> {
+    return super.delete('messages', id);
   }
 
   async findByDeliberation(deliberationId: string): Promise<Message[]> {

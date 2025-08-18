@@ -1,12 +1,21 @@
 import { supabase } from '@/integrations/supabase/client';
-import { BaseRepository } from './base.repository';
+import { SupabaseBaseRepository } from './supabase-base.repository';
 import { IAgentRepository } from '../interfaces';
 import { Agent } from '@/types/api';
 import { logger } from '@/utils/logger';
 
-export class AgentRepository extends BaseRepository<Agent> implements IAgentRepository {
-  constructor() {
-    super('agent_configurations');
+export class AgentRepository extends SupabaseBaseRepository implements IAgentRepository {
+  
+  async findById(id: string): Promise<Agent> {
+    return super.findById('agent_configurations', id);
+  }
+
+  async create(data: any): Promise<Agent> {
+    return super.create('agent_configurations', data);
+  }
+
+  async delete(id: string): Promise<void> {
+    return super.delete('agent_configurations', id);
   }
 
   async findByDeliberation(deliberationId: string): Promise<Agent[]> {

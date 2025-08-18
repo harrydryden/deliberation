@@ -1,12 +1,25 @@
 import { supabase } from '@/integrations/supabase/client';
-import { BaseRepository } from './base.repository';
+import { SupabaseBaseRepository } from './supabase-base.repository';
 import { IDeliberationRepository } from '../interfaces';
 import { Deliberation } from '@/types/api';
 import { logger } from '@/utils/logger';
 
-export class DeliberationRepository extends BaseRepository<Deliberation> implements IDeliberationRepository {
-  constructor() {
-    super('deliberations');
+export class DeliberationRepository extends SupabaseBaseRepository implements IDeliberationRepository {
+  
+  async findById(id: string): Promise<Deliberation> {
+    return super.findById('deliberations', id);
+  }
+
+  async create(data: any): Promise<Deliberation> {
+    return super.create('deliberations', data);
+  }
+
+  async update(id: string, data: any): Promise<Deliberation> {
+    return super.update('deliberations', id, data);
+  }
+
+  async delete(id: string): Promise<void> {
+    return super.delete('deliberations', id);
   }
 
   async findByStatus(status: string): Promise<Deliberation[]> {

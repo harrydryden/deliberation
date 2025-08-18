@@ -1,0 +1,6 @@
+// DEPRECATED: This file is no longer used with Supabase authentication
+// The new authentication system is in src/hooks/useSupabaseAuth.tsx
+
+export const useAuth = () => {
+  throw new Error('useAuth is deprecated. Use useSupabaseAuth instead.');
+};

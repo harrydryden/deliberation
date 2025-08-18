@@ -42,4 +42,82 @@ export abstract class SupabaseBaseRepository {
   protected logInfo(operation: string, data?: any) {
     logger.info(`Repository operation: ${operation}`, data);
   }
+
+  // Common CRUD operations
+  async findAll(tableName: string): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*');
+      
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      this.logError(`findAll in ${tableName}`, error);
+      throw error;
+    }
+  }
+
+  async findById(tableName: string, id: string): Promise<any | null> {
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      this.logError(`findById in ${tableName}`, error);
+      throw error;
+    }
+  }
+
+  async create(tableName: string, data: any): Promise<any> {
+    try {
+      const { data: result, error } = await supabase
+        .from(tableName)
+        .insert(data)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return result;
+    } catch (error) {
+      this.logError(`create in ${tableName}`, error);
+      throw error;
+    }
+  }
+
+  async update(tableName: string, id: string, data: any): Promise<any> {
+    try {
+      const { data: result, error } = await supabase
+        .from(tableName)
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return result;
+    } catch (error) {
+      this.logError(`update in ${tableName}`, error);
+      throw error;
+    }
+  }
+
+  async delete(tableName: string, id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from(tableName)
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+    } catch (error) {
+      this.logError(`delete in ${tableName}`, error);
+      throw error;
+    }
+  }
 }

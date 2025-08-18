@@ -1,12 +1,29 @@
 import { supabase } from '@/integrations/supabase/client';
-import { BaseRepository } from './base.repository';
+import { SupabaseBaseRepository } from './supabase-base.repository';
 import { IUserRepository } from '../interfaces';
 import { User } from '@/types/api';
 import { logger } from '@/utils/logger';
 
-export class UserRepository extends BaseRepository<User> implements IUserRepository {
-  constructor() {
-    super('profiles');
+export class UserRepository extends SupabaseBaseRepository implements IUserRepository {
+  
+  async findAll(filter?: Record<string, any>): Promise<User[]> {
+    return super.findAll('profiles');
+  }
+
+  async findById(id: string): Promise<User> {
+    return super.findById('profiles', id);
+  }
+
+  async create(data: any): Promise<User> {
+    return super.create('profiles', data);
+  }
+
+  async update(id: string, data: any): Promise<User> {
+    return super.update('profiles', id, data);
+  }
+
+  async delete(id: string): Promise<void> {
+    return super.delete('profiles', id);
   }
 
   async findByEmail(email: string): Promise<User | null> {
