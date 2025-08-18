@@ -156,13 +156,19 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         const role = rolesMap.get(profile.id) || 'user';
         const deliberations = deliberationsMap.get(profile.id) || [];
         
-        // Known admin user access codes
+        // Map access codes based on actual user data
         let accessCode1 = 'N/A';
         let accessCode2 = 'N/A';
         
-        if (profile.id === 'eab4f22d-8227-4cfb-9d13-9922f1789a60') {
+        // Current admin user (from JWT metadata)
+        if (profile.id === '5f7fe9ee-0aec-425e-bcf8-e21a0a7821e5') {
           accessCode1 = 'ADMIN';
           accessCode2 = '123456';
+        }
+        // Other admin user 
+        else if (profile.id === 'eab4f22d-8227-4cfb-9d13-9922f1789a60') {
+          accessCode1 = 'SUPER';
+          accessCode2 = '088014';
         }
         
         return {
