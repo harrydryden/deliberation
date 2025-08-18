@@ -1012,7 +1012,57 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_profiles_with_deliberations: {
+        Row: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          avatar_url: string | null
+          bio: string | null
+          created_at: string | null
+          deliberations: Json | null
+          display_name: string | null
+          expertise_areas: string[] | null
+          id: string | null
+          is_archived: boolean | null
+          role: string | null
+          updated_at: string | null
+          user_role: string | null
+        }
+        Insert: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          deliberations?: never
+          display_name?: string | null
+          expertise_areas?: string[] | null
+          id?: string | null
+          is_archived?: boolean | null
+          role?: string | null
+          updated_at?: string | null
+          user_role?: string | null
+        }
+        Update: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string | null
+          deliberations?: never
+          display_name?: string | null
+          expertise_areas?: string[] | null
+          id?: string | null
+          is_archived?: boolean | null
+          role?: string | null
+          updated_at?: string | null
+          user_role?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_create_ibis_relationship: {
