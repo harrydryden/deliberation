@@ -133,9 +133,14 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
       // Create maps for efficient lookups - ensure all users get proper roles
       const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
       
+      console.log('UserRepository: Original roles from DB:', userRoles);
+      console.log('UserRepository: Roles map before forcing:', Object.fromEntries(rolesMap));
+      
       // Force correct roles for known admin users
       rolesMap.set('5f7fe9ee-0aec-425e-bcf8-e21a0a7821e5', 'admin');
       rolesMap.set('eab4f22d-8227-4cfb-9d13-9922f1789a60', 'admin');
+      
+      console.log('UserRepository: Roles map after forcing:', Object.fromEntries(rolesMap));
       
       const deliberationsMap = new Map();
       
@@ -161,6 +166,8 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         const role = rolesMap.get(profile.id) || 'user';
         const deliberations = deliberationsMap.get(profile.id) || [];
         
+        console.log(`UserRepository: Processing user ${profile.id}, role from map: ${role}`);
+        
         // Map access codes based on actual user data
         let accessCode1 = 'N/A';
         let accessCode2 = 'N/A';
@@ -176,7 +183,7 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
           accessCode2 = '088014';
         }
         
-        return {
+        const userResult = {
           id: profile.id,
           email: `user-${profile.id.slice(0, 8)}@example.com`,
           emailConfirmedAt: profile.created_at,
@@ -197,6 +204,9 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
           accessCode1: accessCode1,
           accessCode2: accessCode2,
         };
+        
+        console.log(`UserRepository: Final user object for ${profile.id}:`, userResult);
+        return userResult;
       });
 
       logger.info('User repository findAll users fetched directly', { count: users.length });
