@@ -62,14 +62,29 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
 
   async updateRole(userId: string, role: string): Promise<void> {
     try {
-      const { error } = await supabase
+      // Update both the profiles table and user_roles table
+      const { error: profileError } = await supabase
         .from('profiles')
-        .update({ role, updated_at: new Date().toISOString() })
+        .update({ updated_at: new Date().toISOString() })
         .eq('id', userId);
 
-      if (error) {
-        logger.error('User repository updateRole error', error, { userId, role });
-        throw error;
+      if (profileError) {
+        logger.error('User repository updateRole profile error', profileError, { userId, role });
+        throw profileError;
+      }
+
+      // Update or insert user role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert({ 
+          user_id: userId, 
+          role: role as any,
+          created_at: new Date().toISOString()
+        });
+
+      if (roleError) {
+        logger.error('User repository updateRole role error', roleError, { userId, role });
+        throw roleError;
       }
 
       logger.info('User role updated successfully', { userId, role });
@@ -79,114 +94,64 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
     }
   }
 
-  // Override to handle profiles table specifics - excludes archived users
+  // Using profiles table directly instead of auth.admin API
   async findAll(filter?: Record<string, any>): Promise<User[]> {
     try {
-      // Query auth.users with profiles and user roles
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      // Query profiles with user roles and deliberations
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          user_roles (role),
+          participants (
+            role,
+            deliberations (
+              id,
+              title
+            )
+          )
+        `)
+        .eq('is_archived', false); // Only non-archived users
       
-      if (authError) {
-        logger.error('User repository findAll auth error', authError, { filter });
-        throw authError;
+      if (profilesError) {
+        logger.error('User repository findAll profiles error', profilesError, { filter });
+        throw profilesError;
       }
 
-      if (!authUsers?.users) {
+      logger.info('User repository findAll profiles fetched', { count: profiles?.length });
+
+      if (!profiles) {
         return [];
       }
 
-      // Get profiles and roles for these users
-      const userIds = authUsers.users.map(user => user.id);
-      
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          is_archived,
-          archived_at,
-          archived_by,
-          archive_reason
-        `)
-        .in('id', userIds)
-        .or('is_archived.is.null,is_archived.eq.false'); // Exclude archived users
+      return profiles.map(profile => {
+        const role = profile.user_roles?.[0]?.role || 'user';
+        const deliberations = profile.participants?.map((p: any) => ({
+          id: p.deliberations?.id || '',
+          title: p.deliberations?.title || '',
+          role: p.role || 'participant'
+        })) || [];
 
-      if (profileError) {
-        logger.error('User repository profiles error', profileError);
-        throw profileError;
-      }
-
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('user_id', userIds);
-
-      if (rolesError) {
-        logger.error('User repository roles error', rolesError);
-        throw rolesError;
-      }
-
-      // Get deliberations for these users
-      const { data: participants, error: participantsError } = await supabase
-        .from('participants')
-        .select(`
-          user_id,
-          deliberations!inner(id, title, status)
-        `)
-        .in('user_id', userIds.map(id => id.toString()));
-
-      if (participantsError) {
-        logger.error('User repository participants error', participantsError);
-      }
-
-      // Map auth users to our User interface
-      const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
-      const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
-      const deliberationsMap = new Map();
-      
-      // Group deliberations by user  
-      participants?.forEach((p: any) => {
-        const userId = p.user_id.toString();
-        if (!deliberationsMap.has(userId)) {
-          deliberationsMap.set(userId, []);
-        }
-        if (p.deliberations) {
-          deliberationsMap.get(userId).push({
-            id: p.deliberations.id,
-            title: p.deliberations.title,
-            role: 'participant'
-          });
-        }
+        return {
+          id: profile.id,
+          email: profile.migrated_from_access_code || `user-${profile.id.slice(0, 8)}@example.com`, // Fallback email
+          emailConfirmedAt: profile.created_at,
+          createdAt: profile.created_at,
+          lastSignInAt: profile.updated_at,
+          role: role,
+          profile: {
+            displayName: `User ${profile.id.slice(0, 8)}`,
+            avatarUrl: '',
+            bio: '',
+            expertiseAreas: [],
+          },
+          deliberations: deliberations,
+          isArchived: profile.is_archived || false,
+          archivedAt: profile.archived_at,
+          archivedBy: profile.archived_by,
+          archiveReason: profile.archive_reason,
+        } as User;
       });
-
-      return authUsers.users
-        .filter(user => {
-          const profile = profilesMap.get(user.id);
-          return !profile?.is_archived; // Only include non-archived users
-        })
-        .map(user => {
-          const profile = profilesMap.get(user.id);
-          const role = rolesMap.get(user.id) || 'user';
-          const deliberations = deliberationsMap.get(user.id.toString()) || [];
-
-          return {
-            id: user.id,
-            email: user.email || '',
-            emailConfirmedAt: user.email_confirmed_at,
-            createdAt: user.created_at,
-            lastSignInAt: user.last_sign_in_at,
-            role: role,
-            profile: {
-              displayName: user.user_metadata?.display_name || '',
-              avatarUrl: user.user_metadata?.avatar_url || '',
-              bio: user.user_metadata?.bio || '',
-              expertiseAreas: user.user_metadata?.expertise_areas || [],
-            },
-            deliberations: deliberations,
-            isArchived: profile?.is_archived || false,
-            archivedAt: profile?.archived_at,
-            archivedBy: profile?.archived_by,
-            archiveReason: profile?.archive_reason,
-          } as User;
-        });
     } catch (error) {
       logger.error('User repository findAll failed', error, { filter });
       throw error;
@@ -213,12 +178,6 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         logger.error('User repository archive error', error, { userId, archivedBy });
         throw error;
       }
-      
-      // Also deactivate their access code
-      await supabase
-        .from('access_codes')
-        .update({ is_active: false })
-        .eq('used_by', userId);
       
       console.log('UserRepository: Archive operation completed');
       logger.info('User archived successfully from repository', { userId, archivedBy });
@@ -247,12 +206,6 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         throw error;
       }
       
-      // Reactivate their access code
-      await supabase
-        .from('access_codes')
-        .update({ is_active: true })
-        .eq('used_by', userId);
-      
       logger.info('User unarchived successfully from repository', { userId });
     } catch (error) {
       logger.error('User repository unarchive failed', error, { userId });
@@ -262,71 +215,56 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
 
   async findAllIncludingArchived(filter?: Record<string, any>): Promise<User[]> {
     try {
-      // For archived users, we need to query auth.users too
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      // Query all profiles including archived ones
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          user_roles (role),
+          participants (
+            role,
+            deliberations (
+              id,
+              title
+            )
+          )
+        `);
       
-      if (authError) {
-        logger.error('User repository findAllIncludingArchived auth error', authError);
-        throw authError;
+      if (profilesError) {
+        logger.error('User repository findAllIncludingArchived profiles error', profilesError);
+        throw profilesError;
       }
 
-      if (!authUsers?.users) {
+      if (!profiles) {
         return [];
       }
 
-      // Get all profiles including archived
-      const userIds = authUsers.users.map(user => user.id);
-      
-      const { data: profiles, error: profileError } = await supabase
-        .from('profiles')
-        .select(`
-          id,
-          is_archived,
-          archived_at,
-          archived_by,
-          archive_reason
-        `)
-        .in('id', userIds);
-
-      if (profileError) {
-        logger.error('User repository profiles error', profileError);
-        throw profileError;
-      }
-
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('user_id', userIds);
-
-      if (rolesError) {
-        logger.error('User repository roles error', rolesError);
-      }
-
-      const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
-      const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
-
-      return authUsers.users.map(user => {
-        const profile = profilesMap.get(user.id);
-        const role = rolesMap.get(user.id) || 'user';
+      return profiles.map(profile => {
+        const role = profile.user_roles?.[0]?.role || 'user';
+        const deliberations = profile.participants?.map((p: any) => ({
+          id: p.deliberations?.id || '',
+          title: p.deliberations?.title || '',
+          role: p.role || 'participant'
+        })) || [];
 
         return {
-          id: user.id,
-          email: user.email || '',
-          emailConfirmedAt: user.email_confirmed_at,
-          createdAt: user.created_at,
-          lastSignInAt: user.last_sign_in_at,
+          id: profile.id,
+          email: profile.migrated_from_access_code || `user-${profile.id.slice(0, 8)}@example.com`,
+          emailConfirmedAt: profile.created_at,
+          createdAt: profile.created_at,
+          lastSignInAt: profile.updated_at,
           role: role,
           profile: {
-            displayName: user.user_metadata?.display_name || '',
-            avatarUrl: user.user_metadata?.avatar_url || '',
-            bio: user.user_metadata?.bio || '',
-            expertiseAreas: user.user_metadata?.expertise_areas || [],
+            displayName: `User ${profile.id.slice(0, 8)}`,
+            avatarUrl: '',
+            bio: '',
+            expertiseAreas: [],
           },
-          deliberations: [],
-          isArchived: profile?.is_archived || false,
-          archivedAt: profile?.archived_at,
-          archivedBy: profile?.archived_by,
-          archiveReason: profile?.archive_reason,
+          deliberations: deliberations,
+          isArchived: profile.is_archived || false,
+          archivedAt: profile.archived_at,
+          archivedBy: profile.archived_by,
+          archiveReason: profile.archive_reason,
         } as User;
       });
     } catch (error) {
@@ -334,5 +272,4 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
       throw error;
     }
   }
-
 }
