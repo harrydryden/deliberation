@@ -26,9 +26,9 @@ export const SupabaseAuthForm = () => {
       return false;
     }
     
-    // Validate Access Code 2: 5 digits
-    if (!/^\d{5}$/.test(accessCode2)) {
-      setError('Access Code 2 must be exactly 5 digits');
+    // Validate Access Code 2: 6 digits
+    if (!/^\d{6}$/.test(accessCode2)) {
+      setError('Access Code 2 must be exactly 6 digits');
       return false;
     }
     
@@ -121,13 +121,13 @@ export const SupabaseAuthForm = () => {
                 inputMode="numeric"
                 value={accessCode2}
                 onChange={(e) => setAccessCode2(e.target.value.replace(/\D/g, ''))}
-                placeholder="5 digits (e.g., 12345)"
-                maxLength={5}
+                placeholder="6 digits (e.g., 123456)"
+                maxLength={6}
                 className="font-mono text-center"
                 required
               />
               <p className="text-sm text-muted-foreground">
-                Enter exactly 5 digits
+                Enter exactly 6 digits
               </p>
             </div>
 
