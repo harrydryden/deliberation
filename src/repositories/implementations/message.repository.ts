@@ -72,19 +72,60 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
       const user = storedUser ? JSON.parse(storedUser) : null;
       console.log('ensureUserContextWithRetry: Current user', { userId: user?.id });
       
-      // Import setUserContext from utils which now consistently sets UUIDs
-      const { setUserContext } = await import('@/utils/authHelpers');
-      const result = await setUserContext();
+      if (!user?.id) {
+        console.error('ensureUserContextWithRetry: No user ID found');
+        return false;
+      }
       
-      console.log('ensureUserContextWithRetry: Result', { result, userId: user?.id });
-      return result;
+      // Try up to 5 times to set the context properly
+      let attempts = 5;
+      while (attempts > 0) {
+        try {
+          // Set the context directly
+          const { data, error } = await supabase.rpc('set_config', {
+            setting_name: 'app.current_user_id',
+            new_value: user.id,
+            is_local: false
+          });
+          
+          if (error) {
+            console.error('ensureUserContextWithRetry: Error setting context', error);
+            attempts--;
+            if (attempts > 0) await new Promise(resolve => setTimeout(resolve, 100));
+            continue;
+          }
+          
+          // Wait a bit for the context to be set
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          // Verify the context was set correctly
+          const { data: debugData, error: debugError } = await supabase.rpc('debug_current_user_settings');
+          if (!debugError && debugData?.config_value === user.id) {
+            console.log('ensureUserContextWithRetry: Success', { userId: user.id, attempts: 5 - attempts + 1 });
+            return true;
+          }
+          
+          console.warn('ensureUserContextWithRetry: Verification failed', { 
+            expected: user.id, 
+            actual: debugData?.config_value, 
+            attempts 
+          });
+          
+        } catch (error) {
+          console.error('ensureUserContextWithRetry: Attempt failed', { error, attempts });
+        }
+        
+        attempts--;
+        if (attempts > 0) {
+          await new Promise(resolve => setTimeout(resolve, 100 * (6 - attempts))); // Increasing delay
+        }
+      }
+      
+      console.error('ensureUserContextWithRetry: All attempts failed');
+      return false;
     } catch (error) {
-      console.error('ensureUserContextWithRetry: Error, falling back to setUserContext', { error });
-      // Fallback to setUserContext if ensureUserContext is not available
-      const { setUserContext } = await import('@/integrations/supabase/client');
-      const result = await setUserContext();
-      console.log('ensureUserContextWithRetry: Fallback result', { result });
-      return result;
+      console.error('ensureUserContextWithRetry: Fatal error', { error });
+      return false;
     }
   }
 
