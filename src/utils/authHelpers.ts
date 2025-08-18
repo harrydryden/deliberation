@@ -40,16 +40,39 @@ export const getCurrentUser = (): AccessCodeUser | null => {
  */
 export const setUserContext = async (): Promise<boolean> => {
   const user = getCurrentUser();
-  if (!user) return false;
+  if (!user) {
+    console.error('No user found when setting context');
+    return false;
+  }
   
   try {
+    console.log('Setting user context for:', { userId: user.id });
+    
     // ALWAYS use the user UUID, never the access code
     // The user.id should already be a UUID from the authentication process
-    await supabase.rpc('set_config', {
+    const { data, error } = await supabase.rpc('set_config', {
       setting_name: 'app.current_user_id',
       new_value: user.id, // This should be the UUID
       is_local: false
     });
+    
+    if (error) {
+      console.error('Error setting user context:', error);
+      return false;
+    }
+    
+    // Verify the context was set
+    const { data: debugData, error: debugError } = await supabase.rpc('debug_current_user_settings');
+    if (!debugError) {
+      console.log('User context verification:', { 
+        expected: user.id, 
+        actual: debugData?.config_value,
+        success: debugData?.config_value === user.id
+      });
+      return debugData?.config_value === user.id;
+    }
+    
+    console.log('User context set successfully (no verification):', { userId: user.id });
     return true;
   } catch (error) {
     console.error('Error setting user context:', error);

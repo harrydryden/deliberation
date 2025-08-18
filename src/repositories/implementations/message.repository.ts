@@ -119,8 +119,17 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
       // Ensure user context is properly set for RLS policies
       const contextSet = await this.ensureUserContextWithRetry();
       if (!contextSet) {
-        logger.warn('Could not set user context for RLS, message creation may fail', { userId: data.userId });
+        logger.error('Could not set user context for RLS, message creation will fail', { userId: data.userId });
+        throw new Error('User context could not be set. Please try logging out and back in.');
       }
+      
+      // Debug: Verify context was set correctly
+      const { data: debugData } = await supabase.rpc('debug_current_user_settings');
+      logger.info('Message creation - user context check', { 
+        debugData, 
+        expectedUserId: data.userId,
+        contextSet 
+      });
       
       // Map the data to database column names
       const dbData = {
