@@ -33,6 +33,32 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // Check if current user is admin
+  const user = userContextManager.getCurrentUser();
+  const isAdmin = user?.role === 'admin';
+
+  // Only show component to admins
+  if (!isAdmin) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Upload Documents
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-center py-8 text-muted-foreground">
+            <Upload className="h-12 w-12 mx-auto mb-4 opacity-30" />
+            <p className="text-lg font-medium">Admin Access Required</p>
+            <p className="text-sm">Only administrators can upload knowledge documents.</p>
+            <p className="text-sm mt-2">Users can access knowledge through the Bill agent during conversations.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !selectedAgent) {
