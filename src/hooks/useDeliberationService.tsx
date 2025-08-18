@@ -47,10 +47,13 @@ class SupabaseDeliberationService implements DeliberationService {
       deliberations.map(async (deliberation) => {
         logger.info('Getting participant count', { deliberationId: deliberation.id });
         
-        // Get total participant count
+        // Set user context before each query to ensure RLS works
+        await setUserContext();
+        
+        // Get total participant count with a simple count query
         const { count, error: countError } = await supabase
           .from('participants')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .eq('deliberation_id', deliberation.id);
 
         if (countError) {
@@ -65,6 +68,7 @@ class SupabaseDeliberationService implements DeliberationService {
             deliberationId: deliberation.id 
           });
           
+          // Use the UUID directly for comparison
           const { data: userParticipation, error: participationError } = await supabase
             .from('participants')
             .select('id')
