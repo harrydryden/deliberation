@@ -349,7 +349,7 @@ const DeliberationChat = () => {
                       <h1 className="text-xl font-semibold text-democratic-blue truncate">
                         {deliberation.title}
                       </h1>
-                      <Badge className={`${getStatusColor(deliberation.status)} text-white text-sm shrink-0`}>
+                      <Badge className="bg-blue-500 text-white text-sm shrink-0">
                         {deliberation.status}
                       </Badge>
                     </div>
