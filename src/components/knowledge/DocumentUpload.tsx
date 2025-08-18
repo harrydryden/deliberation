@@ -83,8 +83,28 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         throw new Error('User not authenticated');
       }
 
-      // Set both user ID and access code for RLS policies
-      await userContextManager.ensureUserContext(user.id);
+      console.log('Setting context for upload:', { userId: user.id, accessCode: user.accessCode, role: user.role });
+
+      // Ensure context is set and verified before upload
+      const contextSet = await userContextManager.ensureUserContext(user.id);
+      if (!contextSet) {
+        throw new Error('Failed to set user context for upload');
+      }
+
+      // Add extra delay to ensure context is fully propagated
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Debug: Check context before upload
+      try {
+        const { data: contextDebug, error: debugError } = await supabase.rpc('debug_storage_context');
+        if (debugError) {
+          console.error('Debug function error:', debugError);
+        } else {
+          console.log('Context debug before upload:', contextDebug);
+        }
+      } catch (debugErr) {
+        console.warn('Could not run context debug:', debugErr);
+      }
 
       setUploadProgress(10);
 
@@ -94,6 +114,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       
       logger.component.update('DocumentUpload', { action: 'uploadStart', fileName });
       
+      console.log('Attempting storage upload with fileName:', fileName);
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
         .upload(fileName, file);

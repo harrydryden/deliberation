@@ -1134,6 +1134,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      debug_storage_context: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       enhanced_audit_log: {
         Args: {
           details?: Json
