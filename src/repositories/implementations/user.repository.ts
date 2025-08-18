@@ -96,14 +96,17 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
 
   async findAll(filter?: Record<string, any>): Promise<User[]> {
     try {
-      // Call the edge function to get all users with metadata including access codes
+      console.log('🚀 Calling admin-get-users edge function...');
       const { data: usersData, error: usersError } = await supabase.functions.invoke('admin-get-users');
       
       if (usersError) {
-        console.error('Error fetching users from edge function:', usersError);
+        console.error('❌ Edge function error:', usersError);
+        console.error('❌ Error details:', JSON.stringify(usersError, null, 2));
         logger.error('User repository findAll failed via edge function', usersError, { filter });
         throw usersError;
       }
+
+      console.log('✅ Edge function response:', usersData);
 
       const users = usersData?.users || [];
       logger.info('User repository findAll users fetched via edge function', { count: users.length });

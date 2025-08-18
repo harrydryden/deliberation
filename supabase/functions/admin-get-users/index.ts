@@ -11,6 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('📋 Admin get users function called');
     // Create Supabase client with service role key for admin operations
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -25,8 +26,10 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Verify the requesting user is an admin
+    console.log('🔐 Checking authorization header...');
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
+      console.error('❌ No authorization header found');
       return new Response(
         JSON.stringify({ error: 'No authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -34,30 +37,41 @@ Deno.serve(async (req) => {
     }
 
     // Extract token from Bearer format
+    console.log('🎫 Extracting token from authorization header...');
     const token = authHeader.replace('Bearer ', '')
     
     // Verify the token and get user
+    console.log('👤 Verifying user token...');
     const { data: { user }, error: userError } = await supabase.auth.getUser(token)
     if (userError || !user) {
+      console.error('❌ Invalid user token:', userError);
       return new Response(
         JSON.stringify({ error: 'Invalid user token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    console.log('✅ User verified:', user.id);
+
     // Check if user has admin role
+    console.log('🔍 Checking admin role for user:', user.id);
     const { data: userRoles, error: roleError } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id)
       .eq('role', 'admin')
 
+    console.log('📋 User roles query result:', { userRoles, roleError });
+
     if (roleError || !userRoles || userRoles.length === 0) {
+      console.error('❌ Admin access check failed:', { roleError, userRoles, userId: user.id });
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log('✅ Admin access verified for user:', user.id);
 
     // Get profiles first
     const { data: profiles, error: profilesError } = await supabase
