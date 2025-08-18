@@ -11,25 +11,27 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Admin get users function called')
-    
     // Create Supabase client with service role key for admin operations
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return new Response(
+        JSON.stringify({ error: 'Missing Supabase configuration' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Verify the requesting user is an admin
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      console.log('No authorization header')
       return new Response(
         JSON.stringify({ error: 'No authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    console.log('Authorization header present')
 
     // Extract token from Bearer format
     const token = authHeader.replace('Bearer ', '')
@@ -37,14 +39,11 @@ Deno.serve(async (req) => {
     // Verify the token and get user
     const { data: { user }, error: userError } = await supabase.auth.getUser(token)
     if (userError || !user) {
-      console.log('Invalid user token:', userError)
       return new Response(
         JSON.stringify({ error: 'Invalid user token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    console.log('User verified:', user.id)
 
     // Check if user has admin role
     const { data: userRoles, error: roleError } = await supabase
@@ -54,27 +53,24 @@ Deno.serve(async (req) => {
       .eq('role', 'admin')
 
     if (roleError || !userRoles || userRoles.length === 0) {
-      console.log('User not admin:', roleError, userRoles)
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    console.log('Admin verified, fetching data')
-
-    // Get profiles
+    // Get profiles first
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
       .eq('is_archived', false)
 
     if (profilesError) {
-      console.error('Profiles error:', profilesError)
-      throw profilesError
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch profiles' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
-
-    console.log('Profiles fetched:', profiles?.length || 0)
 
     if (!profiles || profiles.length === 0) {
       return new Response(
@@ -83,39 +79,26 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get auth users with admin privileges  
-    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers()
+    // Get auth users with service role to access metadata
+    const { data: authData, error: authError } = await supabase.auth.admin.listUsers()
     
-    if (authError) {
-      console.error('Auth error:', authError)
-      // Continue without auth data instead of throwing
-    }
-
-    console.log('Auth users fetched:', authUsers?.users?.length || 0)
-
     // Create a map of auth user data
     const authUsersMap = new Map()
-    if (authUsers?.users) {
-      authUsers.users.forEach((authUser) => {
+    if (authData?.users) {
+      authData.users.forEach((authUser) => {
         authUsersMap.set(authUser.id, authUser)
       })
     }
 
     // Get user roles
     const userIds = profiles.map(p => p.id)
-    const { data: allUserRoles, error: rolesError } = await supabase
+    const { data: allUserRoles } = await supabase
       .from('user_roles')
       .select('user_id, role')
       .in('user_id', userIds)
 
-    if (rolesError) {
-      console.error('Roles error:', rolesError)
-    }
-
-    console.log('User roles fetched:', allUserRoles?.length || 0)
-
-    // Get participants
-    const { data: participants, error: participantsError } = await supabase
+    // Get participants with deliberations
+    const { data: participants } = await supabase
       .from('participants')
       .select(`
         user_id,
@@ -126,12 +109,6 @@ Deno.serve(async (req) => {
         )
       `)
       .in('user_id', userIds.map(id => id.toString()))
-
-    if (participantsError) {
-      console.error('Participants error:', participantsError)
-    }
-
-    console.log('Participants fetched:', participants?.length || 0)
 
     // Create maps for efficient lookups
     const rolesMap = new Map(allUserRoles?.map(r => [r.user_id, r.role]) || [])
@@ -187,17 +164,14 @@ Deno.serve(async (req) => {
       }
     })
 
-    console.log('Users processed:', users.length)
-
     return new Response(
       JSON.stringify({ users }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('Function error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Internal server error', details: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
