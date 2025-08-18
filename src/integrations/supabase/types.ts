@@ -1190,6 +1190,10 @@ export type Database = {
           deliberation_id: string
         }[]
       }
+      get_current_user_id_clean: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
