@@ -8,10 +8,9 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   isAdmin: boolean;
-  signUp: (email: string, password: string, accessCode?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
-  validateAccessCode: (code: string) => Promise<{ isValid: boolean; codeType: string; error?: any }>;
+  createAccessCodeUsers: (count: number, roleType: 'admin' | 'user') => Promise<{ users: Array<{ accessCode1: string; accessCode2: string; role: string }>, error?: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -85,78 +84,65 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const validateAccessCode = async (code: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('access_codes')
-        .select('code_type, is_active, is_used, expires_at, max_uses, current_uses')
-        .eq('code', code)
-        .single();
-
-      if (error || !data) {
-        return { isValid: false, codeType: '', error: 'Invalid access code' };
-      }
-
-      if (!data.is_active) {
-        return { isValid: false, codeType: '', error: 'Access code is inactive' };
-      }
-
-      if (data.expires_at && new Date(data.expires_at) < new Date()) {
-        return { isValid: false, codeType: '', error: 'Access code has expired' };
-      }
-
-      if (data.max_uses && data.current_uses >= data.max_uses) {
-        return { isValid: false, codeType: '', error: 'Access code usage limit reached' };
-      }
-
-      return { isValid: true, codeType: data.code_type };
-    } catch (error) {
-      logger.error('Error validating access code:', error);
-      return { isValid: false, codeType: '', error: 'Error validating access code' };
+  const generateAccessCode1 = (): string => {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let result = '';
+    for (let i = 0; i < 5; i++) {
+      result += letters.charAt(Math.floor(Math.random() * letters.length));
     }
+    return result;
   };
 
-  const signUp = async (email: string, password: string, accessCode?: string) => {
+  const generateAccessCode2 = (): string => {
+    return Math.floor(10000 + Math.random() * 90000).toString();
+  };
+
+  const createAccessCodeUsers = async (count: number, roleType: 'admin' | 'user' = 'user') => {
     try {
-      // Validate access code if provided
-      let codeType = 'user';
-      if (accessCode) {
-        const validation = await validateAccessCode(accessCode);
-        if (!validation.isValid) {
-          return { error: validation.error };
-        }
-        codeType = validation.codeType;
-      }
-
-      const redirectUrl = `${window.location.origin}/`;
+      const users = [];
       
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            access_code: accessCode,
-            access_code_type: codeType
+      for (let i = 0; i < count; i++) {
+        const accessCode1 = generateAccessCode1();
+        const accessCode2 = generateAccessCode2();
+        const email = `${accessCode1}@deliberation.local`;
+        
+        // Create user in Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+          email,
+          password: accessCode2,
+          user_metadata: {
+            access_code_1: accessCode1,
+            access_code_2: accessCode2,
+            role: roleType
           }
-        }
-      });
+        });
 
-      // Update access code usage if provided
-      if (accessCode && !error) {
-        await supabase
-          .from('access_codes')
-          .update({ 
-            current_uses: supabase.rpc('increment', { x: 1 }),
-            last_used_at: new Date().toISOString()
-          })
-          .eq('code', accessCode);
+        if (authError) {
+          logger.error('Error creating user:', authError);
+          continue;
+        }
+
+        if (authData.user) {
+          // Add to user_roles table
+          await supabase
+            .from('user_roles')
+            .insert({
+              user_id: authData.user.id,
+              role: roleType
+            });
+
+          users.push({
+            accessCode1,
+            accessCode2,
+            role: roleType
+          });
+        }
       }
 
-      return { error };
+      return { users };
     } catch (error) {
-      logger.error('Sign up error:', error);
-      return { error };
+      logger.error('Error creating access code users:', error);
+      return { users: [], error };
     }
   };
 
@@ -193,10 +179,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     session,
     isLoading,
     isAdmin,
-    signUp,
     signIn,
     signOut,
-    validateAccessCode
+    createAccessCodeUsers
   };
 
   return (

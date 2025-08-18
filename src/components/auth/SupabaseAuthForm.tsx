@@ -10,45 +10,60 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
 export const SupabaseAuthForm = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [accessCode, setAccessCode] = useState('');
+  const [accessCode1, setAccessCode1] = useState('');
+  const [accessCode2, setAccessCode2] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   
-  const { signIn, signUp } = useSupabaseAuth();
+  const { signIn } = useSupabaseAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const validateAccessCodes = () => {
+    // Validate Access Code 1: 5 letters
+    if (!/^[A-Z]{5}$/.test(accessCode1.toUpperCase())) {
+      setError('Access Code 1 must be exactly 5 letters');
+      return false;
+    }
+    
+    // Validate Access Code 2: 5 digits
+    if (!/^\d{5}$/.test(accessCode2)) {
+      setError('Access Code 2 must be exactly 5 digits');
+      return false;
+    }
+    
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
+    if (!validateAccessCodes()) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      let result;
+      // Transform Access Code 1 to email format
+      const email = `${accessCode1.toUpperCase()}@deliberation.local`;
+      const password = accessCode2;
       
-      if (mode === 'signin') {
-        result = await signIn(email, password);
-      } else {
-        result = await signUp(email, password, accessCode);
-      }
+      const result = await signIn(email, password);
 
       if (result.error) {
-        setError(result.error.message || 'Authentication failed');
+        setError('Invalid access codes. Please check your Access Code 1 and Access Code 2.');
       } else {
         toast({
-          title: mode === 'signin' ? 'Signed in successfully' : 'Account created successfully',
-          description: mode === 'signin' ? 'Welcome back!' : 'Please check your email to verify your account.',
+          title: 'Signed in successfully',
+          description: 'Welcome to the deliberation platform!',
         });
         
-        if (mode === 'signin') {
-          navigate('/admin');
-        }
+        navigate('/admin');
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred');
+      setError('Invalid access codes. Please check your Access Code 1 and Access Code 2.');
     } finally {
       setIsLoading(false);
     }
@@ -66,103 +81,52 @@ export const SupabaseAuthForm = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={mode} onValueChange={(value) => setMode(value as 'signin' | 'signup')} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="access-code-1">Access Code 1</Label>
+              <Input
+                id="access-code-1"
+                type="text"
+                value={accessCode1}
+                onChange={(e) => setAccessCode1(e.target.value.toUpperCase())}
+                placeholder="5 letters (e.g., ABCDE)"
+                maxLength={5}
+                className="font-mono text-center uppercase"
+                required
+              />
+              <p className="text-sm text-muted-foreground">
+                Enter exactly 5 letters
+              </p>
+            </div>
             
-            <TabsContent value="signin">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    required
-                  />
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="access-code-2">Access Code 2</Label>
+              <Input
+                id="access-code-2"
+                type="text"
+                inputMode="numeric"
+                value={accessCode2}
+                onChange={(e) => setAccessCode2(e.target.value.replace(/\D/g, ''))}
+                placeholder="5 digits (e.g., 12345)"
+                maxLength={5}
+                className="font-mono text-center"
+                required
+              />
+              <p className="text-sm text-muted-foreground">
+                Enter exactly 5 digits
+              </p>
+            </div>
 
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Signing in...' : 'Sign In'}
-                </Button>
-              </form>
-            </TabsContent>
-            
-            <TabsContent value="signup">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
-                    required
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Create a password"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="access-code">Access Code (Required)</Label>
-                  <Input
-                    id="access-code"
-                    type="text"
-                    value={accessCode}
-                    onChange={(e) => setAccessCode(e.target.value)}
-                    placeholder="Enter your access code"
-                    required
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    You need a valid access code to create an account
-                  </p>
-                </div>
-
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Creating account...' : 'Sign Up'}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Signing in...' : 'Access Platform'}
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>
