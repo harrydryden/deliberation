@@ -67,7 +67,19 @@ export const AdminDeliberationView = () => {
         setMessagesLoading(true);
 
         // Ensure admin context is set for RLS policies
-        await setUserContext();
+        const contextSet = await setUserContext();
+        console.log('Admin context set successfully:', contextSet);
+        
+        // Debug: Check if admin context is working
+        const { data: debugData } = await supabase.rpc('debug_current_user_settings');
+        console.log('Admin context debug:', debugData);
+        
+        // Also check the user from localStorage
+        const storedUser = localStorage.getItem('simple_auth_user');
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          console.log('Stored admin user:', { id: user.id, role: user.role, accessCode: user.accessCode });
+        }
 
         // Load deliberation and participants separately for better control
         const [deliberationResult, participantsResult] = await Promise.all([
