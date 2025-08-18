@@ -131,16 +131,14 @@ export class AccessCodeRepository implements IAccessCodeRepository {
   }
 
   private async generateSecureCode(): Promise<string> {
-    // Generate a cryptographically secure access code
-    const chars = 'ABCDEFGHIJKLMNPQRSTUVWXYZ23456789'; // Removed similar chars
-    let result = '';
-    
-    // Use crypto.getRandomValues for secure random generation
-    const array = new Uint8Array(12);
+    // Generate a cryptographically secure 10-digit access code
+    const array = new Uint8Array(10);
     crypto.getRandomValues(array);
     
-    for (let i = 0; i < 12; i++) {
-      result += chars.charAt(array[i] % chars.length);
+    let result = '';
+    for (let i = 0; i < 10; i++) {
+      // Generate random digit 0-9
+      result += (array[i] % 10).toString();
     }
     
     return result;
