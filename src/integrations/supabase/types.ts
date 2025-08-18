@@ -1188,6 +1188,12 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      get_user_deliberation_ids: {
+        Args: { user_uuid: string }
+        Returns: {
+          deliberation_id: string
+        }[]
+      }
       halfvec_avg: {
         Args: { "": number[] }
         Returns: unknown
