@@ -1317,14 +1317,6 @@ export type Database = {
         Args: { input_code: string }
         Returns: Json
       }
-      validate_role_change: {
-        Args: {
-          current_user_role?: string
-          new_role: string
-          target_user_id: string
-        }
-        Returns: boolean
-      }
       vector_avg: {
         Args: { "": number[] }
         Returns: string
