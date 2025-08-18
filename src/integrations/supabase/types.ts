@@ -834,9 +834,9 @@ export type Database = {
           created_at: string | null
           id: string
           is_archived: boolean | null
-          role: string | null
+          migrated_from_access_code: string | null
+          original_access_code_id: string | null
           updated_at: string | null
-          user_role: string | null
         }
         Insert: {
           archive_reason?: string | null
@@ -845,9 +845,9 @@ export type Database = {
           created_at?: string | null
           id: string
           is_archived?: boolean | null
-          role?: string | null
+          migrated_from_access_code?: string | null
+          original_access_code_id?: string | null
           updated_at?: string | null
-          user_role?: string | null
         }
         Update: {
           archive_reason?: string | null
@@ -856,9 +856,9 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_archived?: boolean | null
-          role?: string | null
+          migrated_from_access_code?: string | null
+          original_access_code_id?: string | null
           updated_at?: string | null
-          user_role?: string | null
         }
         Relationships: []
       }
@@ -934,6 +934,27 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_sessions: {
         Row: {
           created_at: string | null
@@ -972,61 +993,7 @@ export type Database = {
       }
     }
     Views: {
-      user_profiles_with_deliberations: {
-        Row: {
-          archive_reason: string | null
-          archived_at: string | null
-          archived_by: string | null
-          created_at: string | null
-          deliberations: Json | null
-          id: string | null
-          is_archived: boolean | null
-          role: string | null
-          updated_at: string | null
-          user_role: string | null
-        }
-        Insert: {
-          archive_reason?: string | null
-          archived_at?: string | null
-          archived_by?: string | null
-          created_at?: string | null
-          deliberations?: never
-          id?: string | null
-          is_archived?: boolean | null
-          role?: string | null
-          updated_at?: string | null
-          user_role?: string | null
-        }
-        Update: {
-          archive_reason?: string | null
-          archived_at?: string | null
-          archived_by?: string | null
-          created_at?: string | null
-          deliberations?: never
-          id?: string | null
-          is_archived?: boolean | null
-          role?: string | null
-          updated_at?: string | null
-          user_role?: string | null
-        }
-        Relationships: []
-      }
-      user_profiles_with_deliberations_with_codes: {
-        Row: {
-          access_code: string | null
-          archive_reason: string | null
-          archived_at: string | null
-          archived_by: string | null
-          created_at: string | null
-          deliberations: Json | null
-          id: string | null
-          is_archived: boolean | null
-          role: string | null
-          updated_at: string | null
-          user_role: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       admin_create_ibis_relationship: {
@@ -1256,6 +1223,13 @@ export type Database = {
         Args: { "": unknown[] }
         Returns: number
       }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       hnsw_bit_support: {
         Args: { "": unknown }
         Returns: unknown
@@ -1274,6 +1248,10 @@ export type Database = {
       }
       increment_access_code_usage: {
         Args: { input_code: string }
+        Returns: boolean
+      }
+      is_admin: {
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       is_admin_user: {
@@ -1429,6 +1407,7 @@ export type Database = {
       }
     }
     Enums: {
+      app_role: "admin" | "user"
       deliberation_status: "draft" | "active" | "concluded" | "archived"
       ibis_node_type: "issue" | "position" | "argument" | "question"
       message_type: "user" | "bill_agent" | "peer_agent" | "flow_agent"
@@ -1560,6 +1539,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "user"],
       deliberation_status: ["draft", "active", "concluded", "archived"],
       ibis_node_type: ["issue", "position", "argument", "question"],
       message_type: ["user", "bill_agent", "peer_agent", "flow_agent"],
