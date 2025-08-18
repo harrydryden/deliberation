@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import { AIOrchestrationService } from '../services/orchestration.service';
 
 const sendMessageSchema = z.object({
   content: z.string().min(1).max(2000),
@@ -22,7 +21,7 @@ const submitToIbisSchema = z.object({
 });
 
 export async function messageRoutes(fastify: FastifyInstance) {
-  const orchestrationService = new AIOrchestrationService(fastify.prisma);
+  // Note: AIOrchestrationService is now deprecated in favor of direct streaming
 
   // Get user's messages
   fastify.get('/', {
@@ -112,37 +111,9 @@ export async function messageRoutes(fastify: FastifyInstance) {
       // Get or initialize session state
       const sessionState = await getSessionState(userId);
 
-      // Call the new Supabase edge function for agent orchestration
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(
-        process.env.SUPABASE_URL || '',
-        process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-      );
-
-      // Process message through Supabase edge function asynchronously
-      supabase.functions.invoke('agent-orchestration', {
-        body: {
-          messageId: userMessage.id,
-          deliberationId,
-          mode: 'chat'
-        }
-      }).then(response => {
-        if (response.error) {
-          fastify.log.error({ 
-            error: response.error, 
-            userId, 
-            messageId: userMessage.id 
-          }, 'Edge function orchestration failed');
-        } else {
-          fastify.log.info({ 
-            userId, 
-            messageId: userMessage.id,
-            response: response.data 
-          }, 'Edge function orchestration completed');
-        }
-      }).catch(error => {
-        fastify.log.error({ error, userId, messageId: userMessage.id }, 'Edge function call failed');
-      });
+      // Note: Agent processing is now handled by frontend streaming hook
+      // calling agent-orchestration-stream edge function directly
+      // This avoids duplicate processing and provides real-time responses
 
       // Return user message immediately
       reply.status(201).send({

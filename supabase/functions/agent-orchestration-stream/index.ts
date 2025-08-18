@@ -325,36 +325,58 @@ async function generateFastResponse(
   return fullResponse;
 }
 
-// Parallel message analysis
-async function analyzeMessage(content: string, openAIApiKey: string): Promise<any> {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'Analyze this message and return JSON with: intent, complexity (0-1), topicRelevance (0-1), requiresExpertise (boolean).'
-        },
-        {
-          role: 'user',
-          content: content
-        }
-      ],
-      max_tokens: 100,
-      temperature: 0.3
-    }),
-  });
-
-  const data = await response.json();
+// Enhanced message analysis with error handling
+async function analyzeMessage(content: string, openAIApiKey: string): Promise<{
+  intent: string;
+  complexity: number;
+  topicRelevance: number;
+  requiresExpertise: boolean;
+}> {
   try {
-    return JSON.parse(data.choices[0].message.content);
-  } catch {
-    return { intent: 'general', complexity: 0.5, topicRelevance: 0.5, requiresExpertise: false };
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'Analyze this message and return JSON with: intent, complexity (0-1), topicRelevance (0-1), requiresExpertise (boolean). Focus on policy, legal, participant, or clarification intents.'
+          },
+          {
+            role: 'user',
+            content: content
+          }
+        ],
+        max_tokens: 150,
+        temperature: 0.3
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const analysisContent = data.choices?.[0]?.message?.content;
+    
+    if (!analysisContent) {
+      throw new Error('No analysis content received');
+    }
+
+    return JSON.parse(analysisContent);
+  } catch (error) {
+    console.error('❌ Message analysis failed:', error);
+    // Return safe defaults
+    return { 
+      intent: 'general', 
+      complexity: 0.5, 
+      topicRelevance: 0.5, 
+      requiresExpertise: false 
+    };
   }
 }
 
@@ -562,11 +584,19 @@ function buildSystemPrompt(agentType: string, analysis: any, conversationState: 
   return prompt;
 }
 
-// Integrated response cache functionality
-const responseCache = new Map();
-const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
+// Enhanced response cache with cleanup
+interface CacheEntry {
+  response: string;
+  agentType: string;
+  timestamp: number;
+  hits: number;
+}
 
-function checkResponseCache(content: string, deliberationId?: string): any | null {
+const responseCache = new Map<string, CacheEntry>();
+const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
+const MAX_CACHE_SIZE = 1000; // Prevent memory leaks
+
+function checkResponseCache(content: string, deliberationId?: string): CacheEntry | null {
   const key = `${deliberationId || 'global'}:${content.toLowerCase().trim()}`;
   const cached = responseCache.get(key);
   
@@ -575,10 +605,20 @@ function checkResponseCache(content: string, deliberationId?: string): any | nul
     return cached;
   }
   
+  // Remove expired entry if found
+  if (cached) {
+    responseCache.delete(key);
+  }
+  
   return null;
 }
 
 function cacheResponse(content: string, response: string, agentType: string, deliberationId?: string): void {
+  // Clean up cache if it's getting too large
+  if (responseCache.size >= MAX_CACHE_SIZE) {
+    cleanupCache();
+  }
+  
   const key = `${deliberationId || 'global'}:${content.toLowerCase().trim()}`;
   responseCache.set(key, {
     response,
@@ -586,4 +626,29 @@ function cacheResponse(content: string, response: string, agentType: string, del
     timestamp: Date.now(),
     hits: 0
   });
+}
+
+function cleanupCache(): void {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+  
+  // Remove expired entries
+  for (const [key, entry] of responseCache.entries()) {
+    if ((now - entry.timestamp) > CACHE_DURATION) {
+      keysToDelete.push(key);
+    }
+  }
+  
+  // If still too many, remove least recently used
+  if (responseCache.size - keysToDelete.length > MAX_CACHE_SIZE) {
+    const sortedEntries = Array.from(responseCache.entries())
+      .filter(([key]) => !keysToDelete.includes(key))
+      .sort(([,a], [,b]) => a.timestamp - b.timestamp);
+    
+    const toRemove = sortedEntries.slice(0, 200); // Remove oldest 200
+    keysToDelete.push(...toRemove.map(([key]) => key));
+  }
+  
+  keysToDelete.forEach(key => responseCache.delete(key));
+  console.log(`🧹 Cleaned up cache: removed ${keysToDelete.length} entries`);
 }
