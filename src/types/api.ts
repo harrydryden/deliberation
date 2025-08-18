@@ -22,6 +22,8 @@ export interface User {
   archivedAt?: string;
   archivedBy?: string;
   archiveReason?: string;
+  accessCode1?: string;
+  accessCode2?: string;
 }
 
 export interface UserDeliberation {

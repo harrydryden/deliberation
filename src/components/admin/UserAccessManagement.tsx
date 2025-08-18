@@ -116,12 +116,12 @@ export const UserAccessManagement = ({
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <code className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                            {user.email.split('@')[0] || 'N/A'}
+                            {user.accessCode1 || 'N/A'}
                           </code>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => copyToClipboard(user.email.split('@')[0] || 'N/A')}
+                            onClick={() => copyToClipboard(user.accessCode1 || 'N/A')}
                           >
                             <Copy className="h-4 w-4" />
                           </Button>
@@ -130,12 +130,12 @@ export const UserAccessManagement = ({
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <code className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                            N/A
+                            {user.accessCode2 || 'N/A'}
                           </code>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => copyToClipboard('N/A')}
+                            onClick={() => copyToClipboard(user.accessCode2 || 'N/A')}
                           >
                             <Copy className="h-4 w-4" />
                           </Button>

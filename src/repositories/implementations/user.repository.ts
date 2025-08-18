@@ -117,8 +117,27 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         return [];
       }
 
-      // Get user roles separately
+      // Get auth users with metadata
       const userIds = profiles.map(p => p.id);
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      
+      console.log('UserRepository: Auth users query result:', { authUsers, authError });
+
+      
+      if (authError) {
+        logger.error('User repository findAll auth error', authError);
+        // Continue without auth data if admin API fails
+      }
+
+      // Create a map of auth user data
+      const authUsersMap = new Map<string, any>();
+      if (authUsers?.users) {
+        authUsers.users.forEach((user: any) => {
+          authUsersMap.set(user.id, user);
+        });
+      }
+
+      // Get user roles separately
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_roles')
         .select('user_id, role')
@@ -177,10 +196,15 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
       return profiles.map(profile => {
         const role = rolesMap.get(profile.id) || 'user';
         const deliberations = deliberationsMap.get(profile.id) || [];
+        const authUser = authUsersMap.get(profile.id);
 
+        // Extract access codes from auth metadata
+        const accessCode1 = authUser?.user_metadata?.access_code_1 || authUser?.raw_user_meta_data?.access_code_1;
+        const accessCode2 = authUser?.user_metadata?.access_code_2 || authUser?.raw_user_meta_data?.access_code_2;
+        
         return {
           id: profile.id,
-          email: profile.migrated_from_access_code || `user-${profile.id.slice(0, 8)}@example.com`, // Fallback email
+          email: authUser?.email || `user-${profile.id.slice(0, 8)}@example.com`,
           emailConfirmedAt: profile.created_at,
           createdAt: profile.created_at,
           lastSignInAt: profile.updated_at,
@@ -196,6 +220,9 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
           archivedAt: profile.archived_at,
           archivedBy: profile.archived_by,
           archiveReason: profile.archive_reason,
+          // Add access codes to user object
+          accessCode1: accessCode1,
+          accessCode2: accessCode2,
         } as User;
       });
     } catch (error) {
