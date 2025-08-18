@@ -63,68 +63,128 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
     }
   }
 
-  private async ensureUserContextWithRetry(): Promise<boolean> {
+  // Single instance context manager to prevent race conditions
+  private static contextPromise: Promise<boolean> | null = null;
+  private static lastSetUserId: string | null = null;
+
+  private async ensureUserContextWithRetry(userId?: string): Promise<boolean> {
     try {
-      console.log('ensureUserContextWithRetry: Starting');
-      
-      // Get current user from localStorage for debugging
-      const storedUser = localStorage.getItem('simple_auth_user');
-      const user = storedUser ? JSON.parse(storedUser) : null;
-      console.log('ensureUserContextWithRetry: Current user', { userId: user?.id });
-      
-      if (!user?.id) {
-        console.error('ensureUserContextWithRetry: No user ID found');
-        return false;
+      // Determine the user ID to use
+      let targetUserId = userId;
+      if (!targetUserId) {
+        // Get current user from localStorage for debugging
+        const storedUser = localStorage.getItem('simple_auth_user');
+        const user = storedUser ? JSON.parse(storedUser) : null;
+        targetUserId = user?.id;
       }
       
-      // Try up to 5 times to set the context properly
-      let attempts = 5;
+      console.log('ensureUserContextWithRetry: Starting', { userId: targetUserId });
+      
+      if (!targetUserId) {
+        console.error('ensureUserContextWithRetry: No user ID available');
+        return false;
+      }
+
+      // If we already have a context promise for this user, reuse it
+      if (MessageRepository.contextPromise && MessageRepository.lastSetUserId === targetUserId) {
+        try {
+          return await MessageRepository.contextPromise;
+        } catch (error) {
+          // Clear failed promise and try again
+          MessageRepository.contextPromise = null;
+          MessageRepository.lastSetUserId = null;
+        }
+      }
+
+      // Create new context setting promise
+      MessageRepository.lastSetUserId = targetUserId;
+      MessageRepository.contextPromise = this.performContextSetting(targetUserId);
+      
+      try {
+        const result = await MessageRepository.contextPromise;
+        
+        // Clear the promise after successful completion
+        setTimeout(() => {
+          if (MessageRepository.lastSetUserId === targetUserId) {
+            MessageRepository.contextPromise = null;
+            MessageRepository.lastSetUserId = null;
+          }
+        }, 1000);
+        
+        return result;
+      } catch (error) {
+        logger.error('Context setting failed', error);
+        MessageRepository.contextPromise = null;
+        MessageRepository.lastSetUserId = null;
+        return false;
+      }
+    } catch (error) {
+      console.error('ensureUserContextWithRetry: Fatal error', { error });
+      return false;
+    }
+  }
+
+  private async performContextSetting(userId: string): Promise<boolean> {
+    try {
+      logger.info('Setting user context for RLS', { userId });
+      
+      // Try up to 3 times to set the context properly
+      let attempts = 3;
       while (attempts > 0) {
         try {
-          // Set the context directly
-          const { data, error } = await supabase.rpc('set_config', {
+          // Set the user context
+          const { error: setError } = await supabase.rpc('set_config', {
             setting_name: 'app.current_user_id',
-            new_value: user.id,
+            new_value: userId,
             is_local: false
           });
-          
-          if (error) {
-            console.error('ensureUserContextWithRetry: Error setting context', error);
+
+          if (setError) {
+            logger.error('Failed to set user context', setError);
             attempts--;
             if (attempts > 0) await new Promise(resolve => setTimeout(resolve, 100));
             continue;
           }
+
+          // Small delay to ensure the setting takes effect
+          await new Promise(resolve => setTimeout(resolve, 150));
           
-          // Wait a bit for the context to be set
-          await new Promise(resolve => setTimeout(resolve, 50));
-          
-          // Verify the context was set correctly
+          // Verify it was set correctly
           const { data: debugData, error: debugError } = await supabase.rpc('debug_current_user_settings');
-          if (!debugError && debugData?.config_value === user.id) {
-            console.log('ensureUserContextWithRetry: Success', { userId: user.id, attempts: 5 - attempts + 1 });
-            return true;
+          
+          if (debugError) {
+            logger.error('Failed to verify user context', debugError);
+            attempts--;
+            if (attempts > 0) await new Promise(resolve => setTimeout(resolve, 100));
+            continue;
           }
+
+          const isCorrect = debugData?.config_value === userId && !debugData?.config_is_null;
           
-          console.warn('ensureUserContextWithRetry: Verification failed', { 
-            expected: user.id, 
-            actual: debugData?.config_value, 
-            attempts 
-          });
-          
+          if (isCorrect) {
+            logger.info('User context successfully set and verified', { userId, attempts: 4 - attempts });
+            return true;
+          } else {
+            logger.warn('User context verification failed', { 
+              expected: userId, 
+              actual: debugData?.config_value,
+              isNull: debugData?.config_is_null,
+              attempts
+            });
+            attempts--;
+            if (attempts > 0) await new Promise(resolve => setTimeout(resolve, 100 * (4 - attempts)));
+          }
         } catch (error) {
-          console.error('ensureUserContextWithRetry: Attempt failed', { error, attempts });
-        }
-        
-        attempts--;
-        if (attempts > 0) {
-          await new Promise(resolve => setTimeout(resolve, 100 * (6 - attempts))); // Increasing delay
+          logger.error('Error in context setting attempt', error);
+          attempts--;
+          if (attempts > 0) await new Promise(resolve => setTimeout(resolve, 100 * (4 - attempts)));
         }
       }
       
-      console.error('ensureUserContextWithRetry: All attempts failed');
+      logger.error('Failed to set user context after all attempts', { userId });
       return false;
     } catch (error) {
-      console.error('ensureUserContextWithRetry: Fatal error', { error });
+      logger.error('Error in performContextSetting', error);
       return false;
     }
   }
@@ -132,7 +192,7 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
   async findByUser(userId: string): Promise<Message[]> {
     try {
       // Ensure user context is properly set for RLS policies
-      const contextSet = await this.ensureUserContextWithRetry();
+      const contextSet = await this.ensureUserContextWithRetry(userId);
       if (!contextSet) {
         logger.warn('Could not set user context for RLS, may return empty results', { userId });
       }
@@ -158,19 +218,10 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
   async create(data: Omit<Message, 'id' | 'createdAt' | 'updatedAt'>): Promise<Message> {
     try {
       // Ensure user context is properly set for RLS policies
-      const contextSet = await this.ensureUserContextWithRetry();
+      const contextSet = await this.ensureUserContextWithRetry(data.userId);
       if (!contextSet) {
-        logger.error('Could not set user context for RLS, message creation will fail', { userId: data.userId });
-        throw new Error('User context could not be set. Please try logging out and back in.');
+        throw new Error('Unable to authenticate your session. Please refresh the page and try again.');
       }
-      
-      // Debug: Verify context was set correctly
-      const { data: debugData } = await supabase.rpc('debug_current_user_settings');
-      logger.info('Message creation - user context check', { 
-        debugData, 
-        expectedUserId: data.userId,
-        contextSet 
-      });
       
       // Map the data to database column names
       const dbData = {
