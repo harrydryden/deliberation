@@ -211,6 +211,7 @@ export const UserAccessManagement = ({
                     <TableRow>
                       <TableHead>User ID</TableHead>
                       <TableHead>Access Code</TableHead>
+                      <TableHead>Code Type</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Deliberations</TableHead>
                       <TableHead>Actions</TableHead>
@@ -237,6 +238,11 @@ export const UserAccessManagement = ({
                               <Copy className="h-4 w-4" />
                             </Button>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getUserCodeType(user.accessCode) === 'admin' ? 'default' : 'secondary'}>
+                            {getUserCodeType(user.accessCode)}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Select
