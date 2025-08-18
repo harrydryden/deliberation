@@ -68,11 +68,8 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
     try {
       // Query profiles with access codes and deliberations
       let query = supabase
-        .from('user_profiles_with_deliberations')
-        .select(`
-          *,
-          access_codes!inner(code)
-        `)
+        .from('user_profiles_with_deliberations_with_codes')
+        .select('*')
         .or('is_archived.is.null,is_archived.eq.false'); // Exclude archived users
       
       if (filter) {
@@ -90,7 +87,7 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
       
       return (data || []).map(item => ({
         id: item.id,
-        accessCode: item.access_codes?.code || '',
+        accessCode: item.access_code || '',
         role: item.user_role || 'user',
         profile: {
           displayName: '',
@@ -181,11 +178,8 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
     try {
       // Query profiles with access codes and deliberations for ALL users including archived
       let query = supabase
-        .from('user_profiles_with_deliberations')
-        .select(`
-          *,
-          access_codes!inner(code)
-        `);
+        .from('user_profiles_with_deliberations_with_codes')
+        .select('*');
       
       if (filter) {
         Object.entries(filter).forEach(([key, value]) => {
@@ -202,7 +196,7 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
       
       return (data || []).map(item => ({
         id: item.id,
-        accessCode: item.access_codes?.code || '',
+        accessCode: item.access_code || '',
         role: item.user_role || 'user',
         profile: {
           displayName: '',
