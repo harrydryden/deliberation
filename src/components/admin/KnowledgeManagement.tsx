@@ -89,7 +89,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
 
     setUploading(true);
     try {
-      // Get current user
+      // Get current user and set context
       const user = await ensureUserContext();
       if (!user) {
         throw new Error('User not authenticated');

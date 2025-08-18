@@ -51,7 +51,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
     const startTime = performance.now();
 
     try {
-      // Get current user
+      // Get current user and set context
       const user = await ensureUserContext();
       if (!user) {
         throw new Error('User not authenticated');

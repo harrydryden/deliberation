@@ -183,9 +183,9 @@ export const IbisSubmissionModal = ({
       });
       return;
     }
-  setIsSubmitting(true);
+    setIsSubmitting(true);
     try {
-      // Create IBIS node
+      // Create IBIS node and set user context
       const user = await ensureUserContext();
       if (!user) {
         throw new Error('User not authenticated');
