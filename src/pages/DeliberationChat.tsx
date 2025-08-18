@@ -346,7 +346,7 @@ const DeliberationChat = () => {
                 <div className="rounded-lg border bg-muted/40 p-3 h-32 flex flex-col justify-center">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <h1 className="text-xl font-semibold text-democratic-blue truncate">
+                      <h1 className="text-lg font-semibold text-democratic-blue truncate">
                         {deliberation.title}
                       </h1>
                       <Badge className="bg-blue-500 text-white text-sm shrink-0">
