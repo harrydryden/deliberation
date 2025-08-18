@@ -1,13 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { LogOut, User, MessageSquare, Settings, Brain } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useNavigate } from "react-router-dom";
+
 export const Header = () => {
-  const {
-    user,
-    logout
-  } = useAuth();
+  const { user, isAdmin, signOut } = useSupabaseAuth();
   const navigate = useNavigate();
   return <header className="border-b bg-background backdrop-blur supports-[backdrop-filter]:bg-background/60" style={{
     position: 'sticky',
@@ -23,16 +21,16 @@ export const Header = () => {
         </div>
         
         {user && <div className="flex items-center space-x-4">
-            {user.role !== 'admin' && <Button variant="ghost" size="sm" onClick={() => navigate('/deliberations')} className="flex items-center space-x-1">
+            {!isAdmin && <Button variant="ghost" size="sm" onClick={() => navigate('/deliberations')} className="flex items-center space-x-1">
               <MessageSquare className="h-4 w-4" />
               <span>Deliberations</span>
             </Button>}
-            {user.role === 'admin' && <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="flex items-center space-x-1">
+            {isAdmin && <Button variant="ghost" size="sm" onClick={() => navigate('/admin')} className="flex items-center space-x-1">
                 <Settings className="h-4 w-4" />
                 <span>Admin</span>
               </Button>}
             
-            <Button variant="outline" size="sm" onClick={logout} className="flex items-center space-x-1">
+            <Button variant="outline" size="sm" onClick={signOut} className="flex items-center space-x-1">
               <LogOut className="h-4 w-4" />
               <span>Sign Out</span>
             </Button>

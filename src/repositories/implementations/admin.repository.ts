@@ -1,8 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { IAdminRepository } from '../interfaces';
+import { SupabaseBaseRepository } from './supabase-base.repository';
 import { logger } from '@/utils/logger';
 
-export class AdminRepository implements IAdminRepository {
+export class AdminRepository extends SupabaseBaseRepository implements IAdminRepository {
   async getSystemStats(): Promise<{
     totalUsers: number;
     totalDeliberations: number;
