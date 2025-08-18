@@ -9,6 +9,7 @@ import { Calendar, Users, Eye, Bot, User, FileText, Workflow, ChevronDown, Chevr
 import { formatToUKDate, formatToUKTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { MarkdownMessage } from '@/components/common/MarkdownMessage';
+import { setUserContext } from '@/utils/authHelpers';
 import type { ChatMessage } from '@/types/chat';
 interface Deliberation {
   id: string;
@@ -65,22 +66,36 @@ export const AdminDeliberationView = () => {
         setLoading(true);
         setMessagesLoading(true);
 
+        // Ensure admin context is set for RLS policies
+        await setUserContext();
+
         // Load deliberation and participants separately for better control
-        const [deliberationResult, participantsResult] = await Promise.all([supabase.from('deliberations').select('*').eq('id', deliberationId).single(), supabase.from('participants').select('user_id, role, joined_at').eq('deliberation_id', deliberationId)]);
+        const [deliberationResult, participantsResult] = await Promise.all([
+          supabase.from('deliberations').select('*').eq('id', deliberationId).single(), 
+          supabase.from('participants').select('user_id, role, joined_at').eq('deliberation_id', deliberationId)
+        ]);
+        
         if (deliberationResult.error) {
           throw deliberationResult.error;
         }
 
-        // Get messages
-        const messagesResult = await supabase.from('messages').select('*').eq('deliberation_id', deliberationId).order('created_at', {
-          ascending: true
-        });
+        // Get messages - admin should be able to see all messages
+        const messagesResult = await supabase
+          .from('messages')
+          .select('*')
+          .eq('deliberation_id', deliberationId)
+          .order('created_at', { ascending: true });
+          
         if (messagesResult.error) {
+          console.error('Messages query error:', messagesResult.error);
           throw messagesResult.error;
         }
+        
         if (deliberationResult.data) {
           // Calculate unique participants from messages since formal participants may not be recorded
-          const uniqueMessageSenders = new Set(messagesResult.data?.filter(msg => msg.message_type === 'user')?.map(msg => msg.user_id)?.filter(Boolean));
+          const uniqueMessageSenders = new Set(
+            messagesResult.data?.filter(msg => msg.message_type === 'user')?.map(msg => msg.user_id)?.filter(Boolean)
+          );
           setDeliberation({
             ...deliberationResult.data,
             participants: participantsResult.data || [],
