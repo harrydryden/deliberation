@@ -12,22 +12,7 @@ export class AdminRepository implements IAdminRepository {
     usedAccessCodes: number;
   }> {
     try {
-      // Set admin context for these operations
-      const storedUser = localStorage.getItem('simple_auth_user');
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        if (user.id) {
-          try {
-            await supabase.rpc('set_config', {
-              setting_name: 'app.current_user_id',
-              new_value: user.id,
-              is_local: false
-            });
-          } catch (contextError) {
-            console.warn('Failed to set admin context:', contextError);
-          }
-        }
-      }
+      // Context is now set automatically via headers
 
       // Execute multiple queries in parallel for better performance
       const [
