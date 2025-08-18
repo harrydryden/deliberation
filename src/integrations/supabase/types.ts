@@ -1000,7 +1000,45 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_profiles_with_deliberations: {
+        Row: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string | null
+          deliberations: Json | null
+          id: string | null
+          is_archived: boolean | null
+          role: string | null
+          updated_at: string | null
+          user_role: string | null
+        }
+        Insert: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string | null
+          deliberations?: never
+          id?: string | null
+          is_archived?: boolean | null
+          role?: string | null
+          updated_at?: string | null
+          user_role?: string | null
+        }
+        Update: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          created_at?: string | null
+          deliberations?: never
+          id?: string | null
+          is_archived?: boolean | null
+          role?: string | null
+          updated_at?: string | null
+          user_role?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_create_ibis_relationship: {
@@ -1122,6 +1160,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_access_code_count: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       get_access_code_type: {
         Args: { access_code: string }
         Returns: string
@@ -1153,6 +1195,10 @@ export type Database = {
           system_prompt: string
           updated_at: string
         }[]
+      }
+      get_profile_count: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       halfvec_avg: {
         Args: { "": number[] }
