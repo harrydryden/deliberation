@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
 import { logger } from '@/utils/logger';
+import { ensureUserContext } from '@/utils/authHelpers';
 
 // Remove PDF.js imports since we're using server-side processing
 
@@ -51,7 +52,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
 
     try {
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await ensureUserContext();
       if (!user) {
         throw new Error('User not authenticated');
       }

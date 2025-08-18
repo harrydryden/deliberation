@@ -32,6 +32,7 @@ import { RefreshCw, Plus, Search, Filter, MessageSquare, GitBranch } from 'lucid
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceDirectedLayout, getNodeDimensions } from './ibis-layout';
+import { ensureUserContext } from '@/utils/authHelpers';
 import { resolveCollisions, findNonOverlappingPosition } from './collision-detection';
 import { applyConcentricLayout, constrainToZone, type ConcentricZones } from './zone-layout';
 import { logger } from '@/utils/logger';
