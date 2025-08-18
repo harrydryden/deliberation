@@ -1126,6 +1126,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_simple_access_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_access_code_count: {
         Args: Record<PropertyKey, never>
         Returns: number
