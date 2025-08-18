@@ -112,11 +112,25 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
 
       logger.component.update('KnowledgeManagement', { action: 'uploadSuccess', path: uploadData.path });
 
-      // Trigger background processing using the correct edge function
+      // Trigger background processing using the enhanced processors
       // Convert MIME type to simple content type for database constraint
       const contentType = file.type === 'application/pdf' ? 'pdf' : 'text';
+      const isPDF = contentType === 'pdf';
       
-      const { data, error } = await supabase.functions.invoke('process-document', {
+      // Show processing guidance for PDFs
+      if (isPDF) {
+        toast({
+          title: "Processing PDF",
+          description: "Using enhanced AI-powered text extraction. For best results, ensure your PDF contains selectable text.",
+          variant: "default"
+        });
+      }
+      
+      // Use enhanced LangChain processor for PDFs, original for text files
+      const processingFunction = isPDF ? 'langchain-process-document' : 'process-document';
+      logger.component.update('KnowledgeManagement', { action: 'processingStart', function: processingFunction });
+      
+      const { data, error } = await supabase.functions.invoke(processingFunction, {
         body: {
           agentId: selectedAgent,
           storagePath: uploadData.path,
@@ -133,9 +147,12 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       }
 
       if (data?.success) {
+        const chunksProcessed = data.chunksProcessed || 0;
+        const totalChunks = data.totalChunks || chunksProcessed;
+        
         toast({
           title: "Success",
-          description: `Successfully uploaded and processed ${file.name}. Created ${data.chunksProcessed} knowledge chunks.`
+          description: `Successfully uploaded and processed ${file.name}. Created ${chunksProcessed} knowledge chunks${totalChunks !== chunksProcessed ? ` (${totalChunks} total chunks)` : ''}.`
         });
         setUploadOpen(false);
         loadKnowledgeForAgent(selectedAgent);
