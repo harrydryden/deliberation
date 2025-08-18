@@ -3,6 +3,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 import { OpenAIEmbeddings } from 'https://esm.sh/@langchain/openai@0.6.3';
 import { ChatOpenAI } from 'https://esm.sh/@langchain/openai@0.6.3';
+import { SupabaseVectorStore } from 'https://esm.sh/@langchain/community@0.3.49/vectorstores/supabase';
+import { RetrievalQAChain } from 'https://esm.sh/langchain@0.3.30/chains/retrieval_qa';
+import { PromptTemplate } from 'https://esm.sh/@langchain/core@0.3.30/prompts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
