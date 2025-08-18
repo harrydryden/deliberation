@@ -99,20 +99,10 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
     try {
       console.log('UserRepository: findAll called with filter:', filter);
       
-      // Query profiles with user roles and deliberations
+      // Query profiles directly (no joins to avoid relationship issues)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles (role),
-          participants (
-            role,
-            deliberations (
-              id,
-              title
-            )
-          )
-        `)
+        .select('*')
         .eq('is_archived', false); // Only non-archived users
       
       console.log('UserRepository: Profiles query result:', { profiles, profilesError });
@@ -122,19 +112,71 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         throw profilesError;
       }
 
-      logger.info('User repository findAll profiles fetched', { count: profiles?.length });
-
-      if (!profiles) {
+      if (!profiles || profiles.length === 0) {
+        console.log('No profiles found');
         return [];
       }
 
+      // Get user roles separately
+      const userIds = profiles.map(p => p.id);
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds);
+      
+      console.log('UserRepository: User roles query result:', { userRoles, rolesError });
+      
+      if (rolesError) {
+        logger.error('User repository findAll roles error', rolesError);
+        // Don't throw, just log and continue without roles
+      }
+
+      // Get participants separately  
+      const { data: participants, error: participantsError } = await supabase
+        .from('participants')
+        .select(`
+          user_id,
+          role,
+          deliberations (
+            id,
+            title
+          )
+        `)
+        .in('user_id', userIds.map(id => id.toString()));
+      
+      console.log('UserRepository: Participants query result:', { participants, participantsError });
+      
+      if (participantsError) {
+        logger.error('User repository findAll participants error', participantsError);
+        // Don't throw, just log and continue without participants
+      }
+
+      // Create maps for efficient lookups
+      const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
+      const deliberationsMap = new Map<string, Array<{ id: string; title: string; role: string }>>();
+      
+      // Initialize deliberations map
+      profiles.forEach(profile => {
+        deliberationsMap.set(profile.id, []);
+      });
+
+      // Populate deliberations map
+      participants?.forEach((p: any) => {
+        const userId = p.user_id;
+        if (deliberationsMap.has(userId) && p.deliberations) {
+          deliberationsMap.get(userId)!.push({
+            id: p.deliberations.id,
+            title: p.deliberations.title,
+            role: p.role || 'participant'
+          });
+        }
+      });
+
+      logger.info('User repository findAll profiles fetched', { count: profiles?.length });
+
       return profiles.map(profile => {
-        const role = profile.user_roles?.[0]?.role || 'user';
-        const deliberations = profile.participants?.map((p: any) => ({
-          id: p.deliberations?.id || '',
-          title: p.deliberations?.title || '',
-          role: p.role || 'participant'
-        })) || [];
+        const role = rolesMap.get(profile.id) || 'user';
+        const deliberations = deliberationsMap.get(profile.id) || [];
 
         return {
           id: profile.id,
@@ -219,37 +261,72 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
 
   async findAllIncludingArchived(filter?: Record<string, any>): Promise<User[]> {
     try {
-      // Query all profiles including archived ones
+      // Query all profiles including archived ones (no joins)
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select(`
-          *,
-          user_roles (role),
-          participants (
-            role,
-            deliberations (
-              id,
-              title
-            )
-          )
-        `);
+        .select('*');
       
       if (profilesError) {
         logger.error('User repository findAllIncludingArchived profiles error', profilesError);
         throw profilesError;
       }
 
-      if (!profiles) {
+      if (!profiles || profiles.length === 0) {
         return [];
       }
 
+      // Get user roles separately
+      const userIds = profiles.map(p => p.id);
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role')
+        .in('user_id', userIds);
+      
+      if (rolesError) {
+        logger.error('User repository findAllIncludingArchived roles error', rolesError);
+      }
+
+      // Get participants separately  
+      const { data: participants, error: participantsError } = await supabase
+        .from('participants')
+        .select(`
+          user_id,
+          role,
+          deliberations (
+            id,
+            title
+          )
+        `)
+        .in('user_id', userIds.map(id => id.toString()));
+      
+      if (participantsError) {
+        logger.error('User repository findAllIncludingArchived participants error', participantsError);
+      }
+
+      // Create maps for efficient lookups
+      const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
+      const deliberationsMap = new Map<string, Array<{ id: string; title: string; role: string }>>();
+      
+      // Initialize deliberations map
+      profiles.forEach(profile => {
+        deliberationsMap.set(profile.id, []);
+      });
+
+      // Populate deliberations map
+      participants?.forEach((p: any) => {
+        const userId = p.user_id;
+        if (deliberationsMap.has(userId) && p.deliberations) {
+          deliberationsMap.get(userId)!.push({
+            id: p.deliberations.id,
+            title: p.deliberations.title,
+            role: p.role || 'participant'
+          });
+        }
+      });
+
       return profiles.map(profile => {
-        const role = profile.user_roles?.[0]?.role || 'user';
-        const deliberations = profile.participants?.map((p: any) => ({
-          id: p.deliberations?.id || '',
-          title: p.deliberations?.title || '',
-          role: p.role || 'participant'
-        })) || [];
+        const role = rolesMap.get(profile.id) || 'user';
+        const deliberations = deliberationsMap.get(profile.id) || [];
 
         return {
           id: profile.id,
