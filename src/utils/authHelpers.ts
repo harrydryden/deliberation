@@ -43,13 +43,11 @@ export const setUserContext = async (): Promise<boolean> => {
   if (!user) return false;
   
   try {
-    // Set the access code in the context, not the user UUID
-    // The RLS policies expect get_current_user_access_code() to return the access code
-    const contextValue = user.accessCode || user.id;
-    
+    // ALWAYS use the user UUID, never the access code
+    // The user.id should already be a UUID from the authentication process
     await supabase.rpc('set_config', {
       setting_name: 'app.current_user_id',
-      new_value: contextValue,
+      new_value: user.id, // This should be the UUID
       is_local: false
     });
     return true;
