@@ -153,21 +153,34 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
       });
 
       // Get all Supabase Auth users to access their metadata
+      console.log('🔍 Fetching auth users for metadata...');
       const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      
+      if (authError) {
+        console.error('❌ Error fetching auth users:', authError);
+      } else {
+        console.log('✅ Auth users fetched:', authUsers?.users?.length || 0);
+        console.log('📊 Sample auth user metadata:', authUsers?.users?.[0]?.user_metadata);
+      }
       
       // Create a map of user IDs to their auth metadata
       const authUsersMap = new Map<string, any>();
       if (authUsers?.users) {
         authUsers.users.forEach((authUser: any) => {
+          console.log(`📝 Mapping user ${authUser.id} with metadata:`, authUser.user_metadata);
           authUsersMap.set(authUser.id, authUser.user_metadata);
         });
       }
+
+      console.log('🗺️ AuthUsersMap size:', authUsersMap.size);
 
       // Map users with their access codes from Supabase Auth metadata
       const users: User[] = profiles.map(profile => {
         const role = rolesMap.get(profile.id) || 'user';
         const deliberations = deliberationsMap.get(profile.id) || [];
         const authMetadata = authUsersMap.get(profile.id);
+        
+        console.log(`🔍 Processing profile ${profile.id}, metadata:`, authMetadata);
         
         // Get access codes from Supabase Auth metadata
         let accessCode1 = 'N/A';
@@ -176,6 +189,9 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         if (authMetadata?.access_code_1 && authMetadata?.access_code_2) {
           accessCode1 = authMetadata.access_code_1;
           accessCode2 = authMetadata.access_code_2;
+          console.log(`✅ Found access codes for ${profile.id}: ${accessCode1} / ${accessCode2}`);
+        } else {
+          console.log(`❌ No access codes found for ${profile.id}, metadata:`, authMetadata);
         }
         
         const userResult = {
