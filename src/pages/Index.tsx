@@ -158,6 +158,10 @@ const Index = () => {
                     <p className="font-medium text-foreground">View Mode Switch:</p>
                     <p className="text-sm">Switch between "Message" view (see conversation flow) and "Map" view (visualize the discussion structure using IBIS methodology).</p>
                   </div>
+                  <div>
+                    <p className="font-medium text-foreground">Voice Mode:</p>
+                    <p className="text-sm">Speak directly with agents using real-time voice chat—simply click and have a proper conversation.</p>
+                  </div>
                 </CardDescription>
               </CardHeader>
             </Card>
