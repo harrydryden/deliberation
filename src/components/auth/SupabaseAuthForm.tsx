@@ -90,7 +90,7 @@ export const SupabaseAuthForm = () => {
             <p className="text-xs text-muted-foreground mt-1">
               1. Enable "Allow new users to sign up" in Supabase Auth Settings<br/>
               2. Go to /setup to create admin users<br/>
-              3. Return here to sign in with ADMIN/12345
+              3. Return here to sign in with ADMIN/123456
             </p>
           </div>
         </CardHeader>

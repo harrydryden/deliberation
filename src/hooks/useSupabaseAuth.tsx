@@ -105,12 +105,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Create ADMIN user
       const { data: adminData, error: adminError } = await supabase.auth.signUp({
         email: 'ADMIN@deliberation.local',
-        password: '12345',
+        password: '123456',
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             access_code_1: 'ADMIN',
-            access_code_2: '12345',
+            access_code_2: '123456',
             role: 'admin'
           }
         }
@@ -135,12 +135,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Create SUPER user
       const { data: superData, error: superError } = await supabase.auth.signUp({
         email: 'SUPER@deliberation.local',
-        password: '54321',
+        password: '543210',
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             access_code_1: 'SUPER',
-            access_code_2: '54321',
+            access_code_2: '543210',
             role: 'admin'
           }
         }
