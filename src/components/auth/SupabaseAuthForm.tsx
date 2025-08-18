@@ -85,6 +85,14 @@ export const SupabaseAuthForm = () => {
           <CardDescription>
             Access the deliberation management system
           </CardDescription>
+          <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded">
+            <p className="text-sm text-destructive font-medium">Setup Required:</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              1. Enable "Allow new users to sign up" in Supabase Auth Settings<br/>
+              2. Go to /setup to create admin users<br/>
+              3. Return here to sign in with ADMIN/12345
+            </p>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
