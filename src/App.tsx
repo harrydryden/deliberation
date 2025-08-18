@@ -47,6 +47,7 @@ const AdminGuard = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const Setup = lazy(() => import("./pages/Setup").then(module => ({ default: module.SetupPage })));
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -64,6 +65,7 @@ const App = () => (
           <BrowserRouter>
             <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-center space-y-4"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" /><p className="text-muted-foreground">Loading...</p></div></div>}>
               <Routes>
+                <Route path="/setup" element={<Setup />} />
                 <Route path="/" element={<AuthGuard><Index /></AuthGuard>} />
                 <Route path="/auth" element={<SupabaseAuthForm />} />
                 

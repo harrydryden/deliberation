@@ -11,6 +11,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
   createAccessCodeUsers: (count: number, roleType: 'admin' | 'user') => Promise<{ users: Array<{ accessCode1: string; accessCode2: string; role: string }>, error?: any }>;
+  createAdminUsers: () => Promise<{ success: boolean; error?: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -99,11 +100,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const createAdminUsers = async () => {
     try {
+      console.log('Creating admin users...');
+      
       // Create ADMIN user
       const { data: adminData, error: adminError } = await supabase.auth.signUp({
         email: 'ADMIN@deliberation.local',
         password: '12345',
         options: {
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             access_code_1: 'ADMIN',
             access_code_2: '12345',
@@ -115,7 +119,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (adminError) {
         console.error('Error creating admin user:', adminError);
       } else {
-        console.log('Admin user created successfully');
+        console.log('Admin user created successfully', adminData);
+        
+        // Add admin role to user_roles table
+        if (adminData.user) {
+          await supabase
+            .from('user_roles')
+            .insert({
+              user_id: adminData.user.id,
+              role: 'admin'
+            });
+        }
       }
 
       // Create SUPER user
@@ -123,6 +137,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         email: 'SUPER@deliberation.local',
         password: '54321',
         options: {
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             access_code_1: 'SUPER',
             access_code_2: '54321',
@@ -134,11 +149,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (superError) {
         console.error('Error creating super user:', superError);
       } else {
-        console.log('Super user created successfully');
+        console.log('Super user created successfully', superData);
+        
+        // Add admin role to user_roles table
+        if (superData.user) {
+          await supabase
+            .from('user_roles')
+            .insert({
+              user_id: superData.user.id,
+              role: 'admin'
+            });
+        }
       }
 
+      return { success: true };
     } catch (error) {
       console.error('Error in createAdminUsers:', error);
+      return { success: false, error };
     }
   };
 
@@ -218,7 +245,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isAdmin,
     signIn,
     signOut,
-    createAccessCodeUsers
+    createAccessCodeUsers,
+    createAdminUsers
   };
 
   return (

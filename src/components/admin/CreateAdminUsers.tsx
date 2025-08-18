@@ -7,54 +7,26 @@ import { supabase } from '@/integrations/supabase/client';
 
 export function CreateAdminUsers() {
   const [isCreating, setIsCreating] = useState(false);
+  const { createAdminUsers } = useSupabaseAuth();
   const { toast } = useToast();
 
-  const createUsers = async () => {
+  const handleCreateUsers = async () => {
     setIsCreating(true);
     try {
-      // Create ADMIN user
-      const { data: adminData, error: adminError } = await supabase.auth.signUp({
-        email: 'ADMIN@deliberation.local',
-        password: '12345',
-        options: {
-          data: {
-            access_code_1: 'ADMIN',
-            access_code_2: '12345',
-            role: 'admin'
-          }
-        }
-      });
-
-      if (adminError) {
-        console.error('Error creating admin user:', adminError);
+      const result = await createAdminUsers();
+      
+      if (result.success) {
+        toast({
+          title: 'Admin users created',
+          description: 'ADMIN/12345 and SUPER/54321 users have been created'
+        });
       } else {
-        console.log('Admin user created successfully', adminData);
+        toast({
+          title: 'Error creating users',
+          description: 'There was an error creating the admin users',
+          variant: 'destructive'
+        });
       }
-
-      // Create SUPER user
-      const { data: superData, error: superError } = await supabase.auth.signUp({
-        email: 'SUPER@deliberation.local',
-        password: '54321',
-        options: {
-          data: {
-            access_code_1: 'SUPER',
-            access_code_2: '54321',
-            role: 'admin'
-          }
-        }
-      });
-
-      if (superError) {
-        console.error('Error creating super user:', superError);
-      } else {
-        console.log('Super user created successfully', superData);
-      }
-
-      toast({
-        title: 'Admin users created',
-        description: 'ADMIN/12345 and SUPER/54321 users have been created'
-      });
-
     } catch (error) {
       console.error('Error creating users:', error);
       toast({
@@ -79,7 +51,7 @@ export function CreateAdminUsers() {
           <br />• SUPER / 54321
         </p>
         
-        <Button onClick={createUsers} disabled={isCreating}>
+        <Button onClick={handleCreateUsers} disabled={isCreating}>
           {isCreating ? 'Creating...' : 'Create Admin Users'}
         </Button>
       </CardContent>
