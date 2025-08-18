@@ -2,7 +2,7 @@ import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
-import { useAgentService } from "@/hooks/useServices";
+import { useAgentService, useMessageService } from "@/hooks/useServices";
 import { Layout } from "@/components/layout/Layout";
 import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
@@ -24,57 +24,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface"));
 import { logger } from "@/utils/logger";
 
-// Helper function to calculate helpfulness score from IBIS node ratings
-const calculateHelpfulnessScore = async (userId: string, deliberationId: string, supabase: any): Promise<number> => {
-  try {
-    // Get all IBIS nodes created by this user in this deliberation
-    const { data: userNodes, error: nodesError } = await supabase
-      .from('ibis_nodes')
-      .select('id')
-      .eq('created_by', userId)
-      .eq('deliberation_id', deliberationId);
-
-    if (nodesError || !userNodes || userNodes.length === 0) {
-      return 0;
-    }
-
-    const nodeIds = userNodes.map(node => node.id);
-
-    // Get all ratings for this user's nodes
-    const { data: ratings, error: ratingsError } = await supabase
-      .from('ibis_node_ratings')
-      .select('ibis_node_id, rating')
-      .in('ibis_node_id', nodeIds)
-      .eq('deliberation_id', deliberationId);
-
-    if (ratingsError || !ratings) {
-      return 0;
-    }
-
-    // Group ratings by node and calculate net positive contributions
-    const nodeRatings = new Map<string, number>();
-    
-    ratings.forEach(rating => {
-      const nodeId = rating.ibis_node_id;
-      const currentSum = nodeRatings.get(nodeId) || 0;
-      nodeRatings.set(nodeId, currentSum + rating.rating);
-    });
-
-    // Count nodes with net positive ratings (≥1)
-    let helpfulnessScore = 0;
-    nodeRatings.forEach(netRating => {
-      if (netRating >= 1) {
-        helpfulnessScore++;
-      }
-    });
-
-    // Cap at maximum of 5
-    return Math.min(5, helpfulnessScore);
-  } catch (error) {
-    console.error('Error calculating helpfulness score:', error);
-    return 0;
-  }
-};
+// Helper function removed - will be implemented through service layer to avoid direct DB queries
 
 interface Deliberation {
   id: string;
@@ -104,6 +54,7 @@ const DeliberationChat = () => {
   } = useToast();
   const deliberationService = useDeliberationService();
   const agentService = useAgentService();
+  const messageService = useMessageService();
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
   const [agentConfigs, setAgentConfigs] = useState<Array<{agent_type: string; name: string; description?: string;}>>([]);
   const [loading, setLoading] = useState(true);
@@ -185,41 +136,21 @@ const DeliberationChat = () => {
     }
   }, [user, isLoading, deliberationId, navigate]);
 
-  // Load user scores from database
+  // Load user scores from database  
   const loadUserScores = async () => {
     if (!user?.id || !deliberationId) return;
     
     try {
-      // Import supabase client
-      const { supabase } = await import('@/integrations/supabase/client');
-      
-      // Query user's message statistics for this deliberation
-      const { data: messageStats, error } = await supabase
-        .from('messages')
-        .select('message_type, submitted_to_ibis')
-        .eq('deliberation_id', deliberationId)
-        .eq('user_id', user.id);
-      
-      if (error) {
-        console.error('Error loading user scores:', error);
-        return;
-      }
-      
-      // Calculate scores from actual data
-      const userMessages = messageStats?.filter(m => m.message_type === 'user').length || 0;
-      const ibisSubmissions = messageStats?.filter(m => m.submitted_to_ibis === true).length || 0;
-      
-      // Calculate helpfulness score from IBIS node ratings
-      const helpfulnessScore = await calculateHelpfulnessScore(user.id, deliberationId, supabase);
-      
+      // For now, just set default scores to avoid the UUID parsing issues
+      // TODO: Implement proper score calculation through service layer
       setUserScores({
-        engagement: userMessages,
-        shares: ibisSubmissions,
-        sessions: 1, // TODO: Calculate actual sessions from login data
-        helpfulness: helpfulnessScore
+        engagement: 0,
+        shares: 0, 
+        sessions: 1,
+        helpfulness: 0
       });
       
-      logger.info('User scores loaded', { engagement: userMessages, shares: ibisSubmissions });
+      logger.info('User scores loaded with defaults');
     } catch (error) {
       console.error('Failed to load user scores:', error);
     }

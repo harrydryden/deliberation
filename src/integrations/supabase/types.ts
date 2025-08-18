@@ -816,7 +816,15 @@ export type Database = {
           role?: Database["public"]["Enums"]["participant_role"] | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "participants_deliberation_id_fkey"
+            columns: ["deliberation_id"]
+            isOneToOne: false
+            referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
