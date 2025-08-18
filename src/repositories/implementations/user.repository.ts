@@ -66,10 +66,13 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
   // Override to handle profiles table specifics - excludes archived users
   async findAll(filter?: Record<string, any>): Promise<User[]> {
     try {
-      // Use the new view that includes deliberations
+      // Query profiles with access codes and deliberations
       let query = supabase
         .from('user_profiles_with_deliberations')
-        .select('*')
+        .select(`
+          *,
+          access_codes!inner(code)
+        `)
         .or('is_archived.is.null,is_archived.eq.false'); // Exclude archived users
       
       if (filter) {
@@ -81,22 +84,25 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
       const { data, error } = await query;
       
       if (error) {
-        logger.error('User repository findAll error', error, { filter });
+        logger.error('User repository findAll failed', error, { filter });
         throw error;
       }
       
-      // Map database format to API format
-      return data.map(item => ({
+      return (data || []).map(item => ({
         id: item.id,
-        accessCode: item.access_code || '',
+        accessCode: item.access_codes?.code || '',
         role: item.user_role || 'user',
         profile: {
           displayName: '',
-          avatarUrl: item.avatar_url || '',
-          bio: item.bio || '',
-          expertiseAreas: item.expertise_areas || [],
+          avatarUrl: '',
+          bio: '',
+          expertiseAreas: [],
         },
         deliberations: Array.isArray(item.deliberations) ? item.deliberations : [],
+        isArchived: item.is_archived || false,
+        archivedAt: item.archived_at,
+        archivedBy: item.archived_by,
+        archiveReason: item.archive_reason,
       })) as User[];
     } catch (error) {
       logger.error('User repository findAll failed', error, { filter });
@@ -173,10 +179,13 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
 
   async findAllIncludingArchived(filter?: Record<string, any>): Promise<User[]> {
     try {
-      // Use the new view that includes deliberations for ALL users including archived
+      // Query profiles with access codes and deliberations for ALL users including archived
       let query = supabase
         .from('user_profiles_with_deliberations')
-        .select('*');
+        .select(`
+          *,
+          access_codes!inner(code)
+        `);
       
       if (filter) {
         Object.entries(filter).forEach(([key, value]) => {
@@ -187,20 +196,19 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
       const { data, error } = await query;
       
       if (error) {
-        logger.error('User repository findAllIncludingArchived error', error, { filter });
+        logger.error('User repository findAllIncludingArchived failed', error, { filter });
         throw error;
       }
       
-      // Map database format to API format
-      return data.map(item => ({
+      return (data || []).map(item => ({
         id: item.id,
-        accessCode: item.access_code || '',
+        accessCode: item.access_codes?.code || '',
         role: item.user_role || 'user',
         profile: {
           displayName: '',
-          avatarUrl: item.avatar_url || '',
-          bio: item.bio || '',
-          expertiseAreas: item.expertise_areas || [],
+          avatarUrl: '',
+          bio: '',
+          expertiseAreas: [],
         },
         deliberations: Array.isArray(item.deliberations) ? item.deliberations : [],
         isArchived: item.is_archived || false,
