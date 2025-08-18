@@ -93,10 +93,10 @@ async function processStreamingOrchestration(
       return;
     }
 
-    // Fast path pattern matching
+    // Enhanced fast path - only for highest confidence patterns
     const fastPath = checkFastPath(message.content);
-    if (fastPath) {
-      console.log('🚀 Using fast path:', fastPath.agent);
+    if (fastPath && fastPath.confidence >= 0.95) {
+      console.log('🚀 Using high-confidence fast path:', fastPath.agent, `(confidence: ${fastPath.confidence})`);
       
       const response = await generateFastResponse(
         message.content,
@@ -116,13 +116,16 @@ async function processStreamingOrchestration(
         deliberation_id: deliberationId,
         agent_context: { 
           agent_type: fastPath.agent,
-          processing_method: 'fast_path',
+          processing_method: 'high_confidence_fast_path',
           confidence: fastPath.confidence 
         }
       });
 
       sendData({ done: true });
       return;
+    } else if (fastPath) {
+      console.log('🔍 Fast path matched but confidence too low, proceeding to full analysis:', 
+        fastPath.agent, `(confidence: ${fastPath.confidence})`);
     }
 
     // Check mode first - if learn mode, force bill agent
@@ -224,37 +227,31 @@ async function processStreamingOrchestration(
   }
 }
 
-// Fast path pattern matching
+// Enhanced fast path pattern matching with higher confidence threshold
 function checkFastPath(content: string): { agent: string; confidence: number; template?: string } | null {
   const patterns = [
-    // Bill agent - legislation, policy, legal questions (higher priority)
+    // Only very specific patterns with high confidence
     {
-      regex: /\b(bill|legislation|law|legal|policy|regulation|government|official|countries|legalised|legalized|dying|assisted|safeguards)\b.*(what|how|step|process|place|ensure)/i,
+      regex: /^(what|which|how many|list)\s+(countries|nations|jurisdictions)\s+(have|allow|permit|legalized|legalised)\s+(assisted dying|euthanasia|MAID)/i,
       agent: 'bill_agent',
-      confidence: 0.95
+      confidence: 0.98
     },
     {
-      regex: /what.+(countries|legislation|laws|regulations|policies).*(place|ensure|safeguards|protections)/i,
+      regex: /^what\s+(specific\s+)?(safeguards|protections|requirements|criteria)\s+(are|exist|in place)/i,
       agent: 'bill_agent', 
-      confidence: 0.9
+      confidence: 0.97
     },
-    // Peer agent - participant responses (lower priority to avoid conflicts)
     {
-      regex: /what.+(participants|people said|mentioned by others|participants think)/i,
+      regex: /^(what did|what have|have any)\s+(other\s+)?(participants|people|users)\s+(said|mentioned|shared|contributed)/i,
       agent: 'peer_agent',
-      confidence: 0.85
+      confidence: 0.96
     },
-    // Flow agent - clarification requests
-    {
-      regex: /\b(clarify|explain|help|understand|confused)\b/i,
-      agent: 'flow_agent',
-      confidence: 0.8
-    }
+    // Removed lower confidence patterns to force more analysis
   ];
 
   for (const pattern of patterns) {
     if (pattern.regex.test(content)) {
-      console.log(`🎯 Fast path matched: "${content}" -> ${pattern.agent} (confidence: ${pattern.confidence})`);
+      console.log(`🎯 High-confidence fast path: "${content}" -> ${pattern.agent} (confidence: ${pattern.confidence})`);
       return {
         agent: pattern.agent,
         confidence: pattern.confidence
@@ -387,21 +384,83 @@ async function findSimilarNodes(supabase: any, content: string): Promise<any[]> 
   return nodes || [];
 }
 
-// Select optimal agent based on analysis
+// Enhanced agent selection with sophisticated weighting algorithm
 function selectOptimalAgent(analysis: any, conversationState: any, similarNodes: any[]): string {
-  if (analysis.requiresExpertise && analysis.complexity > 0.7) {
-    return 'bill_agent';
+  const scores = {
+    bill_agent: 0,
+    peer_agent: 0,
+    flow_agent: 0
+  };
+
+  // Base scoring factors
+  const factors = {
+    complexity: analysis.complexity || 0.5,
+    requiresExpertise: analysis.requiresExpertise || false,
+    intent: analysis.intent || 'general',
+    topicRelevance: analysis.topicRelevance || 0.5,
+    messageCount: conversationState.messageCount || 0,
+    recentMessageTypes: getRecentMessageTypes(conversationState.recentMessages || []),
+    similarNodesCount: similarNodes.length
+  };
+
+  // Bill Agent scoring
+  scores.bill_agent += factors.complexity * 40; // High weight for complexity
+  scores.bill_agent += factors.requiresExpertise ? 30 : 0;
+  scores.bill_agent += factors.topicRelevance * 25;
+  scores.bill_agent += factors.intent.includes('policy') ? 20 : 0;
+  scores.bill_agent += factors.intent.includes('legal') ? 20 : 0;
+  scores.bill_agent += factors.intent.includes('legislation') ? 25 : 0;
+
+  // Peer Agent scoring
+  scores.peer_agent += factors.messageCount > 5 ? 20 : 0; // Needs conversation history
+  scores.peer_agent += factors.similarNodesCount * 15; // Similar discussions boost relevance
+  scores.peer_agent += factors.intent.includes('participant') ? 25 : 0;
+  scores.peer_agent += factors.intent.includes('perspective') ? 20 : 0;
+  scores.peer_agent += getRecentBillAgentCount(factors.recentMessageTypes) > 2 ? 15 : 0; // Balance after bill agent responses
+
+  // Flow Agent scoring  
+  scores.flow_agent += factors.messageCount < 3 ? 25 : 0; // Good for early conversation
+  scores.flow_agent += factors.intent.includes('question') ? 20 : 0;
+  scores.flow_agent += factors.intent.includes('clarify') ? 25 : 0;
+  scores.flow_agent += factors.complexity < 0.3 ? 15 : 0; // Simple queries
+  scores.flow_agent += getRecentFlowAgentCount(factors.recentMessageTypes) === 0 ? 10 : 0; // Avoid repetition
+
+  // Diversity bonus - avoid same agent repeatedly
+  const lastAgentType = getLastAgentType(factors.recentMessageTypes);
+  if (lastAgentType) {
+    scores[lastAgentType as keyof typeof scores] -= 10;
   }
-  
-  if (analysis.intent?.includes('question') || conversationState.messageCount < 3) {
-    return 'flow_agent';
-  }
-  
-  if (similarNodes.length > 0) {
-    return 'peer_agent';
-  }
-  
-  return 'flow_agent';
+
+  // Select agent with highest score
+  const selectedAgent = Object.entries(scores).reduce((max, [agent, score]) => 
+    score > max.score ? { agent, score } : max, 
+    { agent: 'flow_agent', score: -1 }
+  ).agent;
+
+  console.log(`🔬 Agent scoring results:`, {
+    scores,
+    factors,
+    selected: selectedAgent
+  });
+
+  return selectedAgent;
+}
+
+// Helper functions for agent selection
+function getRecentMessageTypes(messages: any[]): string[] {
+  return messages.slice(0, 5).map(m => m.message_type || 'unknown');
+}
+
+function getRecentBillAgentCount(messageTypes: string[]): number {
+  return messageTypes.filter(type => type === 'bill_agent').length;
+}
+
+function getRecentFlowAgentCount(messageTypes: string[]): number {
+  return messageTypes.filter(type => type === 'flow_agent').length;
+}
+
+function getLastAgentType(messageTypes: string[]): string | null {
+  return messageTypes.find(type => type !== 'user') || null;
 }
 
 // Generate streaming response with full context
