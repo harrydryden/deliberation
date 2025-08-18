@@ -99,22 +99,39 @@ class UserContextManager {
     try {
       logger.debug('Setting user context for RLS', { userId });
       
+      // Get the current user to access the access code
+      const user = this.getCurrentUser();
+      
       // Try up to 3 times to set the context properly
       let attempts = 3;
       while (attempts > 0) {
         try {
-          // Set the user context
-          const { error: setError } = await supabase.rpc('set_config', {
-            setting_name: 'app.current_user_id',
-            new_value: userId,
-            is_local: false
-          });
+          // Set both user ID and access code context
+          const [userIdResult, accessCodeResult] = await Promise.all([
+            // Set the user context
+            supabase.rpc('set_config', {
+              setting_name: 'app.current_user_id',
+              new_value: userId,
+              is_local: false
+            }),
+            // Set the access code context if available
+            user?.accessCode ? supabase.rpc('set_config', {
+              setting_name: 'app.current_access_code',
+              new_value: user.accessCode,
+              is_local: false
+            }) : Promise.resolve({ error: null })
+          ]);
 
-          if (setError) {
-            logger.error('Failed to set user context', setError);
+          if (userIdResult.error) {
+            logger.error('Failed to set user context', userIdResult.error);
             attempts--;
             if (attempts > 0) await new Promise(resolve => setTimeout(resolve, 100));
             continue;
+          }
+
+          if (accessCodeResult.error && user?.accessCode) {
+            logger.warn('Failed to set access code context', accessCodeResult.error);
+            // Don't fail for access code errors, but log them
           }
 
           // Small delay to ensure the setting takes effect
@@ -216,6 +233,16 @@ class UserContextManager {
 
 // Export singleton instance
 export const userContextManager = UserContextManager.getInstance();
+
+// Helper function for admin operations
+export const ensureAdminContext = async (): Promise<boolean> => {
+  const user = userContextManager.getCurrentUser();
+  if (!user || user.role !== 'admin') {
+    console.warn('Admin context required but user is not admin');
+    return false;
+  }
+  return await userContextManager.ensureUserContext(user.id);
+};
 
 // Legacy compatibility functions
 export const ensureUserContext = () => userContextManager.ensureUserContext();

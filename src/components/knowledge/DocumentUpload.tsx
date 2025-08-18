@@ -57,6 +57,9 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         throw new Error('User not authenticated');
       }
 
+      // Set both user ID and access code for RLS policies
+      await userContextManager.ensureUserContext(user.id);
+
       setUploadProgress(10);
 
       // Upload file to storage

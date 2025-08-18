@@ -9,7 +9,7 @@ import { Calendar, Users, Eye, Bot, User, FileText, Workflow, ChevronDown, Chevr
 import { formatToUKDate, formatToUKTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { MarkdownMessage } from '@/components/common/MarkdownMessage';
-import { setUserContext } from '@/utils/authHelpers';
+import { ensureAdminContext } from '@/utils/userContextManager';
 import type { ChatMessage } from '@/types/chat';
 interface Deliberation {
   id: string;
@@ -67,22 +67,11 @@ export const AdminDeliberationView = () => {
         setMessagesLoading(true);
 
         // Ensure admin context is set for RLS policies
-        const contextSet = await setUserContext();
+        const contextSet = await ensureAdminContext();
         console.log('Admin context set successfully:', contextSet);
         
-        // Debug: Check if admin context is working
-        const { data: debugData } = await supabase.rpc('debug_current_user_settings');
-        console.log('Admin context debug:', debugData);
-        
-        // Also check the user from localStorage
-        const storedUser = localStorage.getItem('simple_auth_user');
-        if (storedUser) {
-          const user = JSON.parse(storedUser);
-          console.log('Stored admin user:', { id: user.id, role: user.role, accessCode: user.accessCode });
-          
-          // Also manually test the RLS policy function
-          const { data: accessCodeTest } = await supabase.rpc('get_current_user_access_code');
-          console.log('Access code from function:', accessCodeTest);
+        if (!contextSet) {
+          throw new Error('Failed to set admin context - user may not have admin permissions');
         }
 
         // Load deliberation and participants separately for better control
