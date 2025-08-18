@@ -1099,9 +1099,7 @@ export type Database = {
         Returns: number
       }
       create_user_with_access_code: {
-        Args:
-          | { p_display_name?: string; p_user_role?: string }
-          | { p_user_role?: string }
+        Args: { p_user_role?: string }
         Returns: {
           access_code: string
           profile_created: boolean
