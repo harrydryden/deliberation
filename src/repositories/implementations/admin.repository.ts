@@ -13,12 +13,7 @@ export class AdminRepository extends SupabaseBaseRepository implements IAdminRep
     usedAccessCodes: number;
   }> {
     try {
-      // Use the admin stats function that bypasses RLS issues
-      console.log('Calling admin stats function...');
-      
       const { data, error } = await supabase.rpc('get_admin_system_stats');
-      
-      console.log('Admin stats function result:', { data, error });
       
       if (error) {
         logger.error({ error }, 'Admin repository getSystemStats RPC error');
