@@ -42,7 +42,7 @@ export class AdminRepository implements IAdminRepository {
         usedAccessCodes: { count: usedAccessCodesResult.count, error: usedAccessCodesResult.error }
       });
 
-      // Check for errors
+      // Check for errors with detailed logging
       const errors = [
         usersResult.error,
         deliberationsResult.error,
@@ -53,8 +53,23 @@ export class AdminRepository implements IAdminRepository {
       ].filter(Boolean);
 
       if (errors.length > 0) {
+        console.error('Admin repository getSystemStats errors:', errors);
         logger.error({ errors }, 'Admin repository getSystemStats error');
-        throw new Error('Failed to fetch system statistics');
+        
+        // Return partial results instead of throwing error
+        const stats = {
+          totalUsers: usersResult.count || 0,
+          totalDeliberations: deliberationsResult.count || 0,
+          totalMessages: messagesResult.count || 0,
+          activeDeliberations: activeDeliberationsResult.count || 0,
+          totalAccessCodes: accessCodesResult.count || 0,
+          usedAccessCodes: usedAccessCodesResult.count || 0,
+        };
+
+        // Log what we got despite errors
+        console.log('Returning partial stats despite errors:', stats);
+        logger.info({ stats, errorCount: errors.length }, 'Partial system stats retrieved');
+        return stats;
       }
 
       const stats = {
