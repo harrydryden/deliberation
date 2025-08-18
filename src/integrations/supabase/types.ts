@@ -1130,6 +1130,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      debug_auth_functions: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       debug_current_user_settings: {
         Args: Record<PropertyKey, never>
         Returns: Json
