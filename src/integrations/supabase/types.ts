@@ -1168,6 +1168,12 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_current_user_deliberation_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          deliberation_id: string
+        }[]
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1197,6 +1203,12 @@ export type Database = {
         Returns: number
       }
       get_user_deliberation_ids: {
+        Args: { user_uuid: string }
+        Returns: {
+          deliberation_id: string
+        }[]
+      }
+      get_user_deliberation_ids_safe: {
         Args: { user_uuid: string }
         Returns: {
           deliberation_id: string

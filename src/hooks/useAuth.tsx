@@ -64,11 +64,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (validationError) throw validationError;
       if (!validationData?.valid) throw new Error('Invalid access code');
 
-      // Create user object for the auth context with access_ prefix format
+      // Get the actual user UUID from the access_codes table
+      const { data: accessCodeData, error: accessCodeError } = await supabase
+        .from('access_codes')
+        .select('used_by, code_type')
+        .eq('code', accessCode.toUpperCase())
+        .eq('is_active', true)
+        .eq('is_used', true)
+        .single();
+
+      if (accessCodeError || !accessCodeData?.used_by) {
+        throw new Error('Unable to find user associated with access code');
+      }
+
+      // Create user object for the auth context using the proper UUID
       const simpleUser: User = {
-        id: `access_${accessCode}`,
+        id: accessCodeData.used_by, // This is the actual UUID
         accessCode: accessCode,
-        role: userRole,
+        role: accessCodeData.code_type, // Use the role from the access code
         profile: {
           displayName: `User_${accessCode.substring(0, 4)}`,
           avatarUrl: '',
