@@ -92,37 +92,21 @@ export const useAdminData = () => {
   };
 
 
-  // Access Code operations
+  // Access codes are deprecated - remove these functions
   const fetchAccessCodes = async () => {
-    setLoadingAccessCodes(true);
-    try {
-      const data = await services.accessCodeService.getAccessCodes();
-      setAccessCodes(data);
-    } catch (error) {
-      handleError(error, 'fetch access codes');
-    } finally {
-      setLoadingAccessCodes(false);
-    }
+    // No-op: access codes are deprecated
+    setAccessCodes([]);
+    setLoadingAccessCodes(false);
   };
 
   const createAccessCode = async (codeType: string) => {
-    try {
-      await services.accessCodeService.createAccessCode(codeType);
-      toast.success('Access code created successfully');
-      await fetchAccessCodes();
-    } catch (error) {
-      handleError(error, 'create access code');
-    }
+    // No-op: access codes are deprecated
+    toast.error('Access codes are deprecated. Use Supabase Auth instead.');
   };
 
   const deleteAccessCode = async (id: string) => {
-    try {
-      await services.accessCodeService.deleteAccessCode(id);
-      toast.success('Access code deleted successfully');
-      await fetchAccessCodes();
-    } catch (error) {
-      handleError(error, 'delete access code');
-    }
+    // No-op: access codes are deprecated  
+    toast.error('Access codes are deprecated. Use Supabase Auth instead.');
   };
 
   // Agent operations
@@ -180,29 +164,10 @@ export const useAdminData = () => {
   // Agent update and creation operations
   const updateAgent = async (id: string, updates: Partial<Agent>) => {
     try {
-      // Get access code from user data in localStorage
-      const storedUser = localStorage.getItem('simple_auth_user');
-      if (!storedUser) {
-        throw new Error('User not authenticated');
-      }
-
-      const userData = JSON.parse(storedUser);
-      const accessCode = userData.accessCode;
-      
-      if (!accessCode) {
-        throw new Error('Access code not found in user session');
-      }
-
-      console.log('Calling admin database function for global agent...');
-      
-      // Use admin database function to bypass RLS properly
       const { data, error } = await supabase.rpc('admin_update_agent_configuration', {
         p_agent_id: id,
-        p_access_code: accessCode,
         p_updates: updates
       });
-
-      console.log('Database function response:', { data, error });
 
       if (error) {
         console.error('Database function error:', error);
@@ -253,29 +218,10 @@ export const useAdminData = () => {
   // Local agent operations
   const updateLocalAgent = async (id: string, updates: Partial<Agent>) => {
     try {
-      // Get access code from user data in localStorage
-      const storedUser = localStorage.getItem('simple_auth_user');
-      if (!storedUser) {
-        throw new Error('User not authenticated');
-      }
-
-      const userData = JSON.parse(storedUser);
-      const accessCode = userData.accessCode;
-      
-      if (!accessCode) {
-        throw new Error('Access code not found in user session');
-      }
-
-      console.log('Calling admin database function...');
-      
-      // Use admin database function to bypass RLS properly
       const { data, error } = await supabase.rpc('admin_update_agent_configuration', {
         p_agent_id: id,
-        p_access_code: accessCode,
         p_updates: updates
       });
-
-      console.log('Database function response:', { data, error });
 
       if (error) {
         console.error('Database function error:', error);

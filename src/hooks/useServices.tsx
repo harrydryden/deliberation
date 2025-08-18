@@ -19,12 +19,10 @@ export const useServices = () => {
   return useContext(ServiceContext);
 };
 
-// Individual service hooks for convenience
-export const useSimpleAuthService = () => useServices().simpleAuthService;
+// Individual service hooks for convenience  
 export const useMessageService = () => useServices().messageService;
 export const useAgentService = () => useServices().agentService;
 export const useDeliberationService = () => useServices().deliberationService;
 export const useUserService = () => useServices().userService;
-export const useAccessCodeService = () => useServices().accessCodeService;
 export const useAdminService = () => useServices().adminService;
 export const useRealtimeService = () => useServices().realtimeService;

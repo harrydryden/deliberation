@@ -1,19 +1,34 @@
 import { UserRepository } from '@/repositories/implementations/user.repository';
 import { AdminRepository } from '@/repositories/implementations/admin.repository';
+import { AgentRepository } from '@/repositories/implementations/agent.repository';
+import { DeliberationRepository } from '@/repositories/implementations/deliberation.repository';
+import { MessageRepository } from '@/repositories/implementations/message.repository';
 import { UserService } from './implementations/user.service';
 import { AdminService } from './implementations/admin.service';
+import { AgentService } from './implementations/agent.service';
+import { DeliberationService } from './implementations/deliberation.service';
+import { MessageService } from './implementations/message.service';
+import { RealtimeService } from './implementations/realtime.service';
 
 // Create repository instances
 const userRepository = new UserRepository();
 const adminRepository = new AdminRepository();
+const agentRepository = new AgentRepository();
+const deliberationRepository = new DeliberationRepository();
+const messageRepository = new MessageRepository();
 
 // Create service instances
 const userService = new UserService(userRepository);
+const agentService = new AgentService(agentRepository);
+const deliberationService = new DeliberationService(deliberationRepository);
+const messageService = new MessageService(messageRepository);
+const realtimeService = new RealtimeService();
+
 const adminService = new AdminService(
   adminRepository,
   userService,
-  null as any, // agentService - not needed for user management
-  null as any, // deliberationService - not needed for user management
+  agentService,
+  deliberationService,
   null as any  // accessCodeService - deprecated
 );
 
@@ -21,7 +36,18 @@ const adminService = new AdminService(
 export const serviceContainer = {
   userService,
   adminService,
+  agentService,
+  deliberationService,
+  messageService,
+  realtimeService,
 };
 
 // Export individual services for convenience
-export const { userService: userServiceInstance, adminService: adminServiceInstance } = serviceContainer;
+export const {
+  userService: userServiceInstance,
+  adminService: adminServiceInstance,
+  agentService: agentServiceInstance,
+  deliberationService: deliberationServiceInstance,
+  messageService: messageServiceInstance,
+  realtimeService: realtimeServiceInstance
+} = serviceContainer;
