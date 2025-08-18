@@ -355,7 +355,7 @@ const DeliberationChat = () => {
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
                       <Users className="h-4 w-4" />
-                      <span>{deliberation.participants?.length || deliberation.participant_count || 0}/{deliberation.max_participants}</span>
+                      <span>{deliberation.participants?.length || deliberation.participant_count || 0}</span>
                     </div>
                   </div>
                   {deliberation.description && (
