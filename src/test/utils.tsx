@@ -4,7 +4,7 @@ import { screen, waitFor } from '@testing-library/dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from 'next-themes';
-import { AuthProvider } from '@/hooks/useAuth';
+import { AuthProvider } from '@/hooks/useSupabaseAuth';
 
 // Create a custom render function that includes providers
 const AllTheProviders = ({ children }: { children: React.ReactNode }) => {

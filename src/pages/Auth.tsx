@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
-import { AuthForm } from "@/components/auth/AuthForm";
+import { SupabaseAuthForm } from "@/components/auth/SupabaseAuthForm";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 
 const Auth = () => {
@@ -72,7 +72,7 @@ const Auth = () => {
     );
   }
 
-  return <AuthForm />;
+  return <SupabaseAuthForm />;
 };
 
 export default Auth;

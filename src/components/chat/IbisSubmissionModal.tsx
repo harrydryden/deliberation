@@ -10,7 +10,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Lightbulb } from "lucide-react";
-import { getCurrentUser } from '@/integrations/supabase/client';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 interface IbisSubmissionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -185,8 +185,8 @@ export const IbisSubmissionModal = ({
     }
     setIsSubmitting(true);
     try {
-      // Create IBIS node and set user context
-      const user = getCurrentUser();
+      // Get user from hook
+      const { user } = useSupabaseAuth();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -220,7 +220,7 @@ export const IbisSubmissionModal = ({
         source_node_id: inserted.id,
         target_node_id: linkIssueId,
         relationship_type: mapRelType('issue'),
-        created_by: user.id,
+        created_by: user?.id,
         deliberation_id: deliberationId
       });
       if (linkPositionId && linkPositionId !== 'none') rels.push({

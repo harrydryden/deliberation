@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
 import { logger } from '@/utils/logger';
-import { getCurrentUser } from '@/integrations/supabase/client';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
 // Remove PDF.js imports since we're using server-side processing
 
@@ -34,8 +34,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
   const { toast } = useToast();
 
   // Check if current user is admin
-  const user = getCurrentUser();
-  const isAdmin = user?.role === 'admin';
+  const { user, isAdmin } = useSupabaseAuth();
 
   // Only show component to admins
   if (!isAdmin) {
@@ -77,8 +76,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
     const startTime = performance.now();
 
     try {
-      // Get current user
-      const user = getCurrentUser();
+      // User is already available from hook
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -99,7 +97,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
 
       // Upload file to storage
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}_${file.name}`;
+      const fileName = `${user?.id}/${Date.now()}_${file.name}`;
       
       logger.component.update('DocumentUpload', { action: 'uploadStart', fileName });
       
