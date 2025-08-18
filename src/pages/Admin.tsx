@@ -9,12 +9,16 @@ const Admin = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('Admin page: Auth state:', { user: user?.id, isLoading, isAdmin });
+    
     if (!isLoading && !user) {
+      console.log('Admin page: No user, redirecting to auth');
       navigate("/auth");
     } else if (!isLoading && user && !isAdmin) {
+      console.log('Admin page: User exists but not admin, redirecting to home');
       navigate("/");
     }
-  }, [user, isLoading, navigate]);
+  }, [user, isLoading, isAdmin, navigate]);
 
   if (isLoading) return null;
   if (!user) return null;
