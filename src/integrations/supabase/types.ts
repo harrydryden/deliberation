@@ -1164,6 +1164,10 @@ export type Database = {
         Args: { access_code: string }
         Returns: string
       }
+      get_admin_system_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_authenticated_user: {
         Args: Record<PropertyKey, never>
         Returns: string

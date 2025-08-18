@@ -12,76 +12,33 @@ export class AdminRepository implements IAdminRepository {
     usedAccessCodes: number;
   }> {
     try {
-      // Context is now set automatically via headers
-
-      // Execute multiple queries in parallel for better performance
-      console.log('Starting admin stats queries...');
+      // Use the admin stats function that bypasses RLS issues
+      console.log('Calling admin stats function...');
       
-      const [
-        usersResult,
-        deliberationsResult,
-        messagesResult,
-        activeDeliberationsResult,
-        accessCodesResult,
-        usedAccessCodesResult
-      ] = await Promise.all([
-        supabase.from('profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('deliberations').select('id', { count: 'exact', head: true }),
-        supabase.from('messages').select('id', { count: 'exact', head: true }),
-        supabase.from('deliberations').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-        supabase.from('access_codes').select('id', { count: 'exact', head: true }),
-        supabase.from('access_codes').select('id', { count: 'exact', head: true }).eq('is_used', true)
-      ]);
+      const { data, error } = await supabase.rpc('get_admin_system_stats');
+      
+      console.log('Admin stats function result:', { data, error });
+      
+      if (error) {
+        logger.error({ error }, 'Admin repository getSystemStats RPC error');
+        throw error;
+      }
 
-      console.log('Admin stats query results:', {
-        users: { count: usersResult.count, error: usersResult.error },
-        deliberations: { count: deliberationsResult.count, error: deliberationsResult.error },
-        messages: { count: messagesResult.count, error: messagesResult.error },
-        activeDeliberations: { count: activeDeliberationsResult.count, error: activeDeliberationsResult.error },
-        accessCodes: { count: accessCodesResult.count, error: accessCodesResult.error },
-        usedAccessCodes: { count: usedAccessCodesResult.count, error: usedAccessCodesResult.error }
-      });
-
-      // Check for errors with detailed logging
-      const errors = [
-        usersResult.error,
-        deliberationsResult.error,
-        messagesResult.error,
-        activeDeliberationsResult.error,
-        accessCodesResult.error,
-        usedAccessCodesResult.error
-      ].filter(Boolean);
-
-      if (errors.length > 0) {
-        console.error('Admin repository getSystemStats errors:', errors);
-        logger.error({ errors }, 'Admin repository getSystemStats error');
-        
-        // Return partial results instead of throwing error
-        const stats = {
-          totalUsers: usersResult.count || 0,
-          totalDeliberations: deliberationsResult.count || 0,
-          totalMessages: messagesResult.count || 0,
-          activeDeliberations: activeDeliberationsResult.count || 0,
-          totalAccessCodes: accessCodesResult.count || 0,
-          usedAccessCodes: usedAccessCodesResult.count || 0,
-        };
-
-        // Log what we got despite errors
-        console.log('Returning partial stats despite errors:', stats);
-        logger.info({ stats, errorCount: errors.length }, 'Partial system stats retrieved');
-        return stats;
+      if (data?.error) {
+        logger.error({ error: data.error }, 'Admin repository getSystemStats function error');
+        throw new Error(data.error);
       }
 
       const stats = {
-        totalUsers: usersResult.count || 0,
-        totalDeliberations: deliberationsResult.count || 0,
-        totalMessages: messagesResult.count || 0,
-        activeDeliberations: activeDeliberationsResult.count || 0,
-        totalAccessCodes: accessCodesResult.count || 0,
-        usedAccessCodes: usedAccessCodesResult.count || 0,
+        totalUsers: data.totalUsers || 0,
+        totalDeliberations: data.totalDeliberations || 0,
+        totalMessages: data.totalMessages || 0,
+        activeDeliberations: data.activeDeliberations || 0,
+        totalAccessCodes: data.totalAccessCodes || 0,
+        usedAccessCodes: data.usedAccessCodes || 0,
       };
 
-      logger.info({ stats }, 'System stats retrieved successfully');
+      logger.info({ stats }, 'System stats retrieved successfully via RPC');
       return stats;
     } catch (error) {
       logger.error({ error }, 'Admin repository getSystemStats failed');
