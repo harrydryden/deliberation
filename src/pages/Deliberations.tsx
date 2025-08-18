@@ -166,7 +166,7 @@ const Deliberations = () => {
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <div className="flex items-center space-x-1">
                       <Users className="h-4 w-4" />
-                      <span>{deliberation.participant_count || 0}/{deliberation.max_participants}</span>
+                      <span>{deliberation.participant_count || 0}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <Clock className="h-4 w-4" />
