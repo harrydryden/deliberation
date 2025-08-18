@@ -130,17 +130,15 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         `)
         .in('user_id', userIds.map(id => id.toString()));
 
-      // Create maps for efficient lookups - ensure all users get proper roles
+      // Fetch access codes for all users
+      const { data: accessCodes } = await supabase
+        .from('access_codes')
+        .select('used_by, code, code_type')
+        .not('used_by', 'is', null);
+
+      // Create maps for efficient lookups
       const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
-      
-      console.log('UserRepository: Original roles from DB:', userRoles);
-      console.log('UserRepository: Roles map before forcing:', Object.fromEntries(rolesMap));
-      
-      // Force correct roles for known admin users
-      rolesMap.set('5f7fe9ee-0aec-425e-bcf8-e21a0a7821e5', 'admin');
-      rolesMap.set('eab4f22d-8227-4cfb-9d13-9922f1789a60', 'admin');
-      
-      console.log('UserRepository: Roles map after forcing:', Object.fromEntries(rolesMap));
+      const accessCodesMap = new Map(accessCodes?.map(ac => [ac.used_by, ac]) || []);
       
       const deliberationsMap = new Map();
       
@@ -161,26 +159,35 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         }
       });
 
-      // For now, use hardcoded access codes for the known admin user
+      // Map users with their actual access codes from database
       const users: User[] = profiles.map(profile => {
         const role = rolesMap.get(profile.id) || 'user';
         const deliberations = deliberationsMap.get(profile.id) || [];
+        const accessCodeInfo = accessCodesMap.get(profile.id);
         
-        console.log(`UserRepository: Processing user ${profile.id}, role from map: ${role}`);
-        
-        // Map access codes based on actual user data
+        // Get access codes from database or use migrated values
         let accessCode1 = 'N/A';
         let accessCode2 = 'N/A';
         
-        // Current admin user (from JWT metadata)
-        if (profile.id === '5f7fe9ee-0aec-425e-bcf8-e21a0a7821e5') {
-          accessCode1 = 'ADMIN';
-          accessCode2 = '123456';
-        }
-        // Other admin user 
-        else if (profile.id === 'eab4f22d-8227-4cfb-9d13-9922f1789a60') {
-          accessCode1 = 'SUPER';
-          accessCode2 = '088014';
+        if (accessCodeInfo) {
+          // For new users created via bulk creation, use the generated access code
+          accessCode1 = accessCodeInfo.code.slice(0, 5) || 'N/A';
+          accessCode2 = accessCodeInfo.code.slice(5) || 'N/A';
+        } else {
+          // Fallback for existing users - check if they have migrated access codes
+          if (profile.migrated_from_access_code) {
+            accessCode1 = profile.migrated_from_access_code;
+            accessCode2 = 'N/A';
+          }
+          // Legacy hardcoded values for known users
+          else if (profile.id === '5f7fe9ee-0aec-425e-bcf8-e21a0a7821e5') {
+            accessCode1 = 'ADMIN';
+            accessCode2 = '123456';
+          }
+          else if (profile.id === 'eab4f22d-8227-4cfb-9d13-9922f1789a60') {
+            accessCode1 = 'SUPER';
+            accessCode2 = '088014';
+          }
         }
         
         const userResult = {
@@ -205,7 +212,6 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
           accessCode2: accessCode2,
         };
         
-        console.log(`UserRepository: Final user object for ${profile.id}:`, userResult);
         return userResult;
       });
 
