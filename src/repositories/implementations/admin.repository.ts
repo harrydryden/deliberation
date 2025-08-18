@@ -15,6 +15,8 @@ export class AdminRepository implements IAdminRepository {
       // Context is now set automatically via headers
 
       // Execute multiple queries in parallel for better performance
+      console.log('Starting admin stats queries...');
+      
       const [
         usersResult,
         deliberationsResult,
@@ -30,6 +32,15 @@ export class AdminRepository implements IAdminRepository {
         supabase.from('access_codes').select('id', { count: 'exact', head: true }),
         supabase.from('access_codes').select('id', { count: 'exact', head: true }).eq('is_used', true)
       ]);
+
+      console.log('Admin stats query results:', {
+        users: { count: usersResult.count, error: usersResult.error },
+        deliberations: { count: deliberationsResult.count, error: deliberationsResult.error },
+        messages: { count: messagesResult.count, error: messagesResult.error },
+        activeDeliberations: { count: activeDeliberationsResult.count, error: activeDeliberationsResult.error },
+        accessCodes: { count: accessCodesResult.count, error: accessCodesResult.error },
+        usedAccessCodes: { count: usedAccessCodesResult.count, error: usedAccessCodesResult.error }
+      });
 
       // Check for errors
       const errors = [
