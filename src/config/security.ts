@@ -85,7 +85,6 @@ export const SECURITY_CONFIG = {
 // Security validation patterns
 export const SECURITY_PATTERNS = {
   ACCESS_CODE: /^[A-Z0-9]{10}$/,
-  DISPLAY_NAME: /^[a-zA-Z0-9\s\-_\.]{1,100}$/,
   EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
   SAFE_HTML: /^[a-zA-Z0-9\s\-_\.\,\!\?\:\;\"\']*$/,
   SQL_INJECTION: /['"\\;]/,

@@ -14,7 +14,6 @@ export const UserRoleSchema = z.enum(['admin', 'user', 'moderator']);
 
 export const ProfileSchema = z.object({
   id: UUIDSchema,
-  display_name: z.string().nullable(),
   bio: z.string().nullable(),
   avatar_url: URLSchema.nullable(),
   expertise_areas: z.array(z.string()).nullable(),

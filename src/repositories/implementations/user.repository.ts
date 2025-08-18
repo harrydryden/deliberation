@@ -32,7 +32,7 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
         accessCode: '', // Will be populated from context
         role: profile.user_role || 'user',
         profile: {
-          displayName: profile.display_name || '',
+          displayName: '',
           avatarUrl: profile.avatar_url || '',
           bio: profile.bio || '',
           expertiseAreas: profile.expertise_areas || [],
@@ -91,7 +91,7 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
         accessCode: item.access_code || '',
         role: item.user_role || 'user',
         profile: {
-          displayName: item.display_name || '',
+          displayName: '',
           avatarUrl: item.avatar_url || '',
           bio: item.bio || '',
           expertiseAreas: item.expertise_areas || [],
@@ -197,7 +197,7 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
         accessCode: item.access_code || '',
         role: item.user_role || 'user',
         profile: {
-          displayName: item.display_name || '',
+          displayName: '',
           avatarUrl: item.avatar_url || '',
           bio: item.bio || '',
           expertiseAreas: item.expertise_areas || [],

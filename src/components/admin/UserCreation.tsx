@@ -24,8 +24,7 @@ export const UserCreation = ({ onUserCreated }: { onUserCreated: () => void }) =
     try {
       const { data, error } = await supabase
         .rpc('create_user_with_access_code', {
-          p_user_role: userRole,
-          p_display_name: null
+          p_user_role: userRole
         });
 
       if (error) {
