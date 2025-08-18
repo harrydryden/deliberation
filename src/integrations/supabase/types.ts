@@ -1077,6 +1077,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      auth_is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
