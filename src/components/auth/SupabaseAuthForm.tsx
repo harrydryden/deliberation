@@ -50,9 +50,14 @@ export const SupabaseAuthForm = () => {
       const email = `${accessCode1.toUpperCase()}@deliberation.local`;
       const password = accessCode2;
       
+      console.log('Attempting to sign in with:', { email, password: '***' });
+      
       const result = await signIn(email, password);
+      
+      console.log('Sign in result:', { error: result.error, hasError: !!result.error });
 
       if (result.error) {
+        console.error('Authentication error:', result.error);
         setError('Invalid access codes. Please check your Access Code 1 and Access Code 2.');
       } else {
         toast({
@@ -63,6 +68,7 @@ export const SupabaseAuthForm = () => {
         navigate('/admin');
       }
     } catch (err: any) {
+      console.error('Auth exception:', err);
       setError('Invalid access codes. Please check your Access Code 1 and Access Code 2.');
     } finally {
       setIsLoading(false);
