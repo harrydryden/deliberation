@@ -993,7 +993,22 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_profiles_with_deliberations_with_codes: {
+        Row: {
+          access_code: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
+          created_at: string | null
+          deliberations: Json | null
+          id: string | null
+          is_archived: boolean | null
+          migrated_from_access_code: string | null
+          updated_at: string | null
+          user_role: Database["public"]["Enums"]["app_role"] | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_create_ibis_relationship: {
