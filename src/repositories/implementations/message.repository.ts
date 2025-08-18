@@ -72,9 +72,9 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
       const user = storedUser ? JSON.parse(storedUser) : null;
       console.log('ensureUserContextWithRetry: Current user', { userId: user?.id });
       
-      // Import ensureUserContext dynamically to avoid circular imports
-      const { ensureUserContext } = await import('@/integrations/supabase/client');
-      const result = await ensureUserContext();
+      // Import setUserContext from utils which now consistently sets UUIDs
+      const { setUserContext } = await import('@/utils/authHelpers');
+      const result = await setUserContext();
       
       console.log('ensureUserContextWithRetry: Result', { result, userId: user?.id });
       return result;
