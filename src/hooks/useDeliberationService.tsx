@@ -136,6 +136,9 @@ class SupabaseDeliberationService implements DeliberationService {
   async joinDeliberation(deliberationId: string): Promise<void> {
     logger.info('Starting joinDeliberation with access code auth', { deliberationId });
     
+    // Set user context for RLS policies
+    await setUserContext();
+    
     // Get the current authenticated user from localStorage
     const storedUser = localStorage.getItem('simple_auth_user');
     if (!storedUser) {
@@ -146,7 +149,6 @@ class SupabaseDeliberationService implements DeliberationService {
     const userId = user.id; // This is the proper UUID from authentication
     
     logger.info('Using authenticated user for join', { userId });
-    
     // Check if already a participant
     const { data: existing, error: existingError } = await supabase
       .from('participants')
