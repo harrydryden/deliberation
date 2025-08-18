@@ -97,6 +97,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return Math.floor(10000 + Math.random() * 90000).toString();
   };
 
+  const createAdminUsers = async () => {
+    try {
+      // Create ADMIN user
+      const { data: adminData, error: adminError } = await supabase.auth.signUp({
+        email: 'ADMIN@deliberation.local',
+        password: '12345',
+        options: {
+          data: {
+            access_code_1: 'ADMIN',
+            access_code_2: '12345',
+            role: 'admin'
+          }
+        }
+      });
+
+      if (adminError) {
+        console.error('Error creating admin user:', adminError);
+      } else {
+        console.log('Admin user created successfully');
+      }
+
+      // Create SUPER user
+      const { data: superData, error: superError } = await supabase.auth.signUp({
+        email: 'SUPER@deliberation.local',
+        password: '54321',
+        options: {
+          data: {
+            access_code_1: 'SUPER',
+            access_code_2: '54321',
+            role: 'admin'
+          }
+        }
+      });
+
+      if (superError) {
+        console.error('Error creating super user:', superError);
+      } else {
+        console.log('Super user created successfully');
+      }
+
+    } catch (error) {
+      console.error('Error in createAdminUsers:', error);
+    }
+  };
+
   const createAccessCodeUsers = async (count: number, roleType: 'admin' | 'user' = 'user') => {
     try {
       const users = [];
@@ -106,14 +151,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const accessCode2 = generateAccessCode2();
         const email = `${accessCode1}@deliberation.local`;
         
-        // Create user in Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        // Create user in Supabase Auth using signUp
+        const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password: accessCode2,
-          user_metadata: {
-            access_code_1: accessCode1,
-            access_code_2: accessCode2,
-            role: roleType
+          options: {
+            data: {
+              access_code_1: accessCode1,
+              access_code_2: accessCode2,
+              role: roleType
+            }
           }
         });
 
@@ -122,21 +169,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           continue;
         }
 
-        if (authData.user) {
-          // Add to user_roles table
-          await supabase
-            .from('user_roles')
-            .insert({
-              user_id: authData.user.id,
-              role: roleType
-            });
-
-          users.push({
-            accessCode1,
-            accessCode2,
-            role: roleType
-          });
-        }
+        users.push({
+          accessCode1,
+          accessCode2,
+          role: roleType
+        });
       }
 
       return { users };

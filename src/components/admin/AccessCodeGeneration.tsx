@@ -9,6 +9,7 @@ import { Copy, Download, RefreshCw } from 'lucide-react';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { CreateAdminUsers } from './CreateAdminUsers';
 
 interface GeneratedUser {
   accessCode1: string;
@@ -80,6 +81,8 @@ export function AccessCodeGeneration() {
 
   return (
     <div className="space-y-6">
+      <CreateAdminUsers />
+      
       <Card>
         <CardHeader>
           <CardTitle>Generate Access Codes</CardTitle>
