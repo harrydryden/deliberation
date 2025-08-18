@@ -125,6 +125,44 @@ async function processStreamingOrchestration(
       return;
     }
 
+    // Check mode first - if learn mode, force bill agent
+    if (mode === 'learn') {
+      console.log('🎓 Learn mode detected - forcing Bill agent');
+      
+      sendData({ 
+        agentType: 'bill_agent',
+        content: '',
+        done: false 
+      });
+
+      const response = await generateStreamingResponse(
+        message.content,
+        'bill_agent',
+        { intent: 'policy_question', complexity: 0.8, requiresExpertise: true },
+        { messageCount: 1 },
+        [],
+        deliberationId,
+        openAIApiKey,
+        sendData
+      );
+
+      // Store response
+      await supabase.from('messages').insert({
+        content: response,
+        message_type: 'bill_agent',
+        user_id: message.user_id,
+        deliberation_id: deliberationId,
+        agent_context: { 
+          agent_type: 'bill_agent',
+          processing_method: 'mode_forced',
+          mode: 'learn'
+        }
+      });
+
+      sendData({ done: true });
+      return;
+    }
+
     // Full orchestration with parallel processing
     console.log('🔄 Using full orchestration');
     
@@ -147,7 +185,7 @@ async function processStreamingOrchestration(
     sendData({ 
       agentType: selectedAgent,
       content: '',
-      done: false 
+      done: false
     });
 
     // Generate streaming response
