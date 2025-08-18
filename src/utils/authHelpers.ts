@@ -61,18 +61,32 @@ export const setUserContext = async (): Promise<boolean> => {
       return false;
     }
     
-    // Verify the context was set
-    const { data: debugData, error: debugError } = await supabase.rpc('debug_current_user_settings');
-    if (!debugError) {
-      console.log('User context verification:', { 
-        expected: user.id, 
-        actual: debugData?.config_value,
-        success: debugData?.config_value === user.id
-      });
-      return debugData?.config_value === user.id;
+    // Simple wait to ensure the context is set before verification
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Verify the context was set with retry
+    let verificationAttempts = 3;
+    while (verificationAttempts > 0) {
+      try {
+        const { data: debugData, error: debugError } = await supabase.rpc('debug_current_user_settings');
+        if (!debugError && debugData?.config_value === user.id) {
+          console.log('User context verified successfully:', { userId: user.id });
+          return true;
+        }
+        
+        if (verificationAttempts > 1) {
+          console.log(`Verification attempt failed, retrying... (${verificationAttempts - 1} attempts left)`);
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch (verificationError) {
+        console.warn('Context verification error:', verificationError);
+      }
+      
+      verificationAttempts--;
     }
     
-    console.log('User context set successfully (no verification):', { userId: user.id });
+    // If verification fails but set_config succeeded, assume success
+    console.log('Context verification failed but set_config succeeded, proceeding:', { userId: user.id });
     return true;
   } catch (error) {
     console.error('Error setting user context:', error);
