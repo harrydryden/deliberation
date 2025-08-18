@@ -12,7 +12,7 @@ import { DeliberationOverview } from './DeliberationOverview';
 import { DeliberationCreation } from './DeliberationCreation';
 import { KnowledgeManagement } from './KnowledgeManagement';
 import { SystemStats } from './SystemStats';
-import { BulkUserCreation } from './BulkUserCreation';
+
 import { useAdminData } from '@/hooks/useAdminData';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 import { logger } from '@/utils/logger';
@@ -77,13 +77,6 @@ export const AdminDashboard = () => {
         </div>
 
         <TabsContent value="users" className="space-y-4">
-          <BulkUserCreation 
-            onUsersCreated={() => {
-              adminData.fetchUsers();
-              adminData.fetchAccessCodes();
-              adminData.fetchStats();
-            }}
-          />
           <UserAccessManagement
             users={adminData.users}
             accessCodes={adminData.accessCodes}
