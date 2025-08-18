@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,7 @@ export const AuthForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [accessCode, setAccessCode] = useState("");
   
-  const { authenticateWithAccessCode } = useAuth();
+  const { signIn } = useSupabaseAuth();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,7 +40,7 @@ export const AuthForm = () => {
 
       if (data?.valid) {
         // Set the user in the auth context
-        await authenticateWithAccessCode(accessCode, data.code_type);
+        // This component is now deprecated - redirect to Supabase form
         
         toast({
           title: "welcome",

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useAuth } from "./useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useServices } from '@/hooks/useServices';
 import type { ChatMessage } from "@/types/chat";
 import { convertApiMessagesToChatMessages, convertApiMessageToChatMessage } from "@/utils/chat";
@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useResponseStreaming } from '@/hooks/useResponseStreaming';
 
 export const useChat = (deliberationId?: string) => {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useSupabaseAuth();
   const { messageService, realtimeService } = useServices();
   const { handleError, handleAsyncError } = useErrorHandler();
   const [messages, setMessages] = useOptimizedArray<ChatMessage>([]);

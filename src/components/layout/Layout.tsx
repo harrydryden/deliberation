@@ -1,4 +1,4 @@
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { Header } from "./Header";
 import { Loader2 } from "lucide-react";
 import { memo } from "react";
@@ -8,7 +8,7 @@ interface LayoutProps {
 }
 
 export const Layout = memo(({ children }: LayoutProps) => {
-  const { isLoading } = useAuth();
+  const { isLoading } = useSupabaseAuth();
 
   if (isLoading) {
     return (

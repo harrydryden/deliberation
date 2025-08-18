@@ -30,7 +30,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RefreshCw, Plus, Search, Filter, MessageSquare, GitBranch } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceDirectedLayout, getNodeDimensions } from './ibis-layout';
 // Legacy import removed - using header-based auth
 import { resolveCollisions, findNonOverlappingPosition } from './collision-detection';
@@ -105,14 +105,14 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
   const [loading, setLoading] = useState(true);
 const [filterType, setFilterType] = useState<'all' | 'issue' | 'position' | 'argument'>('all');
 const { toast } = useToast();
-const { user } = useAuth();
+const { user, isAdmin } = useSupabaseAuth();
   
   const [isGuideCollapsed, setIsGuideCollapsed] = useState(true);
   const [isOptimizingLayout, setIsOptimizingLayout] = useState(true);
   const hasFocusedOnLoad = useRef(false);
   
   // Check if user is admin
-  const isAdmin = user?.role === 'admin';
+  
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
