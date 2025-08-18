@@ -79,6 +79,10 @@ export const AdminDeliberationView = () => {
         if (storedUser) {
           const user = JSON.parse(storedUser);
           console.log('Stored admin user:', { id: user.id, role: user.role, accessCode: user.accessCode });
+          
+          // Also manually test the RLS policy function
+          const { data: accessCodeTest } = await supabase.rpc('get_current_user_access_code');
+          console.log('Access code from function:', accessCodeTest);
         }
 
         // Load deliberation and participants separately for better control
