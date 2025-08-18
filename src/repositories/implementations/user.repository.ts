@@ -97,6 +97,8 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
   // Using profiles table directly instead of auth.admin API
   async findAll(filter?: Record<string, any>): Promise<User[]> {
     try {
+      console.log('UserRepository: findAll called with filter:', filter);
+      
       // Query profiles with user roles and deliberations
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
@@ -112,6 +114,8 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
           )
         `)
         .eq('is_archived', false); // Only non-archived users
+      
+      console.log('UserRepository: Profiles query result:', { profiles, profilesError });
       
       if (profilesError) {
         logger.error('User repository findAll profiles error', profilesError, { filter });

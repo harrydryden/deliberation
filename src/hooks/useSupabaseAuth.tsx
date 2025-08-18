@@ -35,19 +35,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (session?.user) {
           setTimeout(async () => {
             try {
-              const { data: roles } = await supabase
+              console.log('Checking admin status for user:', session.user.id);
+              const { data: roles, error } = await supabase
                 .from('user_roles')
                 .select('role')
                 .eq('user_id', session.user.id);
               
+              console.log('User roles query result:', { roles, error });
               const hasAdminRole = roles?.some(r => r.role === 'admin') || false;
+              console.log('Has admin role:', hasAdminRole);
               setIsAdmin(hasAdminRole);
             } catch (error) {
+              console.error('Error checking admin status:', error);
               logger.error('Error checking admin status:', error);
               setIsAdmin(false);
             }
           }, 0);
         } else {
+          console.log('No session user, setting isAdmin to false');
           setIsAdmin(false);
         }
         
