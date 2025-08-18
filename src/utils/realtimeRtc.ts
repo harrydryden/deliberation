@@ -15,13 +15,14 @@ export class RealtimeRTC {
   async init(opts?: {
     onEvent?: (event: any) => void;
     onToolCall?: (e: ToolCallEvent) => Promise<string | void> | string | void;
+    dynamicInstructions?: string;
   }) {
     this.onEvent = opts?.onEvent;
     this.onToolCall = opts?.onToolCall;
 
-    // 1) Get ephemeral session from Edge Function
+    // 1) Get ephemeral session from Edge Function with dynamic instructions
     const { data, error } = await supabase.functions.invoke('realtime-session', {
-      body: {},
+      body: { instructions: opts?.dynamicInstructions },
     });
     if (error) throw error;
     const EPHEMERAL_KEY = data?.client_secret?.value as string | undefined;

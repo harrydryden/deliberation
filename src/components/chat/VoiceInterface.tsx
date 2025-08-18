@@ -77,26 +77,91 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     }
   };
 
+  const analyzeDeliberationComplexity = async (delibId: string): Promise<{ 
+    duration: string; 
+    maxItems: number; 
+    totalNodes: number;
+    instructions: string;
+  }> => {
+    try {
+      const { data: nodes, error } = await supabase
+        .from('ibis_nodes')
+        .select('id, title, description, node_type, created_at')
+        .eq('deliberation_id', delibId)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+
+      const totalNodes = (nodes || []).length;
+      
+      // Calculate dynamic duration and content based on complexity
+      let duration: string;
+      let maxItems: number;
+      let instructions: string;
+
+      if (totalNodes < 10) {
+        // Small deliberation: 30-60 seconds
+        duration = "30–60 seconds";
+        maxItems = 5;
+        instructions = "You are a civic deliberation assistant. Always speak responses. When asked to analyze policy, first search the local agent knowledge with the 'search_knowledge' tool to ground your answer. When asked for IBIS highlights or a summary, use the 'get_ibis_context' tool and then narrate a clear, concise 30–60 second spoken summary focusing on the key issues.";
+      } else if (totalNodes < 50) {
+        // Medium deliberation: 2-3 minutes
+        duration = "2–3 minutes";
+        maxItems = 15;
+        instructions = "You are a civic deliberation assistant. Always speak responses. When asked to analyze policy, first search the local agent knowledge with the 'search_knowledge' tool to ground your answer. When asked for IBIS highlights or a summary, use the 'get_ibis_context' tool and then narrate a comprehensive 2–3 minute spoken summary that covers key issues, positions, and their relationships. Provide detailed context for participants.";
+      } else {
+        // Large deliberation: 5-7 minutes
+        duration = "5–7 minutes";
+        maxItems = 30;
+        instructions = "You are a civic deliberation assistant. Always speak responses. When asked to analyze policy, first search the local agent knowledge with the 'search_knowledge' tool to ground your answer. When asked for IBIS highlights or a summary, use the 'get_ibis_context' tool and then narrate a complete 5–7 minute spoken analysis that thoroughly covers all major themes, issue-position relationships, argument patterns, and deliberation evolution. Provide comprehensive insights for participants.";
+      }
+
+      return { duration, maxItems, totalNodes, instructions };
+    } catch (err) {
+      console.error('[VoiceInterface] complexity analysis error', err);
+      return {
+        duration: "30–60 seconds",
+        maxItems: 5,
+        totalNodes: 0,
+        instructions: "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a clear, concise spoken summary."
+      };
+    }
+  };
+
   const doGetIbisContext = async (delibId: string, maxItems: number = 10): Promise<string> => {
     try {
       const { data: nodes, error } = await supabase
         .from('ibis_nodes')
-        .select('id, title, node_type, created_at')
+        .select('id, title, description, node_type, created_at')
         .eq('deliberation_id', delibId)
-        .order('created_at', { ascending: true })
-        .limit(200);
+        .order('created_at', { ascending: true });
       if (error) throw error;
+
       const issues = (nodes || []).filter((n: any) => n.node_type === 'issue');
       const positions = (nodes || []).filter((n: any) => n.node_type === 'position');
       const argumentsN = (nodes || []).filter((n: any) => n.node_type === 'argument');
-      const topIssues = issues.slice(0, Math.min(maxItems, 5)).map((i: any) => `- ${i.title}`).join('\n');
+      
+      // Enhanced content retrieval based on maxItems
+      const selectedIssues = issues.slice(0, Math.min(maxItems, issues.length));
+      const selectedPositions = positions.slice(0, Math.min(maxItems, positions.length));
+      const selectedArguments = argumentsN.slice(0, Math.min(maxItems, argumentsN.length));
+
+      const issueDetails = selectedIssues.map((i: any) => 
+        `- ${i.title}${i.description ? `: ${i.description.substring(0, 100)}...` : ''}`
+      ).join('\n');
+
+      const positionDetails = selectedPositions.map((p: any) => 
+        `- ${p.title}${p.description ? `: ${p.description.substring(0, 100)}...` : ''}`
+      ).join('\n');
+
       return [
-        'IBIS highlights:',
+        'IBIS deliberation context:',
+        `Total nodes: ${nodes.length}`,
         `Issues (${issues.length}):`,
-        topIssues || '- (none)',
-        `Positions: ${positions.length}`,
+        issueDetails || '- (none)',
+        `Positions (${positions.length}):`,
+        positionDetails || '- (none)',
         `Arguments: ${argumentsN.length}`,
-        'Provide a clear 30–60 second spoken summary for participants.'
+        maxItems > 10 ? 'Provide a comprehensive spoken summary covering all major themes and relationships.' : 'Provide a clear spoken summary for participants.'
       ].join('\n');
     } catch (err) {
       console.error('[VoiceInterface] get_ibis_context error', err);
@@ -168,17 +233,30 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   const startIbis = async () => {
     try {
       await ensureIdle();
+      
+      // Analyze deliberation complexity for dynamic duration
+      const complexity = await analyzeDeliberationComplexity(deliberationId);
+      
       rtcRef.current = new RealtimeRTC();
-      await rtcRef.current.init({ onEvent: handleEvent, onToolCall: toolHandler });
+      await rtcRef.current.init({ 
+        onEvent: handleEvent, 
+        onToolCall: toolHandler,
+        dynamicInstructions: complexity.instructions
+      });
       setConnected(true);
       setMode('ibis');
 
-      // Fetch IBIS context directly as a fallback to ensure audio
-      const ctx = await doGetIbisContext(deliberationId, 10);
-      const prompt = `${ctx}\n\nPlease speak a clear 30–60 second summary for participants.`;
+      // Fetch IBIS context with appropriate detail level
+      const ctx = await doGetIbisContext(deliberationId, complexity.maxItems);
+      const prompt = `${ctx}\n\nPlease speak a ${complexity.duration} summary covering the deliberation's key insights.`;
       rtcRef.current.sendText(prompt);
 
-      toast({ title: 'IBIS summary', description: 'Generating spoken summary...' });
+      toast({ 
+        title: 'IBIS summary', 
+        description: complexity.totalNodes === 0 
+          ? 'Generating summary for new deliberation...'
+          : `Generating ${complexity.duration} summary for ${complexity.totalNodes} nodes...` 
+      });
     } catch (err: any) {
       console.error('[VoiceInterface] Start IBIS error', err);
       toast({ title: 'Error', description: err?.message || 'Failed to start IBIS summary', variant: 'destructive' });
