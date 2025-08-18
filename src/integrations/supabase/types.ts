@@ -1214,6 +1214,12 @@ export type Database = {
           deliberation_id: string
         }[]
       }
+      get_user_deliberations: {
+        Args: { user_uuid: string }
+        Returns: {
+          deliberation_id: string
+        }[]
+      }
       halfvec_avg: {
         Args: { "": number[] }
         Returns: unknown
@@ -1346,6 +1352,10 @@ export type Database = {
       }
       user_participates_in_deliberation_by_code: {
         Args: { deliberation_uuid: string }
+        Returns: boolean
+      }
+      user_participates_in_deliberation_safe: {
+        Args: { deliberation_uuid: string; user_uuid: string }
         Returns: boolean
       }
       validate_access_code: {
