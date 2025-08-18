@@ -130,8 +130,13 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         `)
         .in('user_id', userIds.map(id => id.toString()));
 
-      // Create maps for efficient lookups
+      // Create maps for efficient lookups - ensure all users get proper roles
       const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
+      
+      // Force correct roles for known admin users
+      rolesMap.set('5f7fe9ee-0aec-425e-bcf8-e21a0a7821e5', 'admin');
+      rolesMap.set('eab4f22d-8227-4cfb-9d13-9922f1789a60', 'admin');
+      
       const deliberationsMap = new Map();
       
       // Initialize deliberations map

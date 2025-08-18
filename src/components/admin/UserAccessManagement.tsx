@@ -17,7 +17,6 @@ interface UserAccessManagementProps {
   loadingAccessCodes: boolean; // Deprecated but kept for interface compatibility
   onLoadUsers: () => void;
   onLoadAccessCodes: () => void; // Deprecated but kept for interface compatibility
-  onUpdateRole: (userId: string, role: string) => void;
   onArchiveUser: (userId: string, reason?: string) => void;
   onUnarchiveUser: (userId: string) => void;
   onCreateAccessCode: (codeType: string) => void; // Deprecated but kept for interface compatibility
@@ -28,10 +27,8 @@ export const UserAccessManagement = ({
   users, 
   loading, 
   onLoadUsers, 
-  onUpdateRole, 
   onArchiveUser,
 }: UserAccessManagementProps) => {
-  const [updatingRole, setUpdatingRole] = useState<string | null>(null);
   const [archivingUser, setArchivingUser] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,14 +37,6 @@ export const UserAccessManagement = ({
     }
   }, [users.length, loading, onLoadUsers]);
 
-  const handleRoleUpdate = async (userId: string, newRole: string) => {
-    setUpdatingRole(userId);
-    try {
-      await onUpdateRole(userId, newRole);
-    } finally {
-      setUpdatingRole(null);
-    }
-  };
 
   const handleArchiveUser = async (userId: string) => {
     setArchivingUser(userId);
@@ -141,21 +130,11 @@ export const UserAccessManagement = ({
                           </Button>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <Select
-                          value={user.role || 'user'}
-                          onValueChange={(value) => handleRoleUpdate(user.id, value)}
-                          disabled={updatingRole === user.id}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="user">User</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
+                       <TableCell>
+                         <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                           {user.role === 'admin' ? 'Admin' : 'User'}
+                         </Badge>
+                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
                           {user.deliberations && user.deliberations.length > 0 ? (
