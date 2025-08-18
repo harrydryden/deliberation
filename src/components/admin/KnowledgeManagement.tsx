@@ -95,6 +95,20 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         throw new Error('User not authenticated');
       }
 
+      // Set both user ID and access code for RLS policies
+      await userContextManager.ensureUserContext(user.id);
+      
+      // Also set the access code context for storage policies
+      const { error: accessCodeError } = await supabase.rpc('set_config', {
+        setting_name: 'app.current_access_code',
+        new_value: user.accessCode,
+        is_local: false
+      });
+
+      if (accessCodeError) {
+        console.warn('Failed to set access code context:', accessCodeError);
+      }
+
       // Upload file to storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}_${file.name}`;
