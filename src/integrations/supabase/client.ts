@@ -18,17 +18,41 @@ const getCurrentAccessCode = (): string | null => {
   }
 };
 
-// Create the Supabase client with automatic access code headers
+// Create the Supabase client with dynamic access code headers
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
-    headers: {
-      // Function that will be called for each request to get the current access code
-      get 'x-access-code'() {
-        return getCurrentAccessCode() || '';
-      }
-    }
+    headers: {},
   }
 })
+
+// Function to ensure access code header is set before any request
+const ensureAccessCodeHeader = () => {
+  const accessCode = getCurrentAccessCode()
+  console.log('🔧 Setting access code header:', accessCode ? 'PRESENT' : 'MISSING')
+  if (accessCode) {
+    // Set the header dynamically for each request
+    (supabase as any).rest.headers = {
+      ...(supabase as any).rest.headers,
+      'x-access-code': accessCode
+    }
+    console.log('✅ Access code header set for request')
+  } else {
+    console.warn('❌ No access code available for header')
+  }
+}
+
+// Wrap key Supabase methods to inject headers
+const originalFrom = supabase.from.bind(supabase)
+supabase.from = function(table: string) {
+  ensureAccessCodeHeader()
+  return originalFrom(table)
+}
+
+const originalRpc = supabase.rpc.bind(supabase)
+supabase.rpc = function(fn: string, args?: any, options?: any) {
+  ensureAccessCodeHeader()
+  return originalRpc(fn, args, options)
+}
 
 // Simple helper function to get current user (no context setting needed)
 export const getCurrentUser = () => {
