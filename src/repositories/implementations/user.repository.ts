@@ -98,29 +98,22 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         throw error;
       }
       
-      console.log('Raw user data from database:', data);
-      
-      return (data || []).map(item => {
-        console.log('Processing user item:', item);
-        console.log('Access code for user:', item.access_code);
-        
-        return {
-          id: item.id,
-          accessCode: item.access_code || '',
-          role: item.user_role || 'user',
-          profile: {
-            displayName: '',
-            avatarUrl: '',
-            bio: '',
-            expertiseAreas: [],
-          },
-          deliberations: Array.isArray(item.deliberations) ? item.deliberations : [],
-          isArchived: item.is_archived || false,
-          archivedAt: item.archived_at,
-          archivedBy: item.archived_by,
-          archiveReason: item.archive_reason,
-        };
-      }) as User[];
+      return (data || []).map(item => ({
+        id: item.id,
+        accessCode: item.access_code || '',
+        role: item.user_role || 'user',
+        profile: {
+          displayName: '',
+          avatarUrl: '',
+          bio: '',
+          expertiseAreas: [],
+        },
+        deliberations: Array.isArray(item.deliberations) ? item.deliberations : [],
+        isArchived: item.is_archived || false,
+        archivedAt: item.archived_at,
+        archivedBy: item.archived_by,
+        archiveReason: item.archive_reason,
+      })) as User[];
     } catch (error) {
       logger.error('User repository findAll failed', error, { filter });
       throw error;
