@@ -11,7 +11,10 @@ export interface AuthResponse {
 
 export interface User {
   id: string;
-  accessCode: string;
+  email: string;
+  emailConfirmedAt?: string;
+  createdAt: string;
+  lastSignInAt?: string;
   profile: UserProfile | null;
   role?: string;
   deliberations?: UserDeliberation[];

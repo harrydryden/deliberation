@@ -92,9 +92,9 @@ export const UserAccessManagement = ({
     }
   };
 
-  const copyToClipboard = (code: string) => {
-    navigator.clipboard.writeText(code);
-    toast.success('Access code copied to clipboard');
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copied to clipboard');
   };
 
   const getStatusBadge = (accessCode: AccessCode) => {
@@ -210,8 +210,8 @@ export const UserAccessManagement = ({
                   <TableHeader>
                     <TableRow>
                       <TableHead>User ID</TableHead>
-                      <TableHead>Access Code</TableHead>
-                      <TableHead>Code Type</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Last Sign In</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Deliberations</TableHead>
                       <TableHead>Actions</TableHead>
@@ -227,22 +227,20 @@ export const UserAccessManagement = ({
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <code className="font-mono bg-muted px-2 py-1 rounded text-sm">
-                              {user.accessCode}
-                            </code>
+                            <span className="text-sm">{user.email}</span>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => copyToClipboard(user.accessCode)}
+                              onClick={() => copyToClipboard(user.email)}
                             >
                               <Copy className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getUserCodeType(user.accessCode) === 'admin' ? 'default' : 'secondary'}>
-                            {getUserCodeType(user.accessCode)}
-                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleDateString() : 'Never'}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <Select
