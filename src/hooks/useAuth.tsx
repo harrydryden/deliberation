@@ -44,7 +44,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const storedUser = localStorage.getItem('simple_auth_user');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        // Check if this is an old user object with access_ prefix ID
+        if (parsedUser.id && parsedUser.id.startsWith('access_')) {
+          console.log('Found old user format, clearing localStorage for re-authentication');
+          localStorage.removeItem('simple_auth_user');
+        } else {
+          setUser(parsedUser);
+        }
       } catch (error) {
         console.warn('Failed to parse stored user:', error);
         localStorage.removeItem('simple_auth_user');
