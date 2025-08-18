@@ -96,130 +96,17 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
 
   async findAll(filter?: Record<string, any>): Promise<User[]> {
     try {
-      // Use direct database queries instead of problematic edge function
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('is_archived', false);
-
-      if (profilesError) {
-        throw profilesError;
+      // Call the edge function to get all users with metadata including access codes
+      const { data: usersData, error: usersError } = await supabase.functions.invoke('admin-get-users');
+      
+      if (usersError) {
+        console.error('Error fetching users from edge function:', usersError);
+        logger.error('User repository findAll failed via edge function', usersError, { filter });
+        throw usersError;
       }
 
-      if (!profiles || profiles.length === 0) {
-        return [];
-      }
-
-      // Get user roles
-      const userIds = profiles.map(p => p.id);
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('user_id', userIds);
-
-      // Get participants with deliberations
-      const { data: participants } = await supabase
-        .from('participants')
-        .select(`
-          user_id,
-          role,
-          deliberations (
-            id,
-            title
-          )
-        `)
-        .in('user_id', userIds.map(id => id.toString()));
-
-      // Create maps for efficient lookups
-      const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
-      
-      const deliberationsMap = new Map();
-      
-      // Initialize deliberations map
-      profiles.forEach(profile => {
-        deliberationsMap.set(profile.id, []);
-      });
-
-      // Populate deliberations map
-      participants?.forEach((p) => {
-        const userId = p.user_id;
-        if (deliberationsMap.has(userId) && p.deliberations && typeof p.deliberations === 'object') {
-          deliberationsMap.get(userId).push({
-            id: (p.deliberations as any).id,
-            title: (p.deliberations as any).title,
-            role: p.role || 'participant'
-          });
-        }
-      });
-
-      // Get all Supabase Auth users to access their metadata
-      console.log('🔍 Fetching auth users for metadata...');
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-      
-      if (authError) {
-        console.error('❌ Error fetching auth users:', authError);
-      } else {
-        console.log('✅ Auth users fetched:', authUsers?.users?.length || 0);
-        console.log('📊 Sample auth user metadata:', authUsers?.users?.[0]?.user_metadata);
-      }
-      
-      // Create a map of user IDs to their auth metadata
-      const authUsersMap = new Map<string, any>();
-      if (authUsers?.users) {
-        authUsers.users.forEach((authUser: any) => {
-          console.log(`📝 Mapping user ${authUser.id} with metadata:`, authUser.user_metadata);
-          authUsersMap.set(authUser.id, authUser.user_metadata);
-        });
-      }
-
-      console.log('🗺️ AuthUsersMap size:', authUsersMap.size);
-
-      // Map users with their access codes from Supabase Auth metadata
-      const users: User[] = profiles.map(profile => {
-        const role = rolesMap.get(profile.id) || 'user';
-        const deliberations = deliberationsMap.get(profile.id) || [];
-        const authMetadata = authUsersMap.get(profile.id);
-        
-        console.log(`🔍 Processing profile ${profile.id}, metadata:`, authMetadata);
-        
-        // Get access codes from Supabase Auth metadata
-        let accessCode1 = 'N/A';
-        let accessCode2 = 'N/A';
-        
-        if (authMetadata?.access_code_1 && authMetadata?.access_code_2) {
-          accessCode1 = authMetadata.access_code_1;
-          accessCode2 = authMetadata.access_code_2;
-          console.log(`✅ Found access codes for ${profile.id}: ${accessCode1} / ${accessCode2}`);
-        } else {
-          console.log(`❌ No access codes found for ${profile.id}, metadata:`, authMetadata);
-        }
-        
-        const userResult = {
-          id: profile.id,
-          email: `user-${profile.id.slice(0, 8)}@example.com`,
-          emailConfirmedAt: profile.created_at,
-          createdAt: profile.created_at,
-          lastSignInAt: profile.updated_at,
-          role: role,
-          profile: {
-            displayName: `User ${profile.id.slice(0, 8)}`,
-            avatarUrl: '',
-            bio: '',
-            expertiseAreas: [],
-          },
-          deliberations: deliberations,
-          isArchived: profile.is_archived || false,
-          archivedAt: profile.archived_at,
-          archivedBy: profile.archived_by,
-          archiveReason: profile.archive_reason,
-          accessCode1: accessCode1,
-          accessCode2: accessCode2,
-        };
-        
-        return userResult;
-      });
-
-      logger.info('User repository findAll users fetched directly', { count: users.length });
+      const users = usersData?.users || [];
+      logger.info('User repository findAll users fetched via edge function', { count: users.length });
       return users;
     } catch (error) {
       logger.error('User repository findAll failed', error, { filter });
