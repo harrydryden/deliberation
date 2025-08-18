@@ -74,6 +74,15 @@ export const BulkUserCreation = ({ onUsersCreated }: BulkUserCreationProps) => {
           if (error) {
             errors.push(`User ${i + 1}: ${error.message}`);
           } else if (data.user) {
+            // Also store access codes in the profiles table for easy retrieval
+            await supabase
+              .from('profiles')
+              .update({
+                access_code_1: accessCode1,
+                access_code_2: accessCode2
+              })
+              .eq('id', data.user.id);
+
             newUsers.push({
               email,
               access_code_1: accessCode1,

@@ -828,6 +828,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          access_code_1: string | null
+          access_code_2: string | null
           archive_reason: string | null
           archived_at: string | null
           archived_by: string | null
@@ -839,6 +841,8 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          access_code_1?: string | null
+          access_code_2?: string | null
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
@@ -850,6 +854,8 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          access_code_1?: string | null
+          access_code_2?: string | null
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null

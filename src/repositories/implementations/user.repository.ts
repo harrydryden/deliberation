@@ -96,7 +96,7 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
 
   async findAll(filter?: Record<string, any>): Promise<User[]> {
     try {
-      // Get profiles first - fallback approach since edge function has connectivity issues
+      // Simple direct database query - no edge functions needed!
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
@@ -151,32 +151,14 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         }
       });
 
-      // Map users with available data - access codes will be shown for bulk created users
+      // Map users - access codes now come directly from the database!
       const users: User[] = profiles.map(profile => {
         const role = rolesMap.get(profile.id) || 'user';
         const deliberations = deliberationsMap.get(profile.id) || [];
         
-        // Extract access codes from email if it's a bulk-created user
-        let accessCode1 = 'N/A';
-        let accessCode2 = 'N/A';
-        
-        // For bulk created users, extract access code from email pattern
-        const email = profile.migrated_from_access_code ? 
-          `${profile.migrated_from_access_code}@temp-access.com` : 
-          `user-${profile.id.slice(0, 8)}@example.com`;
-          
-        if (email.includes('@temp-access.com')) {
-          accessCode1 = email.split('@')[0].toUpperCase();
-          // For now, we'll need the bulk creation to store the 6-digit code somewhere accessible
-          // This will be resolved when edge function connectivity is fixed
-          accessCode2 = 'Pending';
-        }
-        
         return {
           id: profile.id,
-          email: profile.migrated_from_access_code ? 
-            `${profile.migrated_from_access_code}@temp-access.com` : 
-            `user-${profile.id.slice(0, 8)}@example.com`,
+          email: `user-${profile.id.slice(0, 8)}@example.com`,
           emailConfirmedAt: profile.created_at,
           createdAt: profile.created_at,
           lastSignInAt: profile.updated_at,
@@ -192,8 +174,8 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
           archivedAt: profile.archived_at,
           archivedBy: profile.archived_by,
           archiveReason: profile.archive_reason,
-          accessCode1: accessCode1,
-          accessCode2: accessCode2,
+          accessCode1: profile.access_code_1 || 'N/A',
+          accessCode2: profile.access_code_2 || 'N/A',
         };
       });
 
