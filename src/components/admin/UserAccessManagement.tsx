@@ -11,6 +11,7 @@ import { User } from '@/types/api';
 import { AccessCode } from '@/repositories/implementations/access-code.repository';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { toast } from 'sonner';
+import { UserCreation } from './UserCreation';
 
 interface UserAccessManagementProps {
   users: User[];
@@ -132,24 +133,28 @@ export const UserAccessManagement = ({
   const isLoading = loading || loadingAccessCodes;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <UserCog className="h-5 w-5" />
-          User & Access Code Management
-        </CardTitle>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={onLoadUsers} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh Users
-          </Button>
-          <Button variant="outline" size="sm" onClick={onLoadAccessCodes} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loadingAccessCodes ? 'animate-spin' : ''}`} />
-            Refresh Codes
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
+    <div className="space-y-6">
+      {/* User Creation */}
+      <UserCreation onUserCreated={onLoadUsers} />
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <UserCog className="h-5 w-5" />
+            User & Access Code Management
+          </CardTitle>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onLoadUsers} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh Users
+            </Button>
+            <Button variant="outline" size="sm" onClick={onLoadAccessCodes} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loadingAccessCodes ? 'animate-spin' : ''}`} />
+              Refresh Codes
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
         {/* Create New Access Code */}
         <div className="mb-6 p-4 border rounded-lg space-y-4">
           <h3 className="font-medium flex items-center gap-2">
@@ -380,7 +385,8 @@ export const UserAccessManagement = ({
             )}
           </div>
         )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

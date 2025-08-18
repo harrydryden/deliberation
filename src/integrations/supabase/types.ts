@@ -1096,6 +1096,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      create_user_with_access_code: {
+        Args: { p_display_name?: string; p_user_role?: string }
+        Returns: {
+          access_code: string
+          profile_created: boolean
+          user_id: string
+        }[]
+      }
       debug_current_user_settings: {
         Args: Record<PropertyKey, never>
         Returns: Json
