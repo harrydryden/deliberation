@@ -6,24 +6,20 @@ import { logger } from '@/utils/logger';
 
 export class UserRepository extends SupabaseBaseRepository implements IUserRepository {
   
-  async findAll(filter?: Record<string, any>): Promise<User[]> {
-    return super.findAll('profiles');
-  }
-
-  async findById(id: string): Promise<User> {
-    return super.findById('profiles', id);
+  async findById(id: string): Promise<User | null> {
+    return this.findByIdFromTable('profiles', id);
   }
 
   async create(data: any): Promise<User> {
-    return super.create('profiles', data);
+    return this.createInTable('profiles', data);
   }
 
   async update(id: string, data: any): Promise<User> {
-    return super.update('profiles', id, data);
+    return this.updateInTable('profiles', id, data);
   }
 
   async delete(id: string): Promise<void> {
-    return super.delete('profiles', id);
+    return this.deleteFromTable('profiles', id);
   }
 
   async findByEmail(email: string): Promise<User | null> {

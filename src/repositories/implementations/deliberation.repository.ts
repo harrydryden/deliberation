@@ -6,20 +6,20 @@ import { logger } from '@/utils/logger';
 
 export class DeliberationRepository extends SupabaseBaseRepository implements IDeliberationRepository {
   
-  async findById(id: string): Promise<Deliberation> {
-    return super.findById('deliberations', id);
+  async findById(id: string): Promise<Deliberation | null> {
+    return this.findByIdFromTable('deliberations', id);
   }
 
   async create(data: any): Promise<Deliberation> {
-    return super.create('deliberations', data);
+    return this.createInTable('deliberations', data);
   }
 
   async update(id: string, data: any): Promise<Deliberation> {
-    return super.update('deliberations', id, data);
+    return this.updateInTable('deliberations', id, data);
   }
 
   async delete(id: string): Promise<void> {
-    return super.delete('deliberations', id);
+    return this.deleteFromTable('deliberations', id);
   }
 
   async findByStatus(status: string): Promise<Deliberation[]> {

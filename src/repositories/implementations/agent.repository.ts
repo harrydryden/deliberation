@@ -6,16 +6,16 @@ import { logger } from '@/utils/logger';
 
 export class AgentRepository extends SupabaseBaseRepository implements IAgentRepository {
   
-  async findById(id: string): Promise<Agent> {
-    return super.findById('agent_configurations', id);
+  async findById(id: string): Promise<Agent | null> {
+    return this.findByIdFromTable('agent_configurations', id);
   }
 
   async create(data: any): Promise<Agent> {
-    return super.create('agent_configurations', data);
+    return this.createInTable('agent_configurations', data);
   }
 
   async delete(id: string): Promise<void> {
-    return super.delete('agent_configurations', id);
+    return this.deleteFromTable('agent_configurations', id);
   }
 
   async findByDeliberation(deliberationId: string): Promise<Agent[]> {
@@ -250,7 +250,7 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
       }
       
       // Use parent update method with mapped data
-      const result = await super.update(id, dbData);
+      const result = await this.updateInTable('agent_configurations', id, dbData);
       
       // Map result back to camelCase for API consistency
       return {

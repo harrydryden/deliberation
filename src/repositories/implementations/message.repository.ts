@@ -7,19 +7,19 @@ import { logger } from '@/utils/logger';
 export class MessageRepository extends SupabaseBaseRepository implements IMessageRepository {
   
   async findAll(filter?: Record<string, any>): Promise<Message[]> {
-    return super.findAll('messages');
+    return this.findAllFromTable('messages', filter);
   }
 
-  async findById(id: string): Promise<Message> {
-    return super.findById('messages', id);
+  async findById(id: string): Promise<Message | null> {
+    return this.findByIdFromTable('messages', id);
   }
 
   async update(id: string, data: any): Promise<Message> {
-    return super.update('messages', id, data);
+    return this.updateInTable('messages', id, data);
   }
 
   async delete(id: string): Promise<void> {
-    return super.delete('messages', id);
+    return this.deleteFromTable('messages', id);
   }
 
   async findByDeliberation(deliberationId: string): Promise<Message[]> {
