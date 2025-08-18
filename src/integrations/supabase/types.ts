@@ -1164,6 +1164,10 @@ export type Database = {
         Args: { access_code: string }
         Returns: string
       }
+      get_authenticated_user: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_current_access_code_user: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1266,6 +1270,10 @@ export type Database = {
       }
       is_admin_user_simple: {
         Args: { access_code: string }
+        Returns: boolean
+      }
+      is_authenticated_admin: {
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
       is_facilitator_of_deliberation: {
