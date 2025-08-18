@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +15,6 @@ interface NewUser {
 }
 
 export const UserCreation = ({ onUserCreated }: { onUserCreated: () => void }) => {
-  const [displayName, setDisplayName] = useState('');
   const [userRole, setUserRole] = useState('user');
   const [creating, setCreating] = useState(false);
   const [newUser, setNewUser] = useState<NewUser | null>(null);
@@ -27,7 +25,7 @@ export const UserCreation = ({ onUserCreated }: { onUserCreated: () => void }) =
       const { data, error } = await supabase
         .rpc('create_user_with_access_code', {
           p_user_role: userRole,
-          p_display_name: displayName || null
+          p_display_name: null
         });
 
       if (error) {
@@ -39,7 +37,6 @@ export const UserCreation = ({ onUserCreated }: { onUserCreated: () => void }) =
       if (data && data.length > 0) {
         const userData = data[0];
         setNewUser(userData);
-        setDisplayName('');
         setUserRole('user');
         toast.success('User created successfully!');
         onUserCreated();
@@ -59,7 +56,6 @@ export const UserCreation = ({ onUserCreated }: { onUserCreated: () => void }) =
 
   const resetForm = () => {
     setNewUser(null);
-    setDisplayName('');
     setUserRole('user');
   };
 
@@ -74,29 +70,17 @@ export const UserCreation = ({ onUserCreated }: { onUserCreated: () => void }) =
       <CardContent className="space-y-6">
         {!newUser ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="displayName">Display Name (Optional)</Label>
-                <Input
-                  id="displayName"
-                  placeholder="Enter display name"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="userRole">User Role</Label>
-                <Select value={userRole} onValueChange={setUserRole}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="userRole">User Role</Label>
+              <Select value={userRole} onValueChange={setUserRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             
             <Button 
@@ -165,7 +149,7 @@ export const UserCreation = ({ onUserCreated }: { onUserCreated: () => void }) =
               <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded">
                 <p className="text-sm text-blue-800 dark:text-blue-200">
                   <strong>Important:</strong> Share the access code with the user. They'll need it to log into the system.
-                  The access code is automatically linked to their profile in the database.
+                  The user ID and access code are automatically linked in the database.
                 </p>
               </div>
             </div>
