@@ -1,24 +1,24 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { Layout } from "@/components/layout/Layout";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 
 const Admin = () => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, isAdmin } = useSupabaseAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!isLoading && !user) {
       navigate("/auth");
-    } else if (!isLoading && user && user.role !== 'admin') {
+    } else if (!isLoading && user && !isAdmin) {
       navigate("/");
     }
   }, [user, isLoading, navigate]);
 
   if (isLoading) return null;
   if (!user) return null;
-  if (user.role !== 'admin') return null;
+  if (!isAdmin) return null;
 
   return (
     <Layout>

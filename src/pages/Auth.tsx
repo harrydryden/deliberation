@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 
 const Auth = () => {
   console.log('🔍 Auth page component rendering');
-  const { user, isLoading } = useAuth();
-  console.log('🔍 Auth state:', { user: !!user, isLoading });
+  const { user, isLoading, isAdmin } = useSupabaseAuth();
   const navigate = useNavigate();
   const deliberationService = useDeliberationService();
   const [deliberations, setDeliberations] = useState<any[]>([]);
@@ -24,7 +23,7 @@ const Auth = () => {
       console.log('👤 User role:', user?.role);
       
       // Check if user is admin and redirect accordingly
-      if (user?.role === 'admin') {
+      if (isAdmin) {
         console.log('✅ Admin user detected, redirecting to admin dashboard');
         navigate('/admin');
         return;
@@ -46,7 +45,7 @@ const Auth = () => {
     } catch (error) {
       console.error('Failed to load deliberations:', error);
       // Check if user is admin even if deliberations fail to load
-      if (user?.role === 'admin') {
+      if (isAdmin) {
         console.log('✅ Admin user detected (fallback), redirecting to admin dashboard');
         navigate('/admin');
       } else {
@@ -65,7 +64,7 @@ const Auth = () => {
   }
   
   if (user) {
-    const destinationText = user.role === 'admin' ? 'admin dashboard' : 'deliberations';
+    const destinationText = isAdmin ? 'admin dashboard' : 'deliberations';
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div>Redirecting to {destinationText}...</div>

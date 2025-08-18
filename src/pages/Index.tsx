@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { useDeliberationService } from "@/hooks/useDeliberationService";
 const Index = () => {
   const {
     user
-  } = useAuth();
+  } = useSupabaseAuth();
   const navigate = useNavigate();
   const deliberationService = useDeliberationService();
   const [deliberations, setDeliberations] = useState<any[]>([]);

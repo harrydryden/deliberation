@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 import { useAgentService, useMessageService } from "@/hooks/useServices";
 import { Layout } from "@/components/layout/Layout";
@@ -45,9 +45,9 @@ const DeliberationChat = () => {
   }>();
   const {
     user,
-    isLoading
-  } = useAuth();
-  const isAdmin = user?.role === 'admin';
+    isLoading,
+    isAdmin
+  } = useSupabaseAuth();
   const navigate = useNavigate();
   const {
     toast
