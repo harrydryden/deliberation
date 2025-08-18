@@ -15,7 +15,6 @@ interface CreatedUser {
   access_code_1: string;
   access_code_2: string;
   role: string;
-  password: string;
 }
 
 interface BulkUserCreationProps {
@@ -39,10 +38,6 @@ export const BulkUserCreation = ({ onUsersCreated }: BulkUserCreationProps) => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
-  const generatePassword = (): string => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-    return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  };
 
   const handleBulkCreate = async () => {
     if (userCount < 1 || userCount > 50) {
@@ -62,13 +57,12 @@ export const BulkUserCreation = ({ onUsersCreated }: BulkUserCreationProps) => {
       for (let i = 0; i < userCount; i++) {
         const accessCode1 = generateAccessCode1();
         const accessCode2 = generateAccessCode2();
-        const password = generatePassword();
         const email = `${accessCode1.toLowerCase()}@temp-access.com`;
 
         try {
           const { data, error } = await supabase.auth.admin.createUser({
             email,
-            password,
+            password: accessCode2, // Use 6-digit code as password
             user_metadata: {
               access_code_1: accessCode1,
               access_code_2: accessCode2,
@@ -84,8 +78,7 @@ export const BulkUserCreation = ({ onUsersCreated }: BulkUserCreationProps) => {
               email,
               access_code_1: accessCode1,
               access_code_2: accessCode2,
-              role: userRole,
-              password
+              role: userRole
             });
           }
         } catch (err) {
@@ -124,7 +117,7 @@ export const BulkUserCreation = ({ onUsersCreated }: BulkUserCreationProps) => {
   };
 
   const copyUserDetails = async (user: CreatedUser, index: number) => {
-    const details = `Email: ${user.email}\nAccess Code 1: ${user.access_code_1}\nAccess Code 2: ${user.access_code_2}\nPassword: ${user.password}\nRole: ${user.role}`;
+    const details = `Email: ${user.email}\nAccess Code 1: ${user.access_code_1}\nAccess Code 2 (Password): ${user.access_code_2}\nRole: ${user.role}`;
     
     try {
       await navigator.clipboard.writeText(details);
@@ -145,7 +138,7 @@ export const BulkUserCreation = ({ onUsersCreated }: BulkUserCreationProps) => {
 
   const copyAllUsers = async () => {
     const allDetails = createdUsers.map(user => 
-      `Email: ${user.email} | Access Code 1: ${user.access_code_1} | Access Code 2: ${user.access_code_2} | Password: ${user.password} | Role: ${user.role}`
+      `Email: ${user.email} | Access Code 1: ${user.access_code_1} | Access Code 2 (Password): ${user.access_code_2} | Role: ${user.role}`
     ).join('\n');
     
     try {
@@ -239,7 +232,7 @@ export const BulkUserCreation = ({ onUsersCreated }: BulkUserCreationProps) => {
                   <div className="flex-1 space-y-1">
                     <div className="font-medium">{user.email}</div>
                     <div className="text-sm text-muted-foreground">
-                      Access: {user.access_code_1} / {user.access_code_2} | Password: {user.password}
+                      Access: {user.access_code_1} / {user.access_code_2} (Password: {user.access_code_2})
                     </div>
                     <Badge variant={user.role === 'admin' ? 'destructive' : 'secondary'}>
                       {user.role}
