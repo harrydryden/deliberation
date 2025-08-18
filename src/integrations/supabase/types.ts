@@ -1162,23 +1162,11 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      get_current_access_code_user: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_current_user_access_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
       get_current_user_deliberation_ids: {
         Args: Record<PropertyKey, never>
         Returns: {
           deliberation_id: string
         }[]
-      }
-      get_current_user_id_clean: {
-        Args: Record<PropertyKey, never>
-        Returns: string
       }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
@@ -1282,10 +1270,6 @@ export type Database = {
         Returns: boolean
       }
       is_authenticated_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_current_user_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
