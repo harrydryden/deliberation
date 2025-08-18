@@ -130,15 +130,8 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         `)
         .in('user_id', userIds.map(id => id.toString()));
 
-      // Fetch access codes for all users
-      const { data: accessCodes } = await supabase
-        .from('access_codes')
-        .select('used_by, code, code_type')
-        .not('used_by', 'is', null);
-
       // Create maps for efficient lookups
       const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
-      const accessCodesMap = new Map(accessCodes?.map(ac => [ac.used_by, ac]) || []);
       
       const deliberationsMap = new Map();
       
@@ -159,35 +152,30 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         }
       });
 
-      // Map users with their actual access codes from database
+      // Get all Supabase Auth users to access their metadata
+      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+      
+      // Create a map of user IDs to their auth metadata
+      const authUsersMap = new Map<string, any>();
+      if (authUsers?.users) {
+        authUsers.users.forEach((authUser: any) => {
+          authUsersMap.set(authUser.id, authUser.user_metadata);
+        });
+      }
+
+      // Map users with their access codes from Supabase Auth metadata
       const users: User[] = profiles.map(profile => {
         const role = rolesMap.get(profile.id) || 'user';
         const deliberations = deliberationsMap.get(profile.id) || [];
-        const accessCodeInfo = accessCodesMap.get(profile.id);
+        const authMetadata = authUsersMap.get(profile.id);
         
-        // Get access codes from database or use migrated values
+        // Get access codes from Supabase Auth metadata
         let accessCode1 = 'N/A';
         let accessCode2 = 'N/A';
         
-        if (accessCodeInfo) {
-          // For new users created via bulk creation, use the generated access code
-          accessCode1 = accessCodeInfo.code.slice(0, 5) || 'N/A';
-          accessCode2 = accessCodeInfo.code.slice(5) || 'N/A';
-        } else {
-          // Fallback for existing users - check if they have migrated access codes
-          if (profile.migrated_from_access_code) {
-            accessCode1 = profile.migrated_from_access_code;
-            accessCode2 = 'N/A';
-          }
-          // Legacy hardcoded values for known users
-          else if (profile.id === '5f7fe9ee-0aec-425e-bcf8-e21a0a7821e5') {
-            accessCode1 = 'ADMIN';
-            accessCode2 = '123456';
-          }
-          else if (profile.id === 'eab4f22d-8227-4cfb-9d13-9922f1789a60') {
-            accessCode1 = 'SUPER';
-            accessCode2 = '088014';
-          }
+        if (authMetadata?.access_code_1 && authMetadata?.access_code_2) {
+          accessCode1 = authMetadata.access_code_1;
+          accessCode2 = authMetadata.access_code_2;
         }
         
         const userResult = {
