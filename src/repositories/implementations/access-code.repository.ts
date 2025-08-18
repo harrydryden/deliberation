@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, ensureUserContext } from '@/integrations/supabase/client';
 import { IAccessCodeRepository } from '../interfaces';
 import { logger } from '@/utils/logger';
 
@@ -19,6 +19,9 @@ export interface AccessCode {
 export class AccessCodeRepository implements IAccessCodeRepository {
   async findAll(): Promise<AccessCode[]> {
     try {
+      // Ensure user context is set for RLS policies
+      await ensureUserContext();
+      
       const { data, error } = await supabase
         .from('access_codes')
         .select('*')
@@ -58,6 +61,9 @@ export class AccessCodeRepository implements IAccessCodeRepository {
 
   async create(codeType: string): Promise<AccessCode> {
     try {
+      // Ensure user context is set for RLS policies
+      await ensureUserContext();
+      
       // Generate a new access code using Supabase function
       const generatedCode = await this.generateSecureCode();
       
@@ -91,6 +97,9 @@ export class AccessCodeRepository implements IAccessCodeRepository {
 
   async delete(id: string): Promise<void> {
     try {
+      // Ensure user context is set for RLS policies
+      await ensureUserContext();
+      
       const { error } = await supabase
         .from('access_codes')
         .delete()
