@@ -10,7 +10,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Lightbulb } from "lucide-react";
-import { userContextManager } from '@/utils/userContextManager';
+import { getCurrentUser } from '@/integrations/supabase/client';
 interface IbisSubmissionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -186,7 +186,7 @@ export const IbisSubmissionModal = ({
     setIsSubmitting(true);
     try {
       // Create IBIS node and set user context
-      const user = userContextManager.getCurrentUser();
+      const user = getCurrentUser();
       if (!user) {
         throw new Error('User not authenticated');
       }

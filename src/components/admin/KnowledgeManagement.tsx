@@ -15,7 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { logger } from '@/utils/logger';
-import { userContextManager } from '@/utils/userContextManager';
+import { getCurrentUser } from '@/integrations/supabase/client';
 
 interface KnowledgeItem {
   id: string;
@@ -89,14 +89,11 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
 
     setUploading(true);
     try {
-      // Get current user and set context
-      const user = userContextManager.getCurrentUser();
+      // Get current user
+      const user = getCurrentUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
-
-      // Set both user ID and access code for RLS policies
-      await userContextManager.ensureUserContext(user.id);
 
       // Upload file to storage
       const fileExt = file.name.split('.').pop();

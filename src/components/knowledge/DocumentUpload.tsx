@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/api';
 import { logger } from '@/utils/logger';
-import { userContextManager } from '@/utils/userContextManager';
+import { getCurrentUser } from '@/integrations/supabase/client';
 
 // Remove PDF.js imports since we're using server-side processing
 
@@ -34,7 +34,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
   const { toast } = useToast();
 
   // Check if current user is admin
-  const user = userContextManager.getCurrentUser();
+  const user = getCurrentUser();
   const isAdmin = user?.role === 'admin';
 
   // Only show component to admins
@@ -77,22 +77,11 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
     const startTime = performance.now();
 
     try {
-      // Get current user and set context
-      const user = userContextManager.getCurrentUser();
+      // Get current user
+      const user = getCurrentUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
-
-      console.log('Setting context for upload:', { userId: user.id, accessCode: user.accessCode, role: user.role });
-
-      // Ensure context is set and verified before upload
-      const contextSet = await userContextManager.ensureUserContext(user.id);
-      if (!contextSet) {
-        throw new Error('Failed to set user context for upload');
-      }
-
-      // Add extra delay to ensure context is fully propagated
-      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Debug: Check context before upload
       try {

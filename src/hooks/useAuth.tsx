@@ -51,18 +51,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           localStorage.removeItem('simple_auth_user');
         } else {
           setUser(parsedUser);
-          // CRITICAL: Set the database context for RLS policies
-          import('@/integrations/supabase/client').then(({ setUserContext }) => {
-            setUserContext().then((success) => {
-              if (!success) {
-                console.error('Failed to set user context on app load');
-              } else {
-                console.log('User context successfully set on app load');
-              }
-            }).catch(error => {
-              console.error('Error setting user context on app load:', error);
-            });
-          });
+          // Context is now set automatically via headers
         }
       } catch (error) {
         console.warn('Failed to parse stored user:', error);

@@ -9,7 +9,7 @@ import { Calendar, Users, Eye, Bot, User, FileText, Workflow, ChevronDown, Chevr
 import { formatToUKDate, formatToUKTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { MarkdownMessage } from '@/components/common/MarkdownMessage';
-import { ensureAdminContext } from '@/utils/userContextManager';
+// Legacy import removed - using header-based auth
 import type { ChatMessage } from '@/types/chat';
 interface Deliberation {
   id: string;
@@ -66,13 +66,7 @@ export const AdminDeliberationView = () => {
         setLoading(true);
         setMessagesLoading(true);
 
-        // Ensure admin context is set for RLS policies
-        const contextSet = await ensureAdminContext();
-        console.log('Admin context set successfully:', contextSet);
-        
-        if (!contextSet) {
-          throw new Error('Failed to set admin context - user may not have admin permissions');
-        }
+        // Context is now set automatically via headers
 
         // Load deliberation and participants separately for better control
         const [deliberationResult, participantsResult] = await Promise.all([

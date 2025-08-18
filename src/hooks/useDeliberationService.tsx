@@ -1,5 +1,5 @@
 import { useAuth } from '@/hooks/useAuth';
-import { supabase, setUserContext } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 
 interface DeliberationService {
@@ -15,7 +15,7 @@ class SupabaseDeliberationService implements DeliberationService {
     logger.info('Starting getDeliberations with simplified auth');
     
     // Set user context for RLS policies
-    await setUserContext();
+    // Context set automatically via headers
     
     // Query ALL deliberations - the RLS policies will automatically filter
     // to only show deliberations the user can access (public + participated)
@@ -48,7 +48,7 @@ class SupabaseDeliberationService implements DeliberationService {
         logger.info('Getting participant count', { deliberationId: deliberation.id });
         
         // Set user context before each query to ensure RLS works
-        await setUserContext();
+        // Context set automatically via headers
         
         // Get total participant count with a simple count query
         const { count, error: countError } = await supabase
@@ -141,7 +141,7 @@ class SupabaseDeliberationService implements DeliberationService {
     logger.info('Starting joinDeliberation with access code auth', { deliberationId });
     
     // Set user context for RLS policies
-    await setUserContext();
+    // Context set automatically via headers
     
     // Get the current authenticated user from localStorage
     const storedUser = localStorage.getItem('simple_auth_user');

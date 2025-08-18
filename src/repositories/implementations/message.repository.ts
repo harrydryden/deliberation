@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { userContextManager } from '@/utils/userContextManager';
+// Legacy import removed - using header-based auth
 import { BaseRepository } from './base.repository';
 import { IMessageRepository } from '../interfaces';
 import { Message } from '@/types/api';
@@ -12,9 +12,8 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
 
   async findByDeliberation(deliberationId: string): Promise<Message[]> {
     try {
-      // Ensure user context is properly set for RLS policies
-      const contextSet = await userContextManager.ensureUserContext();
-      logger.info('Loading messages for deliberation', { deliberationId, contextSet });
+      // Context set automatically via headers
+      logger.info('Loading messages for deliberation', { deliberationId });
 
       const { data, error } = await supabase
         .from('messages')
@@ -36,11 +35,7 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
 
   async findByUser(userId: string): Promise<Message[]> {
     try {
-      // Ensure user context is properly set for RLS policies
-      const contextSet = await userContextManager.ensureUserContext(userId);
-      if (!contextSet) {
-        logger.warn('Could not set user context for RLS, may return empty results', { userId });
-      }
+      // Context set automatically via headers
       
       const { data, error } = await supabase
         .from('messages')
@@ -62,11 +57,7 @@ export class MessageRepository extends BaseRepository<Message> implements IMessa
 
   async create(data: Omit<Message, 'id' | 'createdAt' | 'updatedAt'>): Promise<Message> {
     try {
-      // Ensure user context is properly set for RLS policies
-      const contextSet = await userContextManager.ensureUserContext(data.userId);
-      if (!contextSet) {
-        throw new Error('Unable to authenticate your session. Please refresh the page and try again.');
-      }
+      // Context set automatically via headers
       
       // Map the data to database column names
       const dbData = {
