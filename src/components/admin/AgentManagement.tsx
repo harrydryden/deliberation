@@ -423,14 +423,18 @@ export const AgentManagement = ({ agents, loading, onLoad, onUpdate, onCreate }:
                               </Select>
                             </div>
                             <div>
-                              <Label htmlFor="system-prompt">System Prompt (Agent Instructions)</Label>
+                              <Label htmlFor="system-prompt">System Prompt Override (Optional)</Label>
                               <Textarea
                                 id="system-prompt"
                                 value={editForm.system_prompt}
                                 onChange={(e) => setEditForm(prev => ({ ...prev, system_prompt: e.target.value }))}
                                 rows={4}
-                                placeholder="Enter the system prompt that defines how this agent should behave..."
+                                placeholder="Leave blank to use default template, or enter custom prompt to override..."
                               />
+                              <p className="text-xs text-muted-foreground mt-1">
+                                If left blank, this agent will use the default system prompt template for its type. 
+                                Enter text here only if you want to override the default for this specific agent.
+                              </p>
                             </div>
                             <div>
                               <Label htmlFor="response-style">Response Style</Label>

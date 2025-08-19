@@ -76,6 +76,7 @@ export type Database = {
           is_default: boolean
           name: string
           preset_questions: Json | null
+          prompt_overrides: Json | null
           response_style: string | null
           system_prompt: string
           updated_at: string
@@ -93,6 +94,7 @@ export type Database = {
           is_default?: boolean
           name: string
           preset_questions?: Json | null
+          prompt_overrides?: Json | null
           response_style?: string | null
           system_prompt: string
           updated_at?: string
@@ -110,6 +112,7 @@ export type Database = {
           is_default?: boolean
           name?: string
           preset_questions?: Json | null
+          prompt_overrides?: Json | null
           response_style?: string | null
           system_prompt?: string
           updated_at?: string
@@ -865,6 +868,48 @@ export type Database = {
           migrated_from_access_code?: string | null
           original_access_code_id?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      prompt_templates: {
+        Row: {
+          agent_type: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          prompt_type: string
+          template: string
+          updated_at: string
+        }
+        Insert: {
+          agent_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name: string
+          prompt_type: string
+          template: string
+          updated_at?: string
+        }
+        Update: {
+          agent_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name?: string
+          prompt_type?: string
+          template?: string
+          updated_at?: string
         }
         Relationships: []
       }

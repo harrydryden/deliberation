@@ -9,6 +9,7 @@ import { AgentService } from './implementations/agent.service';
 import { DeliberationService } from './implementations/deliberation.service';
 import { MessageService } from './implementations/message.service';
 import { RealtimeService } from './implementations/realtime.service';
+import { PromptService } from './implementations/prompt.service';
 
 // Create repository instances
 const userRepository = new UserRepository();
@@ -23,6 +24,7 @@ const agentService = new AgentService(agentRepository);
 const deliberationService = new DeliberationService(deliberationRepository);
 const messageService = new MessageService(messageRepository);
 const realtimeService = new RealtimeService();
+const promptService = new PromptService();
 
 const adminService = new AdminService(
   adminRepository,
@@ -40,6 +42,7 @@ export const serviceContainer = {
   deliberationService,
   messageService,
   realtimeService,
+  promptService,
 };
 
 // Export individual services for convenience
@@ -49,5 +52,6 @@ export const {
   agentService: agentServiceInstance,
   deliberationService: deliberationServiceInstance,
   messageService: messageServiceInstance,
-  realtimeService: realtimeServiceInstance
+  realtimeService: realtimeServiceInstance,
+  promptService: promptServiceInstance
 } = serviceContainer;

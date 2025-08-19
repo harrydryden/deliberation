@@ -26,3 +26,4 @@ export const useDeliberationService = () => useServices().deliberationService;
 export const useUserService = () => useServices().userService;
 export const useAdminService = () => useServices().adminService;
 export const useRealtimeService = () => useServices().realtimeService;
+export const usePromptService = () => useServices().promptService;
