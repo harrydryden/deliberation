@@ -26,7 +26,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
   const [updating, setUpdating] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     prompt_type: 'system_prompt',
-    agent_type: '',
+    agent_type: 'global',
     name: '',
     template: '',
     description: '',
@@ -54,7 +54,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
     setEditingPrompt(prompt);
     setEditForm({
       prompt_type: prompt.prompt_type,
-      agent_type: prompt.agent_type || '',
+      agent_type: prompt.agent_type || 'global',
       name: prompt.name,
       template: prompt.template,
       description: prompt.description || '',
@@ -67,7 +67,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
     setCreating(true);
     setEditForm({
       prompt_type: 'system_prompt',
-      agent_type: '',
+      agent_type: 'global',
       name: '',
       template: '',
       description: '',
@@ -83,7 +83,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
     try {
       await promptService.updatePromptTemplate(editingPrompt.id, {
         prompt_type: editForm.prompt_type,
-        agent_type: editForm.agent_type || null,
+        agent_type: editForm.agent_type === 'global' ? null : editForm.agent_type,
         name: editForm.name,
         template: editForm.template,
         description: editForm.description,
@@ -104,7 +104,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
     try {
       await promptService.createPromptTemplate({
         prompt_type: editForm.prompt_type,
-        agent_type: editForm.agent_type || null,
+        agent_type: editForm.agent_type === 'global' ? null : editForm.agent_type,
         name: editForm.name,
         template: editForm.template,
         description: editForm.description,
@@ -130,7 +130,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
   };
 
   const getAgentTypeBadge = (type?: string) => {
-    if (!type) return <Badge variant="outline">Global</Badge>;
+    if (!type || type === 'global') return <Badge variant="outline">Global</Badge>;
     const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
       'bill_agent': 'default',
       'peer_agent': 'secondary',
@@ -166,7 +166,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
                 <SelectValue placeholder="Select agent type or leave blank for global" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Global (All Agents)</SelectItem>
+                <SelectItem value="global">Global (All Agents)</SelectItem>
                 <SelectItem value="bill_agent">Bill Agent</SelectItem>
                 <SelectItem value="peer_agent">Peer Agent</SelectItem>
                 <SelectItem value="flow_agent">Flow Agent</SelectItem>
