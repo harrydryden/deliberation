@@ -108,7 +108,7 @@ YOUR ROLE:
 
       // Build the complete prompt
       const billAgentPrompt = this.buildPrompt({
-        systemPrompt,
+        systemPrompt: finalSystemPrompt,
         goals: agentConfig?.goals,
         responseStyle: agentConfig?.responseStyle,
         conversationContext,
@@ -483,6 +483,43 @@ ${styleSection}${knowledgeContext ? 'Use the relevant knowledge above to inform 
     } catch (error) {
       logger.error({ error, userId, traceId }, 'Bill Agent streaming error');
       throw error;
+    }
+  }
+
+  private async getSystemPrompt(agentId?: string, agentType: string = 'bill_agent'): Promise<string> {
+    try {
+      // First check for agent-specific overrides if agentId provided
+      if (agentId) {
+        const agentConfig = await this.prisma.agentConfiguration.findUnique({
+          where: { id: agentId },
+          select: { promptOverrides: true }
+        });
+
+        if (agentConfig?.promptOverrides?.['system_prompt']) {
+          return agentConfig.promptOverrides['system_prompt'];
+        }
+      }
+
+      // Fall back to default prompt for agent type
+      const defaultPrompt = await this.prisma.promptTemplate.findFirst({
+        where: {
+          promptType: 'system_prompt',
+          agentType: agentType,
+          isDefault: true,
+          isActive: true
+        },
+        select: { template: true }
+      });
+
+      if (defaultPrompt?.template) {
+        return defaultPrompt.template;
+      }
+
+      // Final fallback to hardcoded default
+      return 'You are the Bill Agent, a specialized AI facilitator for democratic deliberation.';
+    } catch (error) {
+      logger.error({ error, agentId, agentType }, 'Failed to get system prompt');
+      return 'You are the Bill Agent, a specialized AI facilitator for democratic deliberation.';
     }
   }
 }

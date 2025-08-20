@@ -6,6 +6,9 @@ import { logger } from '../utils/logger';
 import { sendSSEMessage } from '../routes/sse';
 import { DeliberationAgentManager } from './deliberation-agent-manager.service';
 
+// Import prompt service
+const PROMPT_SERVICE_URL = process.env.PROMPT_SERVICE_URL || 'http://localhost:3000/api/prompt-service';
+
 interface SessionState {
   lastActivityTime: number;
   messageCount: number;
@@ -166,6 +169,47 @@ export class AIOrchestrationService {
     }
 
     return agents;
+  }
+
+  private async getSystemPrompt(agentId?: string, agentType: string = 'flow_agent'): Promise<string> {
+    try {
+      // First check for agent-specific overrides if agentId provided
+      if (agentId) {
+        const agentConfig = await this.prisma.agentConfiguration.findUnique({
+          where: { id: agentId },
+          select: { promptOverrides: true }
+        });
+
+        if (agentConfig?.promptOverrides?.['system_prompt']) {
+          return agentConfig.promptOverrides['system_prompt'];
+        }
+      }
+
+      // Fall back to default prompt for agent type
+      const defaultPrompt = await this.prisma.promptTemplate.findFirst({
+        where: {
+          promptType: 'system_prompt',
+          agentType: agentType,
+          isDefault: true,
+          isActive: true
+        },
+        select: { template: true }
+      });
+
+      if (defaultPrompt?.template) {
+        return defaultPrompt.template;
+      }
+
+      // Final fallback to hardcoded default
+      return this.getHardcodedFlowPrompt();
+    } catch (error) {
+      logger.error({ error, agentId, agentType }, 'Failed to get system prompt');
+      return this.getHardcodedFlowPrompt();
+    }
+  }
+
+  private getHardcodedFlowPrompt(): string {
+    return 'You are the Flow Agent, managing conversation flow and transitions in democratic deliberation.';
   }
 
   private async executeAgentResponse(
@@ -343,7 +387,8 @@ export class AIOrchestrationService {
       );
       
       if (selectedQuestion) {
-        flowPrompt = `You are the Flow Agent acting as a facilitator in democratic deliberation.
+        const flowSystemPrompt = await this.getSystemPrompt(flowAgentConfig?.id, 'flow_agent');
+        flowPrompt = `${flowSystemPrompt}
 ${deliberationContext}
 FACILITATION CONTEXT:
 - User input type: ${inputType}
@@ -661,7 +706,7 @@ Keep response conversational and under 3 sentences.`;
     sessionState?: SessionState,
     content?: string
   ): string {
-    return `You are the Flow Agent, managing conversation flow and transitions in democratic deliberation.
+    return `${this.getHardcodedFlowPrompt()}
 ${deliberationContext}
 CURRENT CONTEXT:
 - User input type: ${inputType}

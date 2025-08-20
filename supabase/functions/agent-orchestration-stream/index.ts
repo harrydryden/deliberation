@@ -502,7 +502,7 @@ async function generateStreamingResponse(
   
   console.log(`🧠 Using ${model} for ${agentType} response`);
 
-  const systemPrompt = buildSystemPrompt(agentType, analysis, conversationState, similarNodes);
+  const systemPrompt = await buildSystemPrompt(agentType, analysis, conversationState, similarNodes);
 
   const requestBody: any = {
     model,
@@ -563,15 +563,20 @@ async function generateStreamingResponse(
   return fullResponse;
 }
 
-// Build appropriate system prompt
-function buildSystemPrompt(agentType: string, analysis: any, conversationState: any, similarNodes: any[]): string {
-  const basePrompts = {
-    bill_agent: "You are a knowledgeable assistant focused on legislation, policy, and legal frameworks around assisted dying. Provide accurate, factual information.",
-    peer_agent: "You are a facilitator helping users understand what other participants have contributed to this discussion. Share relevant perspectives and contributions.",
-    flow_agent: "You are a conversation facilitator helping guide productive discussions about assisted dying. Ask thoughtful questions and help clarify complex topics."
-  };
-
-  let prompt = basePrompts[agentType as keyof typeof basePrompts] || basePrompts.flow_agent;
+// Build appropriate system prompt using configurable prompts
+async function buildSystemPrompt(agentType: string, analysis: any, conversationState: any, similarNodes: any[]): Promise<string> {
+  // Try to get prompt from database first
+  let prompt = await getPromptFromDatabase(agentType, 'system_prompt');
+  
+  if (!prompt) {
+    // Fallback to hardcoded prompts
+    const basePrompts = {
+      bill_agent: "You are a knowledgeable assistant focused on legislation, policy, and legal frameworks around assisted dying. Provide accurate, factual information.",
+      peer_agent: "You are a facilitator helping users understand what other participants have contributed to this discussion. Share relevant perspectives and contributions.",
+      flow_agent: "You are a conversation facilitator helping guide productive discussions about assisted dying. Ask thoughtful questions and help clarify complex topics."
+    };
+    prompt = basePrompts[agentType as keyof typeof basePrompts] || basePrompts.flow_agent;
+  }
 
   if (analysis.complexity > 0.7) {
     prompt += " This is a complex query requiring detailed analysis and nuanced understanding.";
@@ -582,6 +587,29 @@ function buildSystemPrompt(agentType: string, analysis: any, conversationState: 
   }
 
   return prompt;
+}
+
+// Get prompt from database
+async function getPromptFromDatabase(agentType: string, promptType: string): Promise<string | null> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const { data } = await supabase
+      .from('prompt_templates')
+      .select('template')
+      .eq('prompt_type', promptType)
+      .eq('agent_type', agentType)
+      .eq('is_default', true)
+      .eq('is_active', true)
+      .single();
+
+    return data?.template || null;
+  } catch (error) {
+    console.error('Failed to get prompt from database:', error);
+    return null;
+  }
 }
 
 // Enhanced response cache with cleanup
