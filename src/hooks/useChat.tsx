@@ -184,11 +184,22 @@ export const useChat = (deliberationId?: string) => {
           // onComplete callback - replace with final message
           async (finalContent: string, agentType: string) => {
             try {
-              // Remove streaming message and reload to get the actual stored message
-              setMessages(prev => prev.filter(m => m.id !== `streaming-${saved.id}`));
-              await loadChatHistory();
+              // Replace streaming placeholder with final agent message locally to avoid full reload
+              const finalMessage: ChatMessage = {
+                id: `${saved.id}-final` as string,
+                content: finalContent,
+                message_type: agentType as ChatMessage['message_type'],
+                created_at: new Date().toISOString(),
+                user_id: 'agent',
+                status: 'sent',
+                agent_context: { agentType }
+              };
+              setMessages(prev => {
+                const withoutStreaming = prev.filter(m => m.id !== `streaming-${saved.id}`);
+                return [...withoutStreaming, finalMessage];
+              });
             } catch (error) {
-              logger.error('Error loading final message', { error });
+              logger.error('Error applying final message', { error });
             } finally {
               setIsTyping(false);
             }

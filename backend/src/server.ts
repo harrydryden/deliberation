@@ -9,7 +9,7 @@ import { logger } from './utils/logger';
 import { config } from './config';
 
 const prisma = new PrismaClient({
-  log: ['query', 'info', 'warn', 'error'],
+  log: config.env === 'production' ? ['warn', 'error'] : ['query', 'info', 'warn', 'error'],
 });
 
 const fastify = Fastify({
@@ -29,6 +29,7 @@ async function buildServer() {
     
     // Setup Redis connection
     const redis = createRedisClient();
+    try { await (redis as any).connect?.(); } catch {}
     fastify.decorate('redis', redis);
 
     // Register routes
@@ -47,16 +48,23 @@ async function buildServer() {
     fastify.decorate('io', io);
     setupWebSocket(io, prisma);
 
-    // Health check endpoint
+    // Health check endpoint with short cache
+    let lastHealth: any = null;
+    let lastHealthTs = 0;
     fastify.get('/health', async (request, reply) => {
       try {
+        const now = Date.now();
+        if (lastHealth && now - lastHealthTs < 5000) {
+          return lastHealth;
+        }
+
         // Check database connectivity
         await prisma.$queryRaw`SELECT 1`;
         
         // Check Redis connectivity
         await fastify.redis.ping();
 
-        return {
+        const payload = {
           status: 'healthy',
           timestamp: new Date().toISOString(),
           uptime: process.uptime(),
@@ -67,6 +75,9 @@ async function buildServer() {
             redis: 'healthy',
           },
         };
+        lastHealth = payload;
+        lastHealthTs = now;
+        return payload;
       } catch (error) {
         reply.status(503);
         return {

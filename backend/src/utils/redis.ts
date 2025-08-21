@@ -207,11 +207,11 @@ export class TokenBucket {
           if currentTokens >= tokens then
             currentTokens = currentTokens - tokens
             redis.call('HMSET', bucket, 'tokens', currentTokens, 'lastRefill', now)
-            redis.call('EXPIRE', bucket, 3600) -- 1 hour TTL
+            redis.call('EXPIRE', bucket, math.max( math.floor(refillInterval/1000) * 120, 60)) -- TTL ~2 minutes of refill windows, min 60s
             return {1, currentTokens, 0} -- allowed, remaining, retryAfter
           else
             redis.call('HMSET', bucket, 'tokens', currentTokens, 'lastRefill', now)
-            redis.call('EXPIRE', bucket, 3600)
+            redis.call('EXPIRE', bucket, math.max( math.floor(refillInterval/1000) * 120, 60))
             local retryAfter = math.ceil((tokens - currentTokens) / refillRate) * refillInterval
             return {0, currentTokens, retryAfter} -- not allowed, remaining, retryAfter
           end
@@ -374,34 +374,47 @@ export class CacheManager {
 
   // Cache classification results
   async cacheClassification(input: string, result: string): Promise<void> {
-    const key = `classification:${Buffer.from(input).toString('base64')}`;
+    const key = `classification:${this.hash(input)}`;
     await this.set(key, result, 3600); // 1 hour TTL
   }
 
   async getCachedClassification(input: string): Promise<string | null> {
-    const key = `classification:${Buffer.from(input).toString('base64')}`;
+    const key = `classification:${this.hash(input)}`;
     return this.get(key);
   }
 
   // Cache relevance results  
   async cacheRelevance(query: string, content: string, score: number): Promise<void> {
-    const key = `relevance:${Buffer.from(query + content).toString('base64')}`;
+    const key = `relevance:${this.hash(query + content)}`;
     await this.set(key, score, 1800); // 30 minutes TTL
   }
 
   async getCachedRelevance(query: string, content: string): Promise<number | null> {
-    const key = `relevance:${Buffer.from(query + content).toString('base64')}`;
+    const key = `relevance:${this.hash(query + content)}`;
     return this.get(key);
   }
 
   // Cache safety check results
   async cacheSafetyCheck(content: string, result: any): Promise<void> {
-    const key = `safety:${Buffer.from(content).toString('base64')}`;
+    const key = `safety:${this.hash(content)}`;
     await this.set(key, result, 7200); // 2 hours TTL
   }
 
   async getCachedSafetyCheck(content: string): Promise<any | null> {
-    const key = `safety:${Buffer.from(content).toString('base64')}`;
+    const key = `safety:${this.hash(content)}`;
     return this.get(key);
+  }
+
+  private hash(input: string): string {
+    // Lightweight 53-bit hash to avoid heavy crypto dep; acceptable for cache keys
+    let h1 = 0xdeadbeef ^ input.length, h2 = 0x41c6ce57 ^ input.length;
+    for (let i = 0; i < input.length; i++) {
+      const ch = input.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = (Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)) >>> 0;
+    h2 = (Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)) >>> 0;
+    return (h2 * 4294967296 + h1).toString(36);
   }
 }

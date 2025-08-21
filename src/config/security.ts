@@ -33,7 +33,6 @@ export const SECURITY_CONFIG = {
   // Input validation
   VALIDATION: {
     maxInputLength: 5000,
-    accessCodeLength: 10,
     maxDisplayNameLength: 100,
     maxBioLength: 1000,
     maxTitleLength: 200,
@@ -73,7 +72,7 @@ export const SECURITY_CONFIG = {
   AUDIT: {
     sensitiveActions: [
       'user_role_change',
-      'access_code_creation',
+      'user_creation',
       'deliberation_creation',
       'user_deletion',
       'bulk_operations'
@@ -84,7 +83,6 @@ export const SECURITY_CONFIG = {
 
 // Security validation patterns
 export const SECURITY_PATTERNS = {
-  ACCESS_CODE: /^[A-Z0-9]{10}$/,
   EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
   SAFE_HTML: /^[a-zA-Z0-9\s\-_\.\,\!\?\:\;\"\']*$/,
   SQL_INJECTION: /['"\\;]/,

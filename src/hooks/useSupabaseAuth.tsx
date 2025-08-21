@@ -10,7 +10,6 @@ interface AuthContextType {
   isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
-  createAccessCodeUsers: (count: number, roleType: 'admin' | 'user') => Promise<{ users: Array<{ accessCode1: string; accessCode2: string; role: string }>, error?: any }>;
   createAdminUsers: () => Promise<{ success: boolean; error?: any }>;
 }
 
@@ -188,8 +187,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
-            access_code_1: 'ADMIN',
-            access_code_2: '123456',
             role: 'admin'
           }
         }
@@ -218,8 +215,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
-            access_code_1: 'SUPER',
-            access_code_2: '543210',
             role: 'admin'
           }
         }
@@ -324,7 +319,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isAdmin,
     signIn,
     signOut,
-    createAccessCodeUsers,
+    createAccessCodeUsers: (count: number, roleType: 'admin' | 'user') => Promise<{ users: Array<{ accessCode1: string; accessCode2: string; role: string }>, error?: any }>;
     createAdminUsers
   };
 

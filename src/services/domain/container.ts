@@ -30,8 +30,7 @@ const adminService = new AdminService(
   adminRepository,
   userService,
   agentService,
-  deliberationService,
-  null as any  // accessCodeService - deprecated
+  deliberationService
 );
 
 // Export service container

@@ -67,8 +67,8 @@ export const SystemStats = ({ stats, loading, onRefresh }: SystemStatsProps) => 
       color: 'text-orange-600'
     },
     {
-      title: 'Access Codes',
-      value: `${stats.usedAccessCodes}/${stats.totalAccessCodes}`,
+      title: 'User Management',
+      value: 'Supabase Auth',
       icon: Key,
       color: 'text-red-600'
     }

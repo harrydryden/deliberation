@@ -16,10 +16,14 @@ export const sanitizeForDatabase = (input: string): string => {
 };
 
 // Enhanced validation schemas with stricter security
-export const accessCodeSchema = z.string()
-  .length(10, 'Access code must be exactly 10 characters')
-  .regex(/^[A-Z0-9]+$/, 'Access code must contain only uppercase letters and numbers')
-  .transform(val => val.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+export const accessCode1Schema = z.string()
+  .length(5, 'Access code 1 must be exactly 5 characters')
+  .regex(/^[A-Z]+$/, 'Access code 1 must contain only uppercase letters')
+  .transform(val => val.toUpperCase().replace(/[^A-Z]/g, ''));
+
+export const accessCode2Schema = z.string()
+  .length(6, 'Access code 2 must be exactly 6 characters')
+  .regex(/^\d+$/, 'Access code 2 must contain only digits');
 
 export const displayNameSchema = z.string()
   .min(1, 'Display name is required')

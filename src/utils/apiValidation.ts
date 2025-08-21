@@ -8,7 +8,7 @@ import {
   DeliberationSchema,
   AgentConfigurationSchema,
   IbisNodeSchema,
-  AccessCodeSchema,
+  UserAccessCodeSchema,
   ApiResponseSchema,
   PaginatedResponseSchema,
   validateAndParse,
@@ -84,13 +84,13 @@ export class ApiValidator {
     }
   }
 
-  // Validate access code response
-  static validateAccessCode(data: unknown): ReturnType<typeof AccessCodeSchema.parse> {
+  // Validate user access code response
+  static validateUserAccessCode(data: unknown): ReturnType<typeof UserAccessCodeSchema.parse> {
     try {
-      return validateAndParse(AccessCodeSchema, data);
+      return validateAndParse(UserAccessCodeSchema, data);
     } catch (error) {
-      logger.error('Access code validation failed', { data, error });
-      throw new ValidationError('Invalid access code data format', 'access_code', {
+      logger.error('User access code validation failed', { data, error });
+      throw new ValidationError('Invalid user access code data format', 'user_access_code', {
         originalData: data,
         error: error instanceof Error ? error.message : 'Unknown validation error'
       });

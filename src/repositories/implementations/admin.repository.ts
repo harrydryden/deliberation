@@ -9,8 +9,6 @@ export class AdminRepository extends SupabaseBaseRepository implements IAdminRep
     totalDeliberations: number;
     totalMessages: number;
     activeDeliberations: number;
-    totalAccessCodes: number;
-    usedAccessCodes: number;
   }> {
     try {
       const { data, error } = await supabase.rpc('get_admin_system_stats');
@@ -30,8 +28,6 @@ export class AdminRepository extends SupabaseBaseRepository implements IAdminRep
         totalDeliberations: data.totalDeliberations || 0,
         totalMessages: data.totalMessages || 0,
         activeDeliberations: data.activeDeliberations || 0,
-        totalAccessCodes: data.totalAccessCodes || 0,
-        usedAccessCodes: data.usedAccessCodes || 0,
       };
 
       logger.info({ stats }, 'System stats retrieved successfully via RPC');

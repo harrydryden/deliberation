@@ -32,7 +32,7 @@ export class AudioRecorder {
         this.onAudioData(new Float32Array(inputData));
       };
       this.source.connect(this.processor);
-      this.processor.connect(this.audioContext.destination);
+      // Do not connect to destination to avoid unnecessary playback load
       console.log('[AudioRecorder] Started at 24kHz mono');
     } catch (error) {
       console.error('[AudioRecorder] Error accessing microphone:', error);

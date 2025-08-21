@@ -10,7 +10,6 @@ datasource db {
 model User {
   id         String   @id @default(uuid())
   email      String   @unique
-  accessCode String?  @unique @map("access_code")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
@@ -30,8 +29,16 @@ model Profile {
   avatarUrl      String?   @map("avatar_url")
   bio            String?
   expertiseAreas String[]  @map("expertise_areas")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  // Optimized access code fields for Supabase Auth
+  access_code_1  String(5)?  @map("access_code_1")  // 5 letters max
+  access_code_2  String(6)?  @map("access_code_2")  // 6 digits max
+  role           String?     @default("user")
+  isArchived     Boolean     @default(false) @map("is_archived")
+  archivedAt     DateTime?   @map("archived_at")
+  archivedBy     String?     @map("archived_by")
+  archiveReason  String?     @map("archive_reason")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -183,18 +190,6 @@ model AgentInteraction {
   deliberation Deliberation? @relation(fields: [deliberationId], references: [id])
 
   @@map("agent_interactions")
-}
-
-model AccessCode {
-  id        String    @id @default(uuid())
-  code      String    @unique
-  codeType  String    @map("code_type")
-  isUsed    Boolean   @default(false) @map("is_used")
-  usedBy    String?   @map("used_by")
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  @@map("access_codes")
 }
 
 model FacilitatorSession {

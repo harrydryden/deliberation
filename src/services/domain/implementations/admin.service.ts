@@ -1,4 +1,4 @@
-import { IAdminService, IUserService, IAgentService, IDeliberationService, IAccessCodeService } from '../interfaces';
+import { IAdminService, IUserService, IAgentService, IDeliberationService } from '../interfaces';
 import { IAdminRepository } from '@/repositories/interfaces';
 import { User, Agent, Deliberation } from '@/types/api';
 import { logger } from '@/utils/logger';
@@ -8,8 +8,7 @@ export class AdminService implements IAdminService {
     private adminRepository: IAdminRepository,
     private userService: IUserService,
     private agentService: IAgentService,
-    private deliberationService: IDeliberationService,
-    private accessCodeService: IAccessCodeService
+    private deliberationService: IDeliberationService
   ) {}
 
   async getSystemStats(): Promise<{
@@ -17,8 +16,6 @@ export class AdminService implements IAdminService {
     totalDeliberations: number;
     totalMessages: number;
     activeDeliberations: number;
-    totalAccessCodes: number;
-    usedAccessCodes: number;
   }> {
     try {
       return await this.adminRepository.getSystemStats();
@@ -84,10 +81,7 @@ export class AdminService implements IAdminService {
     }
   }
 
-  async getAllAccessCodes(): Promise<any[]> {
-    // Access codes are deprecated - return empty array
-    return [];
-  }
+  // Access code management removed - Supabase Auth handles user creation
 
   async clearDeliberationMessages(deliberationId: string): Promise<void> {
     try {

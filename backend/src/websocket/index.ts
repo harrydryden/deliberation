@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import { createRedisClient } from '../utils/redis';
 
 interface AuthenticatedSocket {
   id: string;
@@ -16,6 +17,10 @@ interface AuthenticatedSocket {
 }
 
 export function setupWebSocket(io: SocketIOServer, prisma: PrismaClient) {
+  const redis = createRedisClient();
+  const PRESENCE_TTL_SECONDS = 45; // ephemeral presence TTL
+  const PRESENCE_DEBOUNCE_MS = 15000; // minimum interval between DB writes per user
+  const lastDbWrite: Map<string, number> = new Map();
   // Authentication middleware
   io.use(async (socket: any, next) => {
     try {
@@ -25,7 +30,18 @@ export function setupWebSocket(io: SocketIOServer, prisma: PrismaClient) {
         return next(new Error('Authentication error: No token provided'));
       }
 
-      const decoded = jwt.verify(token, config.jwtSecret) as any;
+      // Try Supabase JWT first if configured
+      let decoded: any;
+      try {
+        if (config.supabaseJwtSecret) {
+          decoded = jwt.verify(token, config.supabaseJwtSecret);
+        } else {
+          decoded = jwt.verify(token, config.jwtSecret);
+        }
+      } catch (e) {
+        // Fallback to project JWT if Supabase verify failed
+        decoded = jwt.verify(token, config.jwtSecret);
+      }
       
       // Fetch user from database
       const user = await prisma.user.findUnique({
@@ -118,27 +134,28 @@ export function setupWebSocket(io: SocketIOServer, prisma: PrismaClient) {
     // Handle presence updates
     socket.on('presence_update', async (data: { status: 'online' | 'away' | 'busy' }) => {
       try {
-        // Update user's last active timestamp
-        await prisma.user.update({
-          where: { id: socket.userId },
-          data: { updatedAt: new Date() },
-        });
+        const key = `presence:user:${socket.userId}`;
+        // Update ephemeral presence in Redis
+        await redis.set(key, JSON.stringify({ status: data.status, ts: Date.now() }), 'EX', PRESENCE_TTL_SECONDS);
 
-        // Broadcast presence to all user's deliberations
-        const participants = await prisma.participant.findMany({
-          where: { userId: socket.userId },
-          select: { deliberationId: true },
-        });
+        // Debounced DB write for lastActive
+        const now = Date.now();
+        const last = lastDbWrite.get(socket.userId) || 0;
+        if (now - last > PRESENCE_DEBOUNCE_MS) {
+          lastDbWrite.set(socket.userId, now);
+          prisma.user.update({ where: { id: socket.userId }, data: { updatedAt: new Date() } }).catch(() => {});
+        }
 
-        for (const participant of participants) {
-          if (participant.deliberationId) {
-            socket.to(`deliberation:${participant.deliberationId}`).emit('presence_update', {
+        // Broadcast presence to all deliberations this socket has joined
+        socket.rooms.forEach(room => {
+          if (room.startsWith('deliberation:')) {
+            socket.to(room).emit('presence_update', {
               userId: socket.userId,
               status: data.status,
               lastActive: new Date().toISOString(),
             });
           }
-        }
+        });
       } catch (error) {
         logger.error({ error, userId: socket.userId }, 'Error updating presence');
       }

@@ -15,7 +15,7 @@ export const useAdminData = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
-  // Access Codes (deprecated)
+  // Access Codes (for user provisioning)
   const [accessCodes, setAccessCodes] = useState<any[]>([]);
   const [loadingAccessCodes, setLoadingAccessCodes] = useState(false);
 
@@ -91,21 +91,21 @@ export const useAdminData = () => {
   };
 
 
-  // Access codes are deprecated - remove these functions
+  // Access code functions for user provisioning
   const fetchAccessCodes = async () => {
-    // No-op: access codes are deprecated
+    // No-op: access codes are managed through Supabase Auth
     setAccessCodes([]);
     setLoadingAccessCodes(false);
   };
 
   const createAccessCode = async (codeType: string) => {
-    // No-op: access codes are deprecated
-    toast.error('Access codes are deprecated. Use Supabase Auth instead.');
+    // No-op: access codes are managed through Supabase Auth
+    toast.error('Access codes are managed through Supabase Auth. Use Bulk User Creation instead.');
   };
 
   const deleteAccessCode = async (id: string) => {
-    // No-op: access codes are deprecated  
-    toast.error('Access codes are deprecated. Use Supabase Auth instead.');
+    // No-op: access codes are managed through Supabase Auth
+    toast.error('Access codes are managed through Supabase Auth. Use Supabase Dashboard to manage users.');
   };
 
   // Agent operations

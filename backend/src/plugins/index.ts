@@ -37,9 +37,22 @@ export async function registerPlugins(fastify: FastifyInstance) {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-trace-id'],
   });
 
-  // JWT authentication
+  // JWT authentication (supports custom JWT and optional Supabase JWT)
   await fastify.register(jwt, {
-    secret: config.jwtSecret,
+    secret: async (request) => {
+      // If the token looks like a Supabase JWT (iss contains supabase.co), use Supabase JWT secret when provided
+      const token = fastify.jwt.extractToken(request);
+      if (config.supabaseJwtSecret && token) {
+        try {
+          const header = JSON.parse(Buffer.from(token.split('.')[0] || '', 'base64').toString('utf8'));
+          const payload = JSON.parse(Buffer.from(token.split('.')[1] || '', 'base64').toString('utf8'));
+          if (payload?.iss && typeof payload.iss === 'string' && payload.iss.includes('supabase.co')) {
+            return config.supabaseJwtSecret as string;
+          }
+        } catch {}
+      }
+      return config.jwtSecret;
+    },
     verify: { extractToken: fastify.jwt.extractToken },
   });
 
@@ -72,6 +85,10 @@ export async function registerPlugins(fastify: FastifyInstance) {
   fastify.decorate('authenticate', async function(request: any, reply: any) {
     try {
       await request.jwtVerify();
+      // Normalize user id for downstream code
+      if (request.user && !request.user.id && request.user.sub) {
+        request.user.id = request.user.sub;
+      }
     } catch (err) {
       reply.status(401).send({ error: 'Authentication required' });
     }

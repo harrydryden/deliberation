@@ -75,14 +75,7 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
       description: agentConfig?.description || fallbackAgentInfo.description
     };
     
-    // Debug logging to see what's happening
-    if (!isUser && agentConfig) {
-      console.log('Agent config found:', { 
-        messageType: message.message_type, 
-        agentConfig, 
-        description: agentConfig.description 
-      });
-    }
+    // Avoid noisy render-time logs in production
     const AgentIcon = (agentInfo?.icon as any) || Bot;
 
     return (
@@ -244,7 +237,8 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
           className="h-full"
           data={messages}
           initialTopMostItemIndex={Math.max(0, messages.length - 1)}
-          followOutput={"smooth"}
+          // Use automatic follow to reduce layout churn during streaming
+          followOutput={"auto"}
           atBottomStateChange={setAtBottom}
           itemContent={renderItem}
           increaseViewportBy={200}

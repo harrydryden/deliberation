@@ -17,6 +17,11 @@ const configSchema = z.object({
   
   // AI Services
   openaiApiKey: z.string(),
+
+  // Supabase (optional, for proxying edge functions and JWT verification)
+  supabaseUrl: z.string().optional(),
+  supabaseAnonKey: z.string().optional(),
+  supabaseJwtSecret: z.string().optional(),
   
   // Rate limiting
   rateLimitMax: z.coerce.number().default(100),
@@ -53,6 +58,9 @@ function loadConfig() {
     jwtSecret: process.env.JWT_SECRET,
     jwtExpiresIn: process.env.JWT_EXPIRES_IN,
     openaiApiKey: process.env.OPENAI_API_KEY,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+    supabaseJwtSecret: process.env.SUPABASE_JWT_SECRET,
     rateLimitMax: process.env.RATE_LIMIT_MAX,
     rateLimitWindow: process.env.RATE_LIMIT_WINDOW,
     logLevel: process.env.LOG_LEVEL,

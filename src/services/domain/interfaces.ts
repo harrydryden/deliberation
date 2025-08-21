@@ -1,12 +1,7 @@
 // Domain service interfaces following Clean Architecture principles
 import { User, Message, Agent, Deliberation } from '@/types/api';
 
-// Simple access code authentication service
-export interface ISimpleAuthService {
-  authenticateWithAccessCode(accessCode: string): Promise<{ user: User; session: any }>;
-  signOut(): Promise<void>;
-  getCurrentUser(): Promise<User | null>;
-}
+// Authentication is now handled by Supabase Auth
 
 export interface IMessageService {
   getMessages(deliberationId?: string): Promise<Message[]>;
@@ -45,13 +40,7 @@ export interface IUserService {
   getAllUsersIncludingArchived(filter?: Record<string, any>): Promise<User[]>;
 }
 
-export interface IAccessCodeService {
-  getAccessCodes(): Promise<any[]>;
-  getUnusedAccessCodes(): Promise<any[]>;
-  validateAccessCode(code: string): Promise<any | null>;
-  createAccessCode(codeType: string): Promise<any>;
-  deleteAccessCode(id: string): Promise<void>;
-}
+// Access code service removed - Supabase Auth handles authentication
 
 export interface IAdminService {
   getSystemStats(): Promise<{
@@ -59,15 +48,13 @@ export interface IAdminService {
     totalDeliberations: number;
     totalMessages: number;
     activeDeliberations: number;
-    totalAccessCodes: number;
-    usedAccessCodes: number;
   }>;
   // Aggregate all admin operations
   getAllUsers(): Promise<User[]>;
   getAllUsersIncludingArchived(): Promise<User[]>;
   getAllAgents(): Promise<Agent[]>;
   getAllDeliberations(): Promise<Deliberation[]>;
-  getAllAccessCodes(): Promise<any[]>;
+  // Access code management removed - Supabase Auth handles user creation
   // User management
   archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void>;
   unarchiveUser(userId: string): Promise<void>;

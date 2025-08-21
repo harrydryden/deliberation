@@ -163,23 +163,13 @@ export const IbisRelationshipSchema = z.object({
   deliberation_id: UUIDSchema,
 });
 
-// Access Code schemas
+// Access Code schemas (for user profiles)
 export const AccessCodeTypeSchema = z.enum(['admin', 'user', 'moderator']);
 
-export const AccessCodeSchema = z.object({
-  id: UUIDSchema,
-  code: z.string(),
-  code_type: AccessCodeTypeSchema,
-  is_used: z.boolean(),
-  used_by: UUIDSchema.nullable(),
-  used_at: TimestampSchema.nullable(),
-  created_at: TimestampSchema,
-  expires_at: TimestampSchema.nullable(),
-  max_uses: z.number().int().positive().nullable(),
-  current_uses: z.number().int().min(0),
-  last_used_at: TimestampSchema.nullable(),
-  created_by: UUIDSchema.nullable(),
-  is_active: z.boolean(),
+export const UserAccessCodeSchema = z.object({
+  access_code_1: z.string().length(5).regex(/^[A-Z]{5}$/),
+  access_code_2: z.string().length(6).regex(/^\d{6}$/),
+  role: AccessCodeTypeSchema,
 });
 
 // Error schemas

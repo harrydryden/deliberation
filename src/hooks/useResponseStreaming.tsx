@@ -25,6 +25,9 @@ export const useResponseStreaming = () => {
   });
 
   const streamControllerRef = useRef<AbortController | null>(null);
+  const rafPendingRef = useRef<boolean>(false);
+  const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL as string | undefined;
+  const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string | undefined;
 
   const startStreaming = useCallback(async (
     messageId: string,
@@ -48,23 +51,26 @@ export const useResponseStreaming = () => {
     });
 
     try {
-      // Call the streaming endpoint
-      const response = await fetch(
-        `https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/agent-orchestration-stream`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM`,
-          },
-          body: JSON.stringify({
-            messageId,
-            deliberationId,
-            mode: 'chat'
-          }),
-          signal: streamControllerRef.current.signal,
-        }
-      );
+      // Prefer backend proxy if available, else fallback to Supabase
+      const apiBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
+      const endpoint = apiBase 
+        ? `${apiBase}/api/v1/stream/agent`
+        : `${(SUPABASE_URL || '')}/functions/v1/agent-orchestration-stream`;
+      const authHeader = apiBase ? undefined : (SUPABASE_ANON_KEY ? `Bearer ${SUPABASE_ANON_KEY}` : undefined);
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authHeader ? { Authorization: authHeader } : {}),
+        },
+        body: JSON.stringify({
+          messageId,
+          deliberationId,
+          mode: 'chat'
+        }),
+        signal: streamControllerRef.current.signal,
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -114,12 +120,18 @@ export const useResponseStreaming = () => {
 
             if (parsed.content) {
               currentContent += parsed.content;
-              setStreamingState(prev => ({ 
-                ...prev, 
-                currentMessage: currentContent,
-                agentType: currentAgentType 
-              }));
-              onUpdate(currentContent, currentAgentType);
+              if (!rafPendingRef.current) {
+                rafPendingRef.current = true;
+                requestAnimationFrame(() => {
+                  setStreamingState(prev => ({ 
+                    ...prev, 
+                    currentMessage: currentContent,
+                    agentType: currentAgentType 
+                  }));
+                  onUpdate(currentContent, currentAgentType);
+                  rafPendingRef.current = false;
+                });
+              }
             }
 
             if (parsed.done) {
@@ -159,6 +171,7 @@ export const useResponseStreaming = () => {
         agentType: null,
       });
       streamControllerRef.current = null;
+      rafPendingRef.current = false;
     }
   }, []);
 

@@ -32,13 +32,13 @@ The application now uses a clean, single-backend architecture with Supabase only
 
 Replace old backend service usage:
 ```typescript
-// Old
+// Old (deprecated)
 import { backendServiceFactory } from '@/services/backend/factory';
 const authService = backendServiceFactory.getAuthService();
 
 // New
-import { useAuthService } from '@/hooks/useServices';
-const authService = useAuthService();
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+const { user, signIn, signOut } = useSupabaseAuth();
 ```
 
 ## Testing

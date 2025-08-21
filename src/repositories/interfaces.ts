@@ -34,13 +34,7 @@ export interface IDeliberationRepository extends IRepository<Deliberation> {
   findPublic(): Promise<Deliberation[]>;
 }
 
-export interface IAccessCodeRepository {
-  findAll(): Promise<any[]>;
-  findByCode(code: string): Promise<any | null>;
-  create(codeType: string): Promise<any>;
-  delete(id: string): Promise<void>;
-  findUnused(): Promise<any[]>;
-}
+// Access code repository removed - Supabase Auth handles user management
 
 // Admin-specific repository interfaces
 export interface IAdminRepository {
@@ -49,8 +43,6 @@ export interface IAdminRepository {
     totalDeliberations: number;
     totalMessages: number;
     activeDeliberations: number;
-    totalAccessCodes: number;
-    usedAccessCodes: number;
   }>;
   clearDeliberationMessages(deliberationId: string): Promise<void>;
   clearDeliberationIbis(deliberationId: string): Promise<void>;
