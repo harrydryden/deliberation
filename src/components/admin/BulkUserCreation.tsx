@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Users, Copy, Check } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useToast } from '@/hooks/use-toast';
 
 interface CreatedUser {
@@ -27,17 +27,8 @@ export const BulkUserCreation = ({ onUsersCreated }: BulkUserCreationProps) => {
   const [isCreating, setIsCreating] = useState(false);
   const [createdUsers, setCreatedUsers] = useState<CreatedUser[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const { createAccessCodeUsers } = useSupabaseAuth();
   const { toast } = useToast();
-
-  const generateAccessCode1 = (): string => {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    return Array.from({ length: 5 }, () => letters[Math.floor(Math.random() * letters.length)]).join('');
-  };
-
-  const generateAccessCode2 = (): string => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
-
 
   const handleBulkCreate = async () => {
     if (userCount < 1 || userCount > 50) {
@@ -50,68 +41,30 @@ export const BulkUserCreation = ({ onUsersCreated }: BulkUserCreationProps) => {
     }
 
     setIsCreating(true);
-    const newUsers: CreatedUser[] = [];
-    const errors: string[] = [];
 
     try {
-      for (let i = 0; i < userCount; i++) {
-        const accessCode1 = generateAccessCode1();
-        const accessCode2 = generateAccessCode2();
-        const email = `${accessCode1.toLowerCase()}@temp-access.com`;
+      const result = await createAccessCodeUsers(userCount, userRole);
 
-        try {
-          const { data, error } = await supabase.auth.admin.createUser({
-            email,
-            password: accessCode2, // Use 6-digit code as password
-            user_metadata: {
-              access_code_1: accessCode1,
-              access_code_2: accessCode2,
-              role: userRole
-            },
-            email_confirm: true // Skip email confirmation
-          });
-
-          if (error) {
-            errors.push(`User ${i + 1}: ${error.message}`);
-          } else if (data.user) {
-            // Also store access codes in the profiles table for easy retrieval
-            await supabase
-              .from('profiles')
-              .update({
-                access_code_1: accessCode1,
-                access_code_2: accessCode2
-              })
-              .eq('id', data.user.id);
-
-            newUsers.push({
-              email,
-              access_code_1: accessCode1,
-              access_code_2: accessCode2,
-              role: userRole
-            });
-          }
-        } catch (err) {
-          errors.push(`User ${i + 1}: ${err instanceof Error ? err.message : 'Unknown error'}`);
-        }
-      }
-
-      setCreatedUsers(newUsers);
-
-      if (newUsers.length > 0) {
+      if (result.error) {
         toast({
-          title: "Users Created",
-          description: `Successfully created ${newUsers.length} users${errors.length > 0 ? ` (${errors.length} failed)` : ''}.`,
-        });
-        onUsersCreated();
-      }
-
-      if (errors.length > 0) {
-        console.error('Bulk creation errors:', errors);
-        toast({
-          title: "Some Errors Occurred",
-          description: `${errors.length} users failed to create. Check console for details.`,
+          title: "Creation Failed",
+          description: result.error.message || "Failed to create users. Please try again.",
           variant: "destructive",
         });
+      } else if (result.users && result.users.length > 0) {
+        const newUsers: CreatedUser[] = result.users.map((user, index) => ({
+          email: `${user.accessCode1.toLowerCase()}@temp-access.com`,
+          access_code_1: user.accessCode1,
+          access_code_2: user.accessCode2,
+          role: user.role
+        }));
+
+        setCreatedUsers(newUsers);
+        toast({
+          title: "Users Created",
+          description: `Successfully created ${result.users.length} users.`,
+        });
+        onUsersCreated();
       }
     } catch (error) {
       console.error('Bulk creation failed:', error);
