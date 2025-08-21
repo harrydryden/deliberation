@@ -174,7 +174,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const generateAccessCode2 = (): string => {
-    return Math.floor(10000 + Math.random() * 90000).toString();
+    return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
   const createAdminUsers = async () => {
