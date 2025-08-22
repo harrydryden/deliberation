@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useServices } from '@/hooks/useServices';
-import { User, Agent, Deliberation, LocalAgentCreate } from '@/types/index';
+import { User, Agent, Deliberation, LocalAgentCreate, AccessCode, SystemStats } from '@/types/index';
 import { toast } from 'sonner';
 import { useErrorHandler } from './useErrorHandler';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { logger } from '@/utils/logger';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useAdminData = () => {
   const services = useServices();
+  const { user } = useSupabaseAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,7 +18,7 @@ export const useAdminData = () => {
   const [loadingUsers, setLoadingUsers] = useState(false);
 
   // Access Codes (for user provisioning)
-  const [accessCodes, setAccessCodes] = useState<any[]>([]);
+  const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
   const [loadingAccessCodes, setLoadingAccessCodes] = useState(false);
 
   // Agents
@@ -32,7 +34,7 @@ export const useAdminData = () => {
   const [loadingDeliberations, setLoadingDeliberations] = useState(false);
 
   // Stats
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<SystemStats | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
 
   const { handleError: handleTypedError } = useErrorHandler();
@@ -70,9 +72,10 @@ export const useAdminData = () => {
 
   const archiveUser = async (userId: string, reason?: string) => {
     try {
-      // Get current user for archivedBy field - this would need to be passed from context
-      const currentUserId = 'admin'; // TODO: Get from auth context when implemented
-      await services.adminService.archiveUser(userId, currentUserId, reason);
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+      await services.adminService.archiveUser(userId, user.id, reason);
       toast.success('User archived successfully');
       await fetchUsers();
     } catch (error) {
@@ -246,9 +249,24 @@ export const useAdminData = () => {
     }
   };
 
-  const createLocalAgent = async (agentData: LocalAgentCreate) => {
+  const createLocalAgent = async (agentData: LocalAgentCreate): Promise<Agent> => {
     try {
-      const newAgent = await services.agentService.createAgent(agentData as any);
+      // Convert LocalAgentCreate to the format expected by the service
+      const fullAgentData: Omit<Agent, 'id' | 'created_at' | 'updated_at'> = {
+        name: agentData.name,
+        agent_type: agentData.agent_type,
+        deliberation_id: agentData.deliberationId,
+        description: agentData.description,
+        response_style: agentData.response_style,
+        goals: agentData.goals,
+        facilitator_config: agentData.facilitator_config,
+        is_active: true,
+        is_default: false,
+        preset_questions: [],
+        prompt_overrides: {}
+      };
+      
+      const newAgent = await services.agentService.createAgent(fullAgentData);
       
       // Add to local state
       setLocalAgents(prevAgents => [...prevAgents, newAgent]);

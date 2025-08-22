@@ -14,6 +14,7 @@ import { IbisNodeManagement } from './IbisNodeManagement';
 import { AdminIbisMapEditor } from './AdminIbisMapEditor';
 import { useAdminService } from '@/hooks/useServices';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 interface DeliberationOverviewProps {
   deliberations: Deliberation[];
@@ -23,7 +24,7 @@ interface DeliberationOverviewProps {
 }
 
 export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateStatus }: DeliberationOverviewProps) => {
-  console.log('🔍 DeliberationOverview - Component rendered with deliberations:', deliberations.length);
+  logger.component.mount('DeliberationOverview', { deliberationCount: deliberations.length });
   const [updating, setUpdating] = useState<string | null>(null);
   const [selectedDeliberation, setSelectedDeliberation] = useState<Deliberation | null>(null);
   const [editMode, setEditMode] = useState<'nodes' | 'map' | null>(null);
@@ -89,7 +90,7 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
         description: `All messages cleared from "${deliberationTitle}"`
       });
     } catch (error) {
-      console.error('Failed to clear messages:', error);
+      logger.error('Failed to clear messages', error as Error, { deliberationId });
       toast({
         title: "Error",
         description: "Failed to clear messages. Please try again.",
@@ -120,7 +121,7 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
     }
   };
 
-  console.log('🔍 DeliberationOverview - Render check:', {
+  logger.debug('Render check', {
     selectedDeliberation: selectedDeliberation?.id,
     editMode,
     shouldRenderNodes: selectedDeliberation && editMode === 'nodes',
@@ -128,7 +129,7 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
   });
 
   if (selectedDeliberation && editMode === 'nodes') {
-    console.log('🔍 DeliberationOverview - Rendering IbisNodeManagement');
+    logger.debug('Rendering IbisNodeManagement');
     try {
       return (
         <IbisNodeManagement
@@ -138,13 +139,13 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
         />
       );
     } catch (error) {
-      console.error('🚨 Error rendering IbisNodeManagement:', error);
+      logger.error('Error rendering IbisNodeManagement', error as Error);
       return <div>Error loading node management</div>;
     }
   }
 
   if (selectedDeliberation && editMode === 'map') {
-    console.log('🔍 DeliberationOverview - Rendering AdminIbisMapEditor with:', {
+    logger.debug('Rendering AdminIbisMapEditor', {
       deliberationId: selectedDeliberation.id,
       deliberationTitle: selectedDeliberation.title,
       editMode

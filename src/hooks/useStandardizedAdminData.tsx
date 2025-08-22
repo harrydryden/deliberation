@@ -2,6 +2,7 @@ import { useServices } from '@/hooks/useServices';
 import { useCrudOperations } from './useCrudOperations';
 import { User, Agent, Deliberation } from '@/types/index';
 import { supabase } from '@/integrations/supabase/client';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
 export const useStandardizedAdminData = () => {
   const services = useServices();
@@ -79,8 +80,11 @@ export const useStandardizedAdminData = () => {
 
   // Custom admin operations that don't fit CRUD pattern
   const archiveUser = async (userId: string, reason?: string) => {
-    const currentUserId = 'admin'; // TODO: Get from auth context
-    await services.adminService.archiveUser(userId, currentUserId, reason);
+    const { user } = useSupabaseAuth();
+    if (!user?.id) {
+      throw new Error('User not authenticated');
+    }
+    await services.adminService.archiveUser(userId, user.id, reason);
     await users.load(); // Refresh users list
   };
 

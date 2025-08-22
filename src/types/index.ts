@@ -337,14 +337,101 @@ export interface ConfigOption<T = string> {
   description?: string;
 }
 
-// Validation types
-export interface ValidationRule<T> {
-  validate: (value: T) => boolean;
-  message: string;
+// Enhanced Admin types
+export interface AccessCode {
+  id: string;
+  code: string;
+  code_type: 'admin' | 'user';
+  is_active: boolean;
+  is_used: boolean;
+  used_by?: string;
+  used_at?: string;
+  current_uses: number;
+  max_uses?: number;
+  expires_at?: string;
+  created_at: string;
 }
 
+export interface SystemStats {
+  totalUsers: number;
+  totalDeliberations: number;
+  totalMessages: number;
+  activeDeliberations: number;
+  totalAgents?: number;
+  totalKnowledge?: number;
+}
+
+export interface AdminActionLog {
+  id: string;
+  user_id: string;
+  action: string;
+  table_name?: string;
+  record_id?: string;
+  old_values?: Record<string, unknown>;
+  new_values?: Record<string, unknown>;
+  ip_address?: string;
+  user_agent?: string;
+  created_at: string;
+}
+
+// Knowledge Management types
+export interface KnowledgeDocument {
+  id: string;
+  title: string;
+  content: string;
+  content_type: string;
+  file_name?: string;
+  file_size?: number;
+  processing_status: 'pending' | 'processing' | 'completed' | 'failed';
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Voice Interface types
+export interface VoiceConfig {
+  enabled: boolean;
+  language: string;
+  voiceId?: string;
+  speed: number;
+  pitch: number;
+}
+
+export interface TranscriptionResult {
+  text: string;
+  confidence: number;
+  language?: string;
+  duration?: number;
+}
+
+// Enhanced Message types
+export interface MessageContext {
+  agentType?: string;
+  deliberationPhase?: string;
+  parentMessageId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+// Performance monitoring types
+export interface PerformanceMetrics {
+  renderTime: number;
+  memoryUsage: number;
+  componentName: string;
+  timestamp: number;
+  errorCount?: number;
+}
+
+// Form validation types
 export interface ValidationResult {
   isValid: boolean;
   errors: string[];
   warnings?: string[];
+}
+
+export interface FieldValidation {
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: RegExp;
+  custom?: (value: unknown) => ValidationResult;
 }
