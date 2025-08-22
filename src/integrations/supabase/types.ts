@@ -1041,7 +1041,9 @@ export type Database = {
         }[]
       }
       admin_update_agent_configuration: {
-        Args: { p_access_code: string; p_agent_id: string; p_updates: Json }
+        Args:
+          | { p_access_code: string; p_agent_id: string; p_updates: Json }
+          | { p_agent_id: string; p_updates: Json }
         Returns: {
           id: string
           updated_at: string
