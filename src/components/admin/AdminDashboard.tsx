@@ -70,10 +70,9 @@ export const AdminDashboard = () => {
       {/* Main Content Tabs - Sticky */}
       <Tabs defaultValue="users" className="w-full">
         <div className="sticky top-28 z-30 bg-deliberation-bg/95 backdrop-blur-sm py-2 -mx-6 px-6 border-b border-border/50">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users">Users & Access</TabsTrigger>
           <TabsTrigger value="agents">Agents</TabsTrigger>
-          <TabsTrigger value="prompts">Prompt Templates</TabsTrigger>
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="deliberations">Deliberations</TabsTrigger>
           </TabsList>
@@ -105,9 +104,17 @@ export const AdminDashboard = () => {
             <div>
               <h3 className="text-lg font-semibold mb-4">Global Agent Templates</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Manage reusable agent configurations. System prompts are managed via the "Prompt Templates" tab above.
+                Manage reusable agent configurations. System prompts are managed via the "Prompt Templates" section below.
               </p>
               <AgentManagement />
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Prompt Templates</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Manage reusable prompt templates that can be used by agents across the system.
+              </p>
+              <PromptManagement />
             </div>
             
             <div>
@@ -127,9 +134,6 @@ export const AdminDashboard = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="prompts" className="space-y-4">
-          <PromptManagement />
-        </TabsContent>
 
         <TabsContent value="knowledge" className="space-y-4">
           <KnowledgeManagement
