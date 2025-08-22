@@ -184,55 +184,18 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
             )}
           </div>
 
-          {/* System Prompt Override Section */}
+          {/* Classification Prompt Override */}
           <div className="space-y-4 border-t pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-base font-semibold">System Prompt Override</Label>
+                <Label className="text-base font-semibold">Classification Prompt Override</Label>
                 <p className="text-sm text-muted-foreground">
-                  Override the default template prompt for this specific agent
+                  Override the default classification prompt for this specific agent
                 </p>
               </div>
               <Badge variant="outline" className="text-xs">
                 Template: {agent.agent_type} default
               </Badge>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="system_prompt_override">Custom System Prompt</Label>
-              <Textarea
-                id="system_prompt_override"
-                value={formData.prompt_overrides.system_prompt || ''}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  prompt_overrides: {
-                    ...prev.prompt_overrides,
-                    system_prompt: e.target.value
-                  }
-                }))}
-                placeholder="Leave empty to use template default, or enter custom prompt..."
-                rows={4}
-                className="min-h-[100px]"
-              />
-              {formData.prompt_overrides.system_prompt && (
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setFormData(prev => ({
-                      ...prev,
-                      prompt_overrides: {
-                        ...prev.prompt_overrides,
-                        system_prompt: ''
-                      }
-                    }))}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Clear Override
-                  </Button>
-                </div>
-              )}
             </div>
 
             {/* Classification Prompt Override */}
