@@ -7,6 +7,57 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper function to get classification prompt from template system
+async function getClassificationPrompt(supabase: any, content: string, deliberationContext: string, deliberationNotion: string): Promise<string> {
+  try {
+    // Try to get classification_prompt template
+    const { data: template } = await supabase
+      .from('prompt_templates')
+      .select('template')
+      .eq('prompt_type', 'classification_prompt')
+      .eq('is_active', true)
+      .eq('is_default', true)
+      .single()
+
+    if (template && template.template) {
+      // Replace template variables
+      return template.template
+        .replace('{content}', content)
+        .replace('{deliberationContext}', deliberationContext)
+        .replace('{deliberationNotion}', deliberationNotion)
+    }
+  } catch (error) {
+    console.log('Failed to fetch classification prompt template:', error)
+  }
+
+  // Fallback to hardcoded prompt
+  return `Analyze this message from a democratic deliberation and extract the following information:
+
+Message: "${content}"${deliberationContext}
+
+Please respond with a JSON object containing:
+1. "title": A concise, descriptive title (max 60 characters)
+2. "keywords": An array of 3-5 relevant keywords
+3. "nodeType": One of "issue", "position", or "argument" based on IBIS methodology
+4. "confidence": A number between 0 and 1 indicating confidence in the classification
+5. "description": A brief description explaining the classification
+6. "stanceScore": A number between -1 and 1 indicating the stance relative to the deliberation topic (-1 = strongly against, 0 = neutral, 1 = strongly in favor)
+
+IBIS Guidelines:
+- "issue": Questions, problems, or topics to be discussed
+- "position": Potential solutions, options, or answers to issues
+- "argument": Supporting or opposing evidence for positions
+
+Stance Analysis:
+- Analyze the message's position relative to the deliberation's NOTION: "${deliberationNotion}"
+- Consider the emotional tone, supporting/opposing language, and explicit positions taken
+- Return a score between -1 (strongly opposing) and 1 (strongly supporting) with 0 being neutral
+- Base the stance specifically on the deliberation's notion, not the general topic or sub-issues
+- If no notion is provided, base it on the overall deliberation topic
+
+Respond only with valid JSON.`
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -60,32 +111,8 @@ Notion: "${deliberationNotion}"`
       }
     }
 
-    // Create classification prompt with stance analysis
-    const prompt = `Analyze this message from a democratic deliberation and extract the following information:
-
-Message: "${content}"${deliberationContext}
-
-Please respond with a JSON object containing:
-1. "title": A concise, descriptive title (max 60 characters)
-2. "keywords": An array of 3-5 relevant keywords
-3. "nodeType": One of "issue", "position", or "argument" based on IBIS methodology
-4. "confidence": A number between 0 and 1 indicating confidence in the classification
-5. "description": A brief description explaining the classification
-6. "stanceScore": A number between -1 and 1 indicating the stance relative to the deliberation topic (-1 = strongly against, 0 = neutral, 1 = strongly in favor)
-
-IBIS Guidelines:
-- "issue": Questions, problems, or topics to be discussed
-- "position": Potential solutions, options, or answers to issues
-- "argument": Supporting or opposing evidence for positions
-
-Stance Analysis:
-- Analyze the message's position relative to the deliberation's NOTION: "${deliberationNotion}"
-- Consider the emotional tone, supporting/opposing language, and explicit positions taken
-- Return a score between -1 (strongly opposing) and 1 (strongly supporting) with 0 being neutral
-- Base the stance specifically on the deliberation's notion, not the general topic or sub-issues
-- If no notion is provided, base it on the overall deliberation topic
-
-Respond only with valid JSON.`
+    // Get classification prompt from template system
+    const prompt = await getClassificationPrompt(supabase, content, deliberationContext, deliberationNotion)
 
     // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {

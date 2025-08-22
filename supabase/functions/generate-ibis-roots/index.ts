@@ -7,6 +7,56 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to get IBIS generation prompt from template system
+async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string, deliberationDescription: string, notion: string): Promise<string> {
+  try {
+    // Try to get ibis_generation_prompt template
+    const { data: template } = await supabase
+      .from('prompt_templates')
+      .select('template')
+      .eq('prompt_type', 'ibis_generation_prompt')
+      .eq('is_active', true)
+      .eq('is_default', true)
+      .single()
+
+    if (template && template.template) {
+      // Replace template variables
+      return template.template
+        .replace('{deliberationTitle}', deliberationTitle)
+        .replace('{deliberationDescription}', deliberationDescription || 'No description provided')
+        .replace('{notion}', notion ? `Notion for stance scoring: ${notion}` : '')
+    }
+  } catch (error) {
+    console.log('Failed to fetch IBIS generation prompt template:', error)
+  }
+
+  // Fallback to hardcoded prompt
+  return `You are an expert facilitator helping to identify key issues for a democratic deliberation process using the IBIS (Issue-Based Information System) framework.
+
+Given the following deliberation details:
+Title: ${deliberationTitle}
+Description: ${deliberationDescription || 'No description provided'}
+${notion ? `Notion for stance scoring: ${notion}` : ''}
+
+Please identify 3-5 key root issues that participants should deliberate on. These should be:
+1. Central questions or problems that need to be addressed
+2. Broad enough to generate meaningful discussion
+3. Specific enough to be actionable
+4. Relevant to the deliberation topic
+
+For each issue, provide:
+- A clear, concise title (max 100 characters)
+- A brief description explaining why this is important (max 300 characters)
+
+Respond with a JSON array in this exact format:
+[
+  {
+    "title": "Issue title here",
+    "description": "Brief description of why this issue is important"
+  }
+]`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -35,31 +85,8 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Construct prompt for generating root issues
-    const prompt = `You are an expert facilitator helping to identify key issues for a democratic deliberation process using the IBIS (Issue-Based Information System) framework.
-
-Given the following deliberation details:
-Title: ${deliberationTitle}
-Description: ${deliberationDescription || 'No description provided'}
-${notion ? `Notion for stance scoring: ${notion}` : ''}
-
-Please identify 3-5 key root issues that participants should deliberate on. These should be:
-1. Central questions or problems that need to be addressed
-2. Broad enough to generate meaningful discussion
-3. Specific enough to be actionable
-4. Relevant to the deliberation topic
-
-For each issue, provide:
-- A clear, concise title (max 100 characters)
-- A brief description explaining why this is important (max 300 characters)
-
-Respond with a JSON array in this exact format:
-[
-  {
-    "title": "Issue title here",
-    "description": "Brief description of why this issue is important"
-  }
-]`;
+    // Get IBIS generation prompt from template system
+    const prompt = await getIbisGenerationPrompt(supabase, deliberationTitle, deliberationDescription, notion);
 
     // Call OpenAI API
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
