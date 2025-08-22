@@ -210,12 +210,31 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   };
 
   const ensureIdle = async () => {
+    console.log('[VoiceInterface] ensureIdle called, current mode:', mode);
     if (mode !== 'idle') {
-      console.log('[VoiceInterface] Ensuring idle mode, current mode:', mode);
-      await stop();
-      // Wait longer for cleanup to complete
-      await new Promise((r) => setTimeout(r, 500));
-      console.log('[VoiceInterface] Mode should now be idle');
+      console.log('[VoiceInterface] Forcing complete stop of current mode:', mode);
+      
+      // Force stop any RTC connections immediately
+      if (rtcRef.current) {
+        console.log('[VoiceInterface] Disconnecting RTC immediately');
+        try {
+          rtcRef.current.cancelSpeaking?.();
+          rtcRef.current.disconnect();
+        } catch (e) {
+          console.warn('[VoiceInterface] Error disconnecting RTC:', e);
+        }
+        rtcRef.current = null;
+      }
+      
+      // Force reset all state
+      setConnected(false);
+      setSpeaking(false);
+      setMode('idle');
+      
+      // Wait longer for complete cleanup - this ensures the RTC connection is fully closed
+      console.log('[VoiceInterface] Waiting for complete cleanup...');
+      await new Promise((r) => setTimeout(r, 1000));
+      console.log('[VoiceInterface] Cleanup complete, mode should be idle');
     }
   };
 
@@ -400,7 +419,27 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     }
   };
 
-  useEffect(() => { return () => { void stop(); }; }, []);
+  useEffect(() => { 
+    return () => { 
+      console.log('[VoiceInterface] Component unmounting - cleanup all connections');
+      // Force immediate cleanup on unmount
+      try {
+        if (rtcRef.current) {
+          rtcRef.current.cancelSpeaking?.();
+          rtcRef.current.disconnect();
+          rtcRef.current = null;
+        }
+        if (sttRecorderRef.current) {
+          sttRecorderRef.current.stop();
+        }
+        if (sttStreamRef.current) {
+          sttStreamRef.current.getTracks().forEach(t => t.stop());
+        }
+      } catch (e) {
+        console.error('[VoiceInterface] Cleanup error:', e);
+      }
+    }; 
+  }, []);
 
   return (
     <div className={className}>
