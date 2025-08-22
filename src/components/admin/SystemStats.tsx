@@ -86,7 +86,16 @@ export const SystemStats = ({ stats, loading, onRefresh }: SystemStatsProps) => 
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {statCards.map((stat, index) => (
-          <Card key={index}>
+          <Card key={index} className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">
+                  {stat.title}
+                </p>
+                <p className="text-2xl font-bold">{stat.value}</p>
+              </div>
+              <stat.icon className={`h-8 w-8 ${stat.color}`} />
+            </div>
           </Card>
         ))}
       </div>
