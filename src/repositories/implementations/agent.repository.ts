@@ -271,7 +271,7 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
     }
   }
 
-  // Override update to handle field mapping from camelCase to snake_case
+  // Override update to use admin function for agent configuration updates
   async update(id: string, data: Partial<Agent>): Promise<Agent> {
     try {
       // Convert camelCase fields to snake_case for database
@@ -282,14 +282,31 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         dbData.is_active = data.is_active;
       }
       
-      // Use parent update method with mapped data
-      const result = await this.updateInTable('agent_configurations', id, dbData);
+      // Use admin function for agent configuration updates
+      const { data: result, error } = await supabase
+        .rpc('admin_update_agent_configuration', {
+          p_agent_id: id,
+          p_updates: dbData
+        });
       
-      // Map result back to camelCase for API consistency
-      return {
-        ...result,
-        is_active: (result as any).is_active,
-      } as Agent;
+      if (error) {
+        logger.error({ error, id, data }, 'Agent repository admin update RPC error');
+        throw error;
+      }
+      
+      if (!result || result.length === 0) {
+        throw new Error('Agent configuration update returned no results');
+      }
+      
+      // Fetch the updated agent configuration to return full object
+      const updatedAgent = await this.findById(id);
+      
+      if (!updatedAgent) {
+        throw new Error('Could not retrieve updated agent configuration');
+      }
+      
+      logger.info('Agent repository update successful', { id, updatedFields: Object.keys(data) });
+      return updatedAgent;
     } catch (error) {
       logger.error({ error, id, data }, 'Agent repository update failed');
       throw error;
