@@ -105,7 +105,7 @@ export const AdminDashboard = () => {
             <div>
               <h3 className="text-lg font-semibold mb-4">Global Agent Templates</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Manage reusable agent configurations. System prompts are now managed via the "Prompt Templates" tab above.
+                Manage reusable agent configurations. System prompts are managed via the "Prompt Templates" tab above.
               </p>
               <AgentManagement />
             </div>
@@ -113,7 +113,7 @@ export const AdminDashboard = () => {
             <div>
               <h3 className="text-lg font-semibold mb-4">Local Agents (Deliberation-Specific)</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Deliberation-specific agent instances. System prompts inherit from templates or can be overridden per agent.
+                Deliberation-specific agent instances with customizable prompts. Manage all prompt overrides directly within each agent below.
               </p>
               <LocalAgentManagement
                 localAgents={adminData.localAgents}
