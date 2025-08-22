@@ -1,21 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Agent, FacilitatorConfig } from '@/types/api';
-import { useServices } from '@/hooks/useServices';
+import { useAgentService } from '@/hooks/useServices';
 import { logger } from '@/utils/logger';
-import { usePromptService } from '@/hooks/useServices';
+import { useForm } from '@/hooks/useForm';
+import { FormField } from '@/components/forms/FormField';
+import { GoalsInput } from '@/components/forms/GoalsInput';
 
 interface EditForm {
   name: string;
@@ -28,37 +24,65 @@ interface EditForm {
   facilitator_config: FacilitatorConfig;
 }
 
+const getDefaultFormData = (): EditForm => ({
+  name: '',
+  description: '',
+  is_active: false,
+  response_style: '',
+  goals: [] as string[],
+  agent_type: '',
+  is_default: false,
+  facilitator_config: {
+    prompting_enabled: false,
+    prompting_interval_minutes: 3,
+    max_prompts_per_session: 5,
+    prompting_questions: [],
+    ibis_facilitation: {
+      enabled: false,
+      elicit_issue_prompt: '',
+      elicit_position_prompt: '',
+      elicit_argument_prompt: ''
+    }
+  }
+});
+
 export const AgentManagement: React.FC = () => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
-  const [goalInput, setGoalInput] = useState('');
-  const [editForm, setEditForm] = useState<EditForm>({
-    name: '',
-    description: '',
-    is_active: false,
-    response_style: '',
-    goals: [] as string[],
-    agent_type: '',
-    is_default: false,
-      facilitator_config: {
-        prompting_enabled: false,
-        prompting_interval_minutes: 3,
-        max_prompts_per_session: 5,
-        prompting_questions: [],
-        ibis_facilitation: {
-          enabled: false,
-          elicit_issue_prompt: '',
-          elicit_position_prompt: '',
-          elicit_argument_prompt: ''
-        }
-      }
-  });
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
-  const { agentService } = useServices();
-  const { promptService } = useServices();
+  const agentService = useAgentService();
+
+  const createForm = useForm({
+    initialData: getDefaultFormData(),
+    onSubmit: async (data) => {
+      const createdAgent = await agentService.createAgent(data as Omit<Agent, 'id' | 'created_at' | 'updated_at'>);
+      setAgents([...agents, createdAgent]);
+      setIsCreateDialogOpen(false);
+      createForm.resetForm();
+      toast({
+        title: 'Success',
+        description: 'Agent created successfully',
+      });
+    }
+  });
+
+  const editForm = useForm({
+    initialData: getDefaultFormData(),
+    onSubmit: async (data) => {
+      if (!editingAgent) return;
+      const updatedAgent = await agentService.updateAgent(editingAgent.id, data);
+      setAgents(agents.map(a => a.id === editingAgent.id ? updatedAgent : a));
+      setIsEditDialogOpen(false);
+      setEditingAgent(null);
+      toast({
+        title: 'Success',
+        description: 'Agent updated successfully',
+      });
+    }
+  });
 
   useEffect(() => {
     fetchAgents();
@@ -83,7 +107,7 @@ export const AgentManagement: React.FC = () => {
 
   const handleEditAgent = (agent: Agent) => {
     setEditingAgent(agent);
-    setEditForm({
+    editForm.resetForm({
       name: agent.name,
       description: agent.description,
       is_active: agent.is_active,
@@ -104,7 +128,6 @@ export const AgentManagement: React.FC = () => {
         }
       }
     });
-    setGoalInput('');
     setIsEditDialogOpen(true);
   };
 
@@ -128,83 +151,9 @@ export const AgentManagement: React.FC = () => {
     }
   };
 
-  const handleUpdateAgent = async () => {
-    if (!editingAgent) return;
-    
-    try {
-      const updatedAgent = await agentService.updateAgent(editingAgent.id, {
-        is_active: editForm.is_active,
-        name: editForm.name,
-        description: editForm.description,
-        response_style: editForm.response_style,
-        goals: editForm.goals,
-        agent_type: editForm.agent_type,
-        is_default: editForm.is_default,
-        facilitator_config: editForm.facilitator_config,
-      });
-
-      setAgents(agents.map(a => a.id === editingAgent.id ? updatedAgent : a));
-      setIsEditDialogOpen(false);
-      setEditingAgent(null);
-      
-      toast({
-        title: 'Success',
-        description: 'Agent updated successfully',
-      });
-    } catch (error) {
-      logger.error('Failed to update agent', { agentId: editingAgent.id, error });
-      toast({
-        title: 'Error',
-        description: 'Failed to update agent',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const handleCreateAgent = async () => {
     try {
-      const createdAgent = await agentService.createAgent({
-        name: editForm.name,
-        description: editForm.description,
-        is_active: editForm.is_active,
-        response_style: editForm.response_style,
-        goals: editForm.goals,
-        agent_type: editForm.agent_type,
-        is_default: editForm.is_default,
-        facilitator_config: editForm.facilitator_config,
-      } as Omit<Agent, 'id' | 'created_at' | 'updated_at'>);
-
-      setAgents([...agents, createdAgent]);
-      setIsCreateDialogOpen(false);
-      
-      // Reset form
-      setEditForm({
-        name: '',
-        description: '',
-        is_active: false,
-        response_style: '',
-        goals: [],
-        agent_type: '',
-        is_default: false,
-        facilitator_config: {
-          prompting_enabled: false,
-          prompting_interval_minutes: 3,
-          max_prompts_per_session: 5,
-          prompting_questions: [],
-          ibis_facilitation: {
-            enabled: false,
-            elicit_issue_prompt: '',
-            elicit_position_prompt: '',
-            elicit_argument_prompt: ''
-          }
-        }
-      });
-      setGoalInput('');
-      
-      toast({
-        title: 'Success',
-        description: 'Agent created successfully',
-      });
+      await createForm.handleSubmit();
     } catch (error) {
       logger.error('Failed to create agent', { error });
       toast({
@@ -215,117 +164,78 @@ export const AgentManagement: React.FC = () => {
     }
   };
 
-  const handleAddGoal = () => {
-    if (goalInput.trim()) {
-      setEditForm(prev => ({
-        ...prev,
-        goals: [...prev.goals, goalInput.trim()]
-      }));
-      setGoalInput('');
+  const handleUpdateAgent = async () => {
+    try {
+      await editForm.handleSubmit();
+    } catch (error) {
+      logger.error('Failed to update agent', { editingAgent: editingAgent?.id, error });
+      toast({
+        title: 'Error',
+        description: 'Failed to update agent',
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleRemoveGoal = (index: number) => {
-    setEditForm(prev => ({
-      ...prev,
-      goals: prev.goals.filter((_, i) => i !== index)
-    }));
-  };
-
-  const AgentForm: React.FC<{ isEdit: boolean }> = ({ isEdit }) => (
+  const AgentForm: React.FC<{ form: ReturnType<typeof useForm<EditForm>> }> = ({ form }) => (
     <div className="space-y-4">
-      <div>
-        <Label htmlFor="name">Name</Label>
-        <Input
-          id="name"
-          value={editForm.name}
-          onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-          placeholder="Agent name"
-        />
-      </div>
+      <FormField
+        type="input"
+        label="Name"
+        value={form.formData.name}
+        onChange={(value) => form.updateField('name', value)}
+        placeholder="Agent name"
+        required
+      />
       
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          value={editForm.description}
-          onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-          placeholder="Agent description"
-        />
-      </div>
+      <FormField
+        type="textarea"
+        label="Description"
+        value={form.formData.description}
+        onChange={(value) => form.updateField('description', value)}
+        placeholder="Agent description"
+      />
 
-      <div>
-        <Label htmlFor="agent_type">Agent Type</Label>
-        <Select
-          value={editForm.agent_type}
-          onValueChange={(value) => setEditForm(prev => ({ ...prev, agent_type: value }))}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select agent type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="bill_agent">Bill Agent</SelectItem>
-            <SelectItem value="peer_agent">Peer Agent</SelectItem>
-            <SelectItem value="flow_agent">Flow Agent</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <FormField
+        type="select"
+        label="Agent Type"
+        value={form.formData.agent_type}
+        onChange={(value) => form.updateField('agent_type', value)}
+        placeholder="Select agent type"
+        options={[
+          { value: 'bill_agent', label: 'Bill Agent' },
+          { value: 'peer_agent', label: 'Peer Agent' },
+          { value: 'flow_agent', label: 'Flow Agent' }
+        ]}
+        required
+      />
 
-      <div>
-        <Label htmlFor="response_style">Response Style</Label>
-        <Textarea
-          id="response_style"
-          value={editForm.response_style}
-          onChange={(e) => setEditForm(prev => ({ ...prev, response_style: e.target.value }))}
-          placeholder="Response style guidelines"
-        />
-      </div>
+      <FormField
+        type="textarea"
+        label="Response Style"
+        value={form.formData.response_style}
+        onChange={(value) => form.updateField('response_style', value)}
+        placeholder="Response style guidelines"
+      />
 
-      <div className="space-y-2">
-        <Label>Goals</Label>
-        <div className="flex gap-2">
-          <Input
-            value={goalInput}
-            onChange={(e) => setGoalInput(e.target.value)}
-            placeholder="Add a goal"
-            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddGoal())}
-          />
-          <Button type="button" onClick={handleAddGoal} size="sm">
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-        {editForm.goals.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {editForm.goals.map((goal, index) => (
-              <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                {goal}
-                <X 
-                  className="h-3 w-3 cursor-pointer" 
-                  onClick={() => handleRemoveGoal(index)}
-                />
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
+      <GoalsInput
+        goals={form.formData.goals}
+        onGoalsChange={(goals) => form.updateField('goals', goals)}
+      />
 
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="is_active"
-          checked={editForm.is_active}
-          onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, is_active: checked }))}
-        />
-        <Label htmlFor="is_active">Active</Label>
-      </div>
+      <FormField
+        type="switch"
+        label="Active"
+        checked={form.formData.is_active}
+        onChange={(checked) => form.updateField('is_active', checked)}
+      />
 
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="is_default"
-          checked={editForm.is_default}
-          onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, is_default: checked }))}
-        />
-        <Label htmlFor="is_default">Default Agent</Label>
-      </div>
+      <FormField
+        type="switch"
+        label="Default Agent"
+        checked={form.formData.is_default}
+        onChange={(checked) => form.updateField('is_default', checked)}
+      />
     </div>
   );
 
@@ -355,12 +265,17 @@ export const AgentManagement: React.FC = () => {
                     Create a global agent template. System prompts are managed separately via Prompt Templates.
                   </p>
                 </DialogHeader>
-                <AgentForm isEdit={false} />
+                <AgentForm form={createForm} />
                 <div className="flex justify-end space-x-2">
                   <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleCreateAgent}>Create Agent</Button>
+                  <Button 
+                    onClick={handleCreateAgent}
+                    disabled={createForm.isSubmitting}
+                  >
+                    {createForm.isSubmitting ? 'Creating...' : 'Create Agent'}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -425,12 +340,17 @@ export const AgentManagement: React.FC = () => {
             Update agent configuration. System prompts are managed via Prompt Templates.
           </p>
         </DialogHeader>
-          <AgentForm isEdit={true} />
+          <AgentForm form={editForm} />
           <div className="flex justify-end space-x-2">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateAgent}>Update Agent</Button>
+            <Button 
+              onClick={handleUpdateAgent}
+              disabled={editForm.isSubmitting}
+            >
+              {editForm.isSubmitting ? 'Updating...' : 'Update Agent'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Edit, X, Plus } from 'lucide-react';
+import { Edit } from 'lucide-react';
 import { Agent, FacilitatorConfig } from '@/types/api';
+import { useForm } from '@/hooks/useForm';
+import { FormField } from '@/components/forms/FormField';
+import { GoalsInput } from '@/components/forms/GoalsInput';
 
 interface LocalAgentEditModalProps {
   agent: Agent;
@@ -26,31 +28,43 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
     prompt_overrides: Record<string, string>;
   };
 
-  const [formData, setFormData] = useState<LocalAgentForm>({
-    name: agent.name,
-    description: agent.description || '',
-    response_style: agent.response_style || '',
-    goals: agent.goals || [],
-    prompt_overrides: agent.prompt_overrides || {},
-    facilitator_config: agent.facilitator_config || {
-      prompting_enabled: false,
-      prompting_interval_minutes: 3,
-      max_prompts_per_session: 5,
-      prompting_questions: [],
-      ibis_facilitation: {
-        enabled: true,
-        elicit_issue_prompt: 'To build a coherent IBIS map, could you share 1–2 concise issues we should consider?',
-        elicit_position_prompt: 'What is your position on this issue (one sentence, actionable)?',
-        elicit_argument_prompt: 'Please provide 1–2 arguments supporting your position, with any evidence or sources.'
+  const form = useForm<LocalAgentForm>({
+    initialData: {
+      name: agent.name,
+      description: agent.description || '',
+      response_style: agent.response_style || '',
+      goals: agent.goals || [],
+      prompt_overrides: agent.prompt_overrides || {},
+      facilitator_config: agent.facilitator_config || {
+        prompting_enabled: false,
+        prompting_interval_minutes: 3,
+        max_prompts_per_session: 5,
+        prompting_questions: [],
+        ibis_facilitation: {
+          enabled: true,
+          elicit_issue_prompt: 'To build a coherent IBIS map, could you share 1–2 concise issues we should consider?',
+          elicit_position_prompt: 'What is your position on this issue (one sentence, actionable)?',
+          elicit_argument_prompt: 'Please provide 1–2 arguments supporting your position, with any evidence or sources.'
+        }
       }
+    },
+    onSubmit: async (data) => {
+      onUpdateAgent(agent.id, {
+        name: data.name,
+        description: data.description,
+        response_style: data.response_style,
+        goals: data.goals,
+        prompt_overrides: data.prompt_overrides,
+        facilitator_config: data.facilitator_config,
+      });
+      setOpen(false);
     }
   });
-  const [goalInput, setGoalInput] = useState('');
 
   // Reset form data when agent changes or modal opens
   useEffect(() => {
     if (open) {
-      setFormData({
+      form.resetForm({
         name: agent.name,
         description: agent.description || '',
         response_style: agent.response_style || '',
@@ -69,40 +83,34 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
           }
         }
       });
-      setGoalInput('');
     }
   }, [agent, open]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-  onUpdateAgent(agent.id, {
-    name: formData.name,
-    description: formData.description,
-    response_style: formData.response_style,
-    goals: formData.goals,
-    prompt_overrides: formData.prompt_overrides,
-    facilitator_config: formData.facilitator_config,
-  });
-    
-    setOpen(false);
+    await form.handleSubmit(e);
   };
 
-  const handleAddGoal = () => {
-    if (goalInput.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        goals: [...prev.goals, goalInput.trim()]
-      }));
-      setGoalInput('');
-    }
+  const toggleIbisFacilitation = () => {
+    form.updateField('facilitator_config', {
+      ...form.formData.facilitator_config,
+      ibis_facilitation: {
+        enabled: !form.formData.facilitator_config.ibis_facilitation?.enabled,
+        elicit_issue_prompt: form.formData.facilitator_config.ibis_facilitation?.elicit_issue_prompt || 'To build a coherent IBIS map, could you share 1–2 concise issues we should consider?',
+        elicit_position_prompt: form.formData.facilitator_config.ibis_facilitation?.elicit_position_prompt || 'What is your position on this issue (one sentence, actionable)?',
+        elicit_argument_prompt: form.formData.facilitator_config.ibis_facilitation?.elicit_argument_prompt || 'Please provide 1–2 arguments supporting your position, with any evidence or sources.'
+      }
+    });
   };
 
-  const handleRemoveGoal = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      goals: prev.goals.filter((_, i) => i !== index)
-    }));
+  const updateIbisPrompt = (field: 'elicit_issue_prompt' | 'elicit_position_prompt' | 'elicit_argument_prompt', value: string) => {
+    form.updateField('facilitator_config', {
+      ...form.formData.facilitator_config,
+      ibis_facilitation: {
+        ...(form.formData.facilitator_config.ibis_facilitation || { enabled: true, elicit_issue_prompt: '', elicit_position_prompt: '', elicit_argument_prompt: '' }),
+        [field]: value
+      }
+    });
   };
 
   return (
@@ -124,65 +132,36 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Agent Name *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Agent name"
-              required
-            />
-          </div>
+          <FormField
+            type="input"
+            label="Agent Name"
+            value={form.formData.name}
+            onChange={(value) => form.updateField('name', value)}
+            placeholder="Agent name"
+            required
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Brief description of this agent's purpose"
-              rows={2}
-            />
-          </div>
+          <FormField
+            type="textarea"
+            label="Description"
+            value={form.formData.description}
+            onChange={(value) => form.updateField('description', value)}
+            placeholder="Brief description of this agent's purpose"
+            rows={2}
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="response_style">Response Style</Label>
-            <Input
-              id="response_style"
-              value={formData.response_style}
-              onChange={(e) => setFormData(prev => ({ ...prev, response_style: e.target.value }))}
-              placeholder="e.g., formal, casual, analytical"
-            />
-          </div>
+          <FormField
+            type="input"
+            label="Response Style"
+            value={form.formData.response_style}
+            onChange={(value) => form.updateField('response_style', value)}
+            placeholder="e.g., formal, casual, analytical"
+          />
 
-          <div className="space-y-2">
-            <Label>Goals</Label>
-            <div className="flex gap-2">
-              <Input
-                value={goalInput}
-                onChange={(e) => setGoalInput(e.target.value)}
-                placeholder="Add a goal"
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddGoal())}
-              />
-              <Button type="button" onClick={handleAddGoal} size="sm">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-            {formData.goals.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {formData.goals.map((goal, index) => (
-                  <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                    {goal}
-                    <X 
-                      className="h-3 w-3 cursor-pointer" 
-                      onClick={() => handleRemoveGoal(index)}
-                    />
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
+          <GoalsInput
+            goals={form.formData.goals}
+            onGoalsChange={(goals) => form.updateField('goals', goals)}
+          />
 
           {/* Classification Prompt Override */}
           <div className="space-y-4 border-t pt-4">
@@ -198,37 +177,29 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
               </Badge>
             </div>
 
-            {/* Classification Prompt Override */}
             <div className="space-y-2">
-              <Label htmlFor="classification_prompt_override">Custom Classification Prompt</Label>
-              <Textarea
-                id="classification_prompt_override"
-                value={formData.prompt_overrides.classification_prompt || ''}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  prompt_overrides: {
-                    ...prev.prompt_overrides,
-                    classification_prompt: e.target.value
-                  }
-                }))}
+              <FormField
+                type="textarea"
+                label="Custom Classification Prompt"
+                value={form.formData.prompt_overrides.classification_prompt || ''}
+                onChange={(value) => form.updateField('prompt_overrides', {
+                  ...form.formData.prompt_overrides,
+                  classification_prompt: value
+                })}
                 placeholder="Leave empty to use template default, or enter custom classification prompt..."
                 rows={2}
               />
-              {formData.prompt_overrides.classification_prompt && (
+              {form.formData.prompt_overrides.classification_prompt && (
                 <div className="flex justify-end">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => setFormData(prev => ({
-                      ...prev,
-                      prompt_overrides: {
-                        ...prev.prompt_overrides,
-                        classification_prompt: ''
-                      }
-                    }))}
+                    onClick={() => form.updateField('prompt_overrides', {
+                      ...form.formData.prompt_overrides,
+                      classification_prompt: ''
+                    })}
                   >
-                    <X className="h-4 w-4 mr-1" />
                     Clear Override
                   </Button>
                 </div>
@@ -244,41 +215,21 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setFormData(prev => ({
-                    ...prev,
-                    facilitator_config: {
-                      ...prev.facilitator_config,
-                      ibis_facilitation: {
-                        enabled: !prev.facilitator_config.ibis_facilitation?.enabled,
-                        elicit_issue_prompt: prev.facilitator_config.ibis_facilitation?.elicit_issue_prompt || 'To build a coherent IBIS map, could you share 1–2 concise issues we should consider?',
-                        elicit_position_prompt: prev.facilitator_config.ibis_facilitation?.elicit_position_prompt || 'What is your position on this issue (one sentence, actionable)?',
-                        elicit_argument_prompt: prev.facilitator_config.ibis_facilitation?.elicit_argument_prompt || 'Please provide 1–2 arguments supporting your position, with any evidence or sources.'
-                      }
-                    }
-                  }))}
+                  onClick={toggleIbisFacilitation}
                   size="sm"
                 >
-                  {formData.facilitator_config.ibis_facilitation?.enabled ? 'Disable' : 'Enable'} IBIS Facilitation
+                  {form.formData.facilitator_config.ibis_facilitation?.enabled ? 'Disable' : 'Enable'} IBIS Facilitation
                 </Button>
               </div>
-              {formData.facilitator_config.ibis_facilitation?.enabled && (
+              {form.formData.facilitator_config.ibis_facilitation?.enabled && (
                 <div className="space-y-3">
                   <div>
                     <Label htmlFor="ibis-issue">Issue Elicitation Prompt</Label>
                     <Textarea
                       id="ibis-issue"
                       rows={2}
-                      value={formData.facilitator_config.ibis_facilitation?.elicit_issue_prompt || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        facilitator_config: {
-                          ...prev.facilitator_config,
-                          ibis_facilitation: {
-                            ...(prev.facilitator_config.ibis_facilitation || { enabled: true, elicit_issue_prompt: '', elicit_position_prompt: '', elicit_argument_prompt: '' }),
-                            elicit_issue_prompt: e.target.value
-                          }
-                        }
-                      }))}
+                      value={form.formData.facilitator_config.ibis_facilitation?.elicit_issue_prompt || ''}
+                      onChange={(e) => updateIbisPrompt('elicit_issue_prompt', e.target.value)}
                       placeholder="Prompt to ask participants for issues first"
                     />
                   </div>
@@ -287,17 +238,8 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
                     <Textarea
                       id="ibis-position"
                       rows={2}
-                      value={formData.facilitator_config.ibis_facilitation?.elicit_position_prompt || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        facilitator_config: {
-                          ...prev.facilitator_config,
-                          ibis_facilitation: {
-                            ...(prev.facilitator_config.ibis_facilitation || { enabled: true, elicit_issue_prompt: '', elicit_position_prompt: '', elicit_argument_prompt: '' }),
-                            elicit_position_prompt: e.target.value
-                          }
-                        }
-                      }))}
+                      value={form.formData.facilitator_config.ibis_facilitation?.elicit_position_prompt || ''}
+                      onChange={(e) => updateIbisPrompt('elicit_position_prompt', e.target.value)}
                       placeholder="Prompt to ask for positions on a selected issue"
                     />
                   </div>
@@ -306,17 +248,8 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
                     <Textarea
                       id="ibis-argument"
                       rows={2}
-                      value={formData.facilitator_config.ibis_facilitation?.elicit_argument_prompt || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        facilitator_config: {
-                          ...prev.facilitator_config,
-                          ibis_facilitation: {
-                            ...(prev.facilitator_config.ibis_facilitation || { enabled: true, elicit_issue_prompt: '', elicit_position_prompt: '', elicit_argument_prompt: '' }),
-                            elicit_argument_prompt: e.target.value
-                          }
-                        }
-                      }))}
+                      value={form.formData.facilitator_config.ibis_facilitation?.elicit_argument_prompt || ''}
+                      onChange={(e) => updateIbisPrompt('elicit_argument_prompt', e.target.value)}
                       placeholder="Prompt to elicit 1–2 supporting arguments with evidence"
                     />
                   </div>
@@ -325,12 +258,19 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+          <div className="flex gap-2 pt-4">
+            <Button 
+              type="submit" 
+              disabled={loading || form.isSubmitting}
+            >
+              {(loading || form.isSubmitting) ? 'Updating...' : 'Update Agent'}
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Updating...' : 'Update Agent'}
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => setOpen(false)}
+            >
+              Cancel
             </Button>
           </div>
         </form>
