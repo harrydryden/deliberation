@@ -215,12 +215,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const accessCode2 = generateAccessCode2();
         const email = `${accessCode1}@deliberation.local`;
         
-        // Create user in Supabase Auth using signUp
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password: accessCode2,
-          options: {
-            data: {
+        // Create user using edge function to avoid auto-login
+        const { data: functionData, error: functionError } = await supabase.functions.invoke('admin-create-user', {
+          body: {
+            email,
+            password: accessCode2,
+            metadata: {
               access_code_1: accessCode1,
               access_code_2: accessCode2,
               role: roleType
@@ -228,9 +228,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
         });
 
-        if (authError) {
-          logger.error('Error creating user:', authError);
-          continue;
+        if (functionError) {
+          logger.error('Error creating user via function:', functionError);
+          throw new Error(`Failed to create user: ${functionError.message}`);
         }
 
         users.push({
