@@ -23,6 +23,7 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
     response_style: string;
     goals: string[];
     facilitator_config: FacilitatorConfig;
+    prompt_overrides: Record<string, string>;
   };
 
   const [formData, setFormData] = useState<LocalAgentForm>({
@@ -30,6 +31,7 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
     description: agent.description || '',
     response_style: agent.response_style || '',
     goals: agent.goals || [],
+    prompt_overrides: agent.prompt_overrides || {},
     facilitator_config: agent.facilitator_config || {
       prompting_enabled: false,
       prompting_interval_minutes: 3,
@@ -53,6 +55,7 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
         description: agent.description || '',
         response_style: agent.response_style || '',
         goals: agent.goals || [],
+        prompt_overrides: agent.prompt_overrides || {},
         facilitator_config: agent.facilitator_config || {
           prompting_enabled: false,
           prompting_interval_minutes: 3,
@@ -78,6 +81,7 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
     description: formData.description,
     response_style: formData.response_style,
     goals: formData.goals,
+    prompt_overrides: formData.prompt_overrides,
     facilitator_config: formData.facilitator_config,
   });
     
@@ -178,6 +182,95 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
                 ))}
               </div>
             )}
+          </div>
+
+          {/* System Prompt Override Section */}
+          <div className="space-y-4 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-base font-semibold">System Prompt Override</Label>
+                <p className="text-sm text-muted-foreground">
+                  Override the default template prompt for this specific agent
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                Template: {agent.agent_type} default
+              </Badge>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="system_prompt_override">Custom System Prompt</Label>
+              <Textarea
+                id="system_prompt_override"
+                value={formData.prompt_overrides.system_prompt || ''}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  prompt_overrides: {
+                    ...prev.prompt_overrides,
+                    system_prompt: e.target.value
+                  }
+                }))}
+                placeholder="Leave empty to use template default, or enter custom prompt..."
+                rows={4}
+                className="min-h-[100px]"
+              />
+              {formData.prompt_overrides.system_prompt && (
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFormData(prev => ({
+                      ...prev,
+                      prompt_overrides: {
+                        ...prev.prompt_overrides,
+                        system_prompt: ''
+                      }
+                    }))}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear Override
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Classification Prompt Override */}
+            <div className="space-y-2">
+              <Label htmlFor="classification_prompt_override">Custom Classification Prompt</Label>
+              <Textarea
+                id="classification_prompt_override"
+                value={formData.prompt_overrides.classification_prompt || ''}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  prompt_overrides: {
+                    ...prev.prompt_overrides,
+                    classification_prompt: e.target.value
+                  }
+                }))}
+                placeholder="Leave empty to use template default, or enter custom classification prompt..."
+                rows={2}
+              />
+              {formData.prompt_overrides.classification_prompt && (
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFormData(prev => ({
+                      ...prev,
+                      prompt_overrides: {
+                        ...prev.prompt_overrides,
+                        classification_prompt: ''
+                      }
+                    }))}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Clear Override
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* IBIS Facilitation Prompts (Peer Agent) */}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -81,10 +81,12 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="h-5 w-5" />
-          Local Agent Management
-        </CardTitle>
+            <div>
+              <CardTitle>Local Agent Management</CardTitle>  
+              <CardDescription>
+                Deliberation-specific agents with customizable prompts and settings.
+              </CardDescription>
+            </div>
         <div className="flex gap-2">
           <LocalAgentCreationModal
             deliberations={deliberations}
@@ -144,6 +146,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
                   <TableHead>Deliberation</TableHead>
                   <TableHead>Deliberation Status</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead>Prompts</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -187,6 +190,25 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDate(agent.created_at)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {agent.prompt_overrides?.system_prompt && (
+                          <Badge variant="secondary" className="text-xs">
+                            System Override
+                          </Badge>
+                        )}
+                        {agent.prompt_overrides?.classification_prompt && (
+                          <Badge variant="secondary" className="text-xs">
+                            Classification Override
+                          </Badge>
+                        )}
+                        {(!agent.prompt_overrides?.system_prompt && !agent.prompt_overrides?.classification_prompt) && (
+                          <Badge variant="outline" className="text-xs">
+                            Using Templates
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
