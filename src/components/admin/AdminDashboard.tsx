@@ -104,13 +104,7 @@ export const AdminDashboard = () => {
           <div className="space-y-6">
             <div>
               <h3 className="text-lg font-semibold mb-4">Global Agent Templates</h3>
-              <AgentManagement
-                agents={adminData.agents}
-                loading={adminData.loadingAgents}
-                onLoad={adminData.fetchAgents}
-                onUpdate={adminData.updateAgent}
-                onCreate={adminData.createAgent}
-              />
+              <AgentManagement />
             </div>
             
             <div>

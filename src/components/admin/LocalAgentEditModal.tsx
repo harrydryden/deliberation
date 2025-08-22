@@ -20,7 +20,6 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
   type LocalAgentForm = {
     name: string;
     description: string;
-    system_prompt: string;
     response_style: string;
     goals: string[];
     facilitator_config: FacilitatorConfig;
@@ -29,7 +28,6 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
   const [formData, setFormData] = useState<LocalAgentForm>({
     name: agent.name,
     description: agent.description || '',
-    system_prompt: agent.system_prompt || '',
     response_style: agent.response_style || '',
     goals: agent.goals || [],
     facilitator_config: agent.facilitator_config || {
@@ -53,7 +51,6 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
       setFormData({
         name: agent.name,
         description: agent.description || '',
-        system_prompt: agent.system_prompt || '',
         response_style: agent.response_style || '',
         goals: agent.goals || [],
         facilitator_config: agent.facilitator_config || {
@@ -79,7 +76,6 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
   onUpdateAgent(agent.id, {
     name: formData.name,
     description: formData.description,
-    system_prompt: formData.system_prompt,
     response_style: formData.response_style,
     goals: formData.goals,
     facilitator_config: formData.facilitator_config,
@@ -143,17 +139,6 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               placeholder="Brief description of this agent's purpose"
               rows={2}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="system_prompt">System Prompt</Label>
-            <Textarea
-              id="system_prompt"
-              value={formData.system_prompt}
-              onChange={(e) => setFormData(prev => ({ ...prev, system_prompt: e.target.value }))}
-              placeholder="Define the agent's behavior and instructions"
-              rows={4}
             />
           </div>
 

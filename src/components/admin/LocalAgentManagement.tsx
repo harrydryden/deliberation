@@ -35,7 +35,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
     setUpdating(id);
     try {
-      await onUpdate(id, { isActive: !currentStatus });
+      await onUpdate(id, { is_active: !currentStatus });
     } finally {
       setUpdating(null);
     }
@@ -117,7 +117,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
-                  {localAgents.filter(a => a.isActive).length}
+                  {localAgents.filter(a => a.is_active).length}
                 </div>
                 <div className="text-sm text-muted-foreground">Active</div>
               </div>
@@ -164,7 +164,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
                       {getAgentTypeBadge(agent.agent_type)}
                     </TableCell>
                     <TableCell>
-                      {getStatusBadge(agent.isActive)}
+                      {getStatusBadge(agent.is_active)}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -186,7 +186,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
                       {getDeliberationStatusBadge(agent.deliberation?.status)}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(agent.createdAt)}
+                      {formatDate(agent.created_at)}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
@@ -198,13 +198,13 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleToggleActive(agent.id, agent.isActive)}
+                          onClick={() => handleToggleActive(agent.id, agent.is_active)}
                           disabled={updating === agent.id}
                         >
                           {updating === agent.id ? (
                             <RefreshCw className="h-4 w-4 animate-spin" />
                           ) : (
-                            agent.isActive ? 'Deactivate' : 'Activate'
+                            agent.is_active ? 'Deactivate' : 'Activate'
                           )}
                         </Button>
                       </div>

@@ -71,20 +71,6 @@ export const useUserAgents = () => {
         created_at: config.created_at,
         updated_at: config.updated_at,
       })) || [];
-        id: config.id,
-        name: config.name,
-        description: config.description || '',
-        system_prompt: config.system_prompt || '',
-        response_style: config.response_style,
-        goals: config.goals || [],
-        agent_type: config.agent_type,
-        facilitator_config: config.facilitator_config || undefined,
-        is_default: config.is_default || false,
-        isActive: config.is_active,
-        createdAt: config.created_at,
-        updatedAt: config.updated_at,
-      })) || [];
-
       setLocalAgents(formattedAgents);
     } catch (error: any) {
       console.error('Error fetching user accessible local agents:', error);
