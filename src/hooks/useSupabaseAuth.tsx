@@ -210,25 +210,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const users = [];
       
+      // Store current session to restore it later
+      const currentSession = session;
+      
       for (let i = 0; i < count; i++) {
-        // Use the existing database function to create users without auto-login
-        const { data, error } = await supabase.rpc('create_user_with_access_code', {
-          p_user_role: roleType
+        const accessCode1 = generateAccessCode1();
+        const accessCode2 = generateAccessCode2();
+        const email = `${accessCode1}@deliberation.local`;
+        
+        // Create user in Supabase Auth using signUp
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password: accessCode2,
+          options: {
+            data: {
+              access_code_1: accessCode1,
+              access_code_2: accessCode2,
+              role: roleType
+            }
+          }
         });
 
-        if (error) {
-          logger.error('Error creating user via RPC:', error);
+        if (authError) {
+          logger.error('Error creating user:', authError);
           continue;
         }
 
-        if (data && data.length > 0) {
-          const userData = data[0];
-          users.push({
-            accessCode1: userData.access_code,
-            accessCode2: userData.access_code, // Using same code for both for simplicity
-            role: roleType
-          });
-        }
+        users.push({
+          accessCode1,
+          accessCode2,
+          role: roleType
+        });
+      }
+
+      // Immediately restore the original session to prevent auto-login
+      if (currentSession && users.length > 0) {
+        await supabase.auth.setSession({
+          access_token: currentSession.access_token,
+          refresh_token: currentSession.refresh_token
+        });
       }
 
       return { users };
