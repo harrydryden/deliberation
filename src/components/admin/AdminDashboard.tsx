@@ -101,36 +101,16 @@ export const AdminDashboard = () => {
 
         <TabsContent value="agents" className="space-y-4">
           <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Global Agent Templates</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Manage reusable agent configurations. System prompts are managed via the "Prompt Templates" section below.
-              </p>
-              <AgentManagement />
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Prompt Templates</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Manage reusable prompt templates that can be used by agents across the system.
-              </p>
-              <PromptManagement />
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Local Agents (Deliberation-Specific)</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Deliberation-specific agent instances with customizable prompts. Manage all prompt overrides directly within each agent below.
-              </p>
-              <LocalAgentManagement
-                localAgents={adminData.localAgents}
-                deliberations={adminData.deliberations}
-                loading={adminData.loadingLocalAgents}
-                onLoad={adminData.fetchLocalAgents}
-                onUpdate={adminData.updateLocalAgent}
-                onCreate={adminData.createLocalAgent}
-              />
-            </div>
+            <AgentManagement />
+            <PromptManagement />
+            <LocalAgentManagement
+              localAgents={adminData.localAgents}
+              deliberations={adminData.deliberations}
+              loading={adminData.loadingLocalAgents}
+              onLoad={adminData.fetchLocalAgents}
+              onUpdate={adminData.updateLocalAgent}
+              onCreate={adminData.createLocalAgent}
+            />
           </div>
         </TabsContent>
 
