@@ -189,6 +189,25 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   };
 
   const handleEvent = (event: any) => {
+    // Handle session expired and other critical errors
+    if (event?.type === 'error') {
+      const errorCode = event?.error?.code;
+      const errorMessage = event?.error?.message;
+      
+      if (errorCode === 'session_expired') {
+        console.log('[VoiceInterface] Session expired, forcing cleanup');
+        toast({ title: 'Session expired', description: 'Voice session expired. Click to restart.', variant: 'destructive' });
+        // Force immediate cleanup and reset
+        void stop();
+        return;
+      }
+      
+      // Handle other errors
+      console.error('[VoiceInterface] RTC Error:', event);
+      toast({ title: 'Voice error', description: errorMessage || 'Voice connection error', variant: 'destructive' });
+      return;
+    }
+
     // Minimal speaking indicator using response lifecycle
     if (event?.type === 'response.created') setSpeaking(true);
 
@@ -211,31 +230,51 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
 
   const ensureIdle = async () => {
     console.log('[VoiceInterface] ensureIdle called, current mode:', mode);
-    if (mode !== 'idle') {
-      console.log('[VoiceInterface] Forcing complete stop of current mode:', mode);
-      
-      // Force stop any RTC connections immediately
-      if (rtcRef.current) {
-        console.log('[VoiceInterface] Disconnecting RTC immediately');
-        try {
-          rtcRef.current.cancelSpeaking?.();
-          rtcRef.current.disconnect();
-        } catch (e) {
-          console.warn('[VoiceInterface] Error disconnecting RTC:', e);
-        }
-        rtcRef.current = null;
+    
+    // Always force cleanup, regardless of current mode, to handle expired sessions
+    console.log('[VoiceInterface] Forcing complete cleanup of any existing connections');
+    
+    // Force stop any RTC connections immediately
+    if (rtcRef.current) {
+      console.log('[VoiceInterface] Disconnecting RTC immediately');
+      try {
+        rtcRef.current.cancelSpeaking?.();
+        rtcRef.current.disconnect();
+      } catch (e) {
+        console.warn('[VoiceInterface] Error disconnecting RTC:', e);
       }
-      
-      // Force reset all state
-      setConnected(false);
-      setSpeaking(false);
-      setMode('idle');
-      
-      // Wait longer for complete cleanup - this ensures the RTC connection is fully closed
-      console.log('[VoiceInterface] Waiting for complete cleanup...');
-      await new Promise((r) => setTimeout(r, 1000));
-      console.log('[VoiceInterface] Cleanup complete, mode should be idle');
+      rtcRef.current = null;
     }
+    
+    // Clean up STT connections if any
+    if (sttRecorderRef.current) {
+      try {
+        sttRecorderRef.current.stop();
+      } catch (e) {
+        console.warn('[VoiceInterface] Error stopping STT recorder:', e);
+      }
+      sttRecorderRef.current = null;
+    }
+    
+    if (sttStreamRef.current) {
+      try {
+        sttStreamRef.current.getTracks().forEach(t => t.stop());
+      } catch (e) {
+        console.warn('[VoiceInterface] Error stopping STT stream:', e);
+      }
+      sttStreamRef.current = null;
+    }
+    
+    // Force reset all state
+    setConnected(false);
+    setSpeaking(false);
+    setMode('idle');
+    setSttBusy(false);
+    
+    // Wait for complete cleanup to handle session expiration
+    console.log('[VoiceInterface] Waiting for complete cleanup...');
+    await new Promise((r) => setTimeout(r, 1500));
+    console.log('[VoiceInterface] Cleanup complete, ready for new session');
   };
 
   const startBill = async () => {
