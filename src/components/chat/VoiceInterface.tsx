@@ -211,8 +211,11 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
 
   const ensureIdle = async () => {
     if (mode !== 'idle') {
-      stop();
-      await new Promise((r) => setTimeout(r, 300));
+      console.log('[VoiceInterface] Ensuring idle mode, current mode:', mode);
+      await stop();
+      // Wait longer for cleanup to complete
+      await new Promise((r) => setTimeout(r, 500));
+      console.log('[VoiceInterface] Mode should now be idle');
     }
   };
 
@@ -282,7 +285,10 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
 
   const startStt = async () => {
     try {
+      console.log('[VoiceInterface] Starting STT mode');
       await ensureIdle();
+      console.log('[VoiceInterface] Idle ensured, starting STT recording');
+      
       sttChunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : undefined;
@@ -371,13 +377,27 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   };
 
   const stop = async () => {
-    try { rtcRef.current?.cancelSpeaking?.(); } catch {}
-    await new Promise((r) => setTimeout(r, 150));
-    try { rtcRef.current?.disconnect(); } catch {}
-    rtcRef.current = null;
-    setConnected(false);
-    setSpeaking(false);
-    setMode('idle');
+    console.log('[VoiceInterface] Stopping current mode:', mode);
+    try {
+      if (rtcRef.current) {
+        console.log('[VoiceInterface] Disconnecting RTC');
+        try { rtcRef.current.cancelSpeaking?.(); } catch {}
+        await new Promise((r) => setTimeout(r, 150));
+        rtcRef.current.disconnect();
+        rtcRef.current = null;
+      }
+      setConnected(false);
+      setSpeaking(false);
+      setMode('idle');
+      console.log('[VoiceInterface] Successfully stopped and set to idle');
+    } catch (err: any) {
+      console.error('[VoiceInterface] Error during stop:', err);
+      // Force cleanup even if there's an error
+      rtcRef.current = null;
+      setConnected(false);
+      setSpeaking(false);
+      setMode('idle');
+    }
   };
 
   useEffect(() => { return () => { void stop(); }; }, []);
