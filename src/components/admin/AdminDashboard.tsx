@@ -73,7 +73,7 @@ export const AdminDashboard = () => {
           <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Users & Access</TabsTrigger>
           <TabsTrigger value="agents">Agents</TabsTrigger>
-          <TabsTrigger value="prompts">System Prompts</TabsTrigger>
+          <TabsTrigger value="prompts">Prompt Templates</TabsTrigger>
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="deliberations">Deliberations</TabsTrigger>
           </TabsList>
@@ -104,11 +104,17 @@ export const AdminDashboard = () => {
           <div className="space-y-6">
             <div>
               <h3 className="text-lg font-semibold mb-4">Global Agent Templates</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Manage reusable agent configurations. System prompts are now managed via the "Prompt Templates" tab above.
+              </p>
               <AgentManagement />
             </div>
             
             <div>
               <h3 className="text-lg font-semibold mb-4">Local Agents (Deliberation-Specific)</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Deliberation-specific agent instances. System prompts inherit from templates or can be overridden per agent.
+              </p>
               <LocalAgentManagement
                 localAgents={adminData.localAgents}
                 deliberations={adminData.deliberations}

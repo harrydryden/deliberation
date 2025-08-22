@@ -305,7 +305,7 @@ export const AgentManagement: React.FC = () => {
             <div>
               <CardTitle>Agent Management</CardTitle>
               <CardDescription>
-                Manage global agent configurations (system prompts are now managed via Prompt Templates)
+                Manage global agent configurations. System prompts are now centrally managed via Prompt Templates.
               </CardDescription>
             </div>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -315,6 +315,9 @@ export const AgentManagement: React.FC = () => {
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Create New Agent</DialogTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Create a global agent template. System prompts are managed separately via Prompt Templates.
+                  </p>
                 </DialogHeader>
                 <AgentForm isEdit={false} />
                 <div className="flex justify-end space-x-2">
@@ -380,9 +383,12 @@ export const AgentManagement: React.FC = () => {
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Agent</DialogTitle>
-          </DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Edit Agent</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Update agent configuration. System prompts are managed via Prompt Templates.
+          </p>
+        </DialogHeader>
           <AgentForm isEdit={true} />
           <div className="flex justify-end space-x-2">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
