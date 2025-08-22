@@ -28,7 +28,8 @@ interface Deliberation {
 const Deliberations = () => {
   const {
     user,
-    isLoading
+    isLoading,
+    isAdmin
   } = useSupabaseAuth();
   const navigate = useNavigate();
   const {
@@ -176,7 +177,7 @@ const Deliberations = () => {
                   
                   <div className="flex gap-2">
                     <Button className="flex-1 bg-democratic-blue hover:bg-democratic-blue/90" onClick={() => handleJoinDeliberation(deliberation.id)}>
-                      {user?.role === 'admin' ? "View" : deliberation.is_user_participant ? "Rejoin Discussion" : "Join Discussion"}
+                      {isAdmin ? "View" : deliberation.is_user_participant ? "Rejoin Discussion" : "Join Discussion"}
                     </Button>
                     
                   </div>
