@@ -1,113 +1,100 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Lightbulb } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useDeliberationService } from '@/hooks/useDeliberationService';
+import { useForm } from '@/hooks/useForm';
+import { FormField } from '@/components/forms/FormField';
 import { supabase } from '@/integrations/supabase/client';
-
-const MAX_DESCRIPTION_LENGTH = 400;
+import { toast } from 'sonner';
+import { useDeliberationService } from '@/hooks/useDeliberationService';
 
 interface DeliberationCreationProps {
   onDeliberationCreated: () => void;
 }
 
+type DeliberationForm = {
+  title: string;
+  description: string;
+  notion: string;
+  is_public: boolean;
+  max_participants: number;
+  generate_ibis_roots: boolean;
+};
+
 export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCreationProps) => {
   const [createOpen, setCreateOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    notion: '',
-    is_public: true,
-    max_participants: 50,
-    generate_ibis_roots: true
-  });
-  
-  const { toast } = useToast();
   const deliberationService = useDeliberationService();
-
-  const handleCreateDeliberation = async () => {
-    if (!formData.title.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a title for the deliberation",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!formData.notion.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a notion for stance scoring",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const deliberation = await deliberationService.createDeliberation(formData);
+  
+  const form = useForm<DeliberationForm>({
+    initialData: {
+      title: '',
+      description: '',
+      notion: '',
+      is_public: true,
+      max_participants: 50,
+      generate_ibis_roots: true
+    },
+    validate: (data) => {
+      const errors: Record<string, string> = {};
       
-      // If generate_ibis_roots is enabled, create initial IBIS nodes
-      if (formData.generate_ibis_roots && deliberation?.id) {
+      if (!data.title.trim()) {
+        errors.title = 'Title is required';
+      }
+      
+      if (!data.notion.trim()) {
+        errors.notion = 'Notion is required for stance scoring';
+      }
+      
+      if (data.description.length > 400) {
+        errors.description = 'Description must be 400 characters or less';
+      }
+      
+      if (data.notion.length > 100) {
+        errors.notion = 'Notion must be 100 characters or less';
+      }
+      
+      return Object.keys(errors).length > 0 ? errors : null;
+    },
+    onSubmit: async (data) => {
+      // Create deliberation
+      const deliberation = await deliberationService.createDeliberation(data);
+      
+      // Generate IBIS roots if enabled
+      if (data.generate_ibis_roots && deliberation?.id) {
         try {
           const { data: rootsData, error: rootsError } = await supabase.functions.invoke('generate-ibis-roots', {
             body: {
               deliberationId: deliberation.id,
-              deliberationTitle: formData.title,
-              deliberationDescription: formData.description,
-              notion: formData.notion
+              deliberationTitle: data.title,
+              deliberationDescription: data.description,
+              notion: data.notion
             }
           });
 
           if (rootsError) {
             console.error('Error generating IBIS roots:', rootsError);
-            toast({
-              title: "Partial Success",
-              description: "Deliberation created but failed to generate initial IBIS nodes. You can add them manually.",
-              variant: "destructive"
-            });
+            toast.error('Deliberation created but failed to generate initial IBIS nodes. You can add them manually.');
           } else if (rootsData?.success) {
-            toast({
-              title: "Success",
-              description: `Deliberation created with ${rootsData.count} AI-generated root issues`
-            });
+            toast.success(`Deliberation created with ${rootsData.count} AI-generated root issues`);
           }
         } catch (rootsError) {
           console.error('Error generating IBIS roots:', rootsError);
-          toast({
-            title: "Partial Success",
-            description: "Deliberation created but failed to generate initial IBIS nodes",
-            variant: "destructive"
-          });
+          toast.error('Deliberation created but failed to generate initial IBIS nodes');
         }
       } else {
-        toast({
-          title: "Success",
-          description: "Deliberation created successfully"
-        });
+        toast.success('Deliberation created successfully');
       }
       
       setCreateOpen(false);
-      setFormData({ title: '', description: '', notion: '', is_public: true, max_participants: 50, generate_ibis_roots: true });
+      form.resetForm();
       onDeliberationCreated();
-    } catch (error) {
-      console.error('Failed to create deliberation:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create deliberation. Only administrators can create deliberations.",
-        variant: "destructive"
-      });
-    } finally {
-      setCreating(false);
     }
+  });
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await form.handleSubmit(e);
   };
 
   return (
@@ -138,87 +125,74 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
               </DialogDescription>
             </DialogHeader>
             
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Enter deliberation title"
-                />
-              </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <FormField
+                type="input"
+                label="Title"
+                value={form.formData.title}
+                onChange={(value) => form.updateField('title', value)}
+                placeholder="Enter deliberation title"
+                required
+                error={form.errors.title}
+              />
               
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value.slice(0, MAX_DESCRIPTION_LENGTH) }))}
-                  placeholder={`Describe what this deliberation is about (max ${MAX_DESCRIPTION_LENGTH} chars)`}
-                  rows={4}
-                  maxLength={MAX_DESCRIPTION_LENGTH}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formData.description.length}/{MAX_DESCRIPTION_LENGTH} characters
-                </p>
-              </div>
+              <FormField
+                type="textarea"
+                label="Description"
+                value={form.formData.description}
+                onChange={(value) => form.updateField('description', value.slice(0, 400))}
+                placeholder="Describe what this deliberation is about (max 400 chars)"
+                rows={4}
+                error={form.errors.description}
+              />
+              <p className="text-xs text-muted-foreground -mt-1">
+                {form.formData.description.length}/400 characters
+              </p>
               
-              <div>
-                <Label htmlFor="notion">Notion *</Label>
-                <Input
-                  id="notion"
-                  value={formData.notion}
-                  onChange={(e) => setFormData(prev => ({ ...prev, notion: e.target.value.slice(0, 100) }))}
-                  placeholder="Enter the core notion for stance scoring (max 100 chars)"
-                  maxLength={100}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formData.notion.length}/100 characters - This notion will be used to determine if messages are supportive or opposing
-                </p>
-              </div>
+              <FormField
+                type="input"
+                label="Notion"
+                value={form.formData.notion}
+                onChange={(value) => form.updateField('notion', value.slice(0, 100))}
+                placeholder="Enter the core notion for stance scoring (max 100 chars)"
+                required
+                error={form.errors.notion}
+              />
+              <p className="text-xs text-muted-foreground -mt-1">
+                {form.formData.notion.length}/100 characters - This notion will be used to determine if messages are supportive or opposing
+              </p>
               
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="is_public"
-                  checked={formData.is_public}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_public: checked }))}
-                />
-                <Label htmlFor="is_public">Public deliberation</Label>
-              </div>
+              <FormField
+                type="switch"
+                label="Public deliberation"
+                checked={form.formData.is_public}
+                onChange={(checked) => form.updateField('is_public', checked)}
+              />
               
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="generate_ibis_roots"
-                  checked={formData.generate_ibis_roots}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, generate_ibis_roots: checked }))}
-                />
-                <Label htmlFor="generate_ibis_roots" className="flex items-center gap-2">
-                  <Lightbulb className="h-4 w-4" />
-                  Generate initial IBIS root issues with AI
-                </Label>
-              </div>
+              <FormField
+                type="switch"
+                label="Generate initial IBIS root issues with AI"
+                checked={form.formData.generate_ibis_roots}
+                onChange={(checked) => form.updateField('generate_ibis_roots', checked)}
+                description="Use AI to create starting discussion points"
+              />
               
-              <div>
-                <Label htmlFor="max_participants">Maximum Participants</Label>
-                <Input
-                  id="max_participants"
-                  type="number"
-                  value={formData.max_participants}
-                  onChange={(e) => setFormData(prev => ({ ...prev, max_participants: parseInt(e.target.value) || 50 }))}
-                  min={2}
-                  max={200}
-                />
-              </div>
+              <FormField
+                type="input"
+                label="Maximum Participants"
+                value={form.formData.max_participants.toString()}
+                onChange={(value) => form.updateField('max_participants', parseInt(value) || 50)}
+                placeholder="50"
+              />
               
               <Button 
-                onClick={handleCreateDeliberation}
+                type="submit"
                 className="w-full bg-democratic-blue hover:bg-democratic-blue/90"
-                disabled={!formData.title.trim() || !formData.notion.trim() || creating}
+                disabled={form.isSubmitting}
               >
-                {creating ? 'Creating...' : 'Create Deliberation'}
+                {form.isSubmitting ? 'Creating...' : 'Create Deliberation'}
               </Button>
-            </div>
+            </form>
           </DialogContent>
         </Dialog>
       </CardContent>
