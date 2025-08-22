@@ -106,29 +106,20 @@ export const FacilitatorConfigSchema = z.object({
   requireUserInteraction: z.boolean(),
 });
 
-export const AgentConfigurationSchema = z.object({
-  id: UUIDSchema,
-  agent_type: AgentTypeSchema,
+export const agentConfigurationSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  description: z.string().nullable(),
-  system_prompt: z.string().min(1, 'System prompt is required'),
-  goals: z.array(z.string()),
-  response_style: z.string().nullable(),
-  is_active: z.boolean(),
-  is_default: z.boolean(),
-  created_by: UUIDSchema.nullable(),
-  deliberation_id: UUIDSchema.nullable(),
-  created_at: TimestampSchema,
-  updated_at: TimestampSchema,
-  preset_questions: z.array(FacilitatorQuestionSchema),
-  facilitator_config: FacilitatorConfigSchema,
+  description: z.string().optional(),
+  agent_type: z.string().min(1, 'Agent type is required'),
+  goals: z.array(z.string()).optional(),
+  response_style: z.string().optional(),
+  is_active: z.boolean().default(true),
+  is_default: z.boolean().default(false),
+  deliberation_id: z.string().optional(),
+  preset_questions: z.any().optional(),
+  facilitator_config: z.any().optional(),
 });
 
-export const CreateAgentConfigurationSchema = AgentConfigurationSchema.omit({
-  id: true,
-  created_at: true,
-  updated_at: true,
-});
+export const CreateAgentConfigurationSchema = agentConfigurationSchema.omit({});
 
 // IBIS schemas
 export const IbisNodeTypeSchema = z.enum(['issue', 'position', 'argument']);
@@ -279,7 +270,7 @@ export type CreateDeliberation = z.infer<typeof CreateDeliberationSchema>;
 export type AgentType = z.infer<typeof AgentTypeSchema>;
 export type FacilitatorQuestion = z.infer<typeof FacilitatorQuestionSchema>;
 export type FacilitatorConfig = z.infer<typeof FacilitatorConfigSchema>;
-export type AgentConfiguration = z.infer<typeof AgentConfigurationSchema>;
+export type AgentConfiguration = z.infer<typeof agentConfigurationSchema>;
 export type CreateAgentConfiguration = z.infer<typeof CreateAgentConfigurationSchema>;
 export type IbisNodeType = z.infer<typeof IbisNodeTypeSchema>;
 export type IbisNode = z.infer<typeof IbisNodeSchema>;
@@ -318,7 +309,7 @@ export function isValidDeliberation(value: unknown): value is Deliberation {
 }
 
 export function isValidAgentConfiguration(value: unknown): value is AgentConfiguration {
-  return AgentConfigurationSchema.safeParse(value).success;
+  return agentConfigurationSchema.safeParse(value).success;
 }
 
 export function isValidIbisNode(value: unknown): value is IbisNode {

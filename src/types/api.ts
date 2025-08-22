@@ -51,16 +51,19 @@ export interface Message {
 export interface Agent {
   id: string;
   name: string;
-  description: string;
-  system_prompt: string;
-  response_style?: string;
-  goals?: string[];
+  description?: string;
   agent_type: string;
-  facilitator_config?: FacilitatorConfig;
+  goals?: string[];
+  response_style?: string;
+  is_active: boolean;
   is_default: boolean;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  deliberation_id?: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  preset_questions?: any[];
+  facilitator_config?: any;
+  prompt_overrides?: Record<string, any>;
   deliberation?: {
     id: string;
     title: string;
@@ -111,7 +114,6 @@ export interface LocalAgentCreate {
   agent_type: string;
   deliberationId: string;
   description?: string;
-  system_prompt?: string;
   response_style?: string;
   goals?: string[];
   facilitator_config?: FacilitatorConfig;

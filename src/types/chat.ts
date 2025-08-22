@@ -17,7 +17,6 @@ export interface AgentConfiguration {
   id: string;
   agent_type: string;
   name: string;
-  system_prompt: string;
   description?: string;
   goals?: string[];
   response_style?: string;

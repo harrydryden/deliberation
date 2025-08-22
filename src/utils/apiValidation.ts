@@ -6,7 +6,7 @@ import {
   UserSchema,
   MessageSchema,
   DeliberationSchema,
-  AgentConfigurationSchema,
+  agentConfigurationSchema,
   IbisNodeSchema,
   UserAccessCodeSchema,
   ApiResponseSchema,
@@ -59,9 +59,9 @@ export class ApiValidator {
   }
 
   // Validate agent configuration response
-  static validateAgentConfiguration(data: unknown): ReturnType<typeof AgentConfigurationSchema.parse> {
+  static validateAgentConfiguration(data: unknown): ReturnType<typeof agentConfigurationSchema.parse> {
     try {
-      return validateAndParse(AgentConfigurationSchema, data);
+      return validateAndParse(agentConfigurationSchema, data);
     } catch (error) {
       logger.error('Agent configuration validation failed', { data, error });
       throw new ValidationError('Invalid agent configuration data format', 'agent_config', {

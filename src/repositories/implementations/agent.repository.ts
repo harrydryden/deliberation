@@ -26,10 +26,7 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         delete dbData.isActive;
       }
       
-      // Ensure required fields have default values
-      if (!dbData.system_prompt) {
-        dbData.system_prompt = 'You are a helpful AI assistant in a deliberation process.';
-      }
+      // Remove system_prompt handling - now using prompt templates
       
       // Automatically set created_by to current user
       const currentUserId = await this.getCurrentUserId();
@@ -42,8 +39,8 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
       // Map result back to camelCase for API consistency
       return {
         ...result,
-        isActive: result.is_active,
-        deliberationId: result.deliberation_id,
+        is_active: result.is_active,
+        deliberation_id: result.deliberation_id,
       } as Agent;
     } catch (error) {
       logger.error({ error, data }, 'Agent repository create failed');
@@ -77,16 +74,16 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
           id: item.id,
           name: item.name,
           description: item.description,
-          system_prompt: item.system_prompt,
           response_style: item.response_style,
           goals: item.goals,
           agent_type: item.agent_type,
           facilitator_config: item.facilitator_config,
           is_default: item.is_default,
-          isActive: item.is_active,
+          is_active: item.is_active,
           deliberation_id: item.deliberation_id,
-          createdAt: item.created_at,
-          updatedAt: item.updated_at,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          prompt_overrides: item.prompt_overrides,
         })) as Agent[];
 
       logger.info(`Agent repository findByDeliberation found ${filteredAgents.length} agents`, { 
@@ -141,16 +138,16 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         id: item.id,
         name: item.name,
         description: item.description,
-        system_prompt: item.system_prompt,
         response_style: item.response_style,
         goals: item.goals,
         agent_type: item.agent_type,
         facilitator_config: item.facilitator_config,
         is_default: item.is_default,
-        isActive: item.is_active,
+        is_active: item.is_active,
         deliberation_id: item.deliberation_id,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        prompt_overrides: item.prompt_overrides,
         deliberation: item.deliberation_id && deliberationMap.has(item.deliberation_id) 
           ? deliberationMap.get(item.deliberation_id)
           : undefined
@@ -170,7 +167,6 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
           name,
           description,
           agent_type,
-          system_prompt,
           goals,
           response_style,
           is_active,
@@ -180,7 +176,8 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
           created_at,
           updated_at,
           preset_questions,
-          facilitator_config
+          facilitator_config,
+          prompt_overrides
         `)
         .is('deliberation_id', null);
 
@@ -194,16 +191,16 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         id: item.id,
         name: item.name,
         description: item.description,
-        system_prompt: item.system_prompt,
         response_style: item.response_style,
         goals: item.goals,
         agent_type: item.agent_type,
         facilitator_config: item.facilitator_config,
         is_default: item.is_default,
-        isActive: item.is_active,
+        is_active: item.is_active,
         deliberation_id: item.deliberation_id,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        prompt_overrides: item.prompt_overrides,
       })) as Agent[];
     } catch (error) {
       logger.error({ error }, 'Agent repository findGlobalAgents failed');
@@ -221,7 +218,6 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
           name,
           description,
           agent_type,
-          system_prompt,
           goals,
           response_style,
           is_active,
@@ -231,7 +227,8 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
           created_at,
           updated_at,
           preset_questions,
-          facilitator_config
+          facilitator_config,
+          prompt_overrides
         `);
 
       if (filter) {
@@ -258,15 +255,15 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         id: item.id,
         name: item.name,
         description: item.description,
-        system_prompt: item.system_prompt,
         response_style: item.response_style,
         goals: item.goals,
         agent_type: item.agent_type,
         facilitator_config: item.facilitator_config,
         is_default: item.is_default,
-        isActive: item.is_active,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
+        is_active: item.is_active,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        prompt_overrides: item.prompt_overrides,
       })) as Agent[];
     } catch (error) {
       logger.error({ error, filter }, 'Agent repository findAll failed');
@@ -281,9 +278,8 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
       const dbData: any = { ...data };
       
       // Map camelCase to snake_case
-      if (data.isActive !== undefined) {
-        dbData.is_active = data.isActive;
-        delete dbData.isActive;
+      if (data.is_active !== undefined) {
+        dbData.is_active = data.is_active;
       }
       
       // Use parent update method with mapped data
@@ -292,7 +288,7 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
       // Map result back to camelCase for API consistency
       return {
         ...result,
-        isActive: (result as any).is_active,
+        is_active: (result as any).is_active,
       } as Agent;
     } catch (error) {
       logger.error({ error, id, data }, 'Agent repository update failed');

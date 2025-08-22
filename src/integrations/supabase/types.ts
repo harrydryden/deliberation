@@ -30,7 +30,6 @@ export type Database = {
           preset_questions: Json | null
           prompt_overrides: Json | null
           response_style: string | null
-          system_prompt: string
           updated_at: string
         }
         Insert: {
@@ -48,7 +47,6 @@ export type Database = {
           preset_questions?: Json | null
           prompt_overrides?: Json | null
           response_style?: string | null
-          system_prompt: string
           updated_at?: string
         }
         Update: {
@@ -66,7 +64,6 @@ export type Database = {
           preset_questions?: Json | null
           prompt_overrides?: Json | null
           response_style?: string | null
-          system_prompt?: string
           updated_at?: string
         }
         Relationships: []
