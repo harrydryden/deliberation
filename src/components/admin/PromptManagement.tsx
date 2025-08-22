@@ -291,7 +291,6 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
                   <TableRow key={prompt.id}>
                     <TableCell className="font-medium">
                       {prompt.name}
-                      {prompt.is_default && <Badge variant="outline" className="ml-2">Default</Badge>}
                     </TableCell>
                     <TableCell>
                       {getPromptTypeBadge(prompt.prompt_type)}
