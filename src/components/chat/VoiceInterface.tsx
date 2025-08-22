@@ -300,15 +300,22 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
           const { data, error } = await supabase.functions.invoke('voice-to-text', { body: { audio: b64 } });
           if (error) throw error;
           const text = (data?.text || '').toString().trim();
+          console.log('[VoiceInterface] STT transcription received:', text);
+          console.log('[VoiceInterface] setMessageText available:', !!setMessageText);
+          console.log('[VoiceInterface] sendChatMessage available:', !!sendChatMessage);
+          
           if (text.length > 0) {
             // STT mode should ONLY transcribe to message input, never send
             if (setMessageText) {
+              console.log('[VoiceInterface] Setting message text only, not sending');
               setMessageText(text);
               toast({ title: 'Text transcribed', description: 'Voice transcription added to message input.' });
             } else {
+              console.log('[VoiceInterface] ERROR: No setMessageText function provided');
               toast({ title: 'Error', description: 'No setMessageText function provided for dictation', variant: 'destructive' });
             }
           } else {
+            console.log('[VoiceInterface] No speech detected');
             toast({ title: 'No speech detected', description: 'Nothing was transcribed.', variant: 'destructive' });
           }
         } catch (err: any) {
