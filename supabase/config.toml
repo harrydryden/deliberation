@@ -36,3 +36,6 @@ verify_jwt = false
 
 [functions.admin-get-users]
 verify_jwt = true
+
+[functions.admin-create-user]
+verify_jwt = true
