@@ -73,7 +73,7 @@ export const AdminDashboard = () => {
           <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Users & Access</TabsTrigger>
           <TabsTrigger value="agents">Agents</TabsTrigger>
-          <TabsTrigger value="prompts">Prompts</TabsTrigger>
+          <TabsTrigger value="prompts">System Prompts</TabsTrigger>
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="deliberations">Deliberations</TabsTrigger>
           </TabsList>
