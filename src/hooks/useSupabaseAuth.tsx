@@ -59,25 +59,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               console.log('User roles query result:', { roles, error });
               let hasAdminRole = roles?.some(r => r.role === 'admin') || false;
               
-              // For testing, assign admin role if user doesn't have one
-              if (!hasAdminRole) {
-                console.log('No admin role found, assigning admin role for testing');
-                const { error: roleError } = await supabase
-                  .from('user_roles')
-                  .upsert({ 
-                    user_id: session.user.id, 
-                    role: 'admin',
-                    created_at: new Date().toISOString()
-                  });
-                  
-                if (!roleError) {
-                  hasAdminRole = true;
-                  console.log('Admin role assigned successfully');
-                } else {
-                  console.error('Failed to assign admin role:', roleError);
-                }
-              }
-              
               console.log('Has admin role:', hasAdminRole);
               setIsAdmin(hasAdminRole);
             } catch (error) {
@@ -127,25 +108,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             
             console.log('User roles query result:', { roles, error });
             let hasAdminRole = roles?.some(r => r.role === 'admin') || false;
-            
-            // For testing, assign admin role if user doesn't have one
-            if (!hasAdminRole) {
-              console.log('No admin role found, assigning admin role for testing');
-              const { error: roleError } = await supabase
-                .from('user_roles')
-                .upsert({ 
-                  user_id: session.user.id, 
-                  role: 'admin',
-                  created_at: new Date().toISOString()
-                });
-                
-              if (!roleError) {
-                hasAdminRole = true;
-                console.log('Admin role assigned successfully');
-              } else {
-                console.error('Failed to assign admin role:', roleError);
-              }
-            }
             
             console.log('Final admin status:', hasAdminRole);
             setIsAdmin(hasAdminRole);
