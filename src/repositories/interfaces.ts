@@ -1,5 +1,5 @@
 // Repository interfaces following the Repository pattern
-import { User, Message, Agent, Deliberation } from '@/types/api';
+import { User, Message, Agent, Deliberation } from '@/types/index';
 
 export interface IRepository<T> {
   findAll(filter?: Record<string, any>): Promise<T[]>;

@@ -1,6 +1,6 @@
 import { useServices } from '@/hooks/useServices';
 import { useCrudOperations } from './useCrudOperations';
-import { User, Agent, Deliberation } from '@/types/api';
+import { User, Agent, Deliberation } from '@/types/index';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useStandardizedAdminData = () => {

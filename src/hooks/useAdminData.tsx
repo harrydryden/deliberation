@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useServices } from '@/hooks/useServices';
-import { User, Agent, Deliberation, LocalAgentCreate } from '@/types/api';
+import { User, Agent, Deliberation, LocalAgentCreate } from '@/types/index';
 import { toast } from 'sonner';
 import { useErrorHandler } from './useErrorHandler';
 import { logger } from '@/utils/logger';

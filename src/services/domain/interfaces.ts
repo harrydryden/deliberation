@@ -1,5 +1,5 @@
 // Domain service interfaces following Clean Architecture principles
-import { User, Message, Agent, Deliberation } from '@/types/api';
+import { User, Message, Agent, Deliberation } from '@/types/index';
 
 // Authentication is now handled by Supabase Auth
 
