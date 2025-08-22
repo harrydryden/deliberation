@@ -211,33 +211,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const users = [];
       
       for (let i = 0; i < count; i++) {
-        const accessCode1 = generateAccessCode1();
-        const accessCode2 = generateAccessCode2();
-        const email = `${accessCode1}@deliberation.local`;
-        
-        // Create user using edge function to avoid auto-login
-        const { data: functionData, error: functionError } = await supabase.functions.invoke('admin-create-user', {
-          body: {
-            email,
-            password: accessCode2,
-            metadata: {
-              access_code_1: accessCode1,
-              access_code_2: accessCode2,
-              role: roleType
-            }
-          }
+        // Use the existing database function to create users without auto-login
+        const { data, error } = await supabase.rpc('create_user_with_access_code', {
+          p_user_role: roleType
         });
 
-        if (functionError) {
-          logger.error('Error creating user via function:', functionError);
-          throw new Error(`Failed to create user: ${functionError.message}`);
+        if (error) {
+          logger.error('Error creating user via RPC:', error);
+          continue;
         }
 
-        users.push({
-          accessCode1,
-          accessCode2,
-          role: roleType
-        });
+        if (data && data.length > 0) {
+          const userData = data[0];
+          users.push({
+            accessCode1: userData.access_code,
+            accessCode2: userData.access_code, // Using same code for both for simplicity
+            role: roleType
+          });
+        }
       }
 
       return { users };
