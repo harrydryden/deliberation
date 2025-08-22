@@ -1,5 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+import type { 
+  FilterParams, 
+  CreateData, 
+  UpdateData, 
+  GenericDbResult, 
+  DatabaseError 
+} from '@/types';
 
 /**
  * Base repository class for Supabase operations
@@ -30,21 +37,21 @@ export abstract class SupabaseBaseRepository {
       
       return !!data;
     } catch (error) {
-      logger.error('Error checking admin status:', error);
+      logger.error('Error checking admin status:', error as Error);
       return false;
     }
   }
 
-  protected logError(operation: string, error: any) {
+  protected logError(operation: string, error: Error | DatabaseError) {
     logger.error(`Repository error in ${operation}:`, error);
   }
 
-  protected logInfo(operation: string, data?: any) {
+  protected logInfo(operation: string, data?: Record<string, unknown>) {
     logger.info(`Repository operation: ${operation}`, data);
   }
 
   // Protected helper methods for child repositories
-  protected async findAllFromTable(tableName: string, filter?: Record<string, any>): Promise<any[]> {
+  protected async findAllFromTable(tableName: string, filter?: FilterParams): Promise<unknown[]> {
     try {
       let query = supabase.from(tableName).select('*');
       
@@ -64,12 +71,12 @@ export abstract class SupabaseBaseRepository {
       if (error) throw error;
       return data || [];
     } catch (error) {
-      this.logError(`findAllFromTable in ${tableName}`, error);
+      this.logError(`findAllFromTable in ${tableName}`, error as Error);
       throw error;
     }
   }
 
-  protected async findByIdFromTable(tableName: string, id: string): Promise<any | null> {
+  protected async findByIdFromTable(tableName: string, id: string): Promise<unknown | null> {
     try {
       const { data, error } = await supabase
         .from(tableName)
@@ -80,12 +87,12 @@ export abstract class SupabaseBaseRepository {
       if (error && error.code !== 'PGRST116') throw error;
       return data || null;
     } catch (error) {
-      this.logError(`findByIdFromTable in ${tableName}`, error);
+      this.logError(`findByIdFromTable in ${tableName}`, error as Error);
       throw error;
     }
   }
 
-  protected async createInTable(tableName: string, data: any): Promise<any> {
+  protected async createInTable(tableName: string, data: CreateData): Promise<unknown> {
     try {
       const { data: result, error } = await supabase
         .from(tableName)
@@ -96,12 +103,12 @@ export abstract class SupabaseBaseRepository {
       if (error) throw error;
       return result;
     } catch (error) {
-      this.logError(`createInTable in ${tableName}`, error);
+      this.logError(`createInTable in ${tableName}`, error as Error);
       throw error;
     }
   }
 
-  protected async updateInTable(tableName: string, id: string, data: any): Promise<any> {
+  protected async updateInTable(tableName: string, id: string, data: UpdateData): Promise<unknown> {
     try {
       const { data: result, error } = await supabase
         .from(tableName)
@@ -113,7 +120,7 @@ export abstract class SupabaseBaseRepository {
       if (error) throw error;
       return result;
     } catch (error) {
-      this.logError(`updateInTable in ${tableName}`, error);
+      this.logError(`updateInTable in ${tableName}`, error as Error);
       throw error;
     }
   }
@@ -127,7 +134,7 @@ export abstract class SupabaseBaseRepository {
       
       if (error) throw error;
     } catch (error) {
-      this.logError(`deleteFromTable in ${tableName}`, error);
+      this.logError(`deleteFromTable in ${tableName}`, error as Error);
       throw error;
     }
   }

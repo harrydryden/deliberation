@@ -25,12 +25,12 @@ export const usePerformanceOptimization = (config: PerformanceConfig = {}) => {
     if (enableLogging) {
       logger.debug(`${componentName} render #${renderCountRef.current}`, {
         timeSinceLastRender,
-        memoryUsage: (performance as any).memory?.usedJSHeapSize || 0
+        memoryUsage: (performance as any)?.memory?.usedJSHeapSize || 0
       });
     }
 
     // Memory leak detection
-    if ((performance as any).memory?.usedJSHeapSize) {
+    if ((performance as any)?.memory?.usedJSHeapSize) {
       const memoryMB = (performance as any).memory.usedJSHeapSize / 1024 / 1024;
       if (memoryMB > memoryThreshold) {
         logger.warn(`High memory usage detected in ${componentName}`, {
@@ -43,7 +43,7 @@ export const usePerformanceOptimization = (config: PerformanceConfig = {}) => {
 
   // Optimized callback creator with dependency tracking
   const createOptimizedCallback = useCallback(
-    (fn: any, deps: React.DependencyList, debugName?: string) => {
+    (fn: (...args: any[]) => any, deps: React.DependencyList, debugName?: string) => {
       const depsRef = useRef(deps);
       const callbackRef = useRef(fn);
 
@@ -98,7 +98,7 @@ export const usePerformanceOptimization = (config: PerformanceConfig = {}) => {
 
   // Debounced function creator
   const createDebouncedCallback = useCallback(
-    (fn: any, delay: number) => {
+    (fn: (...args: any[]) => any, delay: number) => {
       const timeoutRef = useRef<NodeJS.Timeout>();
 
       return useCallback(
@@ -119,7 +119,7 @@ export const usePerformanceOptimization = (config: PerformanceConfig = {}) => {
 
   // Throttled function creator
   const createThrottledCallback = useCallback(
-    (fn: any, limit: number) => {
+    (fn: (...args: any[]) => any, limit: number) => {
       const inThrottleRef = useRef(false);
 
       return useCallback(
@@ -176,9 +176,6 @@ export const usePerformanceOptimization = (config: PerformanceConfig = {}) => {
   };
 };
 
-/**
- * Hook for monitoring component performance metrics
- */
 export const useComponentMetrics = (componentName: string) => {
   const renderTimeRef = useRef<number[]>([]);
   const mountTimeRef = useRef(Date.now());

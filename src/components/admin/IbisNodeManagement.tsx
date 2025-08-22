@@ -32,7 +32,7 @@ interface IbisNodeManagementProps {
 }
 
 export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }: IbisNodeManagementProps) => {
-  console.log('🔍 IbisNodeManagement - Component initialized with props:', { deliberationId, deliberationTitle });
+  logger.component.mount('IbisNodeManagement', { deliberationId, deliberationTitle });
   const [nodes, setNodes] = useState<IbisNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingNode, setEditingNode] = useState<IbisNode | null>(null);
@@ -52,7 +52,7 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
   const { toast } = useToast();
 
   const fetchNodes = async () => {
-    console.log('🔍 IbisNodeManagement - Starting fetchNodes for deliberationId:', deliberationId);
+    logger.debug('Starting fetchNodes', { deliberationId });
     setLoading(true);
     try {
       // Use the admin function instead of direct table access to bypass RLS
@@ -60,13 +60,13 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
         target_deliberation_id: deliberationId
       });
 
-      console.log('🔍 IbisNodeManagement - Admin function result:', { data, error, count: data?.length });
+      logger.debug('Admin function result', { data, error, count: data?.length });
       
       if (error) throw error;
       setNodes(data || []);
-      console.log('🔍 IbisNodeManagement - Nodes set in state:', data?.length || 0);
+      logger.debug('Nodes set in state', { count: data?.length || 0 });
     } catch (error) {
-      console.error('🚨 IbisNodeManagement - Error fetching IBIS nodes:', error);
+      logger.error('Error fetching IBIS nodes', error as Error);
       toast({
         title: "Error",
         description: "Failed to load IBIS nodes",
@@ -74,7 +74,7 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
       });
     } finally {
       setLoading(false);
-      console.log('🔍 IbisNodeManagement - fetchNodes completed, loading set to false');
+      logger.debug('fetchNodes completed', { loading: false });
     }
   };
 
@@ -124,7 +124,7 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
           body: { nodeId: editingNode.id, deliberationId, nodeType: editForm.node_type },
         });
       } catch (e) {
-        console.warn('Embedding/linking refresh failed', e);
+        logger.warn('Embedding/linking refresh failed', e as Error);
       }
 
       toast({
@@ -135,7 +135,7 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
       setEditingNode(null);
       fetchNodes();
     } catch (error) {
-      console.error('Error updating IBIS node:', error);
+      logger.error('Error updating IBIS node', error as Error);
       toast({
         title: "Error",
         description: "Failed to update IBIS node",

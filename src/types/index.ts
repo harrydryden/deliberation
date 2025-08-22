@@ -435,3 +435,130 @@ export interface FieldValidation {
   pattern?: RegExp;
   custom?: (value: unknown) => ValidationResult;
 }
+
+// Enhanced types to replace any types
+export interface IbisNode {
+  id: string;
+  title: string;
+  description?: string;
+  node_type: 'issue' | 'position' | 'argument';
+  parent_id?: string;
+  position_x?: number;
+  position_y?: number;
+  message_id?: string;
+  created_at: string;
+  updated_at: string;
+  embedding?: number[];
+  deliberation_id: string;
+}
+
+export interface IbisRelationship {
+  id: string;
+  source_node_id: string;
+  target_node_id: string;
+  relationship_type: 'supports' | 'opposes' | 'relates_to' | 'responds_to';
+  created_at: string;
+  created_by: string;
+  deliberation_id: string;
+}
+
+export interface DatabaseError {
+  message: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+}
+
+export interface GenericDbResult<T = unknown> {
+  data: T | null;
+  error: DatabaseError | null;
+  count?: number;
+  status: number;
+  statusText: string;
+}
+
+export interface UpdateData {
+  [key: string]: string | number | boolean | Date | null | undefined;
+}
+
+export interface CreateData {
+  [key: string]: string | number | boolean | Date | null | undefined;
+}
+
+export interface FilterParams {
+  [key: string]: string | number | boolean | null | 'not_null';
+}
+
+export interface EventHandlerParams {
+  name?: string;
+  call_id: string;
+  arguments: string;
+}
+
+export interface ReactFlowNodeData {
+  originalNode: IbisNode;
+  label: string;
+  config: NodeTypeConfig;
+  scaleFactor: number;
+}
+
+export interface NodeTypeConfig {
+  color: string;
+  shape: string;
+  label: string;
+}
+
+export interface SessionStatus {
+  remainingTime: number;
+  needsRenewal: boolean;
+  sessionAge: number;
+  isActive?: boolean;
+}
+
+export interface DeliberationComplexity {
+  duration: string;
+  maxItems: number;
+  totalNodes: number;
+  instructions: string;
+}
+
+export interface ToolCallResult {
+  result?: string;
+  error?: string;
+}
+
+export interface PerformanceOptimizationConfig {
+  enableLogging?: boolean;
+  componentName?: string;
+  memoryThreshold?: number;
+}
+
+export interface ComponentMetrics {
+  componentName: string;
+  averageRenderTime: number;
+  totalRenders: number;
+  mountTime: number;
+  lastRenderTime: number;
+}
+
+export interface OptimizedCallbackRef<T = (...args: unknown[]) => unknown> {
+  current: T;
+}
+
+export interface DependencyList extends ReadonlyArray<unknown> {}
+
+export interface ComparisonFunction {
+  (prev: DependencyList, next: DependencyList): boolean;
+}
+
+export interface FactoryFunction<T = unknown> {
+  (): T;
+}
+
+export interface UpdaterFunction<T = unknown> {
+  (prev: T): T;
+}
+
+export interface BatchedStateUpdate<T = unknown> {
+  (update: T | UpdaterFunction<T>): void;
+}

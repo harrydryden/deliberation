@@ -142,18 +142,29 @@ const DeliberationChat = () => {
     if (!user?.id || !deliberationId) return;
     
     try {
-      // For now, just set default scores to avoid the UUID parsing issues
-      // TODO: Implement proper score calculation through service layer
-      setUserScores({
-        engagement: 0,
-        shares: 0, 
-        sessions: 1,
-        helpfulness: 0
-      });
+      // Implement proper score calculation through service layer
+      const { data: scores, error } = await supabase
+        .from('user_participation_scores')
+        .select('engagement, shares, sessions, helpfulness')
+        .eq('user_id', user.id)
+        .eq('deliberation_id', deliberationId)
+        .single();
+
+      if (error) {
+        logger.warn('Score calculation not available, using defaults', { error });
+        setUserScores({
+          engagement: 0,
+          shares: 0, 
+          sessions: 1,
+          helpfulness: 0
+        });
+      } else {
+        setUserScores(scores);
+      }
       
       logger.info('User scores loaded with defaults');
     } catch (error) {
-      console.error('Failed to load user scores:', error);
+      logger.error('Failed to load user scores', error as Error);
     }
   };
 

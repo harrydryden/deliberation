@@ -97,7 +97,7 @@ const relationshipConfig = {
 };
 
 export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }: AdminIbisMapEditorProps) => {
-  console.log('🔍 IBIS Map Editor - Component initialized with props:', { deliberationId, deliberationTitle });
+  logger.component.mount('AdminIbisMapEditor', { deliberationId, deliberationTitle });
   
   // Simplified state management to prevent re-render loops
   const [ibisNodes, setIbisNodes] = useState<IbisNode[]>([]);
@@ -219,7 +219,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
                 p_position_y: change.position.y
               });
             } catch (error) {
-              console.error('Failed to save node position:', error);
+              logger.error('Failed to save node position', error as Error);
               toast({
                 title: "Error",
                 description: "Failed to save node position",
@@ -241,11 +241,11 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
   // Enhanced edge deletion with proper temp ID handling
   const handleEdgeDelete = useCallback(async (edgeId: string) => {
-    console.log('🗑️ Deleting edge:', edgeId);
+    logger.debug('Deleting edge', { edgeId });
     
     // Check if this is a temporary ID
     if (edgeId.startsWith('temp_')) {
-      console.log('🗑️ Removing temporary edge from local state');
+      logger.debug('Removing temporary edge from local state', { edgeId });
       setIbisRelationships(current => 
         current.filter(rel => rel.id !== edgeId)
       );
@@ -277,7 +277,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       });
 
     } catch (error) {
-      console.error('❌ Error deleting edge:', error);
+      logger.error('Error deleting edge', error as Error, { edgeId });
       toast({
         title: "Error",
         description: "Failed to delete relationship.",
@@ -290,13 +290,13 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
   // Handle edge changes with proper deletion support
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
-    console.log('🔍 Edge changes:', changes);
+    logger.debug('Edge changes detected', { changes });
     
     // Handle edge removal
     const removedEdges = changes.filter(change => change.type === 'remove');
     removedEdges.forEach(change => {
       const edgeId = change.id;
-      console.log('🔍 Edge removed via change:', edgeId);
+      logger.debug('Edge removed via change', { edgeId });
       handleEdgeDelete(edgeId);
     });
     
@@ -310,7 +310,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
 
   // Handle new connections with optimal handle routing
   const handleConnect = useCallback(async (connection: Connection) => {
-    console.log('🔍 Connection attempt:', connection);
+    logger.debug('Connection attempt', { connection });
     
     if (!connection.source || !connection.target) return;
 
@@ -420,7 +420,7 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       });
       
     } catch (error) {
-      console.error('Error saving changes:', error);
+      logger.error('Error saving changes', error as Error);
       toast({
         title: "Error",
         description: "Failed to save changes",
@@ -454,10 +454,10 @@ export const AdminIbisMapEditor = ({ deliberationId, deliberationTitle, onBack }
       setIbisRelationships(relationshipsData || []);
 
     } catch (error) {
-      console.error('Error fetching IBIS data:', error);
+      logger.error('Error fetching IBIS data', error as Error);
       toast({
         title: "Error",
-        description: `Failed to load IBIS data: ${error?.message || 'Unknown error'}`,
+        description: `Failed to load IBIS data: ${(error as Error)?.message || 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
