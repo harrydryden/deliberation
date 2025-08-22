@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Agent, FacilitatorConfig } from '@/types/api';
 import { useServices } from '@/hooks/useServices';
@@ -31,6 +32,7 @@ export const AgentManagement: React.FC = () => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [goalInput, setGoalInput] = useState('');
   const [editForm, setEditForm] = useState<EditForm>({
     name: '',
     description: '',
@@ -102,6 +104,7 @@ export const AgentManagement: React.FC = () => {
         }
       }
     });
+    setGoalInput('');
     setIsEditDialogOpen(true);
   };
 
@@ -196,6 +199,7 @@ export const AgentManagement: React.FC = () => {
           }
         }
       });
+      setGoalInput('');
       
       toast({
         title: 'Success',
@@ -209,6 +213,23 @@ export const AgentManagement: React.FC = () => {
         variant: 'destructive',
       });
     }
+  };
+
+  const handleAddGoal = () => {
+    if (goalInput.trim()) {
+      setEditForm(prev => ({
+        ...prev,
+        goals: [...prev.goals, goalInput.trim()]
+      }));
+      setGoalInput('');
+    }
+  };
+
+  const handleRemoveGoal = (index: number) => {
+    setEditForm(prev => ({
+      ...prev,
+      goals: prev.goals.filter((_, i) => i !== index)
+    }));
   };
 
   const AgentForm: React.FC<{ isEdit: boolean }> = ({ isEdit }) => (
@@ -260,17 +281,32 @@ export const AgentManagement: React.FC = () => {
         />
       </div>
 
-      <div>
-        <Label htmlFor="goals">Goals (comma-separated)</Label>
-        <Textarea
-          id="goals"
-          value={editForm.goals.join(', ')}
-          onChange={(e) => setEditForm(prev => ({ 
-            ...prev, 
-            goals: e.target.value.split(',').map(goal => goal.trim()).filter(goal => goal.length > 0)
-          }))}
-          placeholder="Agent goals, separated by commas"
-        />
+      <div className="space-y-2">
+        <Label>Goals</Label>
+        <div className="flex gap-2">
+          <Input
+            value={goalInput}
+            onChange={(e) => setGoalInput(e.target.value)}
+            placeholder="Add a goal"
+            onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddGoal())}
+          />
+          <Button type="button" onClick={handleAddGoal} size="sm">
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        {editForm.goals.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {editForm.goals.map((goal, index) => (
+              <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                {goal}
+                <X 
+                  className="h-3 w-3 cursor-pointer" 
+                  onClick={() => handleRemoveGoal(index)}
+                />
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center space-x-2">
