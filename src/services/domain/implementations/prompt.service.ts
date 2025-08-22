@@ -28,7 +28,10 @@ export class PromptService {
         .eq('is_active', true)
         .order('prompt_type, agent_type, name');
 
-      if (filter?.prompt_type) {
+      // Filter out system_prompt - it's now handled by agent configurations
+      query = query.neq('prompt_type', 'system_prompt');
+
+      if (filter?.prompt_type && filter.prompt_type !== 'system_prompt') {
         query = query.eq('prompt_type', filter.prompt_type);
       }
       if (filter?.agent_type) {
@@ -89,6 +92,12 @@ export class PromptService {
 
   async getAgentPrompt(agentId: string, promptType: string, agentType: string): Promise<string> {
     try {
+      // System prompts are no longer handled here - they're part of agent configuration
+      if (promptType === 'system_prompt') {
+        logger.warn('System prompt requested via getAgentPrompt - this should now be handled by AgentService.generateSystemPrompt');
+        return this.getHardcodedFallback(promptType, agentType);
+      }
+
       // First check for agent-specific overrides
       const { data: agentConfig } = await supabase
         .from('agent_configurations')

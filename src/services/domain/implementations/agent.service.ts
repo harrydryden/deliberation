@@ -6,6 +6,48 @@ import { logger } from '@/utils/logger';
 export class AgentService implements IAgentService {
   constructor(private agentRepository: IAgentRepository) {}
 
+  generateSystemPrompt(agent: Agent): string {
+    // Check for manual override first
+    if (agent.prompt_overrides?.system_prompt) {
+      return agent.prompt_overrides.system_prompt;
+    }
+    
+    // Auto-generate from agent configuration
+    let prompt = `You are ${agent.name}`;
+    
+    if (agent.description) {
+      prompt += `, ${agent.description}`;
+    }
+    
+    if (agent.goals?.length) {
+      prompt += `\n\nYour goals are:\n${agent.goals.map(g => `- ${g}`).join('\n')}`;
+    }
+    
+    if (agent.response_style) {
+      prompt += `\n\nResponse style: ${agent.response_style}`;
+    }
+    
+    // Add fallback based on agent type if prompt is too short
+    if (prompt.length < 50) {
+      prompt += this.getSystemPromptFallback(agent.agent_type);
+    }
+    
+    return prompt;
+  }
+
+  private getSystemPromptFallback(agentType: string): string {
+    switch (agentType) {
+      case 'bill_agent':
+        return '\n\nYou are a specialized AI facilitator for democratic deliberation, focusing on policy and legislative analysis.';
+      case 'peer_agent':
+        return '\n\nYou represent diverse perspectives in democratic deliberation, helping to synthesize participant viewpoints.';
+      case 'flow_agent':
+        return '\n\nYou act as a facilitator in democratic deliberation, guiding conversation flow and engagement.';
+      default:
+        return '\n\nYou are an AI assistant helping with democratic deliberation.';
+    }
+  }
+
   async getAgents(filter?: Record<string, any>): Promise<Agent[]> {
     try {
       return await this.agentRepository.findAll(filter);

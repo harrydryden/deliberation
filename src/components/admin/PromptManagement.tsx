@@ -25,7 +25,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
-    prompt_type: 'system_prompt',
+    prompt_type: 'classification_prompt',
     agent_type: 'global',
     name: '',
     template: '',
@@ -66,7 +66,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
   const handleCreatePrompt = () => {
     setCreating(true);
     setEditForm({
-      prompt_type: 'system_prompt',
+      prompt_type: 'classification_prompt',
       agent_type: 'global',
       name: '',
       template: '',
@@ -122,9 +122,8 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
 
   const getPromptTypeBadge = (type: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
-      'system_prompt': 'default',
-      'classification_prompt': 'secondary',
-      'ibis_generation_prompt': 'destructive'
+      'classification_prompt': 'default',
+      'ibis_generation_prompt': 'secondary'
     };
     return <Badge variant={variants[type] || 'default'}>{type}</Badge>;
   };
@@ -153,7 +152,6 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
                 <SelectValue placeholder="Select prompt type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="system_prompt">System Prompt</SelectItem>
                 <SelectItem value="classification_prompt">Classification Prompt</SelectItem>
                 <SelectItem value="ibis_generation_prompt">IBIS Generation Prompt</SelectItem>
               </SelectContent>

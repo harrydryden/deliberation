@@ -9,6 +9,7 @@ import { Agent, Deliberation, LocalAgentCreate } from '@/types/api';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { LocalAgentCreationModal } from './LocalAgentCreationModal';
 import { LocalAgentEditModal } from './LocalAgentEditModal';
+import { SystemPromptPreview } from './SystemPromptPreview';
 import { logger } from '@/utils/logger';
 
 interface LocalAgentManagementProps {
@@ -205,7 +206,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
                         )}
                         {(!agent.prompt_overrides?.system_prompt && !agent.prompt_overrides?.classification_prompt) && (
                           <Badge variant="outline" className="text-xs">
-                            Using Templates
+                            Auto-Generated
                           </Badge>
                         )}
                       </div>
@@ -229,6 +230,13 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
                             agent.is_active ? 'Deactivate' : 'Activate'
                           )}
                         </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={8} className="p-0">
+                      <div className="px-6 pb-4">
+                        <SystemPromptPreview agent={agent} />
                       </div>
                     </TableCell>
                   </TableRow>
