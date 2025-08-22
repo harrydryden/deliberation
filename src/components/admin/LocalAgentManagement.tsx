@@ -153,93 +153,95 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
               </TableHeader>
               <TableBody>
                 {localAgents.map((agent) => (
-                  <TableRow key={agent.id}>
-                    <TableCell className="font-medium">
-                      <div>
-                        <div className="font-semibold">{agent.name}</div>
-                        {agent.description && (
-                          <div className="text-sm text-muted-foreground truncate max-w-xs">
-                            {agent.description}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getAgentTypeBadge(agent.agent_type)}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(agent.is_active)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{agent.deliberation?.title || 'Unknown'}</span>
-                        {agent.deliberation && (
-                          <Button variant="ghost" size="sm" asChild>
-                            <a 
-                              href={`/deliberations/${agent.deliberation.id}`} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                            >
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getDeliberationStatusBadge(agent.deliberation?.status)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(agent.created_at)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {agent.prompt_overrides?.system_prompt && (
-                          <Badge variant="secondary" className="text-xs">
-                            System Override
-                          </Badge>
-                        )}
-                        {agent.prompt_overrides?.classification_prompt && (
-                          <Badge variant="secondary" className="text-xs">
-                            Classification Override
-                          </Badge>
-                        )}
-                        {(!agent.prompt_overrides?.system_prompt && !agent.prompt_overrides?.classification_prompt) && (
-                          <Badge variant="outline" className="text-xs">
-                            Auto-Generated
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <LocalAgentEditModal
-                          agent={agent}
-                          onUpdateAgent={onUpdate}
-                          loading={updating === agent.id}
-                        />
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleActive(agent.id, agent.is_active)}
-                          disabled={updating === agent.id}
-                        >
-                          {updating === agent.id ? (
-                            <RefreshCw className="h-4 w-4 animate-spin" />
-                          ) : (
-                            agent.is_active ? 'Deactivate' : 'Activate'
+                  <>
+                    <TableRow key={agent.id}>
+                      <TableCell className="font-medium">
+                        <div>
+                          <div className="font-semibold">{agent.name}</div>
+                          {agent.description && (
+                            <div className="text-sm text-muted-foreground truncate max-w-xs">
+                              {agent.description}
+                            </div>
                           )}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell colSpan={8} className="p-0">
-                      <div className="px-6 pb-4">
-                        <SystemPromptPreview agent={agent} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {getAgentTypeBadge(agent.agent_type)}
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(agent.is_active)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{agent.deliberation?.title || 'Unknown'}</span>
+                          {agent.deliberation && (
+                            <Button variant="ghost" size="sm" asChild>
+                              <a 
+                                href={`/deliberations/${agent.deliberation.id}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {getDeliberationStatusBadge(agent.deliberation?.status)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDate(agent.created_at)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {agent.prompt_overrides?.system_prompt && (
+                            <Badge variant="secondary" className="text-xs">
+                              System Override
+                            </Badge>
+                          )}
+                          {agent.prompt_overrides?.classification_prompt && (
+                            <Badge variant="secondary" className="text-xs">
+                              Classification Override
+                            </Badge>
+                          )}
+                          {(!agent.prompt_overrides?.system_prompt && !agent.prompt_overrides?.classification_prompt) && (
+                            <Badge variant="outline" className="text-xs">
+                              Auto-Generated
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <LocalAgentEditModal
+                            agent={agent}
+                            onUpdateAgent={onUpdate}
+                            loading={updating === agent.id}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleActive(agent.id, agent.is_active)}
+                            disabled={updating === agent.id}
+                          >
+                            {updating === agent.id ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              agent.is_active ? 'Deactivate' : 'Activate'
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow key={`${agent.id}-prompt`}>
+                      <TableCell colSpan={8} className="p-0">
+                        <div className="px-6 pb-4">
+                          <SystemPromptPreview agent={agent} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </>
                 ))}
               </TableBody>
             </Table>

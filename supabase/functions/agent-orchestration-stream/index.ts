@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getDefaultSystemPrompt, generateSystemPromptFromAgent } from './helpers.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -563,34 +564,60 @@ async function generateStreamingResponse(
   return fullResponse;
 }
 
-// Build appropriate system prompt using configurable prompts
+// Build appropriate system prompt using agent configuration
 async function buildSystemPrompt(agentType: string, analysis: any, conversationState: any, similarNodes: any[]): Promise<string> {
-  // Try to get prompt from database first
-  let prompt = await getPromptFromDatabase(agentType, 'system_prompt');
+  // Get agent configuration with system prompt
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
   
-  if (!prompt) {
-    // Fallback to hardcoded prompts
-    const basePrompts = {
-      bill_agent: "You are a knowledgeable assistant focused on legislation, policy, and legal frameworks around assisted dying. Provide accurate, factual information.",
-      peer_agent: "You are a facilitator helping users understand what other participants have contributed to this discussion. Share relevant perspectives and contributions.",
-      flow_agent: "You are a conversation facilitator helping guide productive discussions about assisted dying. Ask thoughtful questions and help clarify complex topics."
-    };
-    prompt = basePrompts[agentType as keyof typeof basePrompts] || basePrompts.flow_agent;
+  // Get agent configuration
+  let systemPrompt = getDefaultSystemPrompt(agentType);
+  
+  try {
+    const { data: agentConfigs } = await supabase
+      .from('agent_configurations')
+      .select('*')
+      .eq('agent_type', agentType)
+      .eq('is_active', true)
+      .order('deliberation_id', { nullsFirst: false })
+      .limit(1);
+    
+    if (agentConfigs && agentConfigs.length > 0) {
+      const agent = agentConfigs[0];
+      
+      // Generate system prompt from agent configuration
+      if (agent.prompt_overrides?.system_prompt) {
+        systemPrompt = agent.prompt_overrides.system_prompt;
+      } else {
+        // Auto-generate from agent configuration
+        systemPrompt = generateSystemPromptFromAgent(agent);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to get agent configuration, using default:', error);
   }
 
+  // Add context based on analysis
   if (analysis.complexity > 0.7) {
-    prompt += " This is a complex query requiring detailed analysis and nuanced understanding.";
+    systemPrompt += "\n\nThis is a complex query requiring detailed analysis and nuanced understanding.";
   }
 
   if (similarNodes.length > 0) {
-    prompt += ` There are ${similarNodes.length} related discussion points that may be relevant to reference.`;
+    systemPrompt += `\n\nThere are ${similarNodes.length} related discussion points that may be relevant to reference.`;
   }
 
-  return prompt;
+  return systemPrompt;
 }
 
-// Get prompt from database
+// Legacy function - no longer used for system prompts
 async function getPromptFromDatabase(agentType: string, promptType: string): Promise<string | null> {
+  // System prompts are now handled by agent configurations
+  if (promptType === 'system_prompt') {
+    console.warn('getPromptFromDatabase called for system_prompt - this should now use agent configurations');
+    return null;
+  }
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
