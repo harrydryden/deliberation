@@ -508,12 +508,12 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
               onClick={() => { mode === 'bill' ? void stop() : void startBill(); }}
               variant={mode === 'bill' ? 'default' : 'secondary'}
               size="sm"
-              aria-label="Chat to Policy"
+              aria-label="Chat to Bill Agent"
               aria-pressed={mode === 'bill'}
               className="w-full h-8 text-xs"
             >
               <Mic className="h-3 w-3 mr-1" />
-              Chat to Policy
+              Chat to Bill Agent
               {mode === 'bill' && speaking && <Waves className="h-3 w-3 ml-1" />}
             </Button>
 
@@ -521,12 +521,12 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
               onClick={() => { mode === 'ibis' ? void stop() : void startIbis(); }}
               variant={mode === 'ibis' ? 'default' : 'secondary'}
               size="sm"
-              aria-label="Deliberation Summary"
+              aria-label="Chat to Policy"
               aria-pressed={mode === 'ibis'}
               className="w-full h-8 text-xs"
             >
               <AudioLines className="h-3 w-3 mr-1" />
-              Deliberation Summary
+              Chat to Policy
               {mode === 'ibis' && speaking && <Waves className="h-3 w-3 ml-1" />}
             </Button>
 
