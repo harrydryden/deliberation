@@ -26,6 +26,11 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         delete dbData.isActive;
       }
       
+      // Ensure required fields have default values
+      if (!dbData.system_prompt) {
+        dbData.system_prompt = 'You are a helpful AI assistant in a deliberation process.';
+      }
+      
       // Automatically set created_by to current user
       const currentUserId = await this.getCurrentUserId();
       if (currentUserId) {
