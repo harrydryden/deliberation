@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { SupabaseBaseRepository } from './supabase-base.repository';
 import { IUserRepository } from '../interfaces';
-import { User } from '@/types/api';
+import { User } from '@/types/index';
 import { logger } from '@/utils/logger';
 
 export class UserRepository extends SupabaseBaseRepository implements IUserRepository {

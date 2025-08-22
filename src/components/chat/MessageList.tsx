@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatToUKTime } from "@/utils/timeUtils";
 const LazyMarkdownMessage = lazy(() => import("@/components/common/MarkdownMessage").then(m => ({ default: m.MarkdownMessage })));
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
-import type { ChatMessage } from "@/types/chat";
+import type { ChatMessage } from "@/types/index";
 import SimilarIbisNodes from "@/components/chat/SimilarIbisNodes";
 
 interface MessageListProps {

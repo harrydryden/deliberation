@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { SupabaseBaseRepository } from './supabase-base.repository';
 import { IMessageRepository } from '../interfaces';
-import { Message } from '@/types/api';
+import { Message } from '@/types/index';
 import { logger } from '@/utils/logger';
 
 export class MessageRepository extends SupabaseBaseRepository implements IMessageRepository {

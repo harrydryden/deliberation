@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Brain, Send, Loader2, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Agent } from '@/types/api';
+import { Agent } from '@/types/index';
 import { logger } from '@/utils/logger';
 
 interface Message {

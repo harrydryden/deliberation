@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RefreshCw, Bot, ExternalLink } from 'lucide-react';
 import { formatToUKDateTime } from '@/utils/timeUtils';
-import { Agent, Deliberation, LocalAgentCreate } from '@/types/api';
+import { Agent, Deliberation, LocalAgentCreate } from '@/types/index';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { LocalAgentCreationModal } from './LocalAgentCreationModal';
 import { LocalAgentEditModal } from './LocalAgentEditModal';

@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Edit } from 'lucide-react';
-import { Agent, FacilitatorConfig } from '@/types/api';
+import { Agent, FacilitatorConfig } from '@/types/index';
 import { useForm } from '@/hooks/useForm';
 import { FormField } from '@/components/forms/FormField';
 import { GoalsInput } from '@/components/forms/GoalsInput';

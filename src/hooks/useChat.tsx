@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useServices } from '@/hooks/useServices';
-import type { ChatMessage } from "@/types/chat";
+import type { ChatMessage } from "@/types/index";
 import { convertApiMessagesToChatMessages, convertApiMessageToChatMessage } from "@/utils/chat";
 import { getErrorMessage } from "@/utils/errors";
 import { useErrorHandler } from './useErrorHandler';

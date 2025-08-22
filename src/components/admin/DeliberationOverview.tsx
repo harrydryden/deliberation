@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { RefreshCw, MessageSquare, Eye, GitBranch, Trash2, Database, Map } from 'lucide-react';
 import { formatToUKDateTime } from '@/utils/timeUtils';
-import { Deliberation } from '@/types/api';
+import { Deliberation } from '@/types/index';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useNavigate } from 'react-router-dom';
 import { IbisNodeManagement } from './IbisNodeManagement';

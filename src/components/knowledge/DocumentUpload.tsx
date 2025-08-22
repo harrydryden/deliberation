@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Agent } from '@/types/api';
+import { Agent } from '@/types/index';
 import { logger } from '@/utils/logger';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 

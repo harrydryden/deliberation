@@ -1,6 +1,6 @@
 import { IAgentService } from '../interfaces';
 import { IAgentRepository } from '@/repositories/interfaces';
-import { Agent } from '@/types/api';
+import { Agent } from '@/types/index';
 import { logger } from '@/utils/logger';
 
 export class AgentService implements IAgentService {

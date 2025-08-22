@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { IRealtimeService } from '../interfaces';
-import { Message, Deliberation } from '@/types/api';
+import { Message, Deliberation } from '@/types/index';
 import { logger } from '@/utils/logger';
 
 export class RealtimeService implements IRealtimeService {

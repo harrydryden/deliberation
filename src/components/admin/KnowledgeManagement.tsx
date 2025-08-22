@@ -12,7 +12,7 @@ import { Upload, FileText, Brain, Trash2, Search, AlertTriangle } from 'lucide-r
 import { useToast } from '@/hooks/use-toast';
 import { formatToUKDate } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
-import { Agent } from '@/types/api';
+import { Agent } from '@/types/index';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { logger } from '@/utils/logger';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';

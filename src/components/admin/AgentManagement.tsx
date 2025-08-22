@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Agent, FacilitatorConfig } from '@/types/api';
+import { Agent, FacilitatorConfig } from '@/types/index';
 import { useAgentService } from '@/hooks/useServices';
 import { logger } from '@/utils/logger';
 import { useForm } from '@/hooks/useForm';

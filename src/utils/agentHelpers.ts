@@ -1,5 +1,5 @@
 // Frontend utilities for agent interactions
-import type { AgentType, MessageType } from "@/types/chat";
+import type { AgentType, MessageType } from "@/types/index";
 
 export const getAgentInfo = (messageType: MessageType) => {
   switch (messageType) {

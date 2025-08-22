@@ -182,6 +182,53 @@ export interface Agent {
   };
 }
 
+export interface FacilitatorConfig {
+  prompting_enabled: boolean;
+  prompting_interval_minutes: number;
+  max_prompts_per_session: number;
+  prompting_questions: FacilitatorQuestion[];
+  ibis_facilitation?: IbisFacilitationConfig;
+}
+
+export interface FacilitatorQuestion {
+  id: string;
+  text: string;
+  category: 'exploration' | 'perspective' | 'clarification' | 'synthesis' | 'action';
+  weight: number;
+}
+
+export interface IbisFacilitationConfig {
+  enabled: boolean;
+  elicit_issue_prompt: string;
+  elicit_position_prompt: string;
+  elicit_argument_prompt: string;
+}
+
+export interface LocalAgentCreate {
+  name: string;
+  agent_type: string;
+  deliberationId: string;
+  description?: string;
+  response_style?: string;
+  goals?: string[];
+  facilitator_config?: FacilitatorConfig;
+}
+
+export interface Message {
+  id: string;
+  content: string;
+  messageType: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiError {
+  message: string;
+  status: number;
+  code?: string;
+}
+
 export interface Deliberation {
   id: string;
   title: string;

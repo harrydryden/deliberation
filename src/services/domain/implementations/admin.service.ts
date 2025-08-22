@@ -1,6 +1,6 @@
 import { IAdminService, IUserService, IAgentService, IDeliberationService } from '../interfaces';
 import { IAdminRepository } from '@/repositories/interfaces';
-import { User, Agent, Deliberation } from '@/types/api';
+import { User, Agent, Deliberation } from '@/types/index';
 import { logger } from '@/utils/logger';
 
 export class AdminService implements IAdminService {

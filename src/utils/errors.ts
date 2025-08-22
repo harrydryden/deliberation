@@ -1,4 +1,4 @@
-import { ApiError } from '@/types/api';
+import { ApiError } from '@/types/index';
 
 export class AuthenticationError extends Error {
   constructor(message: string) {

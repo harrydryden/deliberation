@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { SupabaseBaseRepository } from './supabase-base.repository';
 import { IDeliberationRepository } from '../interfaces';
-import { Deliberation } from '@/types/api';
+import { Deliberation } from '@/types/index';
 import { logger } from '@/utils/logger';
 
 export class DeliberationRepository extends SupabaseBaseRepository implements IDeliberationRepository {

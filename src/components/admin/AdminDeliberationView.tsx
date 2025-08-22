@@ -10,7 +10,7 @@ import { formatToUKDate, formatToUKTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { MarkdownMessage } from '@/components/common/MarkdownMessage';
 // Legacy import removed - using header-based auth
-import type { ChatMessage } from '@/types/chat';
+import type { ChatMessage } from '@/types/index';
 interface Deliberation {
   id: string;
   title: string;

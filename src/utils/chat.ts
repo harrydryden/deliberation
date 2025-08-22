@@ -1,5 +1,5 @@
-import { ChatMessage } from '@/types/chat';
-import { Message } from '@/types/api';
+import { ChatMessage } from '@/types/index';
+import { Message } from '@/types/index';
 
 export function convertApiMessageToChatMessage(apiMessage: any): ChatMessage {
   return {

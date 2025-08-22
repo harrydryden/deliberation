@@ -1,6 +1,6 @@
 import { IUserService } from '../interfaces';
 import { IUserRepository } from '@/repositories/interfaces';
-import { User } from '@/types/api';
+import { User } from '@/types/index';
 import { logger } from '@/utils/logger';
 
 export class UserService implements IUserService {

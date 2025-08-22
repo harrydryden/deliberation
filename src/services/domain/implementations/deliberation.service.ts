@@ -1,6 +1,6 @@
 import { IDeliberationService } from '../interfaces';
 import { IDeliberationRepository } from '@/repositories/interfaces';
-import { Deliberation } from '@/types/api';
+import { Deliberation } from '@/types/index';
 import { logger } from '@/utils/logger';
 
 export class DeliberationService implements IDeliberationService {

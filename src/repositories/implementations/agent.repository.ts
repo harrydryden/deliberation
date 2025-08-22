@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { SupabaseBaseRepository } from './supabase-base.repository';
 import { IAgentRepository } from '../interfaces';
-import { Agent } from '@/types/api';
+import { Agent } from '@/types/index';
 import { logger } from '@/utils/logger';
 
 export class AgentRepository extends SupabaseBaseRepository implements IAgentRepository {
