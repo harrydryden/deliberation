@@ -6,20 +6,32 @@ import { Send } from "lucide-react";
 interface MessageInputProps {
   onSendMessage: (message: string) => Promise<void> | void;
   disabled?: boolean;
+  value?: string;
+  onValueChange?: (text: string) => void;
 }
 
-export const MessageInput = memo(({ onSendMessage, disabled }: MessageInputProps) => {
+export const MessageInput = memo(({ onSendMessage, disabled, value, onValueChange }: MessageInputProps) => {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Use controlled value if provided, otherwise use internal state
+  const currentMessage = value !== undefined ? value : message;
+  const setCurrentMessage = (text: string) => {
+    if (value !== undefined && onValueChange) {
+      onValueChange(text);
+    } else {
+      setMessage(text);
+    }
+  };
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim() && !disabled && !isSubmitting) {
+    if (currentMessage.trim() && !disabled && !isSubmitting) {
       setIsSubmitting(true);
       try {
-        await onSendMessage(message);
-        setMessage("");
+        await onSendMessage(currentMessage);
+        setCurrentMessage("");
         // Use requestAnimationFrame to ensure smooth transition
         requestAnimationFrame(() => {
           textareaRef.current?.focus();
@@ -28,16 +40,16 @@ export const MessageInput = memo(({ onSendMessage, disabled }: MessageInputProps
         setIsSubmitting(false);
       }
     }
-  }, [message, disabled, onSendMessage, isSubmitting]);
+  }, [currentMessage, disabled, onSendMessage, isSubmitting, setCurrentMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (message.trim() && !disabled && !isSubmitting) {
+      if (currentMessage.trim() && !disabled && !isSubmitting) {
         handleSubmit(e);
       }
     }
-  }, [message, disabled, isSubmitting, handleSubmit]);
+  }, [currentMessage, disabled, isSubmitting, handleSubmit]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -45,7 +57,7 @@ export const MessageInput = memo(({ onSendMessage, disabled }: MessageInputProps
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
-  }, [message]);
+  }, [currentMessage]);
 
   return (
     <div className="border-t bg-background p-4">
@@ -53,8 +65,8 @@ export const MessageInput = memo(({ onSendMessage, disabled }: MessageInputProps
         <div className="flex-1">
           <Textarea
             ref={textareaRef}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            value={currentMessage}
+            onChange={(e) => setCurrentMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type your message here... (Press Enter to send, Shift+Enter for new line)"
             disabled={disabled}
@@ -64,7 +76,7 @@ export const MessageInput = memo(({ onSendMessage, disabled }: MessageInputProps
         </div>
         <Button 
           type="submit" 
-          disabled={!message.trim() || disabled || isSubmitting}
+          disabled={!currentMessage.trim() || disabled || isSubmitting}
           className="bg-democratic-blue hover:bg-democratic-blue/90 transition-all duration-200"
           size="icon"
         >
