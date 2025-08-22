@@ -1169,8 +1169,8 @@ export type Database = {
           is_default: boolean
           name: string
           preset_questions: Json
+          prompt_overrides: Json
           response_style: string
-          system_prompt: string
           updated_at: string
         }[]
       }
