@@ -301,14 +301,12 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
           if (error) throw error;
           const text = (data?.text || '').toString().trim();
           if (text.length > 0) {
+            // STT mode should ONLY transcribe to message input, never send
             if (setMessageText) {
               setMessageText(text);
               toast({ title: 'Text transcribed', description: 'Voice transcription added to message input.' });
-            } else if (sendChatMessage) {
-              await sendChatMessage(text);
-              toast({ title: 'Added message', description: 'Voice transcription sent to chat.' });
             } else {
-              toast({ title: 'Error', description: 'No setMessageText or sendMessage function provided', variant: 'destructive' });
+              toast({ title: 'Error', description: 'No setMessageText function provided for dictation', variant: 'destructive' });
             }
           } else {
             toast({ title: 'No speech detected', description: 'Nothing was transcribed.', variant: 'destructive' });
