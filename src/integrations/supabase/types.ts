@@ -14,54 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      access_codes: {
-        Row: {
-          code: string
-          code_type: string
-          created_at: string
-          created_by: string | null
-          current_uses: number | null
-          expires_at: string | null
-          id: string
-          is_active: boolean | null
-          is_used: boolean
-          last_used_at: string | null
-          max_uses: number | null
-          used_at: string | null
-          used_by: string | null
-        }
-        Insert: {
-          code: string
-          code_type: string
-          created_at?: string
-          created_by?: string | null
-          current_uses?: number | null
-          expires_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          is_used?: boolean
-          last_used_at?: string | null
-          max_uses?: number | null
-          used_at?: string | null
-          used_by?: string | null
-        }
-        Update: {
-          code?: string
-          code_type?: string
-          created_at?: string
-          created_by?: string | null
-          current_uses?: number | null
-          expires_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          is_used?: boolean
-          last_used_at?: string | null
-          max_uses?: number | null
-          used_at?: string | null
-          used_by?: string | null
-        }
-        Relationships: []
-      }
       agent_configurations: {
         Row: {
           agent_type: string
@@ -839,8 +791,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_archived: boolean | null
-          migrated_from_access_code: string | null
-          original_access_code_id: string | null
+          role: string | null
           updated_at: string | null
         }
         Insert: {
@@ -852,8 +803,7 @@ export type Database = {
           created_at?: string | null
           id: string
           is_archived?: boolean | null
-          migrated_from_access_code?: string | null
-          original_access_code_id?: string | null
+          role?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -865,8 +815,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_archived?: boolean | null
-          migrated_from_access_code?: string | null
-          original_access_code_id?: string | null
+          role?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -1044,22 +993,7 @@ export type Database = {
       }
     }
     Views: {
-      user_profiles_with_deliberations_with_codes: {
-        Row: {
-          access_code: string | null
-          archive_reason: string | null
-          archived_at: string | null
-          archived_by: string | null
-          created_at: string | null
-          deliberations: Json | null
-          id: string | null
-          is_archived: boolean | null
-          migrated_from_access_code: string | null
-          updated_at: string | null
-          user_role: Database["public"]["Enums"]["app_role"] | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       admin_create_ibis_relationship: {
