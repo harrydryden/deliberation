@@ -26,6 +26,12 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         delete dbData.isActive;
       }
       
+      // Automatically set created_by to current user
+      const currentUserId = await this.getCurrentUserId();
+      if (currentUserId) {
+        dbData.created_by = currentUserId;
+      }
+      
       const result = await this.createInTable('agent_configurations', dbData);
       
       // Map result back to camelCase for API consistency
