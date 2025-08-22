@@ -11,7 +11,33 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
   }
 
   async create(data: any): Promise<Agent> {
-    return this.createInTable('agent_configurations', data);
+    try {
+      // Convert camelCase fields to snake_case for database
+      const dbData: any = { ...data };
+      
+      // Map camelCase to snake_case
+      if (data.deliberationId !== undefined) {
+        dbData.deliberation_id = data.deliberationId;
+        delete dbData.deliberationId;
+      }
+      
+      if (data.isActive !== undefined) {
+        dbData.is_active = data.isActive;
+        delete dbData.isActive;
+      }
+      
+      const result = await this.createInTable('agent_configurations', dbData);
+      
+      // Map result back to camelCase for API consistency
+      return {
+        ...result,
+        isActive: result.is_active,
+        deliberationId: result.deliberation_id,
+      } as Agent;
+    } catch (error) {
+      logger.error({ error, data }, 'Agent repository create failed');
+      throw error;
+    }
   }
 
   async delete(id: string): Promise<void> {
