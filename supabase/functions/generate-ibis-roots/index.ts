@@ -96,9 +96,14 @@ serve(async (req) => {
         'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
-        max_completion_tokens: 1000,
+        model: 'gpt-4.1-2025-04-14', // More reliable model
+        max_tokens: 1000, // Use max_tokens for GPT-4.1
+        temperature: 0.3, // Lower temperature for more consistent output
         messages: [
+          {
+            role: 'system',
+            content: 'You are an expert facilitator. You must respond with ONLY a valid JSON array, no additional text or formatting. Each object must have exactly "title" and "description" fields.'
+          },
           {
             role: 'user',
             content: prompt
