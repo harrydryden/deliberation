@@ -111,9 +111,9 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         const arrayBuffer = await file.arrayBuffer();
         const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
         
-        setProcessingStatus('Extracting text from PDF and creating AI embeddings...');
+        setProcessingStatus('Advanced PDF parsing with pdf-parse library and creating AI embeddings...');
         
-        const response = await supabase.functions.invoke('process-pdf-upload', {
+        const response = await supabase.functions.invoke('sophisticated-pdf-processor', {
           body: {
             pdfBase64: pdfBase64,
             fileName: file.name,
@@ -235,7 +235,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             disabled={uploading || !selectedAgent || !agents || agents.length === 0}
           />
           <p className="text-sm text-muted-foreground">
-            Supported formats: PDF, TXT, MD (secure server-side processing with PDF text extraction, OpenAI embeddings, and langchain)
+            Supported formats: PDF, TXT, MD (sophisticated server-side PDF parsing with pdf-parse library, OpenAI embeddings, and langchain)
           </p>
         </div>
 
