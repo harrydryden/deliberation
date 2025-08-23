@@ -12,6 +12,7 @@ import { Agent } from '@/types/index';
 import { logger } from '@/utils/logger';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import * as pdfjsLib from 'pdfjs-dist';
+import OpenAI from 'openai';
 
 // Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
@@ -153,79 +154,128 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       setProcessingStatus('File uploaded, starting intelligent processing...');
       logger.component.update('DocumentUpload', { action: 'uploadSuccess', path: uploadData.path });
 
-      // Use optimized LangChain processing with progress monitoring
-      setProcessingStatus('Processing with optimized batch operations...');
+      // Client-side processing with OpenAI
+      setProcessingStatus('Processing document with OpenAI...');
       const processingStartTime = performance.now();
       
-      const result = await supabase.functions.invoke('langchain-process-document', {
-        body: {
-          agentId: selectedAgent,
-          storagePath: uploadData.path,
-          fileName: file.name,
-          contentType: fileExt === 'pdf' ? 'pdf' : 'text'
+      // Extract text from file
+      let extractedText = '';
+      if (fileExt === 'pdf') {
+        setProcessingStatus('Extracting text from PDF...');
+        setUploadProgress(40);
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str).join(' ');
+          extractedText += pageText + '\n';
         }
+      } else {
+        // Handle text files
+        extractedText = await file.text();
+      }
+      
+      setProcessingStatus('Splitting text into chunks...');
+      setUploadProgress(50);
+      
+      // Split text into chunks
+      const textSplitter = new TextSplitter();
+      const chunks = textSplitter.splitText(extractedText);
+      
+      setProcessingStatus('Generating embeddings with OpenAI...');
+      setUploadProgress(60);
+      
+      // Get OpenAI API key from Supabase secrets
+      const { data: secretData } = await supabase.functions.invoke('get-openai-key');
+      const openaiApiKey = secretData?.key || import.meta.env.VITE_OPENAI_API_KEY;
+      
+      if (!openaiApiKey) {
+        throw new Error('OpenAI API key not configured');
+      }
+      
+      const openai = new OpenAI({ 
+        apiKey: openaiApiKey,
+        dangerouslyAllowBrowser: true 
       });
       
-      const processingData = result.data;
-      const processingError = result.error;
-      const processingTime = performance.now() - processingStartTime;
+      // Process chunks in batches to avoid rate limits
+      const batchSize = 20;
+      let processedChunks = 0;
+      const allKnowledgeEntries = [];
       
-      logger.component.update('DocumentUpload', { action: 'processingResult', hasData: !!processingData, hasError: !!processingError });
-      
-      setUploadProgress(90);
-      setProcessingStatus('Finalizing and saving results...');
-
-      if (processingError) {
-        console.error('Processing error:', processingError);
-        // Clean up uploaded file on processing error
-        await supabase.storage.from('documents').remove([uploadData.path]);
-        throw new Error(processingError.message || 'Processing failed');
-      }
-
-      if (processingData?.success) {
-        setUploadProgress(100);
-        setProcessingStatus('Processing completed successfully!');
+      for (let i = 0; i < chunks.length; i += batchSize) {
+        const batch = chunks.slice(i, i + batchSize);
+        setProcessingStatus(`Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(chunks.length / batchSize)}...`);
         
-        // Handle duplicate detection
-        if (processingData.skipped) {
-          toast({
-            title: "Document Already Processed",
-            description: `${file.name} was already processed for this agent and has been skipped.`
-          });
-        } else {
-          // Set performance stats
-          const totalTime = performance.now() - startTime;
-          setPerformanceStats({
-            chunksProcessed: processingData.chunksProcessed || 0,
-            batchesProcessed: processingData.performance?.embeddingBatches || 0,
-            processingTime: totalTime,
-            optimized: processingData.optimized || false
-          });
-
-          const processingMethod = processingData.optimized ? 'Optimized Batch Processing' : 
-                                 processingData.langchainProcessed ? 'LangChain' : 'Standard';
+        // Generate embeddings for batch
+        const embeddings = await openai.embeddings.create({
+          model: 'text-embedding-3-small',
+          input: batch
+        });
+        
+        // Prepare knowledge entries
+        const knowledgeEntries = batch.map((chunk, index) => ({
+          agent_id: selectedAgent,
+          title: `${file.name} - Chunk ${i + index + 1}`,
+          content: chunk,
+          content_type: fileExt || 'text',
+          file_name: file.name,
+          storage_path: uploadData.path,
+          chunk_index: i + index,
+          embedding: embeddings.data[index].embedding,
+          created_by: user.id,
+          metadata: {
+            originalFileName: file.name,
+            fileSize: file.size,
+            chunkSize: chunk.length,
+            processingTimestamp: new Date().toISOString()
+          }
+        }));
+        
+        // Insert batch into database
+        const { error: insertError } = await supabase
+          .from('agent_knowledge')
+          .insert(knowledgeEntries);
           
-          const performanceInfo = processingData.optimized ? 
-            ` (${processingData.performance?.embeddingBatches} batches, ${(totalTime/1000).toFixed(1)}s)` : '';
-          
-          toast({
-            title: "Success",
-            description: `Successfully processed ${file.name} using ${processingMethod}. Created ${processingData.chunksProcessed} knowledge chunks${performanceInfo}.`
-          });
+        if (insertError) {
+          console.error('Database insert error:', insertError);
+          throw new Error(`Failed to save knowledge: ${insertError.message}`);
         }
         
-        // Reset form
-        setSelectedAgent('');
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        allKnowledgeEntries.push(...knowledgeEntries);
+        processedChunks += batch.length;
         
-        onUploadSuccess?.();
-      } else {
-        // Clean up uploaded file on processing failure
-        await supabase.storage.from('documents').remove([uploadData.path]);
-        throw new Error(processingData?.error || 'Processing failed');
+        // Update progress
+        const progress = 60 + ((processedChunks / chunks.length) * 30);
+        setUploadProgress(progress);
       }
+      
+      setUploadProgress(100);
+      setProcessingStatus('Processing completed successfully!');
+      
+      // Set performance stats
+      const totalTime = performance.now() - startTime;
+      setPerformanceStats({
+        chunksProcessed: chunks.length,
+        batchesProcessed: Math.ceil(chunks.length / batchSize),
+        processingTime: totalTime,
+        optimized: true
+      });
+      
+      toast({
+        title: "Success",
+        description: `Successfully processed ${file.name} using Client-side Processing. Created ${chunks.length} knowledge chunks in ${(totalTime/1000).toFixed(1)}s.`
+      });
+      
+      // Reset form
+      setSelectedAgent('');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
+      onUploadSuccess?.();
     } catch (error: any) {
       console.error('Upload error:', error);
       toast({
@@ -286,7 +336,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             disabled={uploading || !selectedAgent || !agents || agents.length === 0}
           />
           <p className="text-sm text-muted-foreground">
-            Supported formats: PDF, TXT, MD (with server-side processing)
+            Supported formats: PDF, TXT, MD (with client-side processing)
           </p>
         </div>
 
@@ -323,7 +373,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
               </div>
               <div>
                 <span className="text-muted-foreground">Method:</span>
-                <span className="ml-1 font-medium">{performanceStats.optimized ? 'Optimized' : 'Standard'}</span>
+                <span className="ml-1 font-medium">Client-side</span>
               </div>
             </div>
           </div>
