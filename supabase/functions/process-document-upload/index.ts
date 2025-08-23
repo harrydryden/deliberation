@@ -44,37 +44,55 @@ class TextSplitter {
   }
 }
 
-// PDF text extraction using PDF.js
+// PDF text extraction using PDF.js with proper Deno import
 async function extractPDFText(arrayBuffer: ArrayBuffer): Promise<string> {
   try {
-    // Import PDF.js for Deno
-    const pdfjsLib = await import('https://esm.sh/pdfjs-dist@3.11.174/build/pdf.mjs');
+    // Import PDF.js with proper Deno compatibility
+    const pdfjs = await import('https://esm.sh/pdfjs-dist@4.0.379/build/pdf.min.mjs');
     
-    // Load the PDF document
-    const loadingTask = pdfjsLib.getDocument({
+    // Load the PDF document with proper configuration
+    const loadingTask = pdfjs.getDocument({
       data: new Uint8Array(arrayBuffer),
-      useSystemFonts: true,
+      useSystemFonts: false,
+      disableFontFace: true,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      disableAutoFetch: true,
     });
     
     const pdf = await loadingTask.promise;
     let fullText = '';
     
+    console.log(`PDF has ${pdf.numPages} pages`);
+    
     // Extract text from each page
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      
-      fullText += pageText + '\n';
+      try {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        
+        const pageText = textContent.items
+          .map((item: any) => item.str || '')
+          .filter((text: string) => text.trim().length > 0)
+          .join(' ');
+        
+        if (pageText.trim()) {
+          fullText += pageText + '\n\n';
+        }
+        
+        console.log(`Extracted ${pageText.length} characters from page ${pageNum}`);
+      } catch (pageError) {
+        console.warn(`Failed to extract text from page ${pageNum}:`, pageError);
+        // Continue with other pages
+      }
     }
     
-    return fullText;
+    return fullText.trim();
   } catch (error) {
     console.error('PDF parsing error:', error);
-    throw new Error(`Failed to extract text from PDF: ${error.message}`);
+    
+    // Fallback: try to extract some basic text or return error for manual processing
+    throw new Error(`Failed to extract text from PDF: ${error.message}. Please try uploading a text file instead or a simpler PDF.`);
   }
 }
 
