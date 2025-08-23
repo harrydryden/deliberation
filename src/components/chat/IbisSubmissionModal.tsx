@@ -19,7 +19,7 @@ interface IbisSubmissionModalProps {
   deliberationId: string;
   onSuccess?: () => void;
 }
-type NodeType = 'issue' | 'position' | 'argument';
+type NodeType = 'issue' | 'position' | 'argument' | 'uncategorized';
 export const IbisSubmissionModal = ({
   isOpen,
   onClose,
@@ -122,9 +122,20 @@ export const IbisSubmissionModal = ({
       }
     } catch (error: any) {
       console.error('Error classifying message:', error);
+      
+      // Set fallback state for AI classification failure
+      setAiSuggestions({
+        title: '',
+        keywords: [],
+        nodeType: 'issue' as NodeType, // Default to issue
+        description: 'AI analysis failed to categorize this message',
+        confidence: 0,
+        stanceScore: 0
+      });
+      
       toast({
         title: "AI Classification Failed",
-        description: "Unable to get AI suggestions. You can still fill the form manually.",
+        description: "Unable to get AI suggestions. Please categorize manually or use the uncategorized option.",
         variant: "destructive"
       });
     } finally {
@@ -421,6 +432,14 @@ export const IbisSubmissionModal = ({
                     <div className="font-medium">Argument</div>
                     <div className="text-xs text-muted-foreground">
                       Supporting or opposing evidence
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="uncategorized">
+                  <div>
+                    <div className="font-medium">Uncategorized</div>
+                    <div className="text-xs text-muted-foreground">
+                      AI failed to categorize - manual review needed
                     </div>
                   </div>
                 </SelectItem>

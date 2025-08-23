@@ -41,7 +41,7 @@ interface IbisNode {
   id: string;
   title: string;
   description?: string;
-  node_type: 'issue' | 'position' | 'argument';
+  node_type: 'issue' | 'position' | 'argument' | 'uncategorized';
   parent_id?: string;
   position_x?: number;
   position_y?: number;
@@ -85,6 +85,11 @@ const nodeTypeConfig = {
     color: 'hsl(var(--ibis-argument))',
     shape: 'diamond',
     label: 'Argument'
+  },
+  uncategorized: {
+    color: 'hsl(var(--muted-foreground))',
+    shape: 'hexagon',
+    label: 'Uncategorized'
   }
 };
 
@@ -103,7 +108,7 @@ export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationPro
   const [selectedNode, setSelectedNode] = useState<IbisNode | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState(true);
-const [filterType, setFilterType] = useState<'all' | 'issue' | 'position' | 'argument'>('all');
+const [filterType, setFilterType] = useState<'all' | 'issue' | 'position' | 'argument' | 'uncategorized'>('all');
 const { toast } = useToast();
 const { user, isAdmin } = useSupabaseAuth();
   
@@ -835,6 +840,7 @@ const { user, isAdmin } = useSupabaseAuth();
                   <SelectItem value="issue">Issues</SelectItem>
                   <SelectItem value="position">Positions</SelectItem>
                   <SelectItem value="argument">Arguments</SelectItem>
+                  <SelectItem value="uncategorized">Uncategorized</SelectItem>
                 </SelectContent>
               </Select>
             </div>

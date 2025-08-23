@@ -4,7 +4,7 @@
 export type IbisNodeLike = {
   id: string;
   title: string;
-  node_type: 'issue' | 'position' | 'argument';
+  node_type: 'issue' | 'position' | 'argument' | 'uncategorized';
   position_x?: number | null;
   position_y?: number | null;
   embedding?: number[] | null;
@@ -153,6 +153,8 @@ export const getNodeDimensions = (nodeType: IbisNodeLike['node_type']) => {
     case 'position':
     case 'argument':
       return { width: 160, height: 90 };
+    case 'uncategorized':
+      return { width: 150, height: 100 };
     default:
       return { width: 160, height: 90 };
   }

@@ -12,6 +12,7 @@ export interface ConcentricZones {
   issue: ZoneConfig;
   position: ZoneConfig;
   argument: ZoneConfig;
+  uncategorized?: ZoneConfig;
 }
 
 // Calculate zone boundaries based on canvas size and node counts
@@ -67,7 +68,7 @@ export const constrainToZone = (
   position: { x: number; y: number },
   center: { x: number; y: number },
   zone: ZoneConfig,
-  nodeType: 'issue' | 'position' | 'argument'
+  nodeType: 'issue' | 'position' | 'argument' | 'uncategorized'
 ): { x: number; y: number } => {
   const dx = position.x - center.x;
   const dy = position.y - center.y;
@@ -99,7 +100,8 @@ export const applyConcentricLayout = (
   const nodeTypeCounts = {
     issue: nodes.filter(n => n.node_type === 'issue').length,
     position: nodes.filter(n => n.node_type === 'position').length,
-    argument: nodes.filter(n => n.node_type === 'argument').length
+    argument: nodes.filter(n => n.node_type === 'argument').length,
+    uncategorized: nodes.filter(n => n.node_type === 'uncategorized').length
   };
   
   console.log('🎯 Zone layout - Starting calculation:', {
@@ -115,7 +117,17 @@ export const applyConcentricLayout = (
   
   // Initial positioning within zones
   nodes.forEach((node, index) => {
-    const zone = zones[node.node_type];
+    const zone = zones[node.node_type as keyof ConcentricZones];
+    if (!zone) {
+      // Handle uncategorized nodes - place them in a corner area
+      const uncategorizedPos = {
+        x: canvas.width * 0.85 + (index % 3) * 60,
+        y: 50 + Math.floor(index / 3) * 60
+      };
+      positions.set(node.id, { ...uncategorizedPos, vx: 0, vy: 0 });
+      return;
+    }
+    
     let initialPos;
     
     if (node.position_x && node.position_y) {
@@ -237,25 +249,32 @@ export const applyConcentricLayout = (
     // Apply zone constraints and update positions
     nodes.forEach(node => {
       const pos = positions.get(node.id)!;
-      const zone = zones[node.node_type];
+      const zone = zones[node.node_type as keyof ConcentricZones];
       
       // Apply velocity
       pos.x += pos.vx;
       pos.y += pos.vy;
       
-      // Constrain to zone
-      const constrainedPos = constrainToZone({ x: pos.x, y: pos.y }, center, zone, node.node_type);
+      // Only apply zone constraints for categorized nodes
+      if (zone) {
+        // Constrain to zone
+        const constrainedPos = constrainToZone({ x: pos.x, y: pos.y }, center, zone, node.node_type);
       
-      // Add zone constraint force if position was adjusted
-      if (constrainedPos.x !== pos.x || constrainedPos.y !== pos.y) {
-        const constraintFx = (constrainedPos.x - pos.x) * zoneConstraintStrength;
-        const constraintFy = (constrainedPos.y - pos.y) * zoneConstraintStrength;
-        pos.vx += constraintFx;
-        pos.vy += constraintFy;
+        // Add zone constraint force if position was adjusted
+        if (constrainedPos.x !== pos.x || constrainedPos.y !== pos.y) {
+          const constraintFx = (constrainedPos.x - pos.x) * zoneConstraintStrength;
+          const constraintFy = (constrainedPos.y - pos.y) * zoneConstraintStrength;
+          pos.vx += constraintFx;
+          pos.vy += constraintFy;
+        }
+        
+        pos.x = constrainedPos.x;
+        pos.y = constrainedPos.y;
+      } else {
+        // For uncategorized nodes, just keep them within canvas bounds
+        pos.x = Math.max(20, Math.min(canvas.width - 20, pos.x));
+        pos.y = Math.max(20, Math.min(canvas.height - 20, pos.y));
       }
-      
-      pos.x = constrainedPos.x;
-      pos.y = constrainedPos.y;
     });
   }
   
