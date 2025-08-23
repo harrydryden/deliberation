@@ -64,6 +64,13 @@ export const useChat = (deliberationId?: string) => {
 
     try {
       const unsubscribe = realtimeService.subscribeToMessages((message) => {
+        console.log('📨 Realtime message received:', { 
+          id: message.id, 
+          type: message.messageType, 
+          content: message.content?.substring(0, 50) || '[empty]',
+          userId: message.userId
+        });
+        
         const chatMessage: ChatMessage = {
           id: message.id,
           content: message.content,
@@ -76,8 +83,10 @@ export const useChat = (deliberationId?: string) => {
         setMessages(prev => {
           // Avoid duplicates
           if (prev.some(msg => msg.id === chatMessage.id)) {
+            console.log('🔄 Duplicate message ignored:', chatMessage.id);
             return prev;
           }
+          console.log('➕ Adding realtime message:', chatMessage.id);
           return [...prev, chatMessage];
         });
         
@@ -158,8 +167,13 @@ export const useChat = (deliberationId?: string) => {
           deliberationId,
           // onUpdate callback - update streaming message in real-time
           (streamContent: string, agentType: string) => {
+            console.log('🔄 onUpdate called:', { streamContent: streamContent.substring(0, 50), agentType, hasContent: !!streamContent.trim() });
+            
             // Only create streaming UI messages when we have actual content to show
-            if (!streamContent.trim()) return;
+            if (!streamContent.trim()) {
+              console.log('⚠️ Skipping onUpdate due to empty content');
+              return;
+            }
             
             const streamingMessage: ChatMessage = {
               id: `streaming-${saved.id}`,
@@ -171,14 +185,18 @@ export const useChat = (deliberationId?: string) => {
               agent_context: { agentType }
             };
 
+            console.log('📝 Creating/updating streaming message:', streamingMessage.id);
+
             setMessages(prev => {
               const existingStreamingIndex = prev.findIndex(m => m.id === `streaming-${saved.id}`);
               if (existingStreamingIndex >= 0) {
+                console.log('🔄 Updating existing streaming message at index:', existingStreamingIndex);
                 // Update existing streaming message
                 return prev.map((msg, index) => 
                   index === existingStreamingIndex ? streamingMessage : msg
                 );
               } else {
+                console.log('➕ Adding new streaming message');
                 // Only add streaming message when we have actual content
                 return [...prev, streamingMessage];
               }
@@ -186,6 +204,7 @@ export const useChat = (deliberationId?: string) => {
           },
           // onComplete callback - replace with final message
           async (finalContent: string, agentType: string) => {
+            console.log('✅ onComplete called:', { finalContent: finalContent.substring(0, 50), agentType });
             try {
               // Replace streaming placeholder with final agent message locally to avoid full reload
               const finalMessage: ChatMessage = {
@@ -197,8 +216,10 @@ export const useChat = (deliberationId?: string) => {
                 status: 'sent',
                 agent_context: { agentType }
               };
+              console.log('🏁 Creating final message:', finalMessage.id);
               setMessages(prev => {
                 const withoutStreaming = prev.filter(m => m.id !== `streaming-${saved.id}`);
+                console.log('🧹 Filtered out streaming messages, remaining:', withoutStreaming.length);
                 return [...withoutStreaming, finalMessage];
               });
             } catch (error) {
