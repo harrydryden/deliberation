@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/index';
 import { logger } from '@/utils/logger';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import * as pdfjsLib from 'pdfjs-dist';
+import 'pdfjs-dist/build/pdf.worker.entry';
 
 interface DocumentUploadProps {
   agents?: Agent[];
@@ -34,14 +36,45 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
   // Check if current user is admin
   const { user, isAdmin } = useSupabaseAuth();
 
+  // Configure PDF.js worker
+  React.useEffect(() => {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.js',
+      import.meta.url
+    ).toString();
+  }, []);
+
   const extractPDFText = async (file: File): Promise<string> => {
     try {
-      // Use a simple file reading approach - for now, encourage text files
-      // PDF extraction in browser without dependencies is complex
-      throw new Error('PDF upload currently disabled to avoid build issues. Please convert your PDF to text format and upload as .txt file instead.');
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ 
+        data: arrayBuffer,
+        useSystemFonts: true,
+        disableFontFace: false,
+        useWorkerFetch: false,
+        verbosity: 0
+      }).promise;
+      
+      let fullText = '';
+      
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        
+        const pageText = textContent.items
+          .map((item: any) => item.str || '')
+          .filter((text: string) => text.trim().length > 0)
+          .join(' ');
+        
+        if (pageText.trim()) {
+          fullText += pageText + '\n\n';
+        }
+      }
+      
+      return fullText.trim();
     } catch (error) {
       console.error('PDF extraction error:', error);
-      throw error;
+      throw new Error(`Failed to extract text from PDF: ${error.message}`);
     }
   };
 
@@ -98,8 +131,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       const fileType = file.type || '';
 
       if (file.name.toLowerCase().endsWith('.pdf') || fileType === 'application/pdf') {
-        // Temporarily disable PDF processing to avoid build issues
-        throw new Error('PDF upload is temporarily disabled. Please convert your PDF to text format (.txt) and upload instead.');
+        extractedText = await extractPDFText(file);
       } else {
         // Handle text files
         extractedText = await file.text();
@@ -211,12 +243,12 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             ref={fileInputRef}
             id="file-upload"
             type="file"
-            accept=".txt,.md"
+            accept=".txt,.md,.pdf"
             onChange={handleFileUpload}
             disabled={uploading || !selectedAgent || !agents || agents.length === 0}
           />
           <p className="text-sm text-muted-foreground">
-            Supported formats: TXT, MD (PDF support temporarily disabled)
+            Supported formats: PDF, TXT, MD (client-side processing with OpenAI embeddings)
           </p>
         </div>
 
