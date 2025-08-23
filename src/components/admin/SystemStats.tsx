@@ -65,12 +65,6 @@ export const SystemStats = ({ stats, loading, onRefresh }: SystemStatsProps) => 
       value: stats.activeDeliberations,
       icon: Settings,
       color: 'text-orange-600'
-    },
-    {
-      title: 'User Management',
-      value: 'Supabase Auth',
-      icon: Key,
-      color: 'text-red-600'
     }
   ];
 
