@@ -36,35 +36,12 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
 
   const extractPDFText = async (file: File): Promise<string> => {
     try {
-      // Load PDF.js dynamically at runtime to avoid build issues
-      // @ts-ignore: Dynamic import for browser compatibility
-      const pdfjsLib = await import('https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.mjs');
-      
-      // Set worker source
-      (pdfjsLib as any).GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
-      
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await (pdfjsLib as any).getDocument({ data: arrayBuffer }).promise;
-      let fullText = '';
-      
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        
-        const pageText = textContent.items
-          .map((item: any) => item.str || '')
-          .filter((text: string) => text.trim().length > 0)
-          .join(' ');
-        
-        if (pageText.trim()) {
-          fullText += pageText + '\n\n';
-        }
-      }
-      
-      return fullText.trim();
+      // Use a simple file reading approach - for now, encourage text files
+      // PDF extraction in browser without dependencies is complex
+      throw new Error('PDF upload currently disabled to avoid build issues. Please convert your PDF to text format and upload as .txt file instead.');
     } catch (error) {
       console.error('PDF extraction error:', error);
-      throw new Error(`Failed to extract text from PDF. Please try uploading a text file instead.`);
+      throw error;
     }
   };
 
@@ -121,7 +98,8 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       const fileType = file.type || '';
 
       if (file.name.toLowerCase().endsWith('.pdf') || fileType === 'application/pdf') {
-        extractedText = await extractPDFText(file);
+        // Temporarily disable PDF processing to avoid build issues
+        throw new Error('PDF upload is temporarily disabled. Please convert your PDF to text format (.txt) and upload instead.');
       } else {
         // Handle text files
         extractedText = await file.text();
@@ -233,12 +211,12 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             ref={fileInputRef}
             id="file-upload"
             type="file"
-            accept=".txt,.md,.pdf"
+            accept=".txt,.md"
             onChange={handleFileUpload}
             disabled={uploading || !selectedAgent || !agents || agents.length === 0}
           />
           <p className="text-sm text-muted-foreground">
-            Supported formats: PDF, TXT, MD (client-side processing)
+            Supported formats: TXT, MD (PDF support temporarily disabled)
           </p>
         </div>
 
