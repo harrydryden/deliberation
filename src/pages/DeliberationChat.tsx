@@ -332,7 +332,7 @@ const DeliberationChat = () => {
                       <Target className="h-3 w-3 text-primary" />
                     </div>
                     <div className="text-xs text-primary/80 uppercase tracking-wide font-medium">
-                      Focus:
+                      Notion:
                     </div>
                     <div className="min-w-0 flex-1">
                       <ExpandableText 
@@ -413,9 +413,9 @@ const DeliberationChat = () => {
                       <div className="shrink-0 w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
                         <Target className="h-3 w-3 text-primary" />
                       </div>
-                      <div className="text-xs text-primary/80 uppercase tracking-wide font-medium">
-                        Focus:
-                      </div>
+                       <div className="text-xs text-primary/80 uppercase tracking-wide font-medium">
+                         Notion:
+                       </div>
                       <div className="min-w-0 flex-1">
                         <ExpandableText 
                           text={deliberation.notion}
