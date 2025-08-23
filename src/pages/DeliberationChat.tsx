@@ -8,7 +8,6 @@ import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
-import { NotionBanner } from "@/components/chat/NotionBanner";
 const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({
   default: m.IbisMapVisualization
 })));
@@ -254,9 +253,6 @@ const DeliberationChat = () => {
     }
   };
   const ChatPanel = () => <div className="flex-1 flex flex-col min-h-0">
-      {deliberation?.notion && (
-        <NotionBanner notion={deliberation.notion} className="mx-4 mt-4 mb-2" />
-      )}
       <div className="flex-1 overflow-hidden min-h-0">
         <MessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} deliberationId={deliberationId} agentConfigs={agentConfigs} />
       </div>
@@ -266,7 +262,7 @@ const DeliberationChat = () => {
       />
     </div>;
   if (isLoading || loading) {
-    return <Layout>
+    return <Layout notion={deliberation?.notion}>
         <div className="h-[calc(100vh-120px)] flex items-center justify-center">
           <div className="animate-pulse text-center">
             <div className="h-8 bg-muted rounded w-48 mx-auto mb-4"></div>
@@ -279,11 +275,11 @@ const DeliberationChat = () => {
 
   // Show simplified admin view for admin users
   if (isAdmin) {
-    return <Layout>
+    return <Layout notion={deliberation?.notion}>
         <AdminDeliberationView />
       </Layout>;
   }
-  return <Layout>
+  return <Layout notion={deliberation?.notion}>
       <div className="flex flex-col bg-background rounded-lg border h-[calc(100vh-120px)] min-h-0">
         {/* Deliberation Header - Sticky below main header */}
         <div className="border-b bg-card backdrop-blur-sm" style={{
