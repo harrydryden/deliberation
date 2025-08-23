@@ -25,6 +25,9 @@ verify_jwt = false
 [functions.process-agent-knowledge]
 verify_jwt = true
 
+[functions.process-pdf-upload]
+verify_jwt = false
+
 [functions.query-agent-knowledge]
 verify_jwt = true
 

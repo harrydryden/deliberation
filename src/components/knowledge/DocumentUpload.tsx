@@ -101,37 +101,50 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       setProcessingStatus('Processing document with server-side AI (PDF parsing, OpenAI embeddings, langchain)...');
       logger.component.update('DocumentUpload', { action: 'uploadSuccess', path: uploadData.path });
 
-      // Read file content for processing
-      let fileContent = '';
-      
-      if (file.type.includes('pdf')) {
-        // For now, PDFs need to be converted to text manually
-        // The edge function expects text content, not raw PDF bytes
-        throw new Error('PDF processing temporarily unavailable. Please convert your PDF to text format and upload as .txt file.');
-      } else {
-        // Handle text files
-        fileContent = await file.text();
-      }
-
-      if (!fileContent || fileContent.trim().length < 10) {
-        throw new Error('No meaningful text content found in the document');
-      }
-
       setUploadProgress(75);
-      setProcessingStatus('Creating AI embeddings and knowledge entries...');
+      setProcessingStatus('Processing document with AI (PDF parsing, OpenAI embeddings, langchain)...');
 
-      // Use existing process-agent-knowledge edge function
-      const { data: processResult, error: processError } = await supabase.functions.invoke(
-        'process-agent-knowledge',
-        {
+      let processResult, processError;
+
+      if (file.type.includes('pdf')) {
+        // Handle PDF files - convert to base64 and send to PDF processing function
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        
+        setProcessingStatus('Extracting text from PDF and creating AI embeddings...');
+        
+        const response = await supabase.functions.invoke('process-pdf-upload', {
+          body: {
+            pdfBase64: pdfBase64,
+            fileName: file.name,
+            agentId: selectedAgent
+          }
+        });
+        
+        processResult = response.data;
+        processError = response.error;
+      } else {
+        // Handle text files directly
+        const fileContent = await file.text();
+        
+        if (!fileContent || fileContent.trim().length < 10) {
+          throw new Error('No meaningful text content found in the document');
+        }
+        
+        setProcessingStatus('Creating AI embeddings and knowledge entries...');
+        
+        const response = await supabase.functions.invoke('process-agent-knowledge', {
           body: {
             fileContent: fileContent,
             fileName: file.name,
             agentId: selectedAgent,
             contentType: 'text/plain'
           }
-        }
-      );
+        });
+        
+        processResult = response.data;
+        processError = response.error;
+      }
 
       if (processError || !processResult?.success) {
         console.error('Processing error:', processError || processResult);
@@ -217,12 +230,12 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             ref={fileInputRef}
             id="file-upload"
             type="file"
-            accept=".txt,.md"
+            accept=".txt,.md,.pdf"
             onChange={handleFileUpload}
             disabled={uploading || !selectedAgent || !agents || agents.length === 0}
           />
           <p className="text-sm text-muted-foreground">
-            Supported formats: TXT, MD (PDF processing temporarily disabled while fixing build issues)
+            Supported formats: PDF, TXT, MD (secure server-side processing with PDF text extraction, OpenAI embeddings, and langchain)
           </p>
         </div>
 
