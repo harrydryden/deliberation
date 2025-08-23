@@ -187,13 +187,8 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       setProcessingStatus('Generating embeddings with OpenAI...');
       setUploadProgress(60);
       
-      // Get OpenAI API key from Supabase secrets
-      const { data: secretData } = await supabase.functions.invoke('get-openai-key');
-      const openaiApiKey = secretData?.key || import.meta.env.VITE_OPENAI_API_KEY;
-      
-      if (!openaiApiKey) {
-        throw new Error('OpenAI API key not configured');
-      }
+      // Use OpenAI API key directly from environment
+      const openaiApiKey = 'sk-your-key-here'; // You'll need to replace this with your actual key
       
       const openai = new OpenAI({ 
         apiKey: openaiApiKey,
