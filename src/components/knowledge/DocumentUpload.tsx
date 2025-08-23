@@ -11,47 +11,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/index';
 import { logger } from '@/utils/logger';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import * as pdfjsLib from 'pdfjs-dist';
-import OpenAI from 'openai';
-
-// Set up PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
-
-// Simple text splitter for client-side processing
-class TextSplitter {
-  constructor(
-    private chunkSize: number = 1000,
-    private chunkOverlap: number = 200,
-    private separators: string[] = ['\n\n', '\n', '. ', '? ', '! ', ' ', '']
-  ) {}
-
-  splitText(text: string): string[] {
-    const chunks: string[] = [];
-    let start = 0;
-
-    while (start < text.length) {
-      let end = start + this.chunkSize;
-      if (end > text.length) end = text.length;
-
-      // Try to break at separators
-      if (end < text.length) {
-        for (const separator of this.separators) {
-          const lastSep = text.lastIndexOf(separator, end);
-          if (lastSep > start + this.chunkSize * 0.5) {
-            end = lastSep + separator.length;
-            break;
-          }
-        }
-      }
-
-      chunks.push(text.slice(start, end).trim());
-      start = end - this.chunkOverlap;
-      if (start < 0) start = 0;
-    }
-
-    return chunks.filter(chunk => chunk.length > 0);
-  }
-}
 
 interface DocumentUploadProps {
   agents?: Agent[];
@@ -154,7 +113,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       setProcessingStatus('File uploaded, starting server-side processing...');
       logger.component.update('DocumentUpload', { action: 'uploadSuccess', path: uploadData.path });
 
-      // Server-side processing using edge function
+      // Server-side processing using unified edge function
       setProcessingStatus('Processing document with secure server...');
       setUploadProgress(50);
       
@@ -180,15 +139,15 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       // Set performance stats
       const totalTime = performance.now() - startTime;
       setPerformanceStats({
-        chunksProcessed: processResult.chunksCreated,
-        batchesProcessed: Math.ceil(processResult.chunksCreated / 20),
+        chunksProcessed: processResult.chunksProcessed || 0,
+        batchesProcessed: Math.ceil((processResult.chunksProcessed || 0) / 20),
         processingTime: totalTime,
         optimized: true
       });
       
       toast({
         title: "Success",
-        description: `Successfully processed ${processResult.fileName} using secure server processing. Created ${processResult.chunksCreated} knowledge chunks in ${(totalTime/1000).toFixed(1)}s.`
+        description: `Successfully processed ${processResult.fileName} using secure server processing. Created ${processResult.chunksProcessed || 0} knowledge chunks in ${(totalTime/1000).toFixed(1)}s.`
       });
       
       // Reset form
