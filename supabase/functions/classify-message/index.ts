@@ -145,9 +145,15 @@ Notion: "${deliberationNotion}"`
     // Parse the JSON response
     let classification
     try {
+      console.log('Raw AI Response:', aiResponse)
+      console.log('AI Response type:', typeof aiResponse)
+      console.log('AI Response length:', aiResponse?.length)
+      
       classification = JSON.parse(aiResponse)
+      console.log('Parsed classification:', JSON.stringify(classification, null, 2))
     } catch (parseError) {
       console.error('Failed to parse AI response:', aiResponse)
+      console.error('Parse error details:', parseError)
       throw new Error('Invalid AI response format')
     }
 
@@ -177,6 +183,14 @@ Notion: "${deliberationNotion}"`
     }
 
     // Validate the response structure
+    console.log('Final classification before validation:', JSON.stringify(classification, null, 2))
+    console.log('Validation checks:', {
+      hasTitle: !!classification.title,
+      hasKeywords: !!classification.keywords,
+      hasNodeType: !!classification.nodeType,
+      hasConfidence: !!classification.confidence
+    })
+    
     if (!classification.title || !classification.keywords || !classification.nodeType || !classification.confidence) {
       console.error('Incomplete classification response:', classification)
       throw new Error('Incomplete classification response')
