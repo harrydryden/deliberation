@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 export const SupabaseAuthForm = () => {
   const [accessCode1, setAccessCode1] = useState('');
@@ -50,14 +51,14 @@ export const SupabaseAuthForm = () => {
       const email = `${accessCode1.toUpperCase()}@deliberation.local`;
       const password = accessCode2;
       
-      console.log('Attempting to sign in with:', { email, password: '***' });
+      logger.info('Attempting to sign in', { email });
       
       const result = await signIn(email, password);
       
-      console.log('Sign in result:', { error: result.error, hasError: !!result.error });
+      logger.debug('Sign in result', { hasError: !!result.error });
 
       if (result.error) {
-        console.error('Authentication error:', result.error);
+        logger.error('Authentication error', { error: result.error.message });
         setError('Invalid access codes. Please check your Access Code 1 and Access Code 2.');
       } else {
         toast({
@@ -67,8 +68,9 @@ export const SupabaseAuthForm = () => {
         
         navigate('/admin');
       }
-    } catch (err: any) {
-      console.error('Auth exception:', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      logger.error('Auth exception', { error: error.message, stack: error.stack });
       setError('Invalid access codes. Please check your Access Code 1 and Access Code 2.');
     } finally {
       setIsLoading(false);

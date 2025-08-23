@@ -7,6 +7,23 @@ import { supabase } from '@/integrations/supabase/client';
 import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown, Type, AudioLines, Clock } from 'lucide-react';
 import { RealtimeRTC } from '@/utils/realtimeRtc';
 import { SessionManager } from '@/utils/sessionManager';
+import { logger } from '@/utils/logger';
+// Local interface for voice events
+interface VoiceEvent {
+  type: string;
+  error?: {
+    code: string;
+    message: string;
+  };
+  response?: {
+    status: string;
+    status_details?: {
+      error?: {
+        message: string;
+      };
+    };
+  };
+}
 interface VoiceInterfaceProps {
   deliberationId: string;
   preferredBillAgentId?: string;
@@ -64,7 +81,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       setBillAgentId(id);
       return id;
     } catch (err) {
-      console.error('[VoiceInterface] Failed to fetch Bill agent id', err);
+      logger.error('Failed to fetch Bill agent id', err as Error);
       toast({ title: 'Error', description: 'No Bill agent found for this deliberation', variant: 'destructive' });
       return null;
     }
@@ -81,8 +98,9 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       const sources = Array.isArray(data?.sources) ? data.sources.join(', ') : '';
       const response = data?.response || data?.generatedText || 'No result.';
       return `Knowledge digest:\n${response}${sources ? `\nSources: ${sources}` : ''}`;
-    } catch (err: any) {
-      console.error('[VoiceInterface] search_knowledge error', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      logger.error('search_knowledge error', error);
       return 'Knowledge search failed.';
     }
   };
@@ -127,7 +145,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
 
       return { duration, maxItems, totalNodes, instructions };
     } catch (err) {
-      console.error('[VoiceInterface] complexity analysis error', err);
+      logger.error('complexity analysis error', err as Error);
       return {
         duration: "30–60 seconds",
         maxItems: 5,
@@ -174,7 +192,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
         maxItems > 10 ? 'Provide a comprehensive spoken summary covering all major themes and relationships.' : 'Provide a clear spoken summary for participants.'
       ].join('\n');
     } catch (err) {
-      console.error('[VoiceInterface] get_ibis_context error', err);
+      logger.error('get_ibis_context error', err as Error);
       return 'Unable to load IBIS context.';
     }
   };
@@ -197,7 +215,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     return;
   };
 
-  const handleEvent = (event: any) => {
+  const handleEvent = (event: VoiceEvent) => {
     // Update session activity for any event
     sessionManagerRef.current?.updateActivity();
     
@@ -210,7 +228,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       sessionManagerRef.current?.recordError();
       
       if (errorCode === 'session_expired') {
-        console.log('[VoiceInterface] Session expired, forcing cleanup');
+        logger.warn('Session expired, forcing cleanup');
         toast({ title: 'Session expired', description: 'Voice session expired. Click to restart.', variant: 'destructive' });
         // Force immediate cleanup and reset
         void stop();
@@ -218,7 +236,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       }
       
       // Handle other errors
-      console.error('[VoiceInterface] RTC Error:', event);
+      logger.error('RTC Error', new Error(event?.error?.message || 'Unknown RTC error'), { event });
       toast({ title: 'Voice error', description: errorMessage || 'Voice connection error', variant: 'destructive' });
       return;
     }
@@ -244,19 +262,19 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   };
 
   const ensureIdle = async () => {
-    console.log('[VoiceInterface] ensureIdle called, current mode:', mode);
+    logger.debug('ensureIdle called', { currentMode: mode });
     
     // Always force cleanup, regardless of current mode, to handle expired sessions
-    console.log('[VoiceInterface] Forcing complete cleanup of any existing connections');
+    logger.debug('Forcing complete cleanup of any existing connections');
     
     // Force stop any RTC connections immediately
     if (rtcRef.current) {
-      console.log('[VoiceInterface] Disconnecting RTC immediately');
+      logger.debug('Disconnecting RTC immediately');
       try {
         rtcRef.current.cancelSpeaking?.();
         rtcRef.current.disconnect();
       } catch (e) {
-        console.warn('[VoiceInterface] Error disconnecting RTC:', e);
+        logger.warn('Error disconnecting RTC', e as Error);
       }
       rtcRef.current = null;
     }
@@ -266,7 +284,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       try {
         sttRecorderRef.current.stop();
       } catch (e) {
-        console.warn('[VoiceInterface] Error stopping STT recorder:', e);
+        logger.warn('Error stopping STT recorder', e as Error);
       }
       sttRecorderRef.current = null;
     }
@@ -275,7 +293,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       try {
         sttStreamRef.current.getTracks().forEach(t => t.stop());
       } catch (e) {
-        console.warn('[VoiceInterface] Error stopping STT stream:', e);
+        logger.warn('Error stopping STT stream', e as Error);
       }
       sttStreamRef.current = null;
     }
@@ -287,9 +305,9 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     setSttBusy(false);
     
     // Wait for complete cleanup to handle session expiration
-    console.log('[VoiceInterface] Waiting for complete cleanup...');
+    logger.debug('Waiting for complete cleanup...');
     await new Promise((r) => setTimeout(r, 1500));
-    console.log('[VoiceInterface] Cleanup complete, ready for new session');
+    logger.debug('Cleanup complete, ready for new session');
   };
 
   const createSessionManager = () => {
@@ -302,7 +320,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       },
       {
         onSessionExpired: () => {
-          console.log('[VoiceInterface] Session manager detected expiration');
+          logger.warn('Session manager detected expiration');
           toast({ 
             title: 'Session expired', 
             description: 'Voice session expired. Please reconnect.', 
@@ -311,7 +329,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
           void stop();
         },
         onSessionRenewed: async (sessionId) => {
-          console.log('[VoiceInterface] Session manager requesting renewal:', sessionId);
+          logger.info('Session manager requesting renewal', { sessionId });
           // Attempt graceful renewal by reconnecting
           if (mode === 'bill') {
             await gracefulReconnect(() => startBill());
@@ -330,16 +348,17 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     if (!wasConnected) return;
     
     try {
-      console.log('[VoiceInterface] Starting graceful reconnection for mode:', currentMode);
+      logger.info('Starting graceful reconnection', { currentMode });
       toast({ title: 'Reconnecting...', description: 'Refreshing voice session' });
       
       await ensureIdle();
       await reconnectFn();
       
-      console.log('[VoiceInterface] Graceful reconnection successful');
+      logger.info('Graceful reconnection successful');
       toast({ title: 'Reconnected', description: 'Voice session refreshed successfully' });
-    } catch (err: any) {
-      console.error('[VoiceInterface] Graceful reconnection failed:', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      logger.error('Graceful reconnection failed', error);
       toast({ 
         title: 'Reconnection failed', 
         description: 'Please manually restart the voice session', 
@@ -366,10 +385,11 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       startSessionStatusUpdates();
       
       toast({ title: 'Bill voice connected', description: 'Two-way with knowledge tools enabled.' });
-    } catch (err: any) {
-      console.error('[VoiceInterface] Start Bill error', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      logger.error('Start Bill error', error);
       sessionManagerRef.current?.recordError();
-      toast({ title: 'Error', description: err?.message || 'Failed to start Bill', variant: 'destructive' });
+      toast({ title: 'Error', description: error.message || 'Failed to start Bill', variant: 'destructive' });
     }
   };
 
@@ -436,10 +456,11 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
           ? 'Generating summary for new deliberation...'
           : `Generating ${complexity.duration} summary for ${complexity.totalNodes} nodes...` 
       });
-    } catch (err: any) {
-      console.error('[VoiceInterface] Start IBIS error', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      logger.error('Start IBIS error', error);
       sessionManagerRef.current?.recordError();
-      toast({ title: 'Error', description: err?.message || 'Failed to start IBIS summary', variant: 'destructive' });
+      toast({ title: 'Error', description: error.message || 'Failed to start IBIS summary', variant: 'destructive' });
     }
   };
 
@@ -461,9 +482,9 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
 
   const startStt = async () => {
     try {
-      console.log('[VoiceInterface] Starting STT mode');
+      logger.debug('Starting STT mode');
       await ensureIdle();
-      console.log('[VoiceInterface] Idle ensured, starting STT recording');
+      logger.debug('Idle ensured, starting STT recording');
       
       sttChunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -482,27 +503,26 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
           const { data, error } = await supabase.functions.invoke('voice-to-text', { body: { audio: b64 } });
           if (error) throw error;
           const text = (data?.text || '').toString().trim();
-          console.log('[VoiceInterface] STT transcription received:', text);
-          console.log('[VoiceInterface] setMessageText available:', !!setMessageText);
-          console.log('[VoiceInterface] sendChatMessage available:', !!sendChatMessage);
+          logger.debug('STT transcription received', { text, setMessageTextAvailable: !!setMessageText, sendChatMessageAvailable: !!sendChatMessage });
           
           if (text.length > 0) {
             // STT mode should ONLY transcribe to message input, never send
             if (setMessageText) {
-              console.log('[VoiceInterface] Setting message text only, not sending');
+              logger.debug('Setting message text only, not sending');
               setMessageText(text);
               toast({ title: 'Text transcribed', description: 'Voice transcription added to message input.' });
             } else {
-              console.log('[VoiceInterface] ERROR: No setMessageText function provided');
+              logger.error('No setMessageText function provided');
               toast({ title: 'Error', description: 'No setMessageText function provided for dictation', variant: 'destructive' });
             }
           } else {
-            console.log('[VoiceInterface] No speech detected');
+            logger.debug('No speech detected');
             toast({ title: 'No speech detected', description: 'Nothing was transcribed.', variant: 'destructive' });
           }
-        } catch (err: any) {
-          console.error('[VoiceInterface] STT error', err);
-          toast({ title: 'Voice to text failed', description: err?.message || 'Transcription error', variant: 'destructive' });
+        } catch (err: unknown) {
+          const error = err as Error;
+          logger.error('STT error', error);
+          toast({ title: 'Voice to text failed', description: error.message || 'Transcription error', variant: 'destructive' });
         } finally {
           setSttBusy(false);
           try { sttStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
@@ -519,9 +539,10 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       setConnected(true);
       setMode('stt');
       toast({ title: 'Recording…', description: 'Toggle off to transcribe to message input.' });
-    } catch (err: any) {
-      console.error('[VoiceInterface] startStt error', err);
-      toast({ title: 'Error', description: err?.message || 'Failed to start recording', variant: 'destructive' });
+    } catch (err: unknown) {
+      const error = err as Error;
+      logger.error('startStt error', error);
+      toast({ title: 'Error', description: error.message || 'Failed to start recording', variant: 'destructive' });
     }
   };
 
@@ -546,7 +567,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       }
       rec.stop();
     } catch (e) {
-      console.error('[VoiceInterface] stopStt error', e);
+      logger.error('stopStt error', e as Error);
       setConnected(false);
       setMode('idle');
     }
@@ -554,7 +575,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
 
   const stop = async () => {
     try {
-      console.log('[VoiceInterface] stop called, mode:', mode);
+      logger.debug('stop called', { mode });
       const wasConnected = connected;
       
       // Stop session manager
@@ -564,7 +585,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       }
       
       if (rtcRef.current) {
-        console.log('[VoiceInterface] Disconnecting RTC');
+        logger.debug('Disconnecting RTC');
         rtcRef.current.disconnect();
         rtcRef.current = null;
       }
@@ -577,8 +598,9 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       if (wasConnected) {
         toast({ title: 'Voice disconnected', description: 'Session ended.' });
       }
-    } catch (err: any) {
-      console.error('[VoiceInterface] stop error', err);
+    } catch (err: unknown) {
+      const error = err as Error;
+      logger.error('stop error', error);
     }
   };
 

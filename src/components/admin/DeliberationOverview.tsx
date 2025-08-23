@@ -63,17 +63,17 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
   };
 
   const handleEditNodes = (deliberation: Deliberation) => {
-    console.log('🔍 DeliberationOverview - Edit Nodes clicked for deliberation:', deliberation.id, deliberation.title);
+    logger.info('Edit Nodes clicked for deliberation', { deliberationId: deliberation.id, title: deliberation.title });
     setSelectedDeliberation(deliberation);
     setEditMode('nodes');
-    console.log('🔍 DeliberationOverview - State set, editMode should now be "nodes"');
+    logger.debug('State set, editMode should now be "nodes"');
   };
 
   const handleEditMap = (deliberation: Deliberation) => {
-    console.log('🔍 DeliberationOverview - Edit Map clicked for deliberation:', deliberation.id, deliberation.title);
+    logger.info('Edit Map clicked for deliberation', { deliberationId: deliberation.id, title: deliberation.title });
     setSelectedDeliberation(deliberation);
     setEditMode('map');
-    console.log('🔍 DeliberationOverview - State set, editMode should now be "map"');
+    logger.debug('State set, editMode should now be "map"');
   };
 
   const handleBackFromEdit = () => {
@@ -110,7 +110,7 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
         description: `All IBIS data cleared from "${deliberationTitle}"`
       });
     } catch (error) {
-      console.error('Failed to clear IBIS data:', error);
+      logger.error('Failed to clear IBIS data', error as Error, { deliberationId });
       toast({
         title: "Error",
         description: "Failed to clear IBIS data. Please try again.",

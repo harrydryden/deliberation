@@ -1,5 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { logger } from '@/utils/logger';
 
 interface Props {
   children: ReactNode;
@@ -21,11 +22,11 @@ export class AuthLoadingBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Auth Loading Boundary caught an error:', error, errorInfo);
+    logger.error('Auth Loading Boundary caught an error', { error: error.message, stack: error.stack, errorInfo });
   }
 
   render() {
-    console.log('🔍 AuthLoadingBoundary render, hasError:', this.state.hasError);
+    logger.debug('AuthLoadingBoundary render', { hasError: this.state.hasError });
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center">
