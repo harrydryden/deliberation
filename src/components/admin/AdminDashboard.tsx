@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 
 import { UserAccessManagement } from './UserAccessManagement';
 import { AgentManagement } from './AgentManagement';
@@ -26,6 +27,7 @@ export const AdminDashboard = () => {
   const adminData = useAdminData();
   const { handleAsyncError } = useErrorHandler();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   useMemoryLeakDetection('AdminDashboard');
 

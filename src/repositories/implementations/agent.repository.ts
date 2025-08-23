@@ -7,7 +7,23 @@ import { logger } from '@/utils/logger';
 export class AgentRepository extends SupabaseBaseRepository implements IAgentRepository {
   
   async findById(id: string): Promise<Agent | null> {
-    return this.findByIdFromTable('agent_configurations', id);
+    try {
+      const { data, error } = await supabase
+        .from('agent_configurations')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        if (error.code === 'PGRST116') return null;
+        throw error;
+      }
+      
+      return this.mapToAgent(data);
+    } catch (error) {
+      logger.error('Agent repository findById failed', error as Error, { id });
+      throw error;
+    }
   }
 
   async create(data: any): Promise<Agent> {
@@ -34,22 +50,44 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         dbData.created_by = currentUserId;
       }
       
-      const result = await this.createInTable('agent_configurations', dbData);
+      const { data: result, error } = await supabase
+        .from('agent_configurations')
+        .insert(dbData)
+        .select()
+        .single();
       
-      // Map result back to camelCase for API consistency
-      return {
-        ...result,
-        is_active: result.is_active,
-        deliberation_id: result.deliberation_id,
-      } as Agent;
+      if (error) throw error;
+      
+      return this.mapToAgent(result);
     } catch (error) {
-      logger.error({ error, data }, 'Agent repository create failed');
+      logger.error('Agent repository create failed', error as Error, { data });
       throw error;
     }
   }
 
   async delete(id: string): Promise<void> {
     return this.deleteFromTable('agent_configurations', id);
+  }
+
+  private mapToAgent(data: any): Agent {
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description,
+      agent_type: data.agent_type,
+      goals: data.goals || [],
+      response_style: data.response_style,
+      is_active: data.is_active,
+      is_default: data.is_default,
+      deliberation_id: data.deliberation_id,
+      created_by: data.created_by,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      preset_questions: data.preset_questions,
+      facilitator_config: data.facilitator_config,
+      prompt_overrides: data.prompt_overrides,
+      deliberation: data.deliberation
+    };
   }
 
   async findByDeliberation(deliberationId: string): Promise<Agent[]> {
@@ -59,7 +97,7 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         .rpc('get_local_agents_admin');
 
       if (agentError) {
-        logger.error({ error: agentError, deliberationId }, 'Agent repository findByDeliberation RPC error');
+        logger.error('Agent repository findByDeliberation RPC error', agentError as Error, { deliberationId });
         throw agentError;
       }
 
@@ -70,21 +108,7 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
       // Filter for the specific deliberation and map to Agent format
       const filteredAgents = agentData
         .filter((item: any) => item.deliberation_id === deliberationId && item.is_active)
-        .map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          description: item.description,
-          response_style: item.response_style,
-          goals: item.goals,
-          agent_type: item.agent_type,
-          facilitator_config: item.facilitator_config,
-          is_default: item.is_default,
-          is_active: item.is_active,
-          deliberation_id: item.deliberation_id,
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          prompt_overrides: item.prompt_overrides,
-        })) as Agent[];
+        .map((item: any) => this.mapToAgent(item));
 
       logger.info(`Agent repository findByDeliberation found ${filteredAgents.length} agents`, { 
         deliberationId, 
@@ -93,7 +117,7 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
 
       return filteredAgents;
     } catch (error) {
-      logger.error({ error, deliberationId }, 'Agent repository findByDeliberation failed');
+      logger.error('Agent repository findByDeliberation failed', error as Error, { deliberationId });
       throw error;
     }
   }
@@ -105,7 +129,7 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         .rpc('get_local_agents_admin');
 
       if (agentError) {
-        logger.error({ error: agentError }, 'Agent repository findLocalAgents RPC error');
+        logger.error('Agent repository findLocalAgents RPC error', agentError as Error);
         throw agentError;
       }
 
@@ -124,7 +148,7 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
           .in('id', deliberationIds);
 
         if (deliberationError) {
-          logger.error({ error: deliberationError }, 'Agent repository findLocalAgents deliberation error');
+          logger.error('Agent repository findLocalAgents deliberation error', deliberationError as Error);
           // Continue without deliberation data rather than failing completely
         } else {
           deliberationMap = new Map(
@@ -135,25 +159,13 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
 
       // Map database format to API format with consistent field mapping
       return agentData.map(item => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        response_style: item.response_style,
-        goals: item.goals,
-        agent_type: item.agent_type,
-        facilitator_config: item.facilitator_config,
-        is_default: item.is_default,
-        is_active: item.is_active,
-        deliberation_id: item.deliberation_id,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        prompt_overrides: item.prompt_overrides,
+        ...this.mapToAgent(item),
         deliberation: item.deliberation_id && deliberationMap.has(item.deliberation_id) 
           ? deliberationMap.get(item.deliberation_id)
           : undefined
-      })) as Agent[];
+      }));
     } catch (error) {
-      logger.error({ error }, 'Agent repository findLocalAgents failed');
+      logger.error('Agent repository findLocalAgents failed', error as Error);
       throw error;
     }
   }
@@ -182,28 +194,14 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         .is('deliberation_id', null);
 
       if (error) {
-        logger.error({ error }, 'Agent repository findGlobalAgents error');
+        logger.error('Agent repository findGlobalAgents error', error as Error);
         throw error;
       }
 
       // Map database format to API format
-      return data.map(item => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        response_style: item.response_style,
-        goals: item.goals,
-        agent_type: item.agent_type,
-        facilitator_config: item.facilitator_config,
-        is_default: item.is_default,
-        is_active: item.is_active,
-        deliberation_id: item.deliberation_id,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        prompt_overrides: item.prompt_overrides,
-      })) as Agent[];
+      return data.map(item => this.mapToAgent(item));
     } catch (error) {
-      logger.error({ error }, 'Agent repository findGlobalAgents failed');
+      logger.error('Agent repository findGlobalAgents failed', error as Error);
       throw error;
     }
   }
@@ -246,27 +244,14 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
       const { data, error } = await query;
 
       if (error) {
-        logger.error({ error, filter }, 'Agent repository findAll error');
+        logger.error('Agent repository findAll error', error as Error, { filter });
         throw error;
       }
 
       // Map database format to API format
-      return data.map(item => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        response_style: item.response_style,
-        goals: item.goals,
-        agent_type: item.agent_type,
-        facilitator_config: item.facilitator_config,
-        is_default: item.is_default,
-        is_active: item.is_active,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        prompt_overrides: item.prompt_overrides,
-      })) as Agent[];
+      return data.map(item => this.mapToAgent(item));
     } catch (error) {
-      logger.error({ error, filter }, 'Agent repository findAll failed');
+      logger.error('Agent repository findAll failed', error as Error, { filter });
       throw error;
     }
   }
@@ -290,7 +275,7 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
         });
       
       if (error) {
-        logger.error({ error, id, data }, 'Agent repository admin update RPC error');
+        logger.error('Agent repository admin update RPC error', error as Error, { id, data });
         throw error;
       }
       
@@ -308,7 +293,7 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
       logger.info('Agent repository update successful', { id, updatedFields: Object.keys(data) });
       return updatedAgent;
     } catch (error) {
-      logger.error({ error, id, data }, 'Agent repository update failed');
+      logger.error('Agent repository update failed', error as Error, { id, data });
       throw error;
     }
   }

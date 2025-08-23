@@ -7,19 +7,72 @@ import { logger } from '@/utils/logger';
 export class DeliberationRepository extends SupabaseBaseRepository implements IDeliberationRepository {
   
   async findById(id: string): Promise<Deliberation | null> {
-    return this.findByIdFromTable('deliberations', id);
+    try {
+      const { data, error } = await supabase
+        .from('deliberations')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        if (error.code === 'PGRST116') return null;
+        throw error;
+      }
+      
+      return this.mapToDeliberation(data);
+    } catch (error) {
+      logger.error('Deliberation repository findById failed', error as Error, { id });
+      throw error;
+    }
   }
 
   async create(data: any): Promise<Deliberation> {
-    return this.createInTable('deliberations', data);
+    try {
+      const { data: result, error } = await supabase
+        .from('deliberations')
+        .insert(data)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return this.mapToDeliberation(result);
+    } catch (error) {
+      logger.error('Deliberation repository create failed', error as Error, { data });
+      throw error;
+    }
   }
 
   async update(id: string, data: any): Promise<Deliberation> {
-    return this.updateInTable('deliberations', id, data);
+    try {
+      const { data: result, error } = await supabase
+        .from('deliberations')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return this.mapToDeliberation(result);
+    } catch (error) {
+      logger.error('Deliberation repository update failed', error as Error, { id, data });
+      throw error;
+    }
   }
 
   async delete(id: string): Promise<void> {
     return this.deleteFromTable('deliberations', id);
+  }
+
+  private mapToDeliberation(data: any): Deliberation {
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      notion: data.notion,
+      status: data.status,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   }
 
   async findByStatus(status: string): Promise<Deliberation[]> {
@@ -31,13 +84,13 @@ export class DeliberationRepository extends SupabaseBaseRepository implements ID
         .order('created_at', { ascending: false });
 
       if (error) {
-        logger.error({ error, status }, 'Deliberation repository findByStatus error');
+        logger.error('Deliberation repository findByStatus error', error as Error, { status });
         throw error;
       }
 
-      return data as Deliberation[];
+      return data.map(item => this.mapToDeliberation(item));
     } catch (error) {
-      logger.error({ error, status }, 'Deliberation repository findByStatus failed');
+      logger.error('Deliberation repository findByStatus failed', error as Error, { status });
       throw error;
     }
   }
@@ -51,13 +104,13 @@ export class DeliberationRepository extends SupabaseBaseRepository implements ID
         .order('created_at', { ascending: false });
 
       if (error) {
-        logger.error({ error, facilitatorId }, 'Deliberation repository findByFacilitator error');
+        logger.error('Deliberation repository findByFacilitator error', error as Error, { facilitatorId });
         throw error;
       }
 
-      return data as Deliberation[];
+      return data.map(item => this.mapToDeliberation(item));
     } catch (error) {
-      logger.error({ error, facilitatorId }, 'Deliberation repository findByFacilitator failed');
+      logger.error('Deliberation repository findByFacilitator failed', error as Error, { facilitatorId });
       throw error;
     }
   }
@@ -71,13 +124,13 @@ export class DeliberationRepository extends SupabaseBaseRepository implements ID
         .order('created_at', { ascending: false });
 
       if (error) {
-        logger.error({ error }, 'Deliberation repository findPublic error');
+        logger.error('Deliberation repository findPublic error', error as Error);
         throw error;
       }
 
-      return data as Deliberation[];
+      return data.map(item => this.mapToDeliberation(item));
     } catch (error) {
-      logger.error({ error }, 'Deliberation repository findPublic failed');
+      logger.error('Deliberation repository findPublic failed', error as Error);
       throw error;
     }
   }
@@ -113,22 +166,14 @@ export class DeliberationRepository extends SupabaseBaseRepository implements ID
       const { data, error } = await query;
 
       if (error) {
-        logger.error({ error, filter }, 'Deliberation repository findAll error');
+        logger.error('Deliberation repository findAll error', error as Error, { filter });
         throw error;
       }
 
       // Map database format to API format
-      return data.map(item => ({
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        notion: item.notion,
-        status: item.status,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
-      })) as Deliberation[];
+      return data.map(item => this.mapToDeliberation(item));
     } catch (error) {
-      logger.error({ error, filter }, 'Deliberation repository findAll failed');
+      logger.error('Deliberation repository findAll failed', error as Error, { filter });
       throw error;
     }
   }

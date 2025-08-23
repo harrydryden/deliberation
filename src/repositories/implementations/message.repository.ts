@@ -7,19 +7,83 @@ import { logger } from '@/utils/logger';
 export class MessageRepository extends SupabaseBaseRepository implements IMessageRepository {
   
   async findAll(filter?: Record<string, any>): Promise<Message[]> {
-    return this.findAllFromTable('messages', filter);
+    try {
+      let query = supabase
+        .from('messages')
+        .select('*');
+
+      if (filter) {
+        Object.entries(filter).forEach(([key, value]) => {
+          query = query.eq(key, value);
+        });
+      }
+
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error } = await query;
+
+      if (error) {
+        logger.error('Message repository findAll error', error as Error, { filter });
+        throw error;
+      }
+
+      return data.map(item => this.mapToMessage(item));
+    } catch (error) {
+      logger.error('Message repository findAll failed', error as Error, { filter });
+      throw error;
+    }
   }
 
   async findById(id: string): Promise<Message | null> {
-    return this.findByIdFromTable('messages', id);
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        if (error.code === 'PGRST116') return null;
+        throw error;
+      }
+      
+      return this.mapToMessage(data);
+    } catch (error) {
+      logger.error('Message repository findById failed', error as Error, { id });
+      throw error;
+    }
   }
 
   async update(id: string, data: any): Promise<Message> {
-    return this.updateInTable('messages', id, data);
+    try {
+      const { data: result, error } = await supabase
+        .from('messages')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return this.mapToMessage(result);
+    } catch (error) {
+      logger.error('Message repository update failed', error as Error, { id, data });
+      throw error;
+    }
   }
 
   async delete(id: string): Promise<void> {
     return this.deleteFromTable('messages', id);
+  }
+
+  private mapToMessage(data: any): Message {
+    return {
+      id: data.id,
+      content: data.content,
+      messageType: data.message_type,
+      userId: data.user_id,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   }
 
   async findByDeliberation(deliberationId: string): Promise<Message[]> {
@@ -34,13 +98,13 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
         .order('created_at', { ascending: true });
 
       if (error) {
-        logger.error('Message repository findByDeliberation error', error, { deliberationId });
+        logger.error('Message repository findByDeliberation error', error as Error, { deliberationId });
         throw error;
       }
 
-      return data as Message[];
+      return data.map(item => this.mapToMessage(item));
     } catch (error) {
-      logger.error('Message repository findByDeliberation failed', error, { deliberationId });
+      logger.error('Message repository findByDeliberation failed', error as Error, { deliberationId });
       throw error;
     }
   }
@@ -56,13 +120,13 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
         .order('created_at', { ascending: false });
 
       if (error) {
-        logger.error('Message repository findByUser error', error, { userId });
+        logger.error('Message repository findByUser error', error as Error, { userId });
         throw error;
       }
 
-      return data as Message[];
+      return data.map(item => this.mapToMessage(item));
     } catch (error) {
-      logger.error('Message repository findByUser failed', error, { userId });
+      logger.error('Message repository findByUser failed', error as Error, { userId });
       throw error;
     }
   }
@@ -86,7 +150,7 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
         .single();
 
       if (error) {
-        logger.error('Message repository create error', error, { data });
+        logger.error('Message repository create error', error as Error, { data });
         throw error;
       }
 
@@ -95,18 +159,10 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
       logger.info('Message created successfully', { messageId: result.id, type: data.messageType });
       
       // Map back to API format
-      return {
-        id: result.id,
-        content: result.content,
-        messageType: result.message_type,
-        userId: result.user_id,
-        createdAt: result.created_at,
-        updatedAt: result.updated_at,
-      } as Message;
+      return this.mapToMessage(result);
     } catch (error) {
-      logger.error('Message repository create failed', error, { data });
+      logger.error('Message repository create failed', error as Error, { data });
       throw error;
     }
   }
-
 }

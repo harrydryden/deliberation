@@ -7,15 +7,74 @@ import { logger } from '@/utils/logger';
 export class UserRepository extends SupabaseBaseRepository implements IUserRepository {
   
   async findById(id: string): Promise<User | null> {
-    return this.findByIdFromTable('profiles', id);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        if (error.code === 'PGRST116') return null;
+        throw error;
+      }
+      
+      return this.mapToUser(data);
+    } catch (error) {
+      logger.error('User repository findById failed', error as Error, { id });
+      throw error;
+    }
   }
 
   async create(data: any): Promise<User> {
-    return this.createInTable('profiles', data);
+    try {
+      const { data: result, error } = await supabase
+        .from('profiles')
+        .insert(data)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return this.mapToUser(result);
+    } catch (error) {
+      logger.error('User repository create failed', error as Error, { data });
+      throw error;
+    }
   }
 
   async update(id: string, data: any): Promise<User> {
-    return this.updateInTable('profiles', id, data);
+    try {
+      const { data: result, error } = await supabase
+        .from('profiles')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return this.mapToUser(result);
+    } catch (error) {
+      logger.error('User repository update failed', error as Error, { id, data });
+      throw error;
+    }
+  }
+
+  private mapToUser(data: any): User {
+    return {
+      id: data.id,
+      email: data.email || '',
+      emailConfirmedAt: data.email_confirmed_at,
+      createdAt: data.created_at,
+      lastSignInAt: data.last_sign_in_at,
+      profile: null,
+      role: data.role,
+      isArchived: data.is_archived,
+      archivedAt: data.archived_at,
+      archivedBy: data.archived_by,
+      archiveReason: data.archive_reason,
+      accessCode1: data.access_code_1,
+      accessCode2: data.access_code_2
+    };
   }
 
   async delete(id: string): Promise<void> {

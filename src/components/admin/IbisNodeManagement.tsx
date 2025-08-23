@@ -12,6 +12,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { formatToUKDateTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 interface IbisNode {
   id: string;

@@ -23,6 +23,7 @@ import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
 import { useIsMobile } from "@/hooks/use-mobile";
 const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface"));
 import { logger } from "@/utils/logger";
+import { supabase } from "@/integrations/supabase/client";
 
 // Helper function removed - will be implemented through service layer to avoid direct DB queries
 
