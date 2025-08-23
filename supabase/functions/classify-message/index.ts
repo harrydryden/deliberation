@@ -151,8 +151,34 @@ Notion: "${deliberationNotion}"`
       throw new Error('Invalid AI response format')
     }
 
+    // Map old response format to new format if needed
+    if (classification.item_type && !classification.nodeType) {
+      console.log('Mapping item_type to nodeType:', classification.item_type)
+      // Map item_type values to nodeType values
+      const typeMapping = {
+        'proposal': 'position',
+        'question': 'issue', 
+        'statement': 'argument',
+        'issue': 'issue',
+        'position': 'position',
+        'argument': 'argument'
+      }
+      classification.nodeType = typeMapping[classification.item_type] || 'issue'
+    }
+
+    // Map confidence_score to confidence if needed
+    if (classification.confidence_score && !classification.confidence) {
+      classification.confidence = classification.confidence_score
+    }
+
+    // Map stance_score to stanceScore if needed
+    if (classification.stance_score && !classification.stanceScore) {
+      classification.stanceScore = classification.stance_score
+    }
+
     // Validate the response structure
     if (!classification.title || !classification.keywords || !classification.nodeType || !classification.confidence) {
+      console.error('Incomplete classification response:', classification)
       throw new Error('Incomplete classification response')
     }
 
