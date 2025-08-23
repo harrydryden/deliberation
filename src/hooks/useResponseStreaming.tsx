@@ -142,11 +142,15 @@ export const useResponseStreaming = () => {
             if (parsed.agentType && !currentAgentType) {
               currentAgentType = parsed.agentType;
               setStreamingState(prev => ({ ...prev, agentType: currentAgentType }));
+              // Only notify UI of agent type if we have a valid one
+              if (currentAgentType) {
+                onUpdate('', currentAgentType);
+              }
             }
 
             if (parsed.content) {
               currentContent += parsed.content;
-              if (!rafPendingRef.current) {
+              if (!rafPendingRef.current && currentAgentType) {
                 rafPendingRef.current = true;
                 requestAnimationFrame(() => {
                   setStreamingState(prev => ({ 
@@ -154,6 +158,7 @@ export const useResponseStreaming = () => {
                     currentMessage: currentContent,
                     agentType: currentAgentType 
                   }));
+                  // Only update UI if we have both content and agent type
                   onUpdate(currentContent, currentAgentType);
                   rafPendingRef.current = false;
                 });

@@ -158,6 +158,9 @@ export const useChat = (deliberationId?: string) => {
           deliberationId,
           // onUpdate callback - update streaming message in real-time
           (streamContent: string, agentType: string) => {
+            // Only show streaming messages if we have actual content
+            if (!streamContent.trim() && !agentType) return;
+            
             const streamingMessage: ChatMessage = {
               id: `streaming-${saved.id}`,
               content: streamContent,
@@ -176,8 +179,11 @@ export const useChat = (deliberationId?: string) => {
                   index === existingStreamingIndex ? streamingMessage : msg
                 );
               } else {
-                // Add new streaming message
-                return [...prev, streamingMessage];
+                // Only add new streaming message if we have content or it's the initial agent type announcement
+                if (streamContent.trim() || agentType) {
+                  return [...prev, streamingMessage];
+                }
+                return prev;
               }
             });
           },
@@ -207,7 +213,8 @@ export const useChat = (deliberationId?: string) => {
           // onError callback
           (error: string) => {
             logger.error('Streaming error', { error });
-            setMessages(prev => prev.filter(m => m.id !== `streaming-${saved.id}`));
+            // Clean up any streaming messages on error
+            setMessages(prev => prev.filter(m => m.id !== `streaming-${saved.id}` && !m.id.startsWith('streaming-')));
             setIsTyping(false);
             toast({
               title: "Response Error",
