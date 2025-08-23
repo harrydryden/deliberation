@@ -331,7 +331,6 @@ const DeliberationChat = () => {
                 {/* Mobile Controls */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg border bg-muted/40 p-2">
-                    <div className="text-xs font-medium text-muted-foreground mb-1">Text Mode</div>
                     <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-2">
