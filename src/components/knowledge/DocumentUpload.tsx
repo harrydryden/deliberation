@@ -11,8 +11,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/index';
 import { logger } from '@/utils/logger';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import * as pdfjsLib from 'pdfjs-dist';
-import 'pdfjs-dist/build/pdf.worker.entry';
 
 interface DocumentUploadProps {
   agents?: Agent[];
@@ -36,16 +34,35 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
   // Check if current user is admin
   const { user, isAdmin } = useSupabaseAuth();
 
-  // Configure PDF.js worker
-  React.useEffect(() => {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.min.js',
-      import.meta.url
-    ).toString();
-  }, []);
+  const loadPDFJS = async () => {
+    // Check if PDF.js is already loaded
+    if ((window as any).pdfjsLib) {
+      return (window as any).pdfjsLib;
+    }
+
+    // Load PDF.js dynamically from CDN to avoid build issues
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.min.js';
+    
+    return new Promise((resolve, reject) => {
+      script.onload = () => {
+        // Configure worker
+        (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.min.js';
+        resolve((window as any).pdfjsLib);
+      };
+      script.onerror = () => {
+        document.head.removeChild(script);
+        reject(new Error('Failed to load PDF.js library'));
+      };
+      document.head.appendChild(script);
+    });
+  };
 
   const extractPDFText = async (file: File): Promise<string> => {
     try {
+      // Load PDF.js dynamically
+      const pdfjsLib = await loadPDFJS() as any;
+      
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ 
         data: arrayBuffer,
