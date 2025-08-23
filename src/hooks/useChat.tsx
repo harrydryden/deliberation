@@ -205,6 +205,14 @@ export const useChat = (deliberationId?: string) => {
           // onComplete callback - replace with final message
           async (finalContent: string, agentType: string) => {
             console.log('✅ onComplete called:', { finalContent: finalContent.substring(0, 50), agentType });
+            
+            // Don't create messages with empty content
+            if (!finalContent.trim()) {
+              console.log('⚠️ Skipping onComplete due to empty finalContent');
+              setIsTyping(false);
+              return;
+            }
+            
             try {
               // Replace streaming placeholder with final agent message locally to avoid full reload
               const finalMessage: ChatMessage = {
