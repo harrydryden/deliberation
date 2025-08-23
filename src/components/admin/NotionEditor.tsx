@@ -63,6 +63,7 @@ export const NotionEditor = ({ deliberationId, currentNotion, onNotionUpdated, d
         description: "Notion updated successfully"
       });
     } catch (error) {
+      console.error('Error updating notion:', error);
       toast({
         title: "Error",
         description: "Failed to update notion",
