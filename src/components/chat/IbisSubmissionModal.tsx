@@ -296,7 +296,7 @@ export const IbisSubmissionModal = ({
     }
   };
   return <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add to Deliberation Map</DialogTitle>
         </DialogHeader>
@@ -416,15 +416,17 @@ export const IbisSubmissionModal = ({
           }))} placeholder="Detailed description (optional)" rows={3} />
           </div>
 
-          {/* Enhanced Relationship Selector */}
-          {existingNodes.length > 0 && formData.nodeType && formData.title.trim() && (
-            <EnhancedRelationshipSelector
-              deliberationId={deliberationId}
-              content={formData.description || messageContent}
-              title={formData.title}
-              nodeType={formData.nodeType as 'issue' | 'position' | 'argument'}
-              onRelationshipsChange={handleRelationshipsChange}
-            />
+          {/* Enhanced Relationship Selector - Always show if there are existing nodes */}
+          {existingNodes.length > 0 && (
+            <div className="border-t pt-4 mt-4">
+              <EnhancedRelationshipSelector
+                deliberationId={deliberationId}
+                content={formData.description || messageContent}
+                title={formData.title}
+                nodeType={(formData.nodeType || 'issue') as 'issue' | 'position' | 'argument'}
+                onRelationshipsChange={handleRelationshipsChange}
+              />
+            </div>
           )}
 
           <DialogFooter>

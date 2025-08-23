@@ -42,10 +42,10 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   // Real-time evaluation trigger
   useEffect(() => {
     const evaluateTimer = setTimeout(() => {
-      if (title.trim() && content.trim() && !evaluated) {
+      if (title.trim() && !evaluated) {
         evaluateRelationships();
       }
-    }, 1500); // Debounce for 1.5 seconds
+    }, 800); // Reduced debounce for faster response
 
     return () => clearTimeout(evaluateTimer);
   }, [title, content, nodeType, evaluated]);
@@ -150,8 +150,8 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
           <Brain className="h-4 w-4" />
           Smart Connections
         </Label>
-        <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg">
-          No meaningful relationships detected with existing contributions.
+        <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg border-l-4 border-l-muted">
+          No meaningful relationships detected with existing contributions. Your contribution appears to be introducing new perspectives.
         </div>
       </div>
     );
@@ -193,7 +193,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
       )}
 
       {suggestions.length > 0 && (
-        <div className="space-y-2 max-h-60 overflow-y-auto">
+        <div className="space-y-2 max-h-80 overflow-y-auto border rounded-lg p-2 bg-muted/20">
           {suggestions.map((suggestion, index) => {
             const key = `${suggestion.nodeId}-${suggestion.relationshipType}`;
             const isSelected = selectedRelationships.has(key);
