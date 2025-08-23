@@ -60,7 +60,6 @@ interface DocumentUploadProps {
 
 export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps) {
   const [selectedAgent, setSelectedAgent] = useState<string>('');
-  const [openaiApiKey, setOpenaiApiKey] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingStatus, setProcessingStatus] = useState<string>('');
@@ -100,10 +99,10 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !selectedAgent || !openaiApiKey) {
+    if (!file || !selectedAgent) {
       toast({
         title: "Error",
-        description: "Please select an agent, enter your OpenAI API key, and choose a file",
+        description: "Please select an agent and choose a file",
         variant: "destructive"
       });
       return;
@@ -152,99 +151,27 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       }
 
       setUploadProgress(30);
-      setProcessingStatus('File uploaded, starting intelligent processing...');
+      setProcessingStatus('File uploaded, starting server-side processing...');
       logger.component.update('DocumentUpload', { action: 'uploadSuccess', path: uploadData.path });
 
-      // Client-side processing with OpenAI
-      setProcessingStatus('Processing document with OpenAI...');
-      const processingStartTime = performance.now();
-      
-      // Extract text from file
-      let extractedText = '';
-      if (fileExt === 'pdf') {
-        setProcessingStatus('Extracting text from PDF...');
-        setUploadProgress(40);
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items.map((item: any) => item.str).join(' ');
-          extractedText += pageText + '\n';
-        }
-      } else {
-        // Handle text files
-        extractedText = await file.text();
-      }
-      
-      setProcessingStatus('Splitting text into chunks...');
+      // Server-side processing using edge function
+      setProcessingStatus('Processing document with secure server...');
       setUploadProgress(50);
       
-      // Split text into chunks
-      const textSplitter = new TextSplitter();
-      const chunks = textSplitter.splitText(extractedText);
-      
-      setProcessingStatus('Generating embeddings with OpenAI...');
-      setUploadProgress(60);
-      
-      // Use OpenAI API key from user input
-      
-      const openai = new OpenAI({ 
-        apiKey: openaiApiKey,
-        dangerouslyAllowBrowser: true 
-      });
-      
-      // Process chunks in batches to avoid rate limits
-      const batchSize = 20;
-      let processedChunks = 0;
-      const allKnowledgeEntries = [];
-      
-      for (let i = 0; i < chunks.length; i += batchSize) {
-        const batch = chunks.slice(i, i + batchSize);
-        setProcessingStatus(`Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(chunks.length / batchSize)}...`);
-        
-        // Generate embeddings for batch
-        const embeddings = await openai.embeddings.create({
-          model: 'text-embedding-3-small',
-          input: batch
-        });
-        
-        // Prepare knowledge entries
-        const knowledgeEntries = batch.map((chunk, index) => ({
-          agent_id: selectedAgent,
-          title: `${file.name} - Chunk ${i + index + 1}`,
-          content: chunk,
-          content_type: fileExt || 'text',
-          file_name: file.name,
-          storage_path: uploadData.path,
-          chunk_index: i + index,
-          embedding: embeddings.data[index].embedding,
-          created_by: user.id,
-          metadata: {
-            originalFileName: file.name,
-            fileSize: file.size,
-            chunkSize: chunk.length,
-            processingTimestamp: new Date().toISOString()
+      const { data: processResult, error: processError } = await supabase.functions.invoke(
+        'process-document-upload',
+        {
+          body: {
+            fileName: uploadData.path,
+            agentId: selectedAgent,
+            userId: user.id
           }
-        }));
-        
-        // Insert batch into database
-        const { error: insertError } = await supabase
-          .from('agent_knowledge')
-          .insert(knowledgeEntries);
-          
-        if (insertError) {
-          console.error('Database insert error:', insertError);
-          throw new Error(`Failed to save knowledge: ${insertError.message}`);
         }
-        
-        allKnowledgeEntries.push(...knowledgeEntries);
-        processedChunks += batch.length;
-        
-        // Update progress
-        const progress = 60 + ((processedChunks / chunks.length) * 30);
-        setUploadProgress(progress);
+      );
+
+      if (processError || !processResult?.success) {
+        console.error('Processing error:', processError || processResult);
+        throw new Error(processResult?.error || 'Failed to process document on server');
       }
       
       setUploadProgress(100);
@@ -253,15 +180,15 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       // Set performance stats
       const totalTime = performance.now() - startTime;
       setPerformanceStats({
-        chunksProcessed: chunks.length,
-        batchesProcessed: Math.ceil(chunks.length / batchSize),
+        chunksProcessed: processResult.chunksCreated,
+        batchesProcessed: Math.ceil(processResult.chunksCreated / 20),
         processingTime: totalTime,
         optimized: true
       });
       
       toast({
         title: "Success",
-        description: `Successfully processed ${file.name} using Client-side Processing. Created ${chunks.length} knowledge chunks in ${(totalTime/1000).toFixed(1)}s.`
+        description: `Successfully processed ${processResult.fileName} using secure server processing. Created ${processResult.chunksCreated} knowledge chunks in ${(totalTime/1000).toFixed(1)}s.`
       });
       
       // Reset form
@@ -294,41 +221,24 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       </CardHeader>
       <CardContent className="space-y-4">
         {agents && agents.length > 0 ? (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="agent-select">Select Local Agent</Label>
-              <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a local agent..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {agents.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name} ({agent.agent_type})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Only local agents (specific to deliberations) can receive knowledge uploads.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="openai-key">OpenAI API Key</Label>
-              <Input
-                id="openai-key"
-                type="password"
-                placeholder="sk-..."
-                value={openaiApiKey}
-                onChange={(e) => setOpenaiApiKey(e.target.value)}
-                disabled={uploading}
-              />
-              <p className="text-sm text-muted-foreground">
-                Your API key is only used temporarily during upload and not stored.
-              </p>
-            </div>
-          </>
+          <div className="space-y-2">
+            <Label htmlFor="agent-select">Select Local Agent</Label>
+            <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a local agent..." />
+              </SelectTrigger>
+              <SelectContent>
+                {agents.map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name} ({agent.agent_type})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              Only local agents (specific to deliberations) can receive knowledge uploads.
+            </p>
+          </div>
         ) : (
           <div className="text-center py-4 text-muted-foreground">
             <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -345,10 +255,10 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             type="file"
             accept=".txt,.md,.pdf"
             onChange={handleFileUpload}
-            disabled={uploading || !selectedAgent || !openaiApiKey || !agents || agents.length === 0}
+            disabled={uploading || !selectedAgent || !agents || agents.length === 0}
           />
           <p className="text-sm text-muted-foreground">
-            Supported formats: PDF, TXT, MD (with client-side processing)
+            Supported formats: PDF, TXT, MD (with secure server processing)
           </p>
         </div>
 
@@ -385,7 +295,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
               </div>
               <div>
                 <span className="text-muted-foreground">Method:</span>
-                <span className="ml-1 font-medium">Client-side</span>
+                <span className="ml-1 font-medium">Server-side</span>
               </div>
             </div>
           </div>
