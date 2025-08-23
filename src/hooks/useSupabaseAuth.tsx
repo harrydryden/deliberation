@@ -21,11 +21,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [ignoreAuthChanges, setIgnoreAuthChanges] = useState(false);
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        // Skip auth state changes during bulk user creation
+        if (ignoreAuthChanges) {
+          return;
+        }
+        
         logger.info('Auth state changed', { event, userId: session?.user?.id });
         
         setSession(session);
@@ -208,32 +214,47 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const createAccessCodeUsers = async (count: number, roleType: 'admin' | 'user' = 'user') => {
     try {
-      if (!session?.access_token) {
-        return { users: [], error: 'No authentication token available' };
+      const users = [];
+      
+      // Temporarily ignore auth state changes during bulk creation
+      setIgnoreAuthChanges(true);
+      
+      for (let i = 0; i < count; i++) {
+        const accessCode1 = generateAccessCode1();
+        const accessCode2 = generateAccessCode2();
+        const email = `${accessCode1}@deliberation.local`;
+        
+        // Create user without triggering auth state changes
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password: accessCode2,
+          options: {
+            data: {
+              access_code_1: accessCode1,
+              access_code_2: accessCode2,
+              role: roleType
+            }
+          }
+        });
+
+        if (authError) {
+          logger.error('Error creating user:', authError);
+          continue;
+        }
+
+        users.push({
+          accessCode1,
+          accessCode2,
+          role: roleType
+        });
       }
 
-      // Use edge function to create users without triggering auth state changes
-      const response = await fetch(`https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/admin-bulk-create-users`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM'
-        },
-        body: JSON.stringify({
-          count,
-          roleType
-        })
-      });
+      // Re-enable auth state changes
+      setIgnoreAuthChanges(false);
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        return { users: [], error: result.error || 'Failed to create users' };
-      }
-
-      return { users: result.users };
+      return { users };
     } catch (error) {
+      setIgnoreAuthChanges(false); // Ensure we re-enable on error
       logger.error('Error creating access code users:', error);
       return { users: [], error };
     }
