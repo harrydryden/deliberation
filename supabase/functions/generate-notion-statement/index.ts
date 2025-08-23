@@ -34,14 +34,15 @@ A good notion statement:
 - Is specific and actionable
 - Frames the key decision or position to be deliberated
 - Is neutral but clear about what's being considered
-- Is typically 10-50 words long
+- Must be between 150-240 characters long
+- Should be clear and comprehensive while staying within the character limit
 
 Generate a notion statement based on the deliberation title and description provided.`;
 
     const userPrompt = `Title: ${title}
 ${description ? `Description: ${description}` : ''}
 
-Generate a single, clear notion statement for this deliberation:`;
+Generate a single, clear notion statement for this deliberation (150-240 characters):`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

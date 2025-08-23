@@ -146,10 +146,10 @@ export const NotionEditor = ({ deliberationId, currentNotion, onNotionUpdated, d
       <div className="flex items-center gap-2">
         <Input
           value={editedNotion}
-          onChange={(e) => setEditedNotion(e.target.value.slice(0, 100))}
+          onChange={(e) => setEditedNotion(e.target.value.slice(0, 250))}
           placeholder="Enter notion for stance scoring"
           className="text-sm"
-          maxLength={100}
+          maxLength={250}
         />
         <Button
           variant="ghost"
@@ -187,7 +187,7 @@ export const NotionEditor = ({ deliberationId, currentNotion, onNotionUpdated, d
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
-          {editedNotion.length}/100 characters
+          {editedNotion.length}/250 characters
         </span>
         {!validation.isValid && (
           <div className="flex items-center gap-1 text-xs text-yellow-600">
