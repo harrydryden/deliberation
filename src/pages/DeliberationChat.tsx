@@ -8,6 +8,7 @@ import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
+import { ExpandableText } from "@/components/common/ExpandableText";
 const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({
   default: m.IbisMapVisualization
 })));
@@ -16,7 +17,7 @@ import { AdminDeliberationView } from "@/components/admin/AdminDeliberationView"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ViewModeSelector } from "@/components/chat/ViewModeSelector";
-import { Users, ChevronDown, ChevronUp } from "lucide-react";
+import { Users, ChevronDown, ChevronUp, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
@@ -262,7 +263,7 @@ const DeliberationChat = () => {
       />
     </div>;
   if (isLoading || loading) {
-    return <Layout notion={deliberation?.notion}>
+    return <Layout>
         <div className="h-[calc(100vh-120px)] flex items-center justify-center">
           <div className="animate-pulse text-center">
             <div className="h-8 bg-muted rounded w-48 mx-auto mb-4"></div>
@@ -275,11 +276,11 @@ const DeliberationChat = () => {
 
   // Show simplified admin view for admin users
   if (isAdmin) {
-    return <Layout notion={deliberation?.notion}>
+    return <Layout>
         <AdminDeliberationView />
       </Layout>;
   }
-  return <Layout notion={deliberation?.notion}>
+  return <Layout>
       <div className="flex flex-col bg-background rounded-lg border h-[calc(100vh-120px)] min-h-0">
         {/* Deliberation Header - Sticky below main header */}
         <div className="border-b bg-card backdrop-blur-sm" style={{
@@ -318,6 +319,29 @@ const DeliberationChat = () => {
                      title="Click to view full description">
                     {deliberation.description}
                   </p>
+                </div>
+              </div>
+            )}
+            
+            {/* Notion Focus - Always visible under description */}
+            {deliberation.notion && (
+              <div className="px-3 pb-3">
+                <div className="rounded-lg border bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20 p-2">
+                  <div className="flex items-center gap-2">
+                    <div className="shrink-0 w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
+                      <Target className="h-3 w-3 text-primary" />
+                    </div>
+                    <div className="text-xs text-primary/80 uppercase tracking-wide font-medium">
+                      Focus:
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <ExpandableText 
+                        text={deliberation.notion}
+                        maxLength={50}
+                        title="Deliberation Focus"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -383,6 +407,23 @@ const DeliberationChat = () => {
                        title="Click to view full description">
                       {deliberation.description}
                     </p>
+                  )}
+                  {deliberation.notion && (
+                    <div className="flex items-center gap-2 mt-2 p-2 bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded">
+                      <div className="shrink-0 w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Target className="h-3 w-3 text-primary" />
+                      </div>
+                      <div className="text-xs text-primary/80 uppercase tracking-wide font-medium">
+                        Focus:
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <ExpandableText 
+                          text={deliberation.notion}
+                          maxLength={60}
+                          title="Deliberation Focus"
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

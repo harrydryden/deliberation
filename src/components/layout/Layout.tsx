@@ -5,10 +5,9 @@ import { memo } from "react";
 
 interface LayoutProps {
   children: React.ReactNode;
-  notion?: string;
 }
 
-export const Layout = memo(({ children, notion }: LayoutProps) => {
+export const Layout = memo(({ children }: LayoutProps) => {
   const { isLoading } = useSupabaseAuth();
 
   if (isLoading) {
@@ -24,7 +23,7 @@ export const Layout = memo(({ children, notion }: LayoutProps) => {
 
   return (
     <div className="min-h-screen bg-deliberation-bg">
-      <Header notion={notion} />
+      <Header />
       <main className="container mx-auto px-4 py-4">
         {children}
       </main>
