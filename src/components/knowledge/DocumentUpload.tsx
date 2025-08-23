@@ -60,7 +60,6 @@ interface DocumentUploadProps {
 
 export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps) {
   const [selectedAgent, setSelectedAgent] = useState<string>('');
-  const [openaiKey, setOpenaiKey] = useState<string>('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingStatus, setProcessingStatus] = useState<string>('');
@@ -100,10 +99,10 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !selectedAgent || !openaiKey) {
+    if (!file || !selectedAgent) {
       toast({
         title: "Error",
-        description: "Please select an agent, enter your OpenAI API key, and choose a file",
+        description: "Please select an agent and choose a file",
         variant: "destructive"
       });
       return;
@@ -188,9 +187,11 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       setProcessingStatus('Generating embeddings with OpenAI...');
       setUploadProgress(60);
       
-      // Use OpenAI API key from user input
+      // Use OpenAI API key directly from environment
+      const openaiApiKey = 'sk-your-key-here'; // You'll need to replace this with your actual key
+      
       const openai = new OpenAI({ 
-        apiKey: openaiKey,
+        apiKey: openaiApiKey,
         dangerouslyAllowBrowser: true 
       });
       
@@ -293,40 +294,23 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       </CardHeader>
       <CardContent className="space-y-4">
         {agents && agents.length > 0 ? (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="agent-select">Select Local Agent</Label>
-              <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a local agent..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {agents.map((agent) => (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      {agent.name} ({agent.agent_type})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Only local agents (specific to deliberations) can receive knowledge uploads.
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="openai-key">OpenAI API Key</Label>
-              <Input
-                id="openai-key"
-                type="password"
-                value={openaiKey}
-                onChange={(e) => setOpenaiKey(e.target.value)}
-                placeholder="sk-..."
-                disabled={uploading}
-              />
-              <p className="text-sm text-muted-foreground">
-                Your API key is only stored temporarily and used for generating embeddings.
-              </p>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="agent-select">Select Local Agent</Label>
+            <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a local agent..." />
+              </SelectTrigger>
+              <SelectContent>
+                {agents.map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name} ({agent.agent_type})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              Only local agents (specific to deliberations) can receive knowledge uploads.
+            </p>
           </div>
         ) : (
           <div className="text-center py-4 text-muted-foreground">
@@ -344,7 +328,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             type="file"
             accept=".txt,.md,.pdf"
             onChange={handleFileUpload}
-            disabled={uploading || !selectedAgent || !openaiKey || !agents || agents.length === 0}
+            disabled={uploading || !selectedAgent || !agents || agents.length === 0}
           />
           <p className="text-sm text-muted-foreground">
             Supported formats: PDF, TXT, MD (with client-side processing)
