@@ -34,6 +34,40 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
   // Check if current user is admin
   const { user, isAdmin } = useSupabaseAuth();
 
+  const extractPDFText = async (file: File): Promise<string> => {
+    try {
+      // Load PDF.js dynamically at runtime to avoid build issues
+      // @ts-ignore: Dynamic import for browser compatibility
+      const pdfjsLib = await import('https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.mjs');
+      
+      // Set worker source
+      (pdfjsLib as any).GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.mjs';
+      
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await (pdfjsLib as any).getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        
+        const pageText = textContent.items
+          .map((item: any) => item.str || '')
+          .filter((text: string) => text.trim().length > 0)
+          .join(' ');
+        
+        if (pageText.trim()) {
+          fullText += pageText + '\n\n';
+        }
+      }
+      
+      return fullText.trim();
+    } catch (error) {
+      console.error('PDF extraction error:', error);
+      throw new Error(`Failed to extract text from PDF. Please try uploading a text file instead.`);
+    }
+  };
+
   // Only show component to admins
   if (!isAdmin) {
     return (
@@ -79,58 +113,45 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         throw new Error('User not authenticated');
       }
 
-      // Debug: Check context before upload
-      try {
-        const { data: contextDebug, error: debugError } = await supabase.rpc('debug_storage_context');
-        if (debugError) {
-          console.error('Debug function error:', debugError);
-        } else {
-          console.log('Context debug before upload:', contextDebug);
-        }
-      } catch (debugErr) {
-        console.warn('Could not run context debug:', debugErr);
+      setUploadProgress(20);
+      setProcessingStatus('Extracting text from document...');
+
+      // Extract text content client-side
+      let extractedText = '';
+      const fileType = file.type || '';
+
+      if (file.name.toLowerCase().endsWith('.pdf') || fileType === 'application/pdf') {
+        extractedText = await extractPDFText(file);
+      } else {
+        // Handle text files
+        extractedText = await file.text();
       }
 
-      setUploadProgress(10);
-
-      // Upload file to storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user?.id}/${Date.now()}_${file.name}`;
-      
-      logger.component.update('DocumentUpload', { action: 'uploadStart', fileName });
-      
-      console.log('Attempting storage upload with fileName:', fileName);
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(fileName, file);
-
-      if (uploadError) {
-        console.error('Storage upload error:', uploadError);
-        throw new Error(`Upload failed: ${uploadError.message}`);
+      if (!extractedText || extractedText.trim().length < 10) {
+        throw new Error('No meaningful text content found in the document');
       }
 
-      setUploadProgress(30);
-      setProcessingStatus('File uploaded, starting server-side processing...');
-      logger.component.update('DocumentUpload', { action: 'uploadSuccess', path: uploadData.path });
-
-      // Server-side processing using unified edge function
-      setProcessingStatus('Processing document with secure server...');
       setUploadProgress(50);
+      setProcessingStatus('Processing with AI to create knowledge embeddings...');
       
+      logger.component.update('DocumentUpload', { action: 'textExtracted', length: extractedText.length });
+
+      // Use existing process-agent-knowledge edge function
       const { data: processResult, error: processError } = await supabase.functions.invoke(
-        'process-document-upload',
+        'process-agent-knowledge',
         {
           body: {
-            fileName: uploadData.path,
+            fileContent: extractedText,
+            fileName: file.name,
             agentId: selectedAgent,
-            userId: user.id
+            contentType: file.type || 'text/plain'
           }
         }
       );
 
       if (processError || !processResult?.success) {
         console.error('Processing error:', processError || processResult);
-        throw new Error(processResult?.error || 'Failed to process document on server');
+        throw new Error(processResult?.error || 'Failed to process document');
       }
       
       setUploadProgress(100);
@@ -146,8 +167,8 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       });
       
       toast({
-        title: "Success",
-        description: `Successfully processed ${processResult.fileName} using secure server processing. Created ${processResult.chunksProcessed || 0} knowledge chunks in ${(totalTime/1000).toFixed(1)}s.`
+        title: "Success", 
+        description: `Successfully processed ${file.name}. Created ${processResult.chunksProcessed || 0} knowledge chunks in ${(totalTime/1000).toFixed(1)}s.`
       });
       
       // Reset form
@@ -217,7 +238,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             disabled={uploading || !selectedAgent || !agents || agents.length === 0}
           />
           <p className="text-sm text-muted-foreground">
-            Supported formats: PDF, TXT, MD (with secure server processing)
+            Supported formats: PDF, TXT, MD (client-side processing)
           </p>
         </div>
 
@@ -254,7 +275,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
               </div>
               <div>
                 <span className="text-muted-foreground">Method:</span>
-                <span className="ml-1 font-medium">Server-side</span>
+                <span className="ml-1 font-medium">Client-side</span>
               </div>
             </div>
           </div>
