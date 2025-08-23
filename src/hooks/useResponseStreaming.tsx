@@ -142,10 +142,7 @@ export const useResponseStreaming = () => {
             if (parsed.agentType && !currentAgentType) {
               currentAgentType = parsed.agentType;
               setStreamingState(prev => ({ ...prev, agentType: currentAgentType }));
-              // Only notify UI of agent type if we have a valid one
-              if (currentAgentType) {
-                onUpdate('', currentAgentType);
-              }
+              // Don't call onUpdate here - wait for actual content
             }
 
             if (parsed.content) {
