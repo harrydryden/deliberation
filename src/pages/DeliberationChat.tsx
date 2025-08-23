@@ -8,6 +8,7 @@ import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
+import { NotionBanner } from "@/components/chat/NotionBanner";
 const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({
   default: m.IbisMapVisualization
 })));
@@ -31,6 +32,7 @@ interface Deliberation {
   id: string;
   title: string;
   description?: string;
+  notion?: string;
   status: 'draft' | 'active' | 'completed';
   facilitator_id?: string;
   is_public: boolean;
@@ -252,6 +254,9 @@ const DeliberationChat = () => {
     }
   };
   const ChatPanel = () => <div className="flex-1 flex flex-col min-h-0">
+      {deliberation?.notion && (
+        <NotionBanner notion={deliberation.notion} className="mx-4 mt-4 mb-2" />
+      )}
       <div className="flex-1 overflow-hidden min-h-0">
         <MessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} deliberationId={deliberationId} agentConfigs={agentConfigs} />
       </div>

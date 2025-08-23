@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Plus, Lightbulb } from 'lucide-react';
 import { useForm } from '@/hooks/useForm';
 import { FormField } from '@/components/forms/FormField';
+import { NotionExamples } from '@/components/forms/NotionExamples';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useDeliberationService } from '@/hooks/useDeliberationService';
@@ -24,6 +25,7 @@ type DeliberationForm = {
 
 export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCreationProps) => {
   const [createOpen, setCreateOpen] = useState(false);
+  const [showExamples, setShowExamples] = useState(false);
   const deliberationService = useDeliberationService();
   
   const form = useForm<DeliberationForm>({
@@ -44,6 +46,15 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
       
       if (!data.notion.trim()) {
         errors.notion = 'Notion is required for stance scoring';
+      } else {
+        // Validate stance language
+        const stanceKeywords = ['should', 'must', 'ought', 'need to', 'required', 'necessary', 'appropriate'];
+        const hasStanceLanguage = stanceKeywords.some(keyword => 
+          data.notion.toLowerCase().includes(keyword)
+        );
+        if (!hasStanceLanguage) {
+          errors.notion = 'Notion should contain stance language (should, must, ought) for better analysis';
+        }
       }
       
       if (data.description.length > 400) {
@@ -95,6 +106,11 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await form.handleSubmit(e);
+  };
+
+  const handleSelectExample = (notion: string) => {
+    form.updateField('notion', notion);
+    setShowExamples(false);
   };
 
   return (
@@ -158,9 +174,25 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
                 required
                 error={form.errors.notion}
               />
-              <p className="text-xs text-muted-foreground -mt-1">
-                {form.formData.notion.length}/100 characters - This notion will be used to determine if messages are supportive or opposing
-              </p>
+              <div className="flex items-center justify-between -mt-1">
+                <p className="text-xs text-muted-foreground">
+                  {form.formData.notion.length}/100 characters - Used to determine if messages are supportive or opposing
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowExamples(!showExamples)}
+                  className="text-xs h-6"
+                >
+                  <Lightbulb className="h-3 w-3 mr-1" />
+                  {showExamples ? 'Hide' : 'Show'} Examples
+                </Button>
+              </div>
+              
+              {showExamples && (
+                <NotionExamples onSelectExample={handleSelectExample} />
+              )}
               
               <FormField
                 type="switch"

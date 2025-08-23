@@ -12,6 +12,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useNavigate } from 'react-router-dom';
 import { IbisNodeManagement } from './IbisNodeManagement';
 import { AdminIbisMapEditor } from './AdminIbisMapEditor';
+import { NotionEditor } from './NotionEditor';
 import { useAdminService } from '@/hooks/useServices';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
@@ -23,15 +24,20 @@ interface DeliberationOverviewProps {
   onUpdateStatus: (id: string, status: string) => void;
 }
 
-export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateStatus }: DeliberationOverviewProps) => {
-  logger.component.mount('DeliberationOverview', { deliberationCount: deliberations.length });
+export const DeliberationOverview = ({ deliberations: initialDeliberations, loading, onLoad, onUpdateStatus }: DeliberationOverviewProps) => {
+  logger.component.mount('DeliberationOverview', { deliberationCount: initialDeliberations.length });
   const [updating, setUpdating] = useState<string | null>(null);
   const [selectedDeliberation, setSelectedDeliberation] = useState<Deliberation | null>(null);
   const [editMode, setEditMode] = useState<'nodes' | 'map' | null>(null);
   const [clearing, setClearing] = useState<{ [key: string]: 'messages' | 'ibis' | null }>({});
+  const [deliberations, setDeliberations] = useState(initialDeliberations);
   const navigate = useNavigate();
   const adminService = useAdminService();
   const { toast } = useToast();
+
+  useEffect(() => {
+    setDeliberations(initialDeliberations);
+  }, [initialDeliberations]);
 
   useEffect(() => {
     if (deliberations.length === 0 && !loading) {
@@ -119,6 +125,12 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
     } finally {
       setClearing(prev => ({ ...prev, [deliberationId]: null }));
     }
+  };
+
+  const handleNotionUpdated = (deliberationId: string, newNotion: string) => {
+    setDeliberations(prev => prev.map(d => 
+      d.id === deliberationId ? { ...d, notion: newNotion } : d
+    ));
   };
 
   logger.debug('Render check', {
@@ -239,9 +251,11 @@ export const DeliberationOverview = ({ deliberations, loading, onLoad, onUpdateS
                       </Select>
                     </TableCell>
                     <TableCell className="max-w-xs">
-                      <div className="text-sm font-medium text-primary">
-                        {deliberation.notion || 'No notion set'}
-                      </div>
+                      <NotionEditor
+                        deliberationId={deliberation.id}
+                        currentNotion={deliberation.notion || ''}
+                        onNotionUpdated={(newNotion) => handleNotionUpdated(deliberation.id, newNotion)}
+                      />
                     </TableCell>
                     <TableCell className="max-w-xs truncate">
                       {deliberation.description || 'No description'}
