@@ -175,23 +175,6 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         .from('user_roles')
         .select('user_id, role')
         .in('user_id', userIds);
-        
-      // DEBUG: Log specific data for the problematic user
-      const problematicUserId = profiles.find(p => p.id.startsWith('eab4f22d'))?.id;
-      if (problematicUserId) {
-        console.log('🔍 DEBUG - Problematic user ID from profiles:', problematicUserId);
-        console.log('🔍 DEBUG - Type of problematic user ID:', typeof problematicUserId);
-        console.log('🔍 DEBUG - User roles raw data:', JSON.stringify(userRoles, null, 2));
-        
-        const matchingRole = userRoles?.find(ur => ur.user_id === problematicUserId);
-        console.log('🔍 DEBUG - Matching role entry:', matchingRole);
-        
-        // Test different comparison methods
-        const byString = userRoles?.find(ur => ur.user_id.toString() === problematicUserId.toString());
-        const byDirectEquals = userRoles?.find(ur => ur.user_id === problematicUserId);
-        console.log('🔍 DEBUG - By string comparison:', byString);
-        console.log('🔍 DEBUG - By direct equals:', byDirectEquals);
-      }
 
       // Get participants with deliberations
       const { data: participants } = await supabase
@@ -208,11 +191,6 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
 
       // Create maps for efficient lookups
       const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
-      
-      // DEBUG: Log roles data for troubleshooting
-      console.log('🔍 DEBUG - User roles data:', userRoles);
-      console.log('🔍 DEBUG - Roles map:', rolesMap);
-      
       const deliberationsMap = new Map();
       
       // Initialize deliberations map
@@ -235,15 +213,6 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
       // Map users - access codes now come directly from the database!
       const users: User[] = profiles.map(profile => {
         const role = rolesMap.get(profile.id) || 'user';
-        
-        // DEBUG: Log role lookup for the problematic user
-        if (profile.id.startsWith('eab4f22d')) {
-          console.log('🔍 DEBUG - Profile ID:', profile.id);
-          console.log('🔍 DEBUG - Role from map:', rolesMap.get(profile.id));
-          console.log('🔍 DEBUG - Final role:', role);
-          console.log('🔍 DEBUG - Available roles in map:', Array.from(rolesMap.keys()));
-        }
-        
         const deliberations = deliberationsMap.get(profile.id) || [];
         
         return {
