@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, createClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 
@@ -21,17 +21,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [ignoreAuthChanges, setIgnoreAuthChanges] = useState(false);
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Skip auth state changes during bulk user creation
-        if (ignoreAuthChanges) {
-          return;
-        }
-        
         logger.info('Auth state changed', { event, userId: session?.user?.id });
         
         setSession(session);
@@ -216,24 +210,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const users = [];
       
-      // Temporarily ignore auth state changes during bulk creation
-      setIgnoreAuthChanges(true);
+      // Create a separate admin client that won't affect current auth state
+      const adminClient = createClient(
+        'https://iowsxuxkgvpgrvvklwyt.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzMwMDA5NiwiZXhwIjoyMDY4ODc2MDk2fQ.XGBR78aD3lBUJCHOLJLlcAYtY6BLGQXhKYfJgp3bAu0',
+        {
+          auth: {
+            autoRefreshToken: false,
+            persistSession: false
+          }
+        }
+      );
       
       for (let i = 0; i < count; i++) {
         const accessCode1 = generateAccessCode1();
         const accessCode2 = generateAccessCode2();
         const email = `${accessCode1}@deliberation.local`;
         
-        // Create user without triggering auth state changes
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        // Use admin client to create user without signing them in
+        const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
           email,
           password: accessCode2,
-          options: {
-            data: {
-              access_code_1: accessCode1,
-              access_code_2: accessCode2,
-              role: roleType
-            }
+          email_confirm: true, // Auto-confirm to avoid email verification
+          user_metadata: {
+            access_code_1: accessCode1,
+            access_code_2: accessCode2,
+            role: roleType
           }
         });
 
@@ -249,12 +251,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         });
       }
 
-      // Re-enable auth state changes
-      setIgnoreAuthChanges(false);
-
       return { users };
     } catch (error) {
-      setIgnoreAuthChanges(false); // Ensure we re-enable on error
       logger.error('Error creating access code users:', error);
       return { users: [], error };
     }
