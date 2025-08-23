@@ -1,84 +1,8 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
-
-// Use direct OpenAI API calls to avoid LangChain dependency issues
-class OpenAIEmbeddings {
-  constructor(private config: { openAIApiKey: string; modelName?: string }) {}
-
-  async embedQuery(text: string): Promise<number[]> {
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.config.openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: this.config.modelName || 'text-embedding-3-small',
-        input: text,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.data[0].embedding;
-  }
-}
-
-// Simple text splitter that mimics LangChain's RecursiveCharacterTextSplitter
-class RecursiveCharacterTextSplitter {
-  constructor(private config: { 
-    chunkSize: number; 
-    chunkOverlap: number; 
-    separators: string[]; 
-  }) {}
-
-  async createDocuments(texts: string[], metadatas: any[] = []): Promise<{ pageContent: string; metadata: any }[]> {
-    const documents: { pageContent: string; metadata: any }[] = [];
-    
-    texts.forEach((text, i) => {
-      const chunks = this.splitText(text);
-      chunks.forEach(chunk => {
-        documents.push({
-          pageContent: chunk,
-          metadata: metadatas[i] || {}
-        });
-      });
-    });
-    
-    return documents;
-  }
-
-  private splitText(text: string): string[] {
-    const chunks: string[] = [];
-    let start = 0;
-
-    while (start < text.length) {
-      let end = start + this.config.chunkSize;
-      if (end > text.length) end = text.length;
-
-      // Try to break at separators
-      if (end < text.length) {
-        for (const separator of this.config.separators) {
-          const lastSep = text.lastIndexOf(separator, end);
-          if (lastSep > start + this.config.chunkSize * 0.5) {
-            end = lastSep + separator.length;
-            break;
-          }
-        }
-      }
-
-      chunks.push(text.slice(start, end).trim());
-      start = end - this.config.chunkOverlap;
-      if (start < 0) start = 0;
-    }
-
-    return chunks.filter(chunk => chunk.length > 0);
-  }
-}
+import { OpenAIEmbeddings } from 'https://esm.sh/@langchain/openai@0.3.0?no-check';
+import { RecursiveCharacterTextSplitter } from 'https://esm.sh/langchain@0.3.0/text_splitter?no-check';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
