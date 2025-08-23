@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export const useAdminData = () => {
   const services = useServices();
-  const { user } = useSupabaseAuth();
+  const { user, isAdmin } = useSupabaseAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -150,8 +150,15 @@ export const useAdminData = () => {
     }
   };
 
-  // Stats operations
   const fetchStats = async () => {
+    // Only fetch stats if the user is an admin
+    if (!isAdmin) {
+      console.log('Skipping stats fetch - user is not admin');
+      setStats(null);
+      setLoadingStats(false);
+      return;
+    }
+
     setLoadingStats(true);
     try {
       const data = await services.adminService.getSystemStats();
