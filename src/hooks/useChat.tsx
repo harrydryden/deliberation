@@ -158,8 +158,8 @@ export const useChat = (deliberationId?: string) => {
           deliberationId,
           // onUpdate callback - update streaming message in real-time
           (streamContent: string, agentType: string) => {
-            // Only show streaming messages if we have actual content
-            if (!streamContent.trim() && !agentType) return;
+            // Only create streaming UI messages when we have actual content to show
+            if (!streamContent.trim()) return;
             
             const streamingMessage: ChatMessage = {
               id: `streaming-${saved.id}`,
@@ -179,11 +179,8 @@ export const useChat = (deliberationId?: string) => {
                   index === existingStreamingIndex ? streamingMessage : msg
                 );
               } else {
-                // Only add new streaming message if we have content or it's the initial agent type announcement
-                if (streamContent.trim() || agentType) {
-                  return [...prev, streamingMessage];
-                }
-                return prev;
+                // Only add streaming message when we have actual content
+                return [...prev, streamingMessage];
               }
             });
           },
