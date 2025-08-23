@@ -683,10 +683,6 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
         variant === 'panel' ? (
           <div className="bg-card/50 border rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Waves className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Voice Interface</span>
-              </div>
               {connected && sessionStatus.remainingTime > 0 && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
