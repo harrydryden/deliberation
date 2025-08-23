@@ -1,8 +1,39 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
-import { OpenAIEmbeddings } from 'https://esm.sh/@langchain/openai@0.6.3';
-import { RecursiveCharacterTextSplitter } from 'https://esm.sh/langchain@0.3.30/text_splitter';
+
+// Simple text splitter implementation to avoid langchain dependency issues
+class SimpleTextSplitter {
+  constructor(private chunkSize: number = 1000, private chunkOverlap: number = 200) {}
+
+  splitText(text: string): string[] {
+    const chunks: string[] = [];
+    let start = 0;
+
+    while (start < text.length) {
+      let end = start + this.chunkSize;
+      if (end > text.length) end = text.length;
+
+      // Try to break at sentence boundaries
+      if (end < text.length) {
+        const lastPeriod = text.lastIndexOf('.', end);
+        const lastExclamation = text.lastIndexOf('!', end);
+        const lastQuestion = text.lastIndexOf('?', end);
+        const lastBreak = Math.max(lastPeriod, lastExclamation, lastQuestion);
+        
+        if (lastBreak > start + this.chunkSize * 0.5) {
+          end = lastBreak + 1;
+        }
+      }
+
+      chunks.push(text.slice(start, end).trim());
+      start = end - this.chunkOverlap;
+      if (start < 0) start = 0;
+    }
+
+    return chunks.filter(chunk => chunk.length > 0);
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -104,8 +135,8 @@ For better processing, consider converting to a text-based format.`;
   return finalText;
 }
 
-// Process embeddings in batches
-async function processEmbeddings(chunks: string[], embeddings: OpenAIEmbeddings): Promise<number[][]> {
+// Process embeddings using OpenAI API directly
+async function generateEmbeddings(chunks: string[], openAIApiKey: string): Promise<number[][]> {
   const results: number[][] = [];
   
   for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
@@ -115,9 +146,24 @@ async function processEmbeddings(chunks: string[], embeddings: OpenAIEmbeddings)
     let attempt = 0;
     while (attempt < MAX_RETRIES) {
       try {
-        const batchResults = await Promise.all(
-          batch.map(chunk => embeddings.embedQuery(chunk))
-        );
+        const response = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-3-small',
+            input: batch,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`OpenAI API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const batchResults = data.data.map((item: any) => item.embedding);
         results.push(...batchResults);
         break;
       } catch (error) {
@@ -209,29 +255,16 @@ serve(async (req) => {
       throw new Error('No meaningful text content extracted');
     }
 
-    // Initialize LangChain components
-    const embeddings = new OpenAIEmbeddings({
-      openAIApiKey: openAIApiKey,
-      modelName: 'text-embedding-3-small',
-    });
-
-    const textSplitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1000,
-      chunkOverlap: 200,
-      separators: ['\n\n', '\n', '. ', '? ', '! ', ' ', ''],
-    });
+    // Initialize text splitter
+    const textSplitter = new SimpleTextSplitter(1000, 200);
 
     // Split text into chunks
-    const documents = await textSplitter.createDocuments([textContent], [
-      { agentId, fileName, contentType }
-    ]);
-
-    const chunks = documents.map(doc => doc.pageContent);
+    const chunks = textSplitter.splitText(textContent);
     console.log(`📝 Created ${chunks.length} chunks`);
 
     // Generate embeddings
     console.log('🧠 Generating embeddings...');
-    const embeddingVectors = await processEmbeddings(chunks, embeddings);
+    const embeddingVectors = await generateEmbeddings(chunks, openAIApiKey);
 
     // Prepare knowledge items for database
     const knowledgeItems = chunks.map((chunk, index) => ({
