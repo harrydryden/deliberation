@@ -75,7 +75,7 @@ const DeliberationChat = () => {
   const [viewMode, setViewMode] = useState<'chat' | 'ibis'>('chat');
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
-  const [messageText, setMessageText] = useState("");
+  
 
   // Scoring state - loaded from actual user activity in database
   const [userScores, setUserScores] = useState({
@@ -258,8 +258,6 @@ const DeliberationChat = () => {
       <MessageInput 
         onSendMessage={sendMessage} 
         disabled={chatLoading} 
-        value={messageText}
-        onValueChange={setMessageText}
       />
     </div>;
   if (isLoading || loading) {
@@ -344,7 +342,6 @@ const DeliberationChat = () => {
                         deliberationId={deliberation.id} 
                         variant="panel" 
                         sendMessage={sendMessage} 
-                        setMessageText={setMessageText}
                       />
                     </Suspense>
                   </div>
@@ -413,7 +410,6 @@ const DeliberationChat = () => {
                       deliberationId={deliberation.id} 
                       variant="panel" 
                       sendMessage={sendMessage} 
-                      setMessageText={setMessageText}
                     />
                   </Suspense>
                 </div>
