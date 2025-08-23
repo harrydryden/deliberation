@@ -310,6 +310,8 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
                               deliberationId={deliberation.id}
                               currentNotion={deliberation.notion || ''}
                               onNotionUpdated={(newNotion) => handleNotionUpdated(deliberation.id, newNotion)}
+                              deliberationTitle={deliberation.title}
+                              deliberationDescription={deliberation.description}
                             />
                           </DialogContent>
                         </Dialog>

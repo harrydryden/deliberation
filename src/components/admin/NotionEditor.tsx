@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Edit2, Save, X, AlertTriangle } from 'lucide-react';
+import { Edit2, Save, X, AlertTriangle, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -9,12 +9,15 @@ interface NotionEditorProps {
   deliberationId: string;
   currentNotion: string;
   onNotionUpdated: (newNotion: string) => void;
+  deliberationTitle?: string;
+  deliberationDescription?: string;
 }
 
-export const NotionEditor = ({ deliberationId, currentNotion, onNotionUpdated }: NotionEditorProps) => {
+export const NotionEditor = ({ deliberationId, currentNotion, onNotionUpdated, deliberationTitle, deliberationDescription }: NotionEditorProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedNotion, setEditedNotion] = useState(currentNotion);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
 
   const validateNotion = (notion: string): { isValid: boolean; warning?: string } => {
@@ -75,6 +78,48 @@ export const NotionEditor = ({ deliberationId, currentNotion, onNotionUpdated }:
     setIsEditing(false);
   };
 
+  const handleGenerate = async () => {
+    if (!deliberationTitle) {
+      toast({
+        title: "Error",
+        description: "Cannot generate notion without deliberation title",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-notion-statement', {
+        body: {
+          title: deliberationTitle,
+          description: deliberationDescription || ''
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.notion) {
+        setEditedNotion(data.notion);
+        toast({
+          title: "Success",
+          description: "Notion statement generated successfully"
+        });
+      } else {
+        throw new Error('No notion generated');
+      }
+    } catch (error) {
+      console.error('Error generating notion:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate notion statement",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const validation = validateNotion(editedNotion);
 
   if (!isEditing) {
@@ -96,7 +141,7 @@ export const NotionEditor = ({ deliberationId, currentNotion, onNotionUpdated }:
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Input
           value={editedNotion}
@@ -122,6 +167,22 @@ export const NotionEditor = ({ deliberationId, currentNotion, onNotionUpdated }:
         >
           <X className="h-3 w-3" />
         </Button>
+      </div>
+      
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleGenerate}
+          disabled={isGenerating || !deliberationTitle}
+          className="h-8"
+        >
+          <Sparkles className="h-3 w-3 mr-2" />
+          {isGenerating ? 'Generating...' : 'Generate Notion'}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          AI will create a notion from title and description
+        </span>
       </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
