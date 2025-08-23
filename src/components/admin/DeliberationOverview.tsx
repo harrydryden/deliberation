@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { RefreshCw, MessageSquare, Eye, GitBranch, Trash2, Database, Map } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { RefreshCw, MessageSquare, Eye, GitBranch, Trash2, Database, Map, Edit } from 'lucide-react';
 import { formatToUKDateTime } from '@/utils/timeUtils';
 import { Deliberation } from '@/types/index';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -251,11 +252,9 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
                       </Select>
                     </TableCell>
                     <TableCell className="max-w-xs">
-                      <NotionEditor
-                        deliberationId={deliberation.id}
-                        currentNotion={deliberation.notion || ''}
-                        onNotionUpdated={(newNotion) => handleNotionUpdated(deliberation.id, newNotion)}
-                      />
+                      <span className="text-sm font-medium text-primary">
+                        {deliberation.notion || 'No notion set'}
+                      </span>
                     </TableCell>
                     <TableCell className="max-w-xs truncate">
                       {deliberation.description || 'No description'}
@@ -292,6 +291,28 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
                           <Map className="h-4 w-4 mr-2" />
                           Edit Map
                         </Button>
+                        
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Notion
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Edit Notion for "{deliberation.title}"</DialogTitle>
+                            </DialogHeader>
+                            <NotionEditor
+                              deliberationId={deliberation.id}
+                              currentNotion={deliberation.notion || ''}
+                              onNotionUpdated={(newNotion) => handleNotionUpdated(deliberation.id, newNotion)}
+                            />
+                          </DialogContent>
+                        </Dialog>
                         
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
