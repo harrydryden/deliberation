@@ -208,51 +208,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const createAccessCodeUsers = async (count: number, roleType: 'admin' | 'user' = 'user') => {
     try {
-      const users = [];
-      
-      // Store current session to restore it later
-      const currentSession = session;
-      
-      for (let i = 0; i < count; i++) {
-        const accessCode1 = generateAccessCode1();
-        const accessCode2 = generateAccessCode2();
-        const email = `${accessCode1}@deliberation.local`;
-        
-        // Create user in Supabase Auth using signUp with autoConfirm disabled
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password: accessCode2,
-          options: {
-            emailRedirectTo: undefined, // Prevent any redirects
-            data: {
-              access_code_1: accessCode1,
-              access_code_2: accessCode2,
-              role: roleType
-            }
-          }
-        });
-
-        if (authError) {
-          logger.error('Error creating user:', authError);
-          continue;
-        }
-
-        users.push({
-          accessCode1,
-          accessCode2,
-          role: roleType
-        });
-
-        // Immediately restore session after each user creation to prevent any auth state changes
-        if (currentSession) {
-          await supabase.auth.setSession({
-            access_token: currentSession.access_token,
-            refresh_token: currentSession.refresh_token
-          });
-        }
+      if (!session?.access_token) {
+        return { users: [], error: 'No authentication token available' };
       }
 
-      return { users };
+      // Use edge function to create users without triggering auth state changes
+      const response = await fetch(`https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/admin-bulk-create-users`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM'
+        },
+        body: JSON.stringify({
+          count,
+          roleType
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { users: [], error: result.error || 'Failed to create users' };
+      }
+
+      return { users: result.users };
     } catch (error) {
       logger.error('Error creating access code users:', error);
       return { users: [], error };
