@@ -34,48 +34,6 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
   // Check if current user is admin
   const { user, isAdmin } = useSupabaseAuth();
 
-  const extractPDFText = async (file: File): Promise<string> => {
-    try {
-      // Use the existing pdfjs-dist package that's already in dependencies
-      const pdfjsLib = await import('pdfjs-dist');
-      
-      // Set worker source to a CDN to avoid build issues
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.min.js';
-      
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ 
-        data: arrayBuffer,
-        useSystemFonts: false,
-        disableFontFace: true,
-        useWorkerFetch: false,
-        isEvalSupported: false,
-        disableAutoFetch: true,
-        verbosity: 0
-      }).promise;
-      
-      let fullText = '';
-      
-      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        
-        const pageText = textContent.items
-          .map((item: any) => item.str || '')
-          .filter((text: string) => text.trim().length > 0)
-          .join(' ');
-        
-        if (pageText.trim()) {
-          fullText += pageText + '\n\n';
-        }
-      }
-      
-      return fullText.trim();
-    } catch (error) {
-      console.error('PDF extraction error:', error);
-      throw new Error(`Failed to extract text from PDF: ${error.message}`);
-    }
-  };
-
   // Only show component to admins
   if (!isAdmin) {
     return (
@@ -111,7 +69,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
 
     setUploading(true);
     setUploadProgress(0);
-    setProcessingStatus('Initializing upload...');
+    setProcessingStatus('Uploading file to secure storage...');
     setPerformanceStats(null);
     const startTime = performance.now();
 
@@ -121,45 +79,44 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         throw new Error('User not authenticated');
       }
 
-      setUploadProgress(20);
-      setProcessingStatus('Extracting text from document...');
+      setUploadProgress(25);
 
-      // Extract text content client-side
-      let extractedText = '';
-      const fileType = file.type || '';
+      // Upload file to storage first - no client-side processing
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}_${file.name}`;
+      
+      logger.component.update('DocumentUpload', { action: 'uploadStart', fileName });
+      
+      console.log('Uploading file to storage:', fileName);
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('documents')
+        .upload(fileName, file);
 
-      if (file.name.toLowerCase().endsWith('.pdf') || fileType === 'application/pdf') {
-        extractedText = await extractPDFText(file);
-      } else {
-        // Handle text files
-        extractedText = await file.text();
-      }
-
-      if (!extractedText || extractedText.trim().length < 10) {
-        throw new Error('No meaningful text content found in the document');
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
       setUploadProgress(50);
-      setProcessingStatus('Processing with AI to create knowledge embeddings...');
-      
-      logger.component.update('DocumentUpload', { action: 'textExtracted', length: extractedText.length });
+      setProcessingStatus('Processing document with server-side AI (PDF parsing, OpenAI embeddings, langchain)...');
+      logger.component.update('DocumentUpload', { action: 'uploadSuccess', path: uploadData.path });
 
-      // Use existing process-agent-knowledge edge function
+      // Server-side processing - handles PDF parsing, OpenAI, and langchain
       const { data: processResult, error: processError } = await supabase.functions.invoke(
-        'process-agent-knowledge',
+        'secure-file-processor',
         {
           body: {
-            fileContent: extractedText,
+            storagePath: uploadData.path,
             fileName: file.name,
             agentId: selectedAgent,
-            contentType: file.type || 'text/plain'
+            contentType: file.type.includes('pdf') ? 'pdf' : 'text'
           }
         }
       );
 
       if (processError || !processResult?.success) {
         console.error('Processing error:', processError || processResult);
-        throw new Error(processResult?.error || 'Failed to process document');
+        throw new Error(processResult?.error || 'Failed to process document on server');
       }
       
       setUploadProgress(100);
@@ -176,7 +133,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       
       toast({
         title: "Success", 
-        description: `Successfully processed ${file.name}. Created ${processResult.chunksProcessed || 0} knowledge chunks in ${(totalTime/1000).toFixed(1)}s.`
+        description: `Successfully processed ${file.name} using server-side AI. Created ${processResult.chunksProcessed || 0} knowledge chunks in ${(totalTime/1000).toFixed(1)}s.`
       });
       
       // Reset form
@@ -246,7 +203,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             disabled={uploading || !selectedAgent || !agents || agents.length === 0}
           />
           <p className="text-sm text-muted-foreground">
-            Supported formats: PDF, TXT, MD (client-side processing with OpenAI embeddings)
+            Supported formats: PDF, TXT, MD (secure server-side processing with PDF parsing, OpenAI embeddings, and langchain)
           </p>
         </div>
 
@@ -283,7 +240,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
               </div>
               <div>
                 <span className="text-muted-foreground">Method:</span>
-                <span className="ml-1 font-medium">Client-side</span>
+                <span className="ml-1 font-medium">Server-side AI</span>
               </div>
             </div>
           </div>
