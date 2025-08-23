@@ -10,8 +10,9 @@ const corsHeaders = {
 // Helper function to get IBIS generation prompt from template system
 async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string, deliberationDescription: string, notion: string): Promise<string> {
   try {
+    console.log('Fetching ibis_generation_prompt template...');
     // Try to get ibis_generation_prompt template
-    const { data: template } = await supabase
+    const { data: template, error } = await supabase
       .from('prompt_templates')
       .select('template')
       .eq('prompt_type', 'ibis_generation_prompt')
@@ -19,7 +20,10 @@ async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string,
       .eq('is_default', true)
       .single()
 
+    console.log('Template fetch result:', { template, error });
+
     if (template && template.template) {
+      console.log('Using database template');
       // Replace template variables
       return template.template
         .replace('{deliberationTitle}', deliberationTitle)
@@ -30,29 +34,37 @@ async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string,
     console.log('Failed to fetch IBIS generation prompt template:', error)
   }
 
-  // Fallback to hardcoded prompt
-  return `You are an expert facilitator helping to identify key issues for a democratic deliberation process using the IBIS (Issue-Based Information System) framework.
+  console.log('Using enhanced fallback prompt');
+  // Enhanced fallback prompt with topic-specific guidance
+  return `You are an expert facilitator helping to identify specific, actionable root issues for the deliberation topic "${deliberationTitle}".
 
-Given the following deliberation details:
-Title: ${deliberationTitle}
-Description: ${deliberationDescription || 'No description provided'}
-${notion ? `Notion for stance scoring: ${notion}` : ''}
+DELIBERATION CONTEXT:
+Title: "${deliberationTitle}"
+Description: "${deliberationDescription || 'No description provided'}"
+${notion ? `Stance Scoring Notion: "${notion}"` : ''}
 
-Please identify 3-5 key root issues that participants should deliberate on. These should be:
-1. Central questions or problems that need to be addressed
-2. Broad enough to generate meaningful discussion
-3. Specific enough to be actionable
-4. Relevant to the deliberation topic
+CRITICAL REQUIREMENTS:
+1. Issues must be DIRECTLY RELATED to "${deliberationTitle}" - not abstract concepts
+2. Issues must be SPECIFIC policy/implementation questions within this topic
+3. Issues must be ACTIONABLE - participants can take clear positions 
+4. Issues must address CORE DILEMMAS or decisions needed for this specific topic
+5. Issues should reference concrete aspects mentioned in the description above
 
-For each issue, provide:
-- A clear, concise title (max 100 characters)
-- A brief description explaining why this is important (max 300 characters)
+EXAMPLES for "${deliberationTitle}":
+${deliberationTitle.toLowerCase().includes('assisted dying') ? 
+  '- GOOD: "Should safeguards require multiple doctor assessments?", "What eligibility criteria should apply?"' +
+  '\n- BAD: "What is the meaning of life?", "Should we value individual rights?"' :
+  '- GOOD: Specific implementation questions, eligibility criteria, policy mechanisms' +
+  '\n- BAD: Abstract philosophical concepts, unrelated broad themes'
+}
 
-Respond with a JSON array in this exact format:
+Generate 3-5 issues that directly address decision points participants need to resolve about "${deliberationTitle}".
+
+Respond with ONLY a valid JSON array:
 [
   {
-    "title": "Issue title here",
-    "description": "Brief description of why this issue is important"
+    "title": "Specific decision question about ${deliberationTitle} (max 80 chars)",
+    "description": "Why this specific aspect of ${deliberationTitle} needs resolution (max 250 chars)"
   }
 ]`;
 }
@@ -87,6 +99,8 @@ serve(async (req) => {
 
     // Get IBIS generation prompt from template system
     const prompt = await getIbisGenerationPrompt(supabase, deliberationTitle, deliberationDescription, notion);
+    
+    console.log('Final prompt being sent to AI:', prompt);
 
     // Call OpenAI API
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -98,11 +112,11 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'gpt-4.1-2025-04-14', // More reliable model
         max_tokens: 1000, // Use max_tokens for GPT-4.1
-        temperature: 0.3, // Lower temperature for more consistent output
+        temperature: 0.1, // Very low temperature for consistent, focused output
         messages: [
           {
             role: 'system',
-            content: 'You are an expert facilitator. You must respond with ONLY a valid JSON array, no additional text or formatting. Each object must have exactly "title" and "description" fields.'
+            content: 'You are an expert facilitator specializing in democratic deliberation. You must respond with ONLY a valid JSON array, no additional text or formatting. Each object must have exactly "title" and "description" fields. Focus on specific, actionable issues directly related to the deliberation topic.'
           },
           {
             role: 'user',
