@@ -218,11 +218,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const accessCode2 = generateAccessCode2();
         const email = `${accessCode1}@deliberation.local`;
         
-        // Create user in Supabase Auth using signUp
+        // Create user in Supabase Auth using signUp with autoConfirm disabled
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password: accessCode2,
           options: {
+            emailRedirectTo: undefined, // Prevent any redirects
             data: {
               access_code_1: accessCode1,
               access_code_2: accessCode2,
@@ -241,14 +242,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           accessCode2,
           role: roleType
         });
-      }
 
-      // Immediately restore the original session to prevent auto-login
-      if (currentSession && users.length > 0) {
-        await supabase.auth.setSession({
-          access_token: currentSession.access_token,
-          refresh_token: currentSession.refresh_token
-        });
+        // Immediately restore session after each user creation to prevent any auth state changes
+        if (currentSession) {
+          await supabase.auth.setSession({
+            access_token: currentSession.access_token,
+            refresh_token: currentSession.refresh_token
+          });
+        }
       }
 
       return { users };
