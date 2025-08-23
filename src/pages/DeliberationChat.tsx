@@ -314,11 +314,11 @@ const DeliberationChat = () => {
             {deliberation.description && (
               <div className="px-3 pb-3">
                 <div className="rounded-lg border bg-muted/40 p-2">
-                  <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
+                   <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
                      onClick={() => setIsDescriptionOpen(true)} 
                      title="Click to view full description">
-                    {deliberation.description}
-                  </p>
+                     Description: {deliberation.description}
+                   </p>
                 </div>
               </div>
             )}
@@ -392,11 +392,11 @@ const DeliberationChat = () => {
                     </div>
                   </div>
                   {deliberation.description && (
-                    <p className="text-sm text-muted-foreground mt-2 line-clamp-3 cursor-pointer" 
-                       onClick={() => setIsDescriptionOpen(true)} 
-                       title="Click to view full description">
-                      {deliberation.description}
-                    </p>
+                     <p className="text-sm text-muted-foreground mt-2 line-clamp-3 cursor-pointer" 
+                        onClick={() => setIsDescriptionOpen(true)} 
+                        title="Click to view full description">
+                       Description: {deliberation.description}
+                     </p>
                   )}
                   {deliberation.notion && (
                     <p className="text-sm text-muted-foreground mt-2 line-clamp-3 cursor-pointer" 
