@@ -19,6 +19,9 @@ port = 54324
 [functions.enhanced-pdf-processor]
 verify_jwt = false
 
+[functions.evaluate-ibis-relationships]
+verify_jwt = false
+
 [functions.process-agent-knowledge]
 verify_jwt = true
 

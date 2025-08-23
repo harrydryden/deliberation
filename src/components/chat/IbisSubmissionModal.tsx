@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Lightbulb } from "lucide-react";
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { EnhancedRelationshipSelector } from './EnhancedRelationshipSelector';
 interface IbisSubmissionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -39,10 +40,13 @@ export const IbisSubmissionModal = ({
     nodeType: '' as NodeType | '',
     parentNodeId: ''
   });
-  // New link selectors per type
-  const [linkIssueId, setLinkIssueId] = useState<string>('');
-  const [linkPositionId, setLinkPositionId] = useState<string>('');
-  const [linkArgumentId, setLinkArgumentId] = useState<string>('');
+  // Enhanced relationship management
+  const [selectedRelationships, setSelectedRelationships] = useState<Array<{
+    id: string;
+    type: string;
+    confidence: number;
+  }>>([]);
+  
   const [aiSuggestions, setAiSuggestions] = useState<{
     title: string;
     keywords: string[];
@@ -149,40 +153,8 @@ export const IbisSubmissionModal = ({
     }));
   };
 
-  // AI link recommendation per type
-  const [linkRecs, setLinkRecs] = useState<{ [K in NodeType]?: { id: string; title: string; score: number } }>({});
-  const [linkLoading, setLinkLoading] = useState<{ [K in NodeType]?: boolean }>({});
-
-  const recommendLink = async (targetType: NodeType) => {
-    try {
-      setLinkLoading(prev => ({ ...prev, [targetType]: true }));
-      const baseContent = (formData.title + ' ' + (formData.description || '')).trim() || messageContent;
-      const { data, error } = await supabase.functions.invoke('suggest-ibis-links', {
-        body: {
-          deliberationId,
-          content: baseContent,
-          targetType,
-          threshold: 0.95
-        }
-      });
-      if (error) throw error;
-      if (data?.success && data?.suggestion) {
-        const { id, title, score } = data.suggestion;
-        setLinkRecs(prev => ({ ...prev, [targetType]: { id, title, score } }));
-        // Preselect suggestion
-        if (targetType === 'issue') setLinkIssueId(id);
-        if (targetType === 'position') setLinkPositionId(id);
-        if (targetType === 'argument') setLinkArgumentId(id);
-        toast({ title: 'AI suggestion applied', description: `${title} (${Math.round(score * 100)}%)` });
-      } else {
-        toast({ title: 'No high-confidence match', description: 'No link found above 95% similarity.' });
-      }
-    } catch (e: any) {
-      console.error('Recommend link error', e);
-      toast({ variant: 'destructive', title: 'AI suggestion failed', description: e.message || 'Try again later.' });
-    } finally {
-      setLinkLoading(prev => ({ ...prev, [targetType]: false }));
-    }
+  const handleRelationshipsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
+    setSelectedRelationships(relationships);
   };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -220,36 +192,20 @@ export const IbisSubmissionModal = ({
       if (nodeError) throw nodeError;
       if (!inserted) throw new Error('Failed to create node');
 
-      // Optional links creation (up to 3)
-      const rels: any[] = [];
-      const mapRelType = (targetType: NodeType): string => {
-        if (targetType === 'issue' && inserted.node_type === 'position') return 'responds_to';
-        if (targetType === 'position' && inserted.node_type === 'argument') return 'supports';
-        return 'relates_to';
-      };
-      if (linkIssueId && linkIssueId !== 'none') rels.push({
-        source_node_id: inserted.id,
-        target_node_id: linkIssueId,
-        relationship_type: mapRelType('issue'),
-        created_by: user?.id,
-        deliberation_id: deliberationId
-      });
-      if (linkPositionId && linkPositionId !== 'none') rels.push({
-        source_node_id: inserted.id,
-        target_node_id: linkPositionId,
-        relationship_type: mapRelType('position'),
-        created_by: user.id,
-        deliberation_id: deliberationId
-      });
-      if (linkArgumentId && linkArgumentId !== 'none') rels.push({
-        source_node_id: inserted.id,
-        target_node_id: linkArgumentId,
-        relationship_type: mapRelType('argument'),
-        created_by: user.id,
-        deliberation_id: deliberationId
-      });
-      if (rels.length) {
-        const { error: relErr } = await supabase.from('ibis_relationships').insert(rels);
+      // Create enhanced relationships from AI analysis
+      if (selectedRelationships.length > 0) {
+        const relationshipInserts = selectedRelationships.map(rel => ({
+          source_node_id: inserted.id,
+          target_node_id: rel.id,
+          relationship_type: rel.type,
+          created_by: user.id,
+          deliberation_id: deliberationId
+        }));
+        
+        const { error: relErr } = await supabase
+          .from('ibis_relationships')
+          .insert(relationshipInserts);
+        
         if (relErr) throw relErr;
       }
 
@@ -275,10 +231,7 @@ export const IbisSubmissionModal = ({
         parentNodeId: ''
       });
       setAiSuggestions(null);
-      setLinkIssueId('');
-      setLinkPositionId('');
-      setLinkArgumentId('');
-      setLinkRecs({});
+      setSelectedRelationships([]);
     } catch (error: any) {
       console.error('Error submitting to IBIS:', error);
       toast({
@@ -463,100 +416,15 @@ export const IbisSubmissionModal = ({
           }))} placeholder="Detailed description (optional)" rows={3} />
           </div>
 
-          {existingNodes.length > 0 && (
-            <div className="space-y-3">
-              <Label>Make Links (Optional)</Label>
-
-              {/* Link to Issue */}
-              <div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="linkIssue">Link to Issue</Label>
-                  <Button type="button" size="sm" variant="outline" onClick={() => recommendLink('issue')} disabled={!!linkLoading.issue}>
-                    {linkLoading.issue ? <LoadingSpinner className="h-3 w-3" /> : <Lightbulb className="h-3 w-3" />}
-                    <span className="ml-2 text-xs">AI Recommend</span>
-                  </Button>
-                </div>
-                <Select value={linkIssueId} onValueChange={setLinkIssueId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an Issue to link" className="text-muted-foreground" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No link</SelectItem>
-                    {existingNodes.filter(n => n.node_type === 'issue').map(node => (
-                      <SelectItem key={node.id} value={node.id}>
-                        <div>
-                          <div className="font-medium">{node.title}</div>
-                          <div className="text-xs text-muted-foreground capitalize">Issue</div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {linkRecs.issue && (
-                  <div className="mt-1 text-xs text-muted-foreground">Recommended: {linkRecs.issue.title} ({Math.round(linkRecs.issue.score * 100)}%)</div>
-                )}
-              </div>
-
-              {/* Link to Position */}
-              <div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="linkPosition">Link to Position</Label>
-                  <Button type="button" size="sm" variant="outline" onClick={() => recommendLink('position')} disabled={!!linkLoading.position}>
-                    {linkLoading.position ? <LoadingSpinner className="h-3 w-3" /> : <Lightbulb className="h-3 w-3" />}
-                    <span className="ml-2 text-xs">AI Recommend</span>
-                  </Button>
-                </div>
-                <Select value={linkPositionId} onValueChange={setLinkPositionId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a Position to link" className="text-muted-foreground" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No link</SelectItem>
-                    {existingNodes.filter(n => n.node_type === 'position').map(node => (
-                      <SelectItem key={node.id} value={node.id}>
-                        <div>
-                          <div className="font-medium">{node.title}</div>
-                          <div className="text-xs text-muted-foreground capitalize">Position</div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {linkRecs.position && (
-                  <div className="mt-1 text-xs text-muted-foreground">Recommended: {linkRecs.position.title} ({Math.round(linkRecs.position.score * 100)}%)</div>
-                )}
-              </div>
-
-              {/* Link to Argument */}
-              <div>
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="linkArgument">Link to Argument</Label>
-                  <Button type="button" size="sm" variant="outline" onClick={() => recommendLink('argument')} disabled={!!linkLoading.argument}>
-                    {linkLoading.argument ? <LoadingSpinner className="h-3 w-3" /> : <Lightbulb className="h-3 w-3" />}
-                    <span className="ml-2 text-xs">AI Recommend</span>
-                  </Button>
-                </div>
-                <Select value={linkArgumentId} onValueChange={setLinkArgumentId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an Argument to link" className="text-muted-foreground" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No link</SelectItem>
-                    {existingNodes.filter(n => n.node_type === 'argument').map(node => (
-                      <SelectItem key={node.id} value={node.id}>
-                        <div>
-                          <div className="font-medium">{node.title}</div>
-                          <div className="text-xs text-muted-foreground capitalize">Argument</div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {linkRecs.argument && (
-                  <div className="mt-1 text-xs text-muted-foreground">Recommended: {linkRecs.argument.title} ({Math.round(linkRecs.argument.score * 100)}%)</div>
-                )}
-              </div>
-            </div>
+          {/* Enhanced Relationship Selector */}
+          {existingNodes.length > 0 && formData.nodeType && formData.title.trim() && (
+            <EnhancedRelationshipSelector
+              deliberationId={deliberationId}
+              content={formData.description || messageContent}
+              title={formData.title}
+              nodeType={formData.nodeType as 'issue' | 'position' | 'argument'}
+              onRelationshipsChange={handleRelationshipsChange}
+            />
           )}
 
           <DialogFooter>

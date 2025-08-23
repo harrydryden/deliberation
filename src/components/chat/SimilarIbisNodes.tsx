@@ -11,7 +11,9 @@ interface SimilarNode {
   title: string;
   description?: string;
   nodeType: 'issue' | 'position' | 'argument';
-  relationship: 'supportive' | 'contradictory';
+  relationshipType: string;
+  confidence: number;
+  reasoning?: string;
   similarity: number;
   createdBy?: string;
 }
@@ -78,8 +80,28 @@ const SimilarIbisNodes: React.FC<SimilarIbisNodesProps> = ({
     }
   };
 
-  const getRelationshipColor = (relationship: string) => {
-    return relationship === 'supportive' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+  const getRelationshipColor = (relationshipType: string) => {
+    const supportiveTypes = ['supports', 'strengthens', 'builds_on', 'addresses'];
+    const oppositionalTypes = ['opposes', 'counters', 'contradicts', 'challenges'];
+    const neutralTypes = ['relates_to', 'discusses', 'questions', 'refines'];
+    
+    if (supportiveTypes.some(t => relationshipType.includes(t))) {
+      return 'bg-green-50 border-green-200 text-green-800';
+    }
+    if (oppositionalTypes.some(t => relationshipType.includes(t))) {
+      return 'bg-red-50 border-red-200 text-red-800';
+    }
+    return 'bg-blue-50 border-blue-200 text-blue-800';
+  };
+
+  const formatRelationshipType = (type: string) => {
+    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 0.8) return 'text-green-600';
+    if (confidence >= 0.6) return 'text-yellow-600';  
+    return 'text-red-600';
   };
 
   if (!nodes.length) return null;
@@ -102,9 +124,9 @@ const SimilarIbisNodes: React.FC<SimilarIbisNodesProps> = ({
                   </Badge>
                   <Badge 
                     variant="secondary" 
-                    className={getRelationshipColor(node.relationship)}
+                    className={`border ${getRelationshipColor(node.relationshipType)}`}
                   >
-                    {node.relationship === 'supportive' ? 'In support' : 'In contradiction'}
+                    {formatRelationshipType(node.relationshipType)}
                   </Badge>
                 </div>
                 
@@ -115,10 +137,20 @@ const SimilarIbisNodes: React.FC<SimilarIbisNodesProps> = ({
                       {node.description}
                     </p>
                   )}
+                  {node.reasoning && (
+                    <p className="text-xs text-muted-foreground mt-1 italic">
+                      {node.reasoning}
+                    </p>
+                  )}
                 </div>
                 
-                <div className="text-xs text-muted-foreground">
-                  Similarity: {Math.round(node.similarity * 100)}%
+                <div className="flex items-center gap-3 text-xs">
+                  <span className={`font-medium ${getConfidenceColor(node.confidence)}`}>
+                    {Math.round(node.confidence * 100)}% confidence
+                  </span>
+                  <span className="text-muted-foreground">
+                    {Math.round(node.similarity * 100)}% similarity
+                  </span>
                 </div>
               </div>
               
