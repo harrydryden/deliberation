@@ -39,3 +39,6 @@ verify_jwt = false
 
 [functions.admin-get-users]
 verify_jwt = true
+
+[functions.langchain-process-document]
+verify_jwt = true
