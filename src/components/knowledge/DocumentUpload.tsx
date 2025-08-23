@@ -101,15 +101,34 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       setProcessingStatus('Processing document with server-side AI (PDF parsing, OpenAI embeddings, langchain)...');
       logger.component.update('DocumentUpload', { action: 'uploadSuccess', path: uploadData.path });
 
-      // Server-side processing - handles PDF parsing, OpenAI, and langchain
+      // Read file content for processing
+      let fileContent = '';
+      
+      if (file.type.includes('pdf')) {
+        // For now, PDFs need to be converted to text manually
+        // The edge function expects text content, not raw PDF bytes
+        throw new Error('PDF processing temporarily unavailable. Please convert your PDF to text format and upload as .txt file.');
+      } else {
+        // Handle text files
+        fileContent = await file.text();
+      }
+
+      if (!fileContent || fileContent.trim().length < 10) {
+        throw new Error('No meaningful text content found in the document');
+      }
+
+      setUploadProgress(75);
+      setProcessingStatus('Creating AI embeddings and knowledge entries...');
+
+      // Use existing process-agent-knowledge edge function
       const { data: processResult, error: processError } = await supabase.functions.invoke(
-        'secure-file-processor',
+        'process-agent-knowledge',
         {
           body: {
-            storagePath: uploadData.path,
+            fileContent: fileContent,
             fileName: file.name,
             agentId: selectedAgent,
-            contentType: file.type.includes('pdf') ? 'pdf' : 'text'
+            contentType: 'text/plain'
           }
         }
       );
@@ -198,12 +217,12 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             ref={fileInputRef}
             id="file-upload"
             type="file"
-            accept=".txt,.md,.pdf"
+            accept=".txt,.md"
             onChange={handleFileUpload}
             disabled={uploading || !selectedAgent || !agents || agents.length === 0}
           />
           <p className="text-sm text-muted-foreground">
-            Supported formats: PDF, TXT, MD (secure server-side processing with PDF parsing, OpenAI embeddings, and langchain)
+            Supported formats: TXT, MD (PDF processing temporarily disabled while fixing build issues)
           </p>
         </div>
 
