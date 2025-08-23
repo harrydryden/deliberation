@@ -34,41 +34,22 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
   // Check if current user is admin
   const { user, isAdmin } = useSupabaseAuth();
 
-  const loadPDFJS = async () => {
-    // Check if PDF.js is already loaded
-    if ((window as any).pdfjsLib) {
-      return (window as any).pdfjsLib;
-    }
-
-    // Load PDF.js dynamically from CDN to avoid build issues
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.min.js';
-    
-    return new Promise((resolve, reject) => {
-      script.onload = () => {
-        // Configure worker
-        (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.min.js';
-        resolve((window as any).pdfjsLib);
-      };
-      script.onerror = () => {
-        document.head.removeChild(script);
-        reject(new Error('Failed to load PDF.js library'));
-      };
-      document.head.appendChild(script);
-    });
-  };
-
   const extractPDFText = async (file: File): Promise<string> => {
     try {
-      // Load PDF.js dynamically
-      const pdfjsLib = await loadPDFJS() as any;
+      // Use the existing pdfjs-dist package that's already in dependencies
+      const pdfjsLib = await import('pdfjs-dist');
+      
+      // Set worker source to a CDN to avoid build issues
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@4.0.379/build/pdf.worker.min.js';
       
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ 
         data: arrayBuffer,
-        useSystemFonts: true,
-        disableFontFace: false,
+        useSystemFonts: false,
+        disableFontFace: true,
         useWorkerFetch: false,
+        isEvalSupported: false,
+        disableAutoFetch: true,
         verbosity: 0
       }).promise;
       
