@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import { User, Session, createClient } from '@supabase/supabase-js';
+import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 
@@ -210,32 +210,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const users = [];
       
-      // Create a separate admin client that won't affect current auth state
-      const adminClient = createClient(
-        'https://iowsxuxkgvpgrvvklwyt.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzMwMDA5NiwiZXhwIjoyMDY4ODc2MDk2fQ.XGBR78aD3lBUJCHOLJLlcAYtY6BLGQXhKYfJgp3bAu0',
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false
-          }
-        }
-      );
+      // Store current session to restore it later
+      const currentSession = session;
       
       for (let i = 0; i < count; i++) {
         const accessCode1 = generateAccessCode1();
         const accessCode2 = generateAccessCode2();
         const email = `${accessCode1}@deliberation.local`;
         
-        // Use admin client to create user without signing them in
-        const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+        // Create user in Supabase Auth using signUp
+        const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password: accessCode2,
-          email_confirm: true, // Auto-confirm to avoid email verification
-          user_metadata: {
-            access_code_1: accessCode1,
-            access_code_2: accessCode2,
-            role: roleType
+          options: {
+            data: {
+              access_code_1: accessCode1,
+              access_code_2: accessCode2,
+              role: roleType
+            }
           }
         });
 
@@ -248,6 +240,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           accessCode1,
           accessCode2,
           role: roleType
+        });
+      }
+
+      // Immediately restore the original session to prevent auto-login
+      if (currentSession && users.length > 0) {
+        await supabase.auth.setSession({
+          access_token: currentSession.access_token,
+          refresh_token: currentSession.refresh_token
         });
       }
 
