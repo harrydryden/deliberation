@@ -37,6 +37,7 @@ interface KnowledgeManagementProps {
 export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManagementProps) => {
   logger.component.mount('KnowledgeManagement', { agentCount: agents.length, loading });
   
+  const { user } = useSupabaseAuth();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [queryOpen, setQueryOpen] = useState(false);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
@@ -89,7 +90,6 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
 
     setUploading(true);
     try {
-      const { user } = useSupabaseAuth();
       if (!user) {
         throw new Error('User not authenticated');
       }
