@@ -10,6 +10,7 @@ import { RefreshCw, MessageSquare, Eye, GitBranch, Trash2, Database, Map, Edit }
 import { formatToUKDateTime } from '@/utils/timeUtils';
 import { Deliberation } from '@/types/index';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ExpandableText } from '@/components/common/ExpandableText';
 import { useNavigate } from 'react-router-dom';
 import { IbisNodeManagement } from './IbisNodeManagement';
 import { AdminIbisMapEditor } from './AdminIbisMapEditor';
@@ -216,18 +217,19 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
               </div>
             </div>
             
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Notion</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[200px]">Title</TableHead>
+                    <TableHead className="w-[140px]">Status</TableHead>
+                    <TableHead className="min-w-[250px]">Notion</TableHead>
+                    <TableHead className="min-w-[200px]">Description</TableHead>
+                    <TableHead className="w-[120px]">Created</TableHead>
+                    <TableHead className="w-[120px]">Updated</TableHead>
+                    <TableHead className="min-w-[500px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {deliberations.map((deliberation) => (
                   <TableRow key={deliberation.id}>
@@ -251,13 +253,21 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell className="max-w-xs">
-                      <span className="text-sm font-medium text-primary">
-                        {deliberation.notion || 'No notion set'}
-                      </span>
+                    <TableCell>
+                      <ExpandableText 
+                        text={deliberation.notion} 
+                        placeholder="No notion set"
+                        title={`Notion for "${deliberation.title}"`}
+                        maxLength={60}
+                      />
                     </TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {deliberation.description || 'No description'}
+                    <TableCell>
+                      <ExpandableText 
+                        text={deliberation.description} 
+                        placeholder="No description"
+                        title={`Description for "${deliberation.title}"`}
+                        maxLength={50}
+                      />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDate(deliberation.createdAt)}
@@ -382,7 +392,8 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           </div>
         )}
       </CardContent>
