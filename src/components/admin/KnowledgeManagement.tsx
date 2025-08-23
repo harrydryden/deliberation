@@ -125,16 +125,15 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         });
       }
       
-      // Use enhanced LangChain processor for PDFs, original for text files
-      const processingFunction = isPDF ? 'langchain-process-document' : 'process-document';
+      // Use the unified document processing function
+      const processingFunction = 'process-document-upload';
       logger.component.update('KnowledgeManagement', { action: 'processingStart', function: processingFunction });
       
       const { data, error } = await supabase.functions.invoke(processingFunction, {
         body: {
+          fileName: uploadData.path,
           agentId: selectedAgent,
-          storagePath: uploadData.path,
-          fileName: file.name,
-          contentType: contentType
+          userId: user.id
         }
       });
 

@@ -44,14 +44,34 @@ class TextSplitter {
   }
 }
 
-// PDF text extraction
+// PDF text extraction using PDF.js
 async function extractPDFText(arrayBuffer: ArrayBuffer): Promise<string> {
-  // Use pdf-parse for server-side PDF processing
-  const pdfParse = (await import('https://esm.sh/pdf-parse@1.1.1')).default;
-  
   try {
-    const data = await pdfParse(new Uint8Array(arrayBuffer));
-    return data.text;
+    // Import PDF.js for Deno
+    const pdfjsLib = await import('https://esm.sh/pdfjs-dist@3.11.174/build/pdf.mjs');
+    
+    // Load the PDF document
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(arrayBuffer),
+      useSystemFonts: true,
+    });
+    
+    const pdf = await loadingTask.promise;
+    let fullText = '';
+    
+    // Extract text from each page
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      
+      fullText += pageText + '\n';
+    }
+    
+    return fullText;
   } catch (error) {
     console.error('PDF parsing error:', error);
     throw new Error(`Failed to extract text from PDF: ${error.message}`);
@@ -168,7 +188,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       message: `Successfully processed ${fileName}`,
-      chunksCreated: chunks.length,
+      chunksProcessed: chunks.length,
+      totalChunks: chunks.length,
       fileName: fileName.split('/').pop()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
