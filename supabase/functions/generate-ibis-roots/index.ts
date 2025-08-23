@@ -117,14 +117,29 @@ serve(async (req) => {
     // Parse AI response
     let suggestedIssues;
     try {
-      // Extract JSON from the response
-      const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error('No JSON array found in AI response');
+      console.log('Raw AI Response:', aiResponse);
+      console.log('AI Response type:', typeof aiResponse);
+      console.log('AI Response length:', aiResponse?.length);
+      
+      // First try to parse the entire response as JSON
+      try {
+        suggestedIssues = JSON.parse(aiResponse);
+      } catch (directParseError) {
+        console.log('Direct JSON parse failed, trying to extract JSON array');
+        // Extract JSON from the response if it's wrapped in text
+        const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          console.error('No JSON array found in AI response:', aiResponse);
+          throw new Error('No JSON array found in AI response');
+        }
+        console.log('Extracted JSON string:', jsonMatch[0]);
+        suggestedIssues = JSON.parse(jsonMatch[0]);
       }
-      suggestedIssues = JSON.parse(jsonMatch[0]);
+      
+      console.log('Parsed suggested issues:', JSON.stringify(suggestedIssues, null, 2));
     } catch (parseError) {
       console.error('Failed to parse AI response:', aiResponse);
+      console.error('Parse error details:', parseError);
       throw new Error('Failed to parse AI response as JSON');
     }
 
