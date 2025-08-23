@@ -210,9 +210,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const users = [];
       
-      // Store current session to restore it later
-      const currentSession = session;
-      
       for (let i = 0; i < count; i++) {
         const accessCode1 = generateAccessCode1();
         const accessCode2 = generateAccessCode2();
@@ -240,14 +237,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           accessCode1,
           accessCode2,
           role: roleType
-        });
-      }
-
-      // Immediately restore the original session to prevent auto-login
-      if (currentSession && users.length > 0) {
-        await supabase.auth.setSession({
-          access_token: currentSession.access_token,
-          refresh_token: currentSession.refresh_token
         });
       }
 
