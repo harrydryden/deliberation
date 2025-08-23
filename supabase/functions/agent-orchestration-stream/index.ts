@@ -15,6 +15,15 @@ serve(async (req) => {
   }
 
   try {
+    // Get authorization header for user authentication
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { messageId, deliberationId, mode } = await req.json();
     
     console.log('🚀 Starting streaming agent orchestration', { messageId, deliberationId, mode });
@@ -30,8 +39,8 @@ serve(async (req) => {
       writer.write(encoder.encode(message));
     };
 
-    // Start background processing
-    processStreamingOrchestration(messageId, deliberationId, mode, sendData).finally(() => {
+    // Start background processing with auth header
+    processStreamingOrchestration(messageId, deliberationId, mode, authHeader, sendData).finally(() => {
       writer.close();
     });
 
@@ -57,25 +66,37 @@ async function processStreamingOrchestration(
   messageId: string,
   deliberationId: string,
   mode: string,
+  authHeader: string,
   sendData: (data: any) => void
 ) {
   try {
-    // Initialize Supabase
+    // Initialize Supabase clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
     
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // User client for reading messages (respects RLS)
+    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          authorization: authHeader,
+        },
+      },
+    });
 
-    // Get message details
-    const { data: message } = await supabase
+    // Service client for writing agent messages (bypasses RLS)
+    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get message details using user client (respects RLS)
+    const { data: message, error: messageError } = await userSupabase
       .from('messages')
       .select('*')
       .eq('id', messageId)
       .single();
 
-    if (!message) {
-      throw new Error('Message not found');
+    if (messageError || !message) {
+      throw new Error(`Message not found or access denied: ${messageError?.message}`);
     }
 
     console.log('📨 Processing message:', message.content);
@@ -109,8 +130,8 @@ async function processStreamingOrchestration(
       // Cache the response
       cacheResponse(message.content, response, fastPath.agent, deliberationId);
 
-      // Store response
-      await supabase.from('messages').insert({
+      // Store response using service client
+      await serviceSupabase.from('messages').insert({
         content: response,
         message_type: fastPath.agent,
         user_id: message.user_id,
@@ -150,8 +171,8 @@ async function processStreamingOrchestration(
         sendData
       );
 
-      // Store response
-      await supabase.from('messages').insert({
+      // Store response using service client
+      await serviceSupabase.from('messages').insert({
         content: response,
         message_type: 'bill_agent',
         user_id: message.user_id,
@@ -171,8 +192,8 @@ async function processStreamingOrchestration(
     console.log('🔄 Using full orchestration');
     
     const analysisPromise = analyzeMessage(message.content, openAIApiKey);
-    const conversationPromise = getConversationState(supabase, deliberationId, message.user_id);
-    const similarNodesPromise = findSimilarNodes(supabase, message.content);
+    const conversationPromise = getConversationState(userSupabase, deliberationId, message.user_id);
+    const similarNodesPromise = findSimilarNodes(userSupabase, message.content);
 
     // Wait for all parallel operations
     const [analysis, conversationState, similarNodes] = await Promise.all([
@@ -207,8 +228,8 @@ async function processStreamingOrchestration(
     // Cache the final response
     cacheResponse(message.content, response, selectedAgent, deliberationId);
 
-    // Store final response
-    await supabase.from('messages').insert({
+    // Store final response using service client
+    await serviceSupabase.from('messages').insert({
       content: response,
       message_type: selectedAgent,
       user_id: message.user_id,

@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { logger } from '@/utils/logger';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StreamingState {
   isStreaming: boolean;
@@ -26,8 +27,6 @@ export const useResponseStreaming = () => {
 
   const streamControllerRef = useRef<AbortController | null>(null);
   const rafPendingRef = useRef<boolean>(false);
-  const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL as string | undefined;
-  const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY as string | undefined;
 
   const startStreaming = useCallback(async (
     messageId: string,
@@ -51,18 +50,45 @@ export const useResponseStreaming = () => {
     });
 
     try {
-      // Prefer backend proxy if available, else fallback to Supabase
-      const apiBase = (import.meta as any).env?.VITE_API_BASE_URL as string | undefined;
-      const endpoint = apiBase 
-        ? `${apiBase}/api/v1/stream/agent`
-        : `${(SUPABASE_URL || '')}/functions/v1/agent-orchestration-stream`;
-      const authHeader = apiBase ? undefined : (SUPABASE_ANON_KEY ? `Bearer ${SUPABASE_ANON_KEY}` : undefined);
+      // Get the current session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No authentication session found');
+      }
 
-      const response = await fetch(endpoint, {
+      // Use Supabase functions.invoke for proper authentication
+      const { data, error } = await supabase.functions.invoke('agent-orchestration-stream', {
+        body: {
+          messageId,
+          deliberationId,
+          mode: 'chat'
+        }
+      });
+
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
+      }
+
+      // If the function returns data directly (non-streaming), handle it
+      if (data && !data.stream) {
+        onComplete(data.content || '', data.agentType || 'flow_agent');
+        setStreamingState({
+          isStreaming: false,
+          currentMessage: '',
+          messageId: null,
+          agentType: null,
+        });
+        return;
+      }
+
+      // For streaming responses, we need to make a direct fetch call with proper auth
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const response = await fetch(`https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/agent-orchestration-stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authHeader ? { Authorization: authHeader } : {}),
+          'Authorization': `Bearer ${currentSession?.access_token}`,
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM',
         },
         body: JSON.stringify({
           messageId,
