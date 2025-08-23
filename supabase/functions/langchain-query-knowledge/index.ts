@@ -4,7 +4,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 import { OpenAIEmbeddings } from 'https://esm.sh/@langchain/openai@0.6.3';
 import { ChatOpenAI } from 'https://esm.sh/@langchain/openai@0.6.3';
 import { SupabaseVectorStore } from 'https://esm.sh/@langchain/community@0.3.49/vectorstores/supabase';
-import { RetrievalQAChain } from 'https://esm.sh/langchain@0.3.30/chains/retrieval_qa';
+import { createRetrievalChain } from 'https://esm.sh/@langchain/chains@0.3.30/retrieval';
+import { createStuffDocumentsChain } from 'https://esm.sh/@langchain/chains@0.3.30/combine_documents';
 import { PromptTemplate } from 'https://esm.sh/@langchain/core@0.3.30/prompts';
 
 const corsHeaders = {
@@ -131,7 +132,7 @@ Your role is to provide insightful, contextual analysis rather than simple factu
 Context from relevant documents:
 {context}
 
-Question: {question}
+Question: {input}
 
 Instructions:
 1. Analyze the provided context thoroughly
@@ -145,25 +146,31 @@ Instructions:
 Generate a detailed analytical response:
 `);
 
-    console.log('Creating RetrievalQA chain...');
+    console.log('Creating retrieval chain...');
 
-    // Create retrieval QA chain
-    const chain = RetrievalQAChain.fromLLM(llm, retriever, {
+    // Create document chain for combining documents
+    const documentChain = await createStuffDocumentsChain({
+      llm,
       prompt: promptTemplate,
-      returnSourceDocuments: true,
+    });
+
+    // Create retrieval chain
+    const chain = await createRetrievalChain({
+      retriever,
+      combineDocsChain: documentChain,
     });
 
     console.log('Executing query...');
 
     // Execute the query
-    const result = await chain.call({
-      query: query,
+    const result = await chain.invoke({
+      input: query,
     });
 
-    console.log(`Query completed. Found ${result.sourceDocuments?.length || 0} source documents`);
+    console.log(`Query completed. Found ${result.context?.length || 0} source documents`);
 
     // Extract source information
-    const sources = result.sourceDocuments?.map((doc) => {
+    const sources = result.context?.map((doc) => {
       const metadata = doc.metadata || {};
       return metadata.fileName || metadata.title || 'Unknown source';
     }) || [];
@@ -172,7 +179,7 @@ Generate a detailed analytical response:
     const uniqueSources = [...new Set(sources)];
 
     // Format relevant knowledge for response
-    const relevantKnowledge = result.sourceDocuments?.map((doc, index) => ({
+    const relevantKnowledge = result.context?.map((doc, index) => ({
       id: `langchain-chunk-${index}`,
       content: doc.pageContent,
       metadata: doc.metadata,
@@ -187,7 +194,7 @@ Generate a detailed analytical response:
     return new Response(
       JSON.stringify({
         success: true,
-        response: result.text,
+        response: result.answer,
         knowledgeChunks: relevantKnowledge.length,
         relevantKnowledge,
         sources: uniqueSources,
