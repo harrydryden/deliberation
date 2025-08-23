@@ -175,6 +175,23 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         .from('user_roles')
         .select('user_id, role')
         .in('user_id', userIds);
+        
+      // DEBUG: Log specific data for the problematic user
+      const problematicUserId = profiles.find(p => p.id.startsWith('eab4f22d'))?.id;
+      if (problematicUserId) {
+        console.log('🔍 DEBUG - Problematic user ID from profiles:', problematicUserId);
+        console.log('🔍 DEBUG - Type of problematic user ID:', typeof problematicUserId);
+        console.log('🔍 DEBUG - User roles raw data:', JSON.stringify(userRoles, null, 2));
+        
+        const matchingRole = userRoles?.find(ur => ur.user_id === problematicUserId);
+        console.log('🔍 DEBUG - Matching role entry:', matchingRole);
+        
+        // Test different comparison methods
+        const byString = userRoles?.find(ur => ur.user_id.toString() === problematicUserId.toString());
+        const byDirectEquals = userRoles?.find(ur => ur.user_id === problematicUserId);
+        console.log('🔍 DEBUG - By string comparison:', byString);
+        console.log('🔍 DEBUG - By direct equals:', byDirectEquals);
+      }
 
       // Get participants with deliberations
       const { data: participants } = await supabase
