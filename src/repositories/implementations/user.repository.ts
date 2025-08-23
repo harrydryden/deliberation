@@ -191,6 +191,11 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
 
       // Create maps for efficient lookups
       const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
+      
+      // DEBUG: Log roles data for troubleshooting
+      console.log('🔍 DEBUG - User roles data:', userRoles);
+      console.log('🔍 DEBUG - Roles map:', rolesMap);
+      
       const deliberationsMap = new Map();
       
       // Initialize deliberations map
@@ -213,6 +218,15 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
       // Map users - access codes now come directly from the database!
       const users: User[] = profiles.map(profile => {
         const role = rolesMap.get(profile.id) || 'user';
+        
+        // DEBUG: Log role lookup for the problematic user
+        if (profile.id.startsWith('eab4f22d')) {
+          console.log('🔍 DEBUG - Profile ID:', profile.id);
+          console.log('🔍 DEBUG - Role from map:', rolesMap.get(profile.id));
+          console.log('🔍 DEBUG - Final role:', role);
+          console.log('🔍 DEBUG - Available roles in map:', Array.from(rolesMap.keys()));
+        }
+        
         const deliberations = deliberationsMap.get(profile.id) || [];
         
         return {
