@@ -524,7 +524,14 @@ async function generateStreamingResponse(
   
   console.log(`🧠 Using ${model} for ${agentType} response`);
 
-  const systemPrompt = await buildSystemPrompt(agentType, analysis, conversationState, similarNodes);
+  // For bill agent, retrieve relevant knowledge first
+  let knowledgeContext = '';
+  if (agentType === 'bill_agent') {
+    console.log('📚 Retrieving knowledge for bill agent...');
+    knowledgeContext = await retrieveBillAgentKnowledge(content, deliberationId);
+  }
+
+  const systemPrompt = await buildSystemPrompt(agentType, analysis, conversationState, similarNodes, knowledgeContext);
 
   const requestBody: any = {
     model,
@@ -586,7 +593,7 @@ async function generateStreamingResponse(
 }
 
 // Build appropriate system prompt using agent configuration
-async function buildSystemPrompt(agentType: string, analysis: any, conversationState: any, similarNodes: any[]): Promise<string> {
+async function buildSystemPrompt(agentType: string, analysis: any, conversationState: any, similarNodes: any[], knowledgeContext: string = ''): Promise<string> {
   // Get agent configuration with system prompt
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -628,7 +635,94 @@ async function buildSystemPrompt(agentType: string, analysis: any, conversationS
     systemPrompt += `\n\nThere are ${similarNodes.length} related discussion points that may be relevant to reference.`;
   }
 
+  // Add knowledge context for bill agent
+  if (knowledgeContext && knowledgeContext.length > 0) {
+    systemPrompt += `\n\nRELEVANT KNOWLEDGE CONTEXT:\n${knowledgeContext}\n\nUse this knowledge to inform your response when relevant, but always provide balanced and comprehensive information.`;
+  }
+
   return systemPrompt;
+}
+
+// Retrieve knowledge for bill agent responses
+async function retrieveBillAgentKnowledge(query: string, deliberationId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get bill agent for this deliberation
+    const { data: billAgents } = await supabase
+      .from('agent_configurations')
+      .select('id')
+      .eq('agent_type', 'bill_agent')
+      .eq('deliberation_id', deliberationId)
+      .eq('is_active', true)
+      .limit(1);
+
+    if (!billAgents || billAgents.length === 0) {
+      console.log('📚 No bill agent found for deliberation, checking global agents...');
+      
+      // Fallback to global bill agent
+      const { data: globalAgents } = await supabase
+        .from('agent_configurations')
+        .select('id')
+        .eq('agent_type', 'bill_agent')
+        .is('deliberation_id', null)
+        .eq('is_active', true)
+        .limit(1);
+        
+      if (!globalAgents || globalAgents.length === 0) {
+        console.log('📚 No bill agent found at all');
+        return '';
+      }
+      
+      billAgents.push(globalAgents[0]);
+    }
+
+    const agentId = billAgents[0].id;
+    console.log(`📚 Querying knowledge for agent: ${agentId}`);
+
+    // Try LangChain query first (more advanced)
+    try {
+      const { data, error } = await supabase.functions.invoke('langchain-query-knowledge', {
+        body: { 
+          query, 
+          agentId, 
+          maxResults: 5 
+        }
+      });
+
+      if (!error && data?.response) {
+        console.log('📚 LangChain knowledge retrieved successfully');
+        return data.response;
+      }
+    } catch (langchainError) {
+      console.log('📚 LangChain query failed, trying fallback...');
+    }
+
+    // Fallback to direct query
+    try {
+      const { data, error } = await supabase.functions.invoke('query-agent-knowledge-optimized', {
+        body: { 
+          query, 
+          agentId, 
+          maxResults: 5 
+        }
+      });
+
+      if (!error && data?.response) {
+        console.log('📚 Fallback knowledge retrieved successfully');
+        return data.response;
+      }
+    } catch (fallbackError) {
+      console.log('📚 Fallback query also failed');
+    }
+
+    return '';
+  } catch (error) {
+    console.error('📚 Knowledge retrieval error:', error);
+    return '';
+  }
 }
 
 // Legacy function - no longer used for system prompts
