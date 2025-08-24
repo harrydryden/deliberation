@@ -19,4 +19,12 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    exclude: ['canvas']
+  },
+  build: {
+    rollupOptions: {
+      external: ['canvas']
+    }
+  }
 }));
