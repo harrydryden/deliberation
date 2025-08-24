@@ -68,8 +68,8 @@ CREATE TRIGGER trigger_update_ibis_relationships_updated_at
 -- Create semantic similarity index after table creation
 CREATE INDEX IF NOT EXISTS idx_ibis_relationships_semantic ON ibis_relationships(semantic_similarity) WHERE semantic_similarity IS NOT NULL;
 
--- Function to get node relationships with semantic analysis
-CREATE OR REPLACE FUNCTION get_node_relationships(node_uuid UUID, include_semantic BOOLEAN DEFAULT true)
+-- Function to get node relationships
+CREATE OR REPLACE FUNCTION get_node_relationships(node_uuid UUID)
 RETURNS TABLE(
   relationship_id UUID,
   related_node_id UUID,
@@ -90,7 +90,7 @@ BEGIN
     END as related_node_id,
     r.relationship_type,
     r.strength,
-    CASE WHEN include_semantic THEN r.semantic_similarity ELSE NULL END as semantic_similarity,
+    r.semantic_similarity,
     n.title as related_node_title,
     n.node_type as related_node_type,
     (r.source_node_id = node_uuid) as is_source
@@ -106,13 +106,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to suggest relationships based on semantic similarity
-CREATE OR REPLACE FUNCTION suggest_ibis_relationships(deliberation_uuid UUID, similarity_threshold DECIMAL(3,2) DEFAULT 0.7)
+-- Function to suggest relationships based on node types (simplified version)
+CREATE OR REPLACE FUNCTION suggest_ibis_relationships(deliberation_uuid UUID)
 RETURNS TABLE(
   source_node_id UUID,
   target_node_id UUID,
   suggested_type VARCHAR(50),
-  semantic_similarity DECIMAL(3,2),
   source_title TEXT,
   target_title TEXT
 ) AS $$
@@ -127,7 +126,6 @@ BEGIN
       WHEN n1.node_type = 'argument' AND n2.node_type = 'position' THEN 'challenges'
       ELSE 'similar_to'
     END as suggested_type,
-    GREATEST(n1.semantic_embedding <=> n2.semantic_embedding, 0.0) as semantic_similarity,
     n1.title as source_title,
     n2.title as target_title
   FROM ibis_nodes n1
@@ -135,14 +133,11 @@ BEGIN
   WHERE n1.deliberation_id = deliberation_uuid
     AND n2.deliberation_id = deliberation_uuid
     AND n1.id < n2.id -- Avoid duplicate pairs
-    AND n1.semantic_embedding IS NOT NULL
-    AND n2.semantic_embedding IS NOT NULL
-    AND (n1.semantic_embedding <=> n2.semantic_embedding) > similarity_threshold
     AND NOT EXISTS (
       SELECT 1 FROM ibis_relationships r 
       WHERE (r.source_node_id = n1.id AND r.target_node_id = n2.id)
          OR (r.source_node_id = n2.id AND r.target_node_id = n1.id)
     )
-  ORDER BY semantic_similarity DESC;
+  ORDER BY n1.created_at DESC, n2.created_at DESC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
