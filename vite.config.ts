@@ -23,12 +23,4 @@ export default defineConfig(({ mode }) => ({
     'process.env.NODE_ENV': JSON.stringify(mode),
     'global': 'globalThis',
   },
-  optimizeDeps: {
-    exclude: ['canvas'],
-  },
-  build: {
-    rollupOptions: {
-      external: ['canvas'],
-    },
-  },
 }));
