@@ -1,0 +1,214 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Lightbulb, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { IssueRecommendationService, IssueRecommendation } from '@/services/domain/implementations/issue-recommendation.service';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { logger } from '@/utils/logger';
+
+interface IssueRecommendationsProps {
+  deliberationId: string;
+  userContent: string;
+  onIssueSelected?: (issueId: string) => void;
+  className?: string;
+}
+
+export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
+  deliberationId,
+  userContent,
+  onIssueSelected,
+  className = ''
+}) => {
+  const { user } = useSupabaseAuth();
+  const [recommendations, setRecommendations] = useState<IssueRecommendation[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set());
+
+  const recommendationService = new IssueRecommendationService();
+
+  // Fetch recommendations when content changes
+  useEffect(() => {
+    if (!user?.id || !userContent.trim()) {
+      setRecommendations([]);
+      return;
+    }
+
+    const fetchRecommendations = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const results = await recommendationService.getIssueRecommendations({
+          userId: user.id,
+          deliberationId,
+          content: userContent,
+          maxRecommendations: 2
+        });
+
+        setRecommendations(results);
+        
+        // Track usage for analytics
+        await recommendationService.trackRecommendationUsage(user.id, deliberationId, results);
+      } catch (err) {
+        logger.error('[IssueRecommendations] Error fetching recommendations', { error: err, deliberationId });
+        setError('Failed to load issue recommendations');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Debounce the API call to avoid excessive requests
+    const timeoutId = setTimeout(fetchRecommendations, 500);
+    return () => clearTimeout(timeoutId);
+  }, [user?.id, deliberationId, userContent]);
+
+  // Handle issue selection
+  const handleIssueSelect = (issueId: string) => {
+    const newSelected = new Set(selectedIssues);
+    if (newSelected.has(issueId)) {
+      newSelected.delete(issueId);
+    } else {
+      newSelected.add(issueId);
+    }
+    setSelectedIssues(newSelected);
+
+    // Notify parent component
+    if (onIssueSelected) {
+      onIssueSelected(issueId);
+    }
+  };
+
+  // Handle issue creation from recommendation
+  const handleCreateFromRecommendation = async (recommendation: IssueRecommendation) => {
+    try {
+      // This would typically create a new IBIS node based on the recommendation
+      // For now, we'll just log the action
+      logger.info('[IssueRecommendations] Creating issue from recommendation', { recommendation });
+      
+      // Mark as selected
+      setSelectedIssues(new Set([...selectedIssues, recommendation.issueId]));
+      
+      // Notify parent component
+      if (onIssueSelected) {
+        onIssueSelected(recommendation.issueId);
+      }
+    } catch (err) {
+      logger.error('[IssueRecommendations] Error creating issue from recommendation', { error: err, recommendation });
+      setError('Failed to create issue from recommendation');
+    }
+  };
+
+  // Don't show if no content or no recommendations
+  if (!userContent.trim() || (!isLoading && recommendations.length === 0)) {
+    return null;
+  }
+
+  return (
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Lightbulb className="h-5 w-5 text-yellow-500" />
+          Issue Recommendations
+        </CardTitle>
+        <CardDescription>
+          AI-suggested issues based on your submission
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {isLoading && (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-sm text-muted-foreground">Analyzing your submission...</span>
+          </div>
+        )}
+
+        {!isLoading && recommendations.length > 0 && (
+          <div className="space-y-3">
+            {recommendations.map((recommendation) => (
+              <div
+                key={recommendation.issueId}
+                className={`p-3 border rounded-lg transition-colors ${
+                  selectedIssues.has(recommendation.issueId)
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="font-medium text-sm">{recommendation.title}</h4>
+                      <Badge variant="outline" className="text-xs">
+                        {recommendation.relevanceScore.toFixed(1)} relevance
+                      </Badge>
+                    </div>
+                    
+                    {recommendation.description && (
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {recommendation.description}
+                      </p>
+                    )}
+                    
+                    <p className="text-xs text-muted-foreground">
+                      {recommendation.explanation}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      variant={selectedIssues.has(recommendation.issueId) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleIssueSelect(recommendation.issueId)}
+                      className="h-8 px-3"
+                    >
+                      {selectedIssues.has(recommendation.issueId) ? (
+                        <>
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Selected
+                        </>
+                      ) : (
+                        'Select'
+                      )}
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCreateFromRecommendation(recommendation)}
+                      className="h-8 px-3 text-xs"
+                    >
+                      Create New
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div className="text-xs text-muted-foreground text-center pt-2">
+              Select an issue to link your submission, or create a new one
+            </div>
+          </div>
+        )}
+
+        {!isLoading && recommendations.length === 0 && userContent.trim() && (
+          <div className="text-center py-4">
+            <p className="text-muted-foreground text-sm">
+              No relevant issues found for your submission
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Consider creating a new issue or refining your submission
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
+import React, { useEffect, useRef, useState, useCallback, lazy, Suspense } from "react";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ const LazyMarkdownMessage = lazy(() => import("@/components/common/MarkdownMessa
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import type { ChatMessage } from "@/types/index";
 import SimilarIbisNodes from "@/components/chat/SimilarIbisNodes";
+import { MessageRating } from "@/components/chat/MessageRating";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -170,6 +171,17 @@ export const MessageList = ({ messages, isLoading, isTyping, onAddToIbis, onRetr
                   >
                     Retry
                   </Button>
+                </div>
+              )}
+
+              {/* Message Rating for Agent Messages */}
+              {!isUser && (
+                <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+                  <MessageRating
+                    messageId={message.id}
+                    messageType={message.message_type}
+                    className="justify-start"
+                  />
                 </div>
               )}
 

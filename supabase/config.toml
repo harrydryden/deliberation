@@ -16,23 +16,17 @@ port = 54323
 enabled = true
 port = 54324
 
-[functions.enhanced-pdf-processor]
-verify_jwt = false
+[functions.robust-pdf-processor]
+verify_jwt = true
+import_map = "import_map.json"
 
 [functions.evaluate-ibis-relationships]
-verify_jwt = false
-
-[functions.process-agent-knowledge]
 verify_jwt = true
+import_map = "import_map.json"
 
-[functions.sophisticated-pdf-processor]
-verify_jwt = false
-
-[functions.query-agent-knowledge]
+[functions.create-ibis-node]
 verify_jwt = true
-
-[functions.agent-response]
-verify_jwt = true
+import_map = "import_map.json"
 
 [functions.realtime-chat]
 verify_jwt = false
@@ -43,5 +37,26 @@ verify_jwt = false
 [functions.admin-get-users]
 verify_jwt = true
 
-[functions.langchain-process-document]
+[functions.agent-orchestration-stream]
 verify_jwt = true
+import_map = "import_map.json"
+
+[functions.classify-message]
+verify_jwt = true
+import_map = "import_map.json"
+
+[functions.generate-ibis-roots]
+verify_jwt = true
+import_map = "import_map.json"
+
+[functions.suggest-ibis-links]
+verify_jwt = true
+import_map = "import_map.json"
+
+[functions.compute-ibis-embeddings]
+verify_jwt = true
+import_map = "import_map.json"
+
+[functions.link-similar-ibis-issues]
+verify_jwt = true
+import_map = "import_map.json"

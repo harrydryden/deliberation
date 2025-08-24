@@ -3,225 +3,270 @@ import { logger } from '@/utils/logger';
 
 export interface PromptTemplate {
   id: string;
-  prompt_type: string;
-  agent_type?: string;
   name: string;
-  template: string;
   description?: string;
-  is_default: boolean;
-  is_active: boolean;
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
+  category: string;
+  templateText: string;
+  variables?: Record<string, unknown>;
+  isActive: boolean;
+  version: number;
+  createdBy?: string;
+  deliberationId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PromptVariable {
+  name: string;
+  description: string;
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  required: boolean;
+  defaultValue?: unknown;
 }
 
 export class PromptService {
-  async getPromptTemplates(filter?: {
-    prompt_type?: string;
-    agent_type?: string;
-    is_default?: boolean;
-  }): Promise<PromptTemplate[]> {
+  /**
+   * Get a prompt template by name
+   */
+  async getPromptTemplate(templateName: string): Promise<PromptTemplate | null> {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('prompt_templates')
         .select('*')
+        .eq('name', templateName)
         .eq('is_active', true)
-        .order('prompt_type, agent_type, name');
+        .order('version', { ascending: false })
+        .limit(1)
+        .single();
 
-      // Filter out system_prompt - it's now handled by agent configurations
-      query = query.neq('prompt_type', 'system_prompt');
-
-      if (filter?.prompt_type && filter.prompt_type !== 'system_prompt') {
-        query = query.eq('prompt_type', filter.prompt_type);
-      }
-      if (filter?.agent_type) {
-        query = query.eq('agent_type', filter.agent_type);
-      }
-      if (filter?.is_default !== undefined) {
-        query = query.eq('is_default', filter.is_default);
+      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+        logger.error('[PromptService] Error getting prompt template', { error, templateName });
+        throw new Error(`Failed to get prompt template: ${error.message}`);
       }
 
-      const { data, error } = await query;
+      if (!data) return null;
 
-      if (error) {
-        logger.error('Failed to fetch prompt templates', { error, filter });
-        throw error;
-      }
-
-      return data || [];
+      return this.mapDatabaseToPromptTemplate(data);
     } catch (error) {
-      logger.error('Prompt service getPromptTemplates failed', { error, filter });
+      logger.error('[PromptService] Unexpected error getting prompt template', { error, templateName });
       throw error;
     }
   }
 
-  async getDefaultPrompt(promptType: string, agentType?: string): Promise<string | null> {
-    try {
-      // First try to get agent-specific default prompt
-      if (agentType) {
-        const { data } = await supabase
-          .from('prompt_templates')
-          .select('template')
-          .eq('prompt_type', promptType)
-          .eq('agent_type', agentType)
-          .eq('is_default', true)
-          .eq('is_active', true)
-          .single();
-
-        if (data?.template) {
-          return data.template;
-        }
-      }
-
-      // Fall back to global default prompt
-      const { data } = await supabase
-        .from('prompt_templates')
-        .select('template')
-        .eq('prompt_type', promptType)
-        .is('agent_type', null)
-        .eq('is_default', true)
-        .eq('is_active', true)
-        .single();
-
-      return data?.template || null;
-    } catch (error) {
-      logger.error('Failed to get default prompt', { error, promptType, agentType });
-      return null;
-    }
-  }
-
-  async getAgentPrompt(agentId: string, promptType: string, agentType: string): Promise<string> {
-    try {
-      // System prompts are no longer handled here - they're part of agent configuration
-      if (promptType === 'system_prompt') {
-        logger.warn('System prompt requested via getAgentPrompt - this should now be handled by AgentService.generateSystemPrompt');
-        return this.getHardcodedFallback(promptType, agentType);
-      }
-
-      // First check for agent-specific overrides
-      const { data: agentConfig } = await supabase
-        .from('agent_configurations')
-        .select('prompt_overrides')
-        .eq('id', agentId)
-        .single();
-
-      if (agentConfig?.prompt_overrides?.[promptType]) {
-        return agentConfig.prompt_overrides[promptType];
-      }
-
-      // Fall back to default prompt for agent type
-      const defaultPrompt = await this.getDefaultPrompt(promptType, agentType);
-      if (defaultPrompt) {
-        return defaultPrompt;
-      }
-
-      // Final fallback to hardcoded defaults
-      return this.getHardcodedFallback(promptType, agentType);
-    } catch (error) {
-      logger.error('Failed to get agent prompt', { error, agentId, promptType, agentType });
-      return this.getHardcodedFallback(promptType, agentType);
-    }
-  }
-
-  async createPromptTemplate(template: Omit<PromptTemplate, 'id' | 'created_at' | 'updated_at'>): Promise<PromptTemplate> {
+  /**
+   * Get all prompt templates for a category
+   */
+  async getPromptTemplatesByCategory(category: string): Promise<PromptTemplate[]> {
     try {
       const { data, error } = await supabase
         .from('prompt_templates')
-        .insert(template)
+        .select('*')
+        .eq('category', category)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (error) {
+        logger.error('[PromptService] Error getting prompt templates by category', { error, category });
+        throw new Error(`Failed to get prompt templates: ${error.message}`);
+      }
+
+      return data.map(this.mapDatabaseToPromptTemplate);
+    } catch (error) {
+      logger.error('[PromptService] Unexpected error getting prompt templates by category', { error, category });
+      throw error;
+    }
+  }
+
+  /**
+   * Get all prompt templates
+   */
+  async getAllPromptTemplates(): Promise<PromptTemplate[]> {
+    try {
+      const { data, error } = await supabase
+        .from('prompt_templates')
+        .select('*')
+        .order('category', { ascending: true })
+        .order('name', { ascending: true });
+
+      if (error) {
+        logger.error('[PromptService] Error getting all prompt templates', { error });
+        throw new Error(`Failed to get all prompt templates: ${error.message}`);
+      }
+
+      return data.map(this.mapDatabaseToPromptTemplate);
+    } catch (error) {
+      logger.error('[PromptService] Unexpected error getting all prompt templates', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new prompt template
+   */
+  async createPromptTemplate(template: Omit<PromptTemplate, 'id' | 'createdAt' | 'updatedAt'>): Promise<PromptTemplate> {
+    try {
+      const { data, error } = await supabase
+        .from('prompt_templates')
+        .insert({
+          name: template.name,
+          description: template.description,
+          category: template.category,
+          template_text: template.templateText,
+          variables: template.variables,
+          is_active: template.isActive,
+          version: template.version,
+          created_by: template.createdBy,
+          deliberation_id: template.deliberationId,
+          metadata: template.metadata,
+        })
         .select()
         .single();
 
       if (error) {
-        logger.error('Failed to create prompt template', { error, template });
-        throw error;
+        logger.error('[PromptService] Error creating prompt template', { error, template });
+        throw new Error(`Failed to create prompt template: ${error.message}`);
       }
 
-      logger.info('Prompt template created successfully', { templateId: data.id, name: template.name });
-      return data;
+      return this.mapDatabaseToPromptTemplate(data);
     } catch (error) {
-      logger.error('Prompt service createPromptTemplate failed', { error, template });
+      logger.error('[PromptService] Unexpected error creating prompt template', { error, template });
       throw error;
     }
   }
 
-  async updatePromptTemplate(id: string, updates: Partial<PromptTemplate>): Promise<PromptTemplate> {
+  /**
+   * Update an existing prompt template
+   */
+  async updatePromptTemplate(
+    id: string, 
+    updates: Partial<Omit<PromptTemplate, 'id' | 'createdAt' | 'updatedAt'>>
+  ): Promise<PromptTemplate> {
     try {
+      const updateData: Record<string, unknown> = {};
+      
+      if (updates.name !== undefined) updateData.name = updates.name;
+      if (updates.description !== undefined) updateData.description = updates.description;
+      if (updates.category !== undefined) updateData.category = updates.category;
+      if (updates.templateText !== undefined) updateData.template_text = updates.templateText;
+      if (updates.variables !== undefined) updateData.variables = updates.variables;
+      if (updates.isActive !== undefined) updateData.is_active = updates.isActive;
+      if (updates.version !== undefined) updateData.version = updates.version;
+      if (updates.metadata !== undefined) updateData.metadata = updates.metadata;
+
       const { data, error } = await supabase
         .from('prompt_templates')
-        .update(updates)
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();
 
       if (error) {
-        logger.error('Failed to update prompt template', { error, id, updates });
-        throw error;
+        logger.error('[PromptService] Error updating prompt template', { error, id, updates });
+        throw new Error(`Failed to update prompt template: ${error.message}`);
       }
 
-      logger.info('Prompt template updated successfully', { templateId: id });
-      return data;
+      return this.mapDatabaseToPromptTemplate(data);
     } catch (error) {
-      logger.error('Prompt service updatePromptTemplate failed', { error, id, updates });
+      logger.error('[PromptService] Unexpected error updating prompt template', { error, id, updates });
       throw error;
     }
   }
 
-  async updateAgentPromptOverride(agentId: string, promptType: string, promptText: string): Promise<void> {
+  /**
+   * Delete a prompt template
+   */
+  async deletePromptTemplate(id: string): Promise<void> {
     try {
-      // Get current overrides
-      const { data: currentConfig } = await supabase
-        .from('agent_configurations')
-        .select('prompt_overrides')
-        .eq('id', agentId)
-        .single();
-
-      const currentOverrides = currentConfig?.prompt_overrides || {};
-      const updatedOverrides = {
-        ...currentOverrides,
-        [promptType]: promptText
-      };
-
       const { error } = await supabase
-        .from('agent_configurations')
-        .update({ prompt_overrides: updatedOverrides })
-        .eq('id', agentId);
+        .from('prompt_templates')
+        .delete()
+        .eq('id', id);
 
       if (error) {
-        logger.error('Failed to update agent prompt override', { error, agentId, promptType });
-        throw error;
+        logger.error('[PromptService] Error deleting prompt template', { error, id });
+        throw new Error(`Failed to delete prompt template: ${error.message}`);
       }
-
-      logger.info('Agent prompt override updated successfully', { agentId, promptType });
     } catch (error) {
-      logger.error('Prompt service updateAgentPromptOverride failed', { error, agentId, promptType });
+      logger.error('[PromptService] Unexpected error deleting prompt template', { error, id });
       throw error;
     }
   }
 
-  private getHardcodedFallback(promptType: string, agentType?: string): string {
-    // Hardcoded fallbacks in case database is unavailable
-    if (promptType === 'system_prompt') {
-      switch (agentType) {
-        case 'bill_agent':
-          return 'You are the Bill Agent, a specialized AI facilitator for democratic deliberation.';
-        case 'peer_agent':
-          return 'You are the Peer Agent, representing diverse perspectives in democratic deliberation.';
-        case 'flow_agent':
-          return 'You are the Flow Agent acting as a facilitator in democratic deliberation.';
-        default:
-          return 'You are an AI assistant helping with democratic deliberation.';
+  /**
+   * Render a prompt template with variables
+   */
+  renderPrompt(template: PromptTemplate, variables: Record<string, string>): string {
+    let renderedPrompt = template.templateText;
+
+    // Replace variables in the template
+    for (const [key, value] of Object.entries(variables)) {
+      const placeholder = `{{${key}}}`;
+      renderedPrompt = renderedPrompt.replace(new RegExp(placeholder, 'g'), value);
+    }
+
+    return renderedPrompt;
+  }
+
+  /**
+   * Get the default IBIS generation prompt
+   */
+  async getDefaultIbisGenerationPrompt(): Promise<PromptTemplate | null> {
+    return this.getPromptTemplate('Default IBIS Root Generation');
+  }
+
+  /**
+   * Get the issue recommendation prompt
+   */
+  async getIssueRecommendationPrompt(): Promise<PromptTemplate | null> {
+    return this.getPromptTemplate('Issue Recommendation System');
+  }
+
+  /**
+   * Validate prompt template variables
+   */
+  validatePromptVariables(template: PromptTemplate, variables: Record<string, string>): string[] {
+    const errors: string[] = [];
+    
+    if (!template.variables) return errors;
+
+    // Check for required variables
+    for (const [varName, varConfig] of Object.entries(template.variables)) {
+      const config = varConfig as PromptVariable;
+      if (config.required && !variables[varName]) {
+        errors.push(`Required variable '${varName}' is missing`);
       }
     }
 
-    if (promptType === 'classification_prompt') {
-      return 'Classify the following message: {content}';
+    // Check for extra variables
+    for (const varName of Object.keys(variables)) {
+      if (!template.variables[varName]) {
+        errors.push(`Unknown variable '${varName}'`);
+      }
     }
 
-    if (promptType === 'ibis_generation_prompt') {
-      return 'Generate root issues for deliberation on: {title}';
-    }
+    return errors;
+  }
 
-    return 'You are a helpful AI assistant.';
+  /**
+   * Map database record to PromptTemplate interface
+   */
+  private mapDatabaseToPromptTemplate(data: Record<string, unknown>): PromptTemplate {
+    return {
+      id: data.id as string,
+      name: data.name as string,
+      description: data.description as string | undefined,
+      category: data.category as string,
+      templateText: data.template_text as string,
+      variables: data.variables as Record<string, unknown> | undefined,
+      isActive: data.is_active as boolean,
+      version: data.version as number,
+      createdBy: data.created_by as string | undefined,
+      deliberationId: data.deliberation_id as string | undefined,
+      metadata: data.metadata as Record<string, unknown> | undefined,
+      createdAt: data.created_at as string,
+      updatedAt: data.updated_at as string,
+    };
   }
 }
 

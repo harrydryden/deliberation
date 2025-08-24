@@ -18,6 +18,7 @@ model User {
   ibisNodes    IbisNode[]
   participants Participant[]
   profile      Profile?
+  ratings      AgentRating[]
 
   @@map("users")
 }
@@ -64,6 +65,7 @@ model Message {
   parentMessage Message?      @relation("MessageReplies", fields: [parentMessageId], references: [id])
   replies      Message[]      @relation("MessageReplies")
   ibisNodes    IbisNode[]
+  ratings      AgentRating[]
 
   @@map("messages")
 }
@@ -243,4 +245,23 @@ enum IbisNodeType {
   argument
 
   @@map("ibis_node_type")
+}
+
+model AgentRating {
+  id        String   @id @default(uuid())
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+  rating    Int      // -1 for unhelpful, 1 for helpful
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("agent_ratings")
+  @@index([messageId])
+  @@index([userId])
+  @@index([rating])
 }
