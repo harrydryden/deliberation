@@ -23,9 +23,7 @@ verify_jwt = false
 verify_jwt = true
 import_map = "import_map.json"
 
-[functions.openai-pdf-processor]
-verify_jwt = true
-import_map = "import_map.json"
+
 
 [functions.evaluate-ibis-relationships]
 verify_jwt = true
@@ -73,7 +71,7 @@ import_map = "import_map.json"
 
 # query-agent-knowledge function removed - replaced by langchain-query-knowledge
 
-# secure-file-processor function removed - replaced by openai-pdf-processor
+# secure-file-processor function removed - replaced by robust-pdf-processor
 
 [functions.voice-to-text]
 verify_jwt = true
