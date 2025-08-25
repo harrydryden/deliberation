@@ -12,6 +12,23 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? 'eyJhbGciOiJIUzI1
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzMwMDA5NiwiZXhwIjoyMDY4ODc2MDk2fQ.VLD-yck9_WrJjFanhnMZ5MzQcKv_zkfOJ7e5L1dS2Ck';
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
+// Debug: Log available environment variables
+console.log('Available environment variables:', {
+  SUPABASE_URL: SUPABASE_URL ? 'SET' : 'NOT SET',
+  SUPABASE_ANON_KEY: SUPABASE_ANON_KEY ? 'SET' : 'NOT SET',
+  SUPABASE_SERVICE_ROLE_KEY: SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
+  OPENAI_API_KEY: OPENAI_API_KEY ? 'SET' : 'NOT SET'
+});
+
+// Debug: Log all environment variable keys
+const envKeys = [];
+for (const [key, value] of Object.entries(Deno.env.toObject())) {
+  if (key.includes('OPENAI') || key.includes('API') || key.includes('KEY')) {
+    envKeys.push(key);
+  }
+}
+console.log('Environment variables containing OPENAI/API/KEY:', envKeys);
+
 interface PdfProcessingRequest {
   fileUrl: string;
   fileName: string;
@@ -30,6 +47,12 @@ interface PdfProcessingResult {
 
 serve(async (req) => {
   console.log('OpenAI PDF Processor function called:', req.method, req.url);
+  
+  // Debug: Log environment variables at function start
+  console.log('Function start - Environment check:', {
+    OPENAI_API_KEY: OPENAI_API_KEY ? 'SET' : 'NOT SET',
+    OPENAI_API_KEY_LENGTH: OPENAI_API_KEY ? OPENAI_API_KEY.length : 0
+  });
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
