@@ -434,7 +434,7 @@ async function storeExtractedText(
           agent_id: deliberationId, // Use deliberationId as agent_id
           title: `${fileName} - Chunk ${chunk.index + 1}`,
           content: chunk.content,
-          content_type: 'pdf-extracted-text',
+          content_type: 'text',
           file_name: fileName,
           chunk_index: chunk.index,
           metadata: {
