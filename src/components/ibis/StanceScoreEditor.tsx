@@ -161,7 +161,11 @@ export const StanceScoreEditor: React.FC<StanceScoreEditorProps> = ({
                   variant="outline" 
                   className={`${getStanceDisplay(stanceScore.stanceScore).bgColor} ${getStanceDisplay(stanceScore.stanceScore).color}`}
                 >
-                  <getStanceDisplay(stanceScore.stanceScore).icon className="h-3 w-3 mr-1" />
+                  {(() => {
+                    const stanceDisplay = getStanceDisplay(stanceScore.stanceScore);
+                    const IconComponent = stanceDisplay.icon;
+                    return <IconComponent className="h-3 w-3 mr-1" />;
+                  })()}
                   {getStanceDisplay(stanceScore.stanceScore).label}
                 </Badge>
               </div>

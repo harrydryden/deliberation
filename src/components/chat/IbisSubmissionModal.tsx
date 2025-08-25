@@ -32,6 +32,7 @@ export const IbisSubmissionModal = ({
   const {
     toast
   } = useToast();
+  const { user } = useSupabaseAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isClassifying, setIsClassifying] = useState(false);
   const [formData, setFormData] = useState({
@@ -168,8 +169,6 @@ export const IbisSubmissionModal = ({
     }
     setIsSubmitting(true);
     try {
-      // Get user from hook
-      const { user } = useSupabaseAuth();
       if (!user) {
         throw new Error('User not authenticated');
       }

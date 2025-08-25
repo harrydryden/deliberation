@@ -23,4 +23,17 @@ export default defineConfig(({ mode }) => ({
     'process.env.NODE_ENV': JSON.stringify(mode),
     'global': 'globalThis',
   },
+  optimizeDeps: {
+    exclude: ['canvas', 'jsdom', 'pdfjs-dist'],
+  },
+  build: {
+    target: 'esnext',
+    minify: 'esbuild',
+    rollupOptions: {
+      external: ['canvas', 'jsdom', 'pdfjs-dist'],
+    },
+  },
+  esbuild: {
+    target: 'esnext',
+  },
 }));

@@ -147,8 +147,8 @@ const DeliberationChat = () => {
     try {
       // Implement proper score calculation through service layer
       const { data: scores, error } = await supabase
-        .from('user_participation_scores')
-        .select('engagement, shares, sessions, helpfulness')
+        .from('user_stance_scores')
+        .select('stance_score, confidence_score')
         .eq('user_id', user.id)
         .eq('deliberation_id', deliberationId)
         .single();
@@ -162,7 +162,13 @@ const DeliberationChat = () => {
           helpfulness: 0
         });
       } else {
-        setUserScores(scores);
+        // Map stance scores to the expected format
+        setUserScores({
+          engagement: scores?.stance_score ? Math.abs(scores.stance_score) * 100 : 0,
+          shares: 0, 
+          sessions: 1,
+          helpfulness: scores?.confidence_score ? scores.confidence_score * 100 : 0
+        });
       }
       
       logger.info('User scores loaded with defaults');
