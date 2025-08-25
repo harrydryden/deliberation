@@ -1,15 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.52.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Environment variables - hardcoded for deployment
-const SUPABASE_URL = 'https://iowsxuxkgvpgrvvklwyt.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM';
-const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzMwMDA5NiwiZXhwIjoyMDY4ODc2MDk2fQ.VLD-yck9_WrJjFanhnMZ5MzQcKv_zkfOJ7e5L1dS2Ck';
+// Environment variables
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? 'https://iowsxuxkgvpgrvvklwyt.supabase.co';
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM';
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzMwMDA5NiwiZXhwIjoyMDY4ODc2MDk2fQ.VLD-yck9_WrJjFanhnMZ5MzQcKv_zkfOJ7e5L1dS2Ck';
 
 interface PdfProcessingRequest {
   fileUrl: string;
@@ -28,15 +28,20 @@ interface PdfProcessingResult {
 }
 
 serve(async (req) => {
+  console.log('PDF Processor function called:', req.method, req.url);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    console.log('Processing PDF extraction request...');
+    
     // Verify JWT token
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('No authorization header provided');
       throw new Error('No authorization header');
     }
 
@@ -53,21 +58,34 @@ serve(async (req) => {
     // Verify the user
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
+      console.error('Authentication failed:', authError);
       throw new Error('Invalid authentication');
     }
 
-    const { fileUrl, fileName, deliberationId, userId }: PdfProcessingRequest = await req.json();
+    console.log('User authenticated:', user.id);
+
+    const requestBody = await req.json();
+    console.log('Request body received:', requestBody);
+    
+    const { fileUrl, fileName, deliberationId, userId }: PdfProcessingRequest = requestBody;
 
     if (!fileUrl || !fileName || !deliberationId || !userId) {
+      console.error('Missing parameters:', { fileUrl: !!fileUrl, fileName: !!fileName, deliberationId: !!deliberationId, userId: !!userId });
       throw new Error('Missing required parameters');
     }
+
+    console.log('Starting PDF processing for:', fileName);
 
     // Process the PDF with multiple strategies
     const result = await processPdfWithMultipleStrategies(fileUrl, fileName);
 
     if (result.success) {
+      console.log('PDF processing successful, storing in knowledge base...');
       // Store the extracted text in the knowledge base
       await storeExtractedText(result, deliberationId, userId, fileName);
+      console.log('Knowledge chunks stored successfully');
+    } else {
+      console.warn('PDF processing failed:', result.error);
     }
 
     return new Response(
@@ -90,7 +108,7 @@ serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status: 500,
       }
     );
   }
@@ -141,10 +159,10 @@ async function extractWithPdfJs(fileUrl: string, fileName: string): Promise<PdfP
     const uint8Array = new Uint8Array(arrayBuffer);
 
     // Use PDF.js for text extraction
-    const pdfjsLib = await import('https://esm.sh/pdfjs-dist@3.11.174');
+    const pdfjsLib = await import('https://esm.sh/pdfjs-dist@4.0.379');
     
-    // Set worker source
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    // Set worker source - use a CDN version compatible with Deno
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.min.js';
 
     // Load the PDF document
     const loadingTask = pdfjsLib.getDocument({ data: uint8Array });

@@ -188,9 +188,7 @@ export class StanceService {
       const { data, error } = await supabase
         .from('user_stance_scores')
         .select(`
-          *,
-          user:auth.users(email),
-          deliberation:deliberations(title)
+          *
         `)
         .order('updated_at', { ascending: false });
 
@@ -209,8 +207,8 @@ export class StanceService {
         lastUpdated: score.last_updated,
         createdAt: score.created_at,
         updatedAt: score.updated_at,
-        user: { email: score.user?.email || 'Unknown' },
-        deliberation: { title: score.deliberation?.title || 'Unknown' },
+        user: { email: 'Unknown' },
+        deliberation: { title: 'Unknown' },
       }));
     } catch (error) {
       logger.error('[StanceService] Unexpected error getting all stance scores', { error });

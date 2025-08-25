@@ -25,13 +25,11 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
-    prompt_type: 'classification_prompt',
-    agent_type: 'global',
+    category: 'classification_prompt',
     name: '',
-    template: '',
+    templateText: '',
     description: '',
-    is_default: false,
-    is_active: true
+    isActive: true
   });
 
   const loadPrompts = async () => {
@@ -53,26 +51,22 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
   const handleEditClick = (prompt: PromptTemplate) => {
     setEditingPrompt(prompt);
     setEditForm({
-      prompt_type: prompt.prompt_type,
-      agent_type: prompt.agent_type || 'global',
+      category: prompt.category,
       name: prompt.name,
-      template: prompt.template,
+      templateText: prompt.templateText,
       description: prompt.description || '',
-      is_default: prompt.is_default,
-      is_active: prompt.is_active
+      isActive: prompt.isActive
     });
   };
 
   const handleCreatePrompt = () => {
     setCreating(true);
     setEditForm({
-      prompt_type: 'classification_prompt',
-      agent_type: 'global',
+      category: 'classification_prompt',
       name: '',
-      template: '',
+      templateText: '',
       description: '',
-      is_default: false,
-      is_active: true
+      isActive: true
     });
   };
 
@@ -81,15 +75,16 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
     
     setUpdating(editingPrompt.id);
     try {
-      await promptService.updatePromptTemplate(editingPrompt.id, {
-        prompt_type: editForm.prompt_type,
-        agent_type: editForm.agent_type === 'global' ? null : editForm.agent_type,
+      const updateData = {
+        category: editForm.category,
         name: editForm.name,
-        template: editForm.template,
+        templateText: editForm.templateText,
         description: editForm.description,
-        is_default: editForm.is_default,
-        is_active: editForm.is_active
-      });
+        isActive: editForm.isActive,
+        version: editingPrompt.version,
+      };
+      
+      await promptService.updatePromptTemplate(editingPrompt.id, updateData);
       setEditingPrompt(null);
       await loadPrompts();
     } catch (error) {
@@ -102,15 +97,16 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
   const handleSaveNewPrompt = async () => {
     setUpdating('creating');
     try {
-      await promptService.createPromptTemplate({
-        prompt_type: editForm.prompt_type,
-        agent_type: editForm.agent_type === 'global' ? null : editForm.agent_type,
+      const newPromptData = {
+        category: editForm.category,
         name: editForm.name,
-        template: editForm.template,
+        templateText: editForm.templateText,
         description: editForm.description,
-        is_default: editForm.is_default,
-        is_active: editForm.is_active
-      });
+        isActive: editForm.isActive,
+        version: 1,
+      };
+      
+      await promptService.createPromptTemplate(newPromptData);
       setCreating(false);
       await loadPrompts();
     } catch (error) {
@@ -120,22 +116,21 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
     }
   };
 
-  const getPromptTypeBadge = (type: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
-      'classification_prompt': 'default',
-      'ibis_generation_prompt': 'secondary'
-    };
-    return <Badge variant={variants[type] || 'default'}>{type}</Badge>;
+  const getPromptTypeBadge = (category: string) => {
+    switch(category) {
+      case 'classification_prompt': return <Badge variant="outline">Classification</Badge>;
+      case 'system_prompt': return <Badge variant="secondary">System</Badge>;
+      case 'facilitator_prompt': return <Badge variant="default">Facilitator</Badge>;
+      default: return <Badge variant="outline">{category}</Badge>;
+    }
   };
 
-  const getAgentTypeBadge = (type?: string) => {
-    if (!type || type === 'global') return <Badge variant="outline">Global</Badge>;
-    const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
-      'bill_agent': 'default',
-      'peer_agent': 'secondary',
-      'flow_agent': 'destructive'
-    };
-    return <Badge variant={variants[type] || 'default'}>{type}</Badge>;
+  const getAgentTypeBadge = (type: string) => {
+    switch(type) {
+      case 'global': return <Badge variant="secondary">Global</Badge>;
+      case 'local': return <Badge variant="outline">Local</Badge>;
+      default: return <Badge variant="outline">{type}</Badge>;
+    }
   };
 
   const renderEditDialog = (isCreating: boolean) => (
@@ -147,7 +142,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="prompt-type">Prompt Type</Label>
-            <Select value={editForm.prompt_type} onValueChange={(value) => setEditForm(prev => ({ ...prev, prompt_type: value }))}>
+            <Select value={editForm.category} onValueChange={(value) => setEditForm(prev => ({ ...prev, category: value }))}>
               <SelectTrigger>
                 <SelectValue placeholder="Select prompt type" />
               </SelectTrigger>
@@ -159,7 +154,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
           </div>
           <div>
             <Label htmlFor="agent-type">Agent Type (Optional)</Label>
-            <Select value={editForm.agent_type} onValueChange={(value) => setEditForm(prev => ({ ...prev, agent_type: value }))}>
+            <Select value="global" onValueChange={() => {}}>
               <SelectTrigger>
                 <SelectValue placeholder="Select agent type or leave blank for global" />
               </SelectTrigger>
@@ -195,8 +190,8 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
           <Label htmlFor="prompt-template">Prompt Template</Label>
           <Textarea
             id="prompt-template"
-            value={editForm.template}
-            onChange={(e) => setEditForm(prev => ({ ...prev, template: e.target.value }))}
+            value={editForm.templateText}
+            onChange={(e) => setEditForm(prev => ({ ...prev, templateText: e.target.value }))}
             placeholder="Enter the prompt template..."
             rows={10}
             className="font-mono text-sm"
@@ -208,15 +203,8 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
         <div className="flex items-center gap-4">
           <div className="flex items-center space-x-2">
             <Switch
-              checked={editForm.is_default}
-              onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, is_default: checked }))}
-            />
-            <Label>Set as default for this type</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Switch
-              checked={editForm.is_active}
-              onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, is_active: checked }))}
+              checked={editForm.isActive}
+              onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, isActive: checked }))}
             />
             <Label>Active</Label>
           </div>
@@ -228,7 +216,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
         </Button>
         <Button 
           onClick={isCreating ? handleSaveNewPrompt : handleSaveEdit}
-          disabled={updating !== null || !editForm.name || !editForm.template}
+          disabled={updating !== null || !editForm.name || !editForm.templateText}
         >
           {updating !== null ? (isCreating ? 'Creating...' : 'Updating...') : (isCreating ? 'Create Prompt' : 'Update Prompt')}
         </Button>
@@ -268,8 +256,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Total templates: {prompts.length} | 
-              Active: {prompts.filter(p => p.is_active).length} |
-              Defaults: {prompts.filter(p => p.is_default).length}
+              Active: {prompts.filter(p => p.isActive).length}
             </p>
             
             <Table>
@@ -291,21 +278,21 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
                       {prompt.name}
                     </TableCell>
                     <TableCell>
-                      {getPromptTypeBadge(prompt.prompt_type)}
+                      {getPromptTypeBadge(prompt.category)}
                     </TableCell>
                     <TableCell>
-                      {getAgentTypeBadge(prompt.agent_type)}
+                      {getAgentTypeBadge('global')}
                     </TableCell>
                     <TableCell className="max-w-xs truncate">
                       {prompt.description || 'No description'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={prompt.is_active ? 'default' : 'secondary'}>
-                        {prompt.is_active ? 'Active' : 'Inactive'}
+                      <Badge variant={prompt.isActive ? "default" : "secondary"}>
+                        {prompt.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      {formatToUKDate(prompt.created_at)}
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(prompt.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
                       <Dialog>

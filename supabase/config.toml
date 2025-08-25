@@ -60,3 +60,23 @@ import_map = "import_map.json"
 [functions.link-similar-ibis-issues]
 verify_jwt = true
 import_map = "import_map.json"
+
+[functions.generate-notion-statement]
+verify_jwt = true
+import_map = "import_map.json"
+
+[functions.langchain-query-knowledge]
+verify_jwt = true
+import_map = "import_map.json"
+
+[functions.query-agent-knowledge]
+verify_jwt = true
+import_map = "import_map.json"
+
+[functions.secure-file-processor]
+verify_jwt = true
+import_map = "import_map.json"
+
+[functions.voice-to-text]
+verify_jwt = true
+import_map = "import_map.json"
