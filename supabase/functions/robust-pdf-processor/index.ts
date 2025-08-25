@@ -6,6 +6,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Environment variables - hardcoded for deployment
+const SUPABASE_URL = 'https://iowsxuxkgvpgrvvklwyt.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM';
+const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzMwMDA5NiwiZXhwIjoyMDY4ODc2MDk2fQ.VLD-yck9_WrJjFanhnMZ5MzQcKv_zkfOJ7e5L1dS2Ck';
+
 interface PdfProcessingRequest {
   fileUrl: string;
   fileName: string;
@@ -36,8 +41,8 @@ serve(async (req) => {
     }
 
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY,
       {
         global: {
           headers: { Authorization: authHeader },
@@ -373,17 +378,17 @@ async function storeExtractedText(
 ): Promise<void> {
   try {
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY
     );
 
     // Create knowledge chunks from the extracted text
     const chunks = createKnowledgeChunks(result.text, fileName);
     
-    // Store chunks in the knowledge base
+    // Store chunks in the agent_knowledge table
     for (const chunk of chunks) {
       await supabaseClient
-        .from('knowledge_chunks')
+        .from('agent_knowledge')
         .insert({
           content: chunk.content,
           metadata: {
@@ -395,8 +400,10 @@ async function storeExtractedText(
             extractionStrategy: result.strategy,
             originalPages: result.pages
           },
-          deliberation_id: deliberationId,
-          created_by: userId
+          agent_id: deliberationId, // Use deliberationId as agent_id for now
+          created_by: userId,
+          processing_status: 'completed',
+          file_reference: fileName
         });
     }
 
