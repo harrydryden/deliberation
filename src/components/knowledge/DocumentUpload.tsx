@@ -148,30 +148,58 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         // In production, this should come from the agent's deliberation context
         const deliberationId = `default-${user.id}`; // Create a unique default deliberation
         
-        console.log('DocumentUpload: Calling robust-pdf-processor with:', {
+        console.log('DocumentUpload: About to call edge function with parameters:', {
           fileUrl: signed.signedUrl,
           fileName: file.name,
           deliberationId: deliberationId,
           userId: user.id,
           urlLength: signed.signedUrl.length,
-          urlPreview: signed.signedUrl.substring(0, 100) + '...'
+          urlStartsWith: signed.signedUrl.startsWith('https://'),
+          urlContains: signed.signedUrl.includes('supabase')
         });
         
-        const response = await supabase.functions.invoke('robust-pdf-processor', {
-          body: {
-            fileUrl: signed.signedUrl,
-            fileName: file.name,
-            deliberationId: deliberationId,
-            userId: user.id
+        try {
+          // TEMPORARY: Test with simple function first
+          console.log('DocumentUpload: Testing with simple function first...');
+          const testResponse = await supabase.functions.invoke('test-pdf-processor', {
+            body: {
+              test: 'connection',
+              fileName: file.name
+            }
+          });
+          
+          console.log('DocumentUpload: Test function response:', testResponse);
+          
+          if (testResponse.error) {
+            throw new Error(`Test function failed: ${testResponse.error.message}`);
           }
-        });
-        
-        console.log('DocumentUpload: Edge function response:', response);
-        console.log('DocumentUpload: Response data:', response.data);
-        console.log('DocumentUpload: Response error:', response.error);
-        
-        processResult = response.data;
-        processError = response.error;
+          
+          // Now try the real function
+          console.log('DocumentUpload: Test passed, calling real function...');
+          const response = await supabase.functions.invoke('robust-pdf-processor', {
+            body: {
+              fileUrl: signed.signedUrl,
+              fileName: file.name,
+              deliberationId: deliberationId,
+              userId: user.id
+            }
+          });
+          
+          console.log('DocumentUpload: Edge function response received:', {
+            hasData: !!response.data,
+            hasError: !!response.error,
+            errorMessage: response.error?.message,
+            dataKeys: response.data ? Object.keys(response.data) : []
+          });
+          
+          processResult = response.data;
+          processError = response.error;
+          
+        } catch (invokeError) {
+          console.error('DocumentUpload: Function invocation failed:', invokeError);
+          processError = invokeError;
+          processResult = null;
+        }
       } else {
         // Handle text files - for now, we'll use a simple approach
         // In the future, we can create a text-processing edge function
