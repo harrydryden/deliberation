@@ -157,6 +157,20 @@ serve(async (req) => {
 async function processPdfWithOpenAI(fileUrl: string, fileName: string): Promise<PdfProcessingResult> {
   try {
     console.log('Using OpenAI for PDF processing...');
+    console.log('Processing PDF file:', fileName);
+    console.log('File URL:', fileUrl);
+
+    // Validate that the file URL is accessible
+    try {
+      const fileCheck = await fetch(fileUrl, { method: 'HEAD' });
+      if (!fileCheck.ok) {
+        throw new Error(`File not accessible: ${fileCheck.status} ${fileCheck.statusText}`);
+      }
+      console.log('File accessibility check passed');
+    } catch (fileError) {
+      console.error('File accessibility check failed:', fileError);
+      throw new Error(`File accessibility check failed: ${fileError.message}`);
+    }
 
     // Use OpenAI's vision API to extract text from PDF
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -196,6 +210,17 @@ async function processPdfWithOpenAI(fileUrl: string, fileName: string): Promise<
 
     if (!response.ok) {
       const errorData = await response.json();
+      console.error('OpenAI API error response:', errorData);
+      
+      // Handle specific error cases
+      if (response.status === 400) {
+        if (errorData.error?.message?.includes('unsupported image')) {
+          throw new Error(`PDF processing failed: The file appears to be corrupted or in an unsupported format. Please ensure the PDF is valid and contains readable text.`);
+        } else if (errorData.error?.message?.includes('invalid image')) {
+          throw new Error(`PDF processing failed: The file could not be processed as an image. This may happen with corrupted PDFs or files that are not actually PDFs.`);
+        }
+      }
+      
       throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
     }
 
@@ -203,7 +228,7 @@ async function processPdfWithOpenAI(fileUrl: string, fileName: string): Promise<
     const extractedText = data.choices[0]?.message?.content || '';
 
     if (!extractedText.trim()) {
-      throw new Error('No text extracted from PDF');
+      throw new Error('No text extracted from PDF - the document may be empty, corrupted, or contain only images');
     }
 
     console.log('OpenAI extraction successful, text length:', extractedText.length);
