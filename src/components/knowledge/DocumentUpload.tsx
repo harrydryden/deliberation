@@ -87,16 +87,24 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       
       logger.component.update('DocumentUpload', { action: 'uploadStart', fileName });
       
+      console.log('DocumentUpload: Starting file upload to storage');
+      console.log('DocumentUpload: File details:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        extension: fileExt
+      });
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
         .upload(fileName, file);
 
       if (uploadError) {
-
+        console.error('DocumentUpload: Storage upload failed:', uploadError);
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
+      console.log('DocumentUpload: Storage upload successful:', uploadData);
       setUploadProgress(50);
       setProcessingStatus('Creating secure access URL for processing...');
 
@@ -140,6 +148,15 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         // In production, this should come from the agent's deliberation context
         const deliberationId = `default-${user.id}`; // Create a unique default deliberation
         
+        console.log('DocumentUpload: Calling robust-pdf-processor with:', {
+          fileUrl: signed.signedUrl,
+          fileName: file.name,
+          deliberationId: deliberationId,
+          userId: user.id,
+          urlLength: signed.signedUrl.length,
+          urlPreview: signed.signedUrl.substring(0, 100) + '...'
+        });
+        
         const response = await supabase.functions.invoke('robust-pdf-processor', {
           body: {
             fileUrl: signed.signedUrl,
@@ -149,6 +166,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
           }
         });
         
+        console.log('DocumentUpload: Edge function response:', response);
         processResult = response.data;
         processError = response.error;
       } else {
