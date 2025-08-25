@@ -74,10 +74,45 @@ serve(async (req) => {
       throw new Error('Missing required parameters');
     }
 
-    console.log('Starting PDF processing for:', fileName);
+    // Debug: Log the exact URL received
+    console.log('Raw fileUrl received:', fileUrl);
+    console.log('fileUrl type:', typeof fileUrl);
+    console.log('fileUrl length:', fileUrl?.length);
+    console.log('fileUrl starts with http:', fileUrl?.startsWith?.('http'));
+    
+    // Validate and potentially reconstruct the URL
+    let processedUrl: string;
+    try {
+      // Try to create URL object to validate
+      new URL(fileUrl);
+      processedUrl = fileUrl;
+      console.log('URL validation: PASSED - using original URL');
+    } catch (urlError) {
+      console.warn('URL validation failed:', urlError.message);
+      
+      // If it's a relative path, try to reconstruct the full URL
+      if (fileUrl.startsWith('/storage/v1/object/sign/') || fileUrl.includes('documents/')) {
+        const baseUrl = SUPABASE_URL.replace('/rest/v1', '');
+        processedUrl = fileUrl.startsWith('http') ? fileUrl : `${baseUrl}${fileUrl}`;
+        console.log('Reconstructed URL:', processedUrl);
+        
+        // Validate reconstructed URL
+        try {
+          new URL(processedUrl);
+          console.log('Reconstructed URL validation: PASSED');
+        } catch (reconstructError) {
+          console.error('Reconstructed URL validation: FAILED', reconstructError);
+          throw new Error(`Invalid file URL format: ${fileUrl}`);
+        }
+      } else {
+        throw new Error(`Invalid file URL format: ${fileUrl}`);
+      }
+    }
+
+    console.log('Starting PDF processing for:', fileName, 'with URL:', processedUrl);
 
     // Process the PDF with multiple strategies
-    const result = await processPdfWithMultipleStrategies(fileUrl, fileName);
+    const result = await processPdfWithMultipleStrategies(processedUrl, fileName);
 
     if (result.success) {
       console.log('PDF processing successful, storing in knowledge base...');
@@ -149,14 +184,37 @@ async function processPdfWithMultipleStrategies(fileUrl: string, fileName: strin
 
 async function extractWithPdfJs(fileUrl: string, fileName: string): Promise<PdfProcessingResult> {
   try {
-    // Download the PDF file
+    console.log(`PDF.js extraction: Downloading from URL: ${fileUrl}`);
+    
+    // Download the PDF file with detailed error logging
     const response = await fetch(fileUrl);
+    console.log(`PDF.js extraction: Response status: ${response.status} ${response.statusText}`);
+    console.log(`PDF.js extraction: Response headers:`, Object.fromEntries(response.headers.entries()));
+    
     if (!response.ok) {
-      throw new Error(`Failed to download PDF: ${response.statusText}`);
+      const errorText = await response.text().catch(() => 'No error text available');
+      console.error(`PDF.js extraction: Download failed with status ${response.status}:`, errorText);
+      throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
+    
+    console.log(`PDF.js extraction: Downloaded ${uint8Array.length} bytes`);
+    
+    // Basic PDF file validation
+    if (uint8Array.length < 100) {
+      throw new Error('Downloaded file is too small to be a valid PDF');
+    }
+    
+    // Check for PDF signature
+    const pdfHeader = String.fromCharCode(...uint8Array.slice(0, 4));
+    if (pdfHeader !== '%PDF') {
+      console.warn(`PDF.js extraction: File doesn't start with PDF header, got: ${pdfHeader}`);
+      throw new Error('Downloaded file is not a valid PDF (missing PDF header)');
+    }
+    
+    console.log('PDF.js extraction: PDF file validation passed');
 
     // Use PDF.js for text extraction
     const pdfjsLib = await import('https://esm.sh/pdfjs-dist@4.0.379');

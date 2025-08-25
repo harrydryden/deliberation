@@ -107,7 +107,23 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         .createSignedUrl(uploadData.path, 600); // 10 minute expiry
 
       if (signErr || !signed?.signedUrl) {
+        console.error('Failed to create signed URL:', signErr);
         throw new Error('Failed to create signed URL for processing');
+      }
+
+      // Debug: Log the exact URL being sent
+      console.log('Upload path:', uploadData.path);
+      console.log('Signed URL created:', signed.signedUrl);
+      console.log('URL length:', signed.signedUrl.length);
+      console.log('URL starts with http:', signed.signedUrl.startsWith('http'));
+      
+      // Validate the URL format
+      try {
+        new URL(signed.signedUrl);
+        console.log('URL validation: PASSED');
+      } catch (urlError) {
+        console.error('URL validation: FAILED', urlError);
+        throw new Error('Generated signed URL is invalid');
       }
 
       setUploadProgress(75);
