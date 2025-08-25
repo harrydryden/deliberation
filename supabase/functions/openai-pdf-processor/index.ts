@@ -156,7 +156,6 @@ serve(async (req) => {
 
 async function processPdfWithOpenAI(fileUrl: string, fileName: string): Promise<PdfProcessingResult> {
   try {
-    console.log('Using OpenAI for PDF processing...');
     console.log('Processing PDF file:', fileName);
     console.log('File URL:', fileUrl);
 
@@ -172,87 +171,35 @@ async function processPdfWithOpenAI(fileUrl: string, fileName: string): Promise<
       throw new Error(`File accessibility check failed: ${fileError.message}`);
     }
 
-    // Use OpenAI's vision API to extract text from PDF
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a PDF text extraction specialist. Extract all readable text from the provided PDF document. Preserve the structure and formatting as much as possible. Return only the extracted text, no additional commentary.'
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: `Please extract all readable text from this PDF document: ${fileName}`
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: fileUrl,
-                  detail: 'high'
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 4000,
-        temperature: 0.1
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('OpenAI API error response:', errorData);
-      
-      // Handle specific error cases
-      if (response.status === 400) {
-        if (errorData.error?.message?.includes('unsupported image')) {
-          throw new Error(`PDF processing failed: The file appears to be corrupted or in an unsupported format. Please ensure the PDF is valid and contains readable text.`);
-        } else if (errorData.error?.message?.includes('invalid image')) {
-          throw new Error(`PDF processing failed: The file could not be processed as an image. This may happen with corrupted PDFs or files that are not actually PDFs.`);
-        }
-      }
-      
-      throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+    // Download the PDF file
+    console.log('Downloading PDF file...');
+    const pdfResponse = await fetch(fileUrl);
+    if (!pdfResponse.ok) {
+      throw new Error(`Failed to download PDF: ${pdfResponse.status} ${pdfResponse.statusText}`);
     }
+    
+    const pdfBuffer = await pdfResponse.arrayBuffer();
+    console.log('PDF downloaded, size:', pdfBuffer.byteLength, 'bytes');
 
-    const data = await response.json();
-    const extractedText = data.choices[0]?.message?.content || '';
-
-    if (!extractedText.trim()) {
-      throw new Error('No text extracted from PDF - the document may be empty, corrupted, or contain only images');
-    }
-
-    console.log('OpenAI extraction successful, text length:', extractedText.length);
-
-    return {
-      success: true,
-      text: extractedText.trim(),
-      pages: 1, // OpenAI doesn't provide page count, so we'll estimate
-      strategy: 'openai-vision',
-      metadata: {
-        fileName,
-        extractionMethod: 'OpenAI Vision API',
-        textLength: extractedText.length,
-        model: 'gpt-4o'
-      }
-    };
-
-  } catch (error) {
-    console.error('OpenAI PDF processing failed:', error);
+    // For now, let's return a placeholder since we can't process PDFs directly
+    // In a production environment, you would use a PDF processing library here
+    console.log('PDF processing not yet implemented - returning placeholder');
+    
     return {
       success: false,
       text: '',
       pages: 0,
-      strategy: 'openai-failed',
+      strategy: 'pdf-processing-not-implemented',
+      error: 'PDF text extraction is not yet implemented. This function needs to be updated with a proper PDF processing library.'
+    };
+
+  } catch (error) {
+    console.error('PDF processing failed:', error);
+    return {
+      success: false,
+      text: '',
+      pages: 0,
+      strategy: 'pdf-failed',
       error: error.message
     };
   }

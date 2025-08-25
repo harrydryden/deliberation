@@ -19,6 +19,10 @@ port = 54324
 [functions.test-pdf-processor]
 verify_jwt = false
 
+[functions.robust-pdf-processor]
+verify_jwt = true
+import_map = "import_map.json"
+
 [functions.openai-pdf-processor]
 verify_jwt = true
 import_map = "import_map.json"

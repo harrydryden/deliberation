@@ -140,15 +140,15 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       let processResult, processError;
 
       if (file.type.includes('pdf')) {
-        // Handle PDF files with the new OpenAI-based processor
-        setProcessingStatus('Advanced PDF parsing with OpenAI Vision API...');
+        // Handle PDF files with the robust PDF processor
+        setProcessingStatus('Advanced PDF parsing with robust PDF processor...');
         
         // Get the current deliberation ID from the selected agent context
         // For now, we'll create a default deliberation ID that matches the user
         // In production, this should come from the agent's deliberation context
         const deliberationId = `default-${user.id}`; // Create a unique default deliberation
         
-        console.log('DocumentUpload: About to call OpenAI edge function with parameters:', {
+        console.log('DocumentUpload: About to call robust PDF processor with parameters:', {
           fileUrl: signed.signedUrl,
           fileName: file.name,
           deliberationId: deliberationId,
@@ -159,7 +159,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         });
         
         try {
-          const response = await supabase.functions.invoke('openai-pdf-processor', {
+          const response = await supabase.functions.invoke('robust-pdf-processor', {
             body: {
               fileUrl: signed.signedUrl,
               fileName: file.name,
@@ -168,7 +168,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             }
           });
           
-          console.log('DocumentUpload: OpenAI edge function response received:', {
+          console.log('DocumentUpload: Robust PDF processor response received:', {
             hasData: !!response.data,
             hasError: !!response.error,
             errorMessage: response.error?.message,
@@ -179,7 +179,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
           processError = response.error;
           
         } catch (invokeError) {
-          console.error('DocumentUpload: OpenAI function invocation failed:', invokeError);
+          console.error('DocumentUpload: Robust PDF processor invocation failed:', invokeError);
           processError = invokeError;
           processResult = null;
         }
