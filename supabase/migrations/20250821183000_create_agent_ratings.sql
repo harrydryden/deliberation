@@ -61,13 +61,14 @@ CREATE TRIGGER trigger_update_agent_ratings_updated_at
   EXECUTE FUNCTION update_agent_ratings_updated_at();
 
 -- Function to get message rating summary
-CREATE OR REPLACE FUNCTION get_message_rating_summary(message_uuid UUID)
+CREATE OR REPLACE FUNCTION get_message_rating_summary(message_uuid UUID, user_uuid UUID DEFAULT NULL)
 RETURNS TABLE(
   total_ratings BIGINT,
   helpful_count BIGINT,
   unhelpful_count BIGINT,
   helpful_percentage DECIMAL(5,2),
-  average_rating DECIMAL(3,2)
+  average_rating DECIMAL(3,2),
+  user_rating INTEGER
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -84,7 +85,13 @@ BEGIN
       WHEN COUNT(*) > 0 THEN 
         AVG(rating)::DECIMAL(3,2)
       ELSE 0::DECIMAL(3,2)
-    END as average_rating
+    END as average_rating,
+    COALESCE(
+      (SELECT rating FROM agent_ratings 
+       WHERE message_id = message_uuid AND user_id = user_uuid 
+       LIMIT 1), 
+      0
+    )::INTEGER as user_rating
   FROM agent_ratings
   WHERE message_id = message_uuid;
 END;

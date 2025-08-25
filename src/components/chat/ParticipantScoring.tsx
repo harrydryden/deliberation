@@ -1,4 +1,4 @@
-import { MessageSquare, Share2, Clock, Star, ThumbsUp } from "lucide-react";
+import { MessageSquare, Share2, Clock, Star, ThumbsUp, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -7,12 +7,14 @@ interface ParticipantScoringProps {
   shares: number;
   sessions: number;
   helpfulness: number;
+  stanceScore?: number; // -1.0 to 1.0 (negative to positive stance)
 }
 export const ParticipantScoring = ({
   engagement,
   shares,
   sessions,
   helpfulness,
+  stanceScore,
 }: ParticipantScoringProps) => {
   // Convert raw values to star ratings (1-5)
   const calculateStars = (value: number, threshold: number): number => {
@@ -52,7 +54,8 @@ export const ParticipantScoring = ({
     icon: MessageSquare,
     description: 'How active you are in discussions',
     tooltip: `${engagement} messages sent in this deliberation`,
-    renderMethod: 'stars'
+    renderMethod: 'stars',
+    customIconColor: undefined
   }, {
     label: 'Shares',
     rawValue: shares,
@@ -60,7 +63,8 @@ export const ParticipantScoring = ({
     icon: Share2,
     description: 'Your contributions to the knowledge map',
     tooltip: `${shares} IBIS node${shares !== 1 ? 's' : ''} shared`,
-    renderMethod: 'stars'
+    renderMethod: 'stars',
+    customIconColor: undefined
   }, {
     label: 'Sessions',
     rawValue: sessions,
@@ -68,7 +72,8 @@ export const ParticipantScoring = ({
     icon: Clock,
     description: 'How often you participate',
     tooltip: `${sessions} login session${sessions !== 1 ? 's' : ''} recorded`,
-    renderMethod: 'stars'
+    renderMethod: 'stars',
+    customIconColor: undefined
   }, {
     label: 'Helping',
     rawValue: helpfulness,
@@ -76,15 +81,42 @@ export const ParticipantScoring = ({
     icon: ThumbsUp,
     description: 'Quality of your contributions rated by others',
     tooltip: `${helpfulness} net positive rating${helpfulness !== 1 ? 's' : ''} received`,
-    renderMethod: 'thumbs'
+    renderMethod: 'thumbs',
+    customIconColor: undefined
   }];
+
+  // Add stance score if available
+  if (stanceScore !== undefined) {
+    const getStanceIcon = () => {
+      if (stanceScore >= 0.3) return TrendingUp;
+      if (stanceScore <= -0.3) return TrendingDown;
+      return Minus;
+    };
+
+    const getStanceColor = () => {
+      if (stanceScore >= 0.3) return 'text-green-600';
+      if (stanceScore <= -0.3) return 'text-red-600';
+      return 'text-gray-600';
+    };
+
+    scores.push({
+      label: 'Stance',
+      rawValue: stanceScore,
+      stars: Math.max(1, Math.min(5, Math.floor((stanceScore + 1) * 2.5))), // Convert -1 to 1 range to 1-5 stars
+      icon: getStanceIcon(),
+      description: 'Your stance towards the deliberation topic',
+      tooltip: `Stance: ${stanceScore >= 0.3 ? 'Supporting' : stanceScore <= -0.3 ? 'Opposing' : 'Neutral'} (${stanceScore >= 0 ? '+' : ''}${stanceScore.toFixed(2)})`,
+      renderMethod: 'stars',
+      customIconColor: getStanceColor()
+    });
+  }
 
   return (
     <div className="flex flex-col gap-2 w-full">
       {scores.map(score => (
         <div key={score.label} className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <score.icon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+            <score.icon className={`h-3 w-3 flex-shrink-0 ${score.customIconColor || 'text-muted-foreground'}`} />
             <Popover>
               <PopoverTrigger asChild>
                 <span className="text-xs font-medium text-foreground cursor-help hover:text-primary">{score.label}</span>

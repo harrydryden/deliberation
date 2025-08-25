@@ -125,14 +125,15 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         });
       }
       
-      // Use the unified document processing function
-      const processingFunction = 'process-document-upload';
+      // Use the robust PDF processor function
+      const processingFunction = 'robust-pdf-processor';
       logger.component.update('KnowledgeManagement', { action: 'processingStart', function: processingFunction });
       
       const { data, error } = await supabase.functions.invoke(processingFunction, {
         body: {
-          fileName: uploadData.path,
-          agentId: selectedAgent,
+          fileUrl: uploadData.path, // robust-pdf-processor expects fileUrl
+          fileName: file.name,
+          deliberationId: `default-${user.id}`,
           userId: user.id
         }
       });

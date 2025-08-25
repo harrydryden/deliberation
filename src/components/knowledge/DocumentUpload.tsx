@@ -87,13 +87,13 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       
       logger.component.update('DocumentUpload', { action: 'uploadStart', fileName });
       
-      console.log('Uploading file to storage:', fileName);
+      
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
         .upload(fileName, file);
 
       if (uploadError) {
-        console.error('Storage upload error:', uploadError);
+
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
@@ -157,7 +157,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       }
 
       if (processError || !processResult?.success) {
-        console.error('Processing error:', processError || processResult);
+        
         throw new Error(processResult?.error || processError?.message || 'Failed to process document');
       }
       
@@ -187,7 +187,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       
       onUploadSuccess?.();
     } catch (error: any) {
-      console.error('Upload error:', error);
+      
       toast({
         title: "Error",
         description: `Failed to process file: ${error.message}`,

@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (session?.user) {
           setTimeout(async () => {
             try {
-              console.log('Auth state change - checking admin status for user:', session.user.id);
+      
               
               // Ensure profile exists
               const { error: profileError } = await supabase
@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 });
               
               if (profileError) {
-                console.log('Profile upsert error (might be expected):', profileError);
+                // Profile upsert error might be expected for existing users
               }
               
               const { data: roles, error } = await supabase
@@ -56,10 +56,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 .select('role')
                 .eq('user_id', session.user.id);
               
-              console.log('User roles query result:', { roles, error });
               let hasAdminRole = roles?.some(r => r.role === 'admin') || false;
-              
-              console.log('Has admin role:', hasAdminRole);
               setIsAdmin(hasAdminRole);
             } catch (error) {
               console.error('Error checking admin status:', error);
@@ -68,7 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }
           }, 0);
         } else {
-          console.log('No session user, setting isAdmin to false');
+
           setIsAdmin(false);
         }
         
@@ -85,7 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (session?.user) {
         setTimeout(async () => {
           try {
-            console.log('Initial session - checking admin status for user:', session.user.id);
+    
             
             // Ensure profile exists
             const { error: profileError } = await supabase
@@ -98,7 +95,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               });
             
             if (profileError) {
-              console.log('Profile upsert error (might be expected):', profileError);
+              // Profile upsert error might be expected for existing users
             }
             
             const { data: roles, error } = await supabase
@@ -106,10 +103,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               .select('role')
               .eq('user_id', session.user.id);
             
-            console.log('User roles query result:', { roles, error });
             let hasAdminRole = roles?.some(r => r.role === 'admin') || false;
-            
-            console.log('Final admin status:', hasAdminRole);
             setIsAdmin(hasAdminRole);
           } catch (error) {
             console.error('Error checking admin status:', error);

@@ -84,7 +84,8 @@ const DeliberationChat = () => {
     engagement: 0, // Count of user messages sent total
     shares: 0, // Count of IBIS submissions total
     sessions: 1, // Count of login sessions (placeholder)
-    helpfulness: 0 // Count of net positive IBIS contribution ratings
+    helpfulness: 0, // Count of net positive IBIS contribution ratings
+    stanceScore: undefined as number | undefined // User's stance towards deliberation topic (-1.0 to 1.0)
   });
   const {
     messages,
@@ -159,7 +160,8 @@ const DeliberationChat = () => {
           engagement: 0,
           shares: 0, 
           sessions: 1,
-          helpfulness: 0
+          helpfulness: 0,
+          stanceScore: undefined
         });
       } else {
         // Map stance scores to the expected format
@@ -167,7 +169,8 @@ const DeliberationChat = () => {
           engagement: scores?.stance_score ? Math.abs(scores.stance_score) * 100 : 0,
           shares: 0, 
           sessions: 1,
-          helpfulness: scores?.confidence_score ? scores.confidence_score * 100 : 0
+          helpfulness: scores?.confidence_score ? scores.confidence_score * 100 : 0,
+          stanceScore: scores?.stance_score || undefined
         });
       }
       
@@ -192,7 +195,7 @@ const DeliberationChat = () => {
       
       setAgentConfigs(mappedConfigs);
     } catch (error) {
-      console.error('Failed to load agent configurations:', error);
+
     }
   };
 
@@ -214,7 +217,7 @@ const DeliberationChat = () => {
       const isUserParticipant = data.participants?.some((p: any) => p.user_id === user?.id);
       setIsParticipant(isUserParticipant || false);
     } catch (error) {
-      console.error('❌ Failed to load deliberation details:', error);
+
       toast({
         title: "Error",
         description: "Failed to load deliberation details",
@@ -370,6 +373,7 @@ const DeliberationChat = () => {
                       shares={userScores.shares} 
                       sessions={userScores.sessions}
                       helpfulness={userScores.helpfulness}
+                      stanceScore={userScores.stanceScore}
                     />
                   </div>
                 </div>
@@ -449,6 +453,7 @@ const DeliberationChat = () => {
                     shares={userScores.shares} 
                     sessions={userScores.sessions}
                     helpfulness={userScores.helpfulness}
+                    stanceScore={userScores.stanceScore}
                   />
                 </div>
               </div>

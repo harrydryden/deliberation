@@ -51,7 +51,12 @@ export const MessageRating: React.FC<MessageRatingProps> = ({
     setError(null);
 
     try {
-      await ratingService.rateMessage(messageId, user.id, rating);
+      // If user clicks the same rating again, remove it (set to neutral)
+      if (userRating === rating) {
+        await ratingService.removeRating(messageId, user.id);
+      } else {
+        await ratingService.rateMessage(messageId, user.id, rating);
+      }
       
       // Refresh the rating summary
       const summary = await ratingService.getMessageRatingSummary(messageId, user.id);
@@ -98,10 +103,10 @@ export const MessageRating: React.FC<MessageRatingProps> = ({
           size="sm"
           onClick={() => handleRating(1)}
           disabled={isLoading}
-          className="h-8 w-8 p-0"
-          title="Mark as helpful"
+          className={`h-8 w-8 p-0 ${userRating === 1 ? 'bg-green-600 hover:bg-green-700' : ''}`}
+          title={userRating === 1 ? "Click again to remove rating" : "Mark as helpful"}
         >
-          <ThumbsUp className="h-4 w-4" />
+          <ThumbsUp className={`h-4 w-4 ${userRating === 1 ? 'text-white' : ''}`} />
         </Button>
         
         <Button
@@ -109,10 +114,10 @@ export const MessageRating: React.FC<MessageRatingProps> = ({
           size="sm"
           onClick={() => handleRating(-1)}
           disabled={isLoading}
-          className="h-8 w-8 p-0"
-          title="Mark as unhelpful"
+          className={`h-8 w-8 p-0 ${userRating === -1 ? 'bg-red-600 hover:bg-red-700' : ''}`}
+          title={userRating === -1 ? "Click again to remove rating" : "Mark as unhelpful"}
         >
-          <ThumbsDown className="h-4 w-4" />
+          <ThumbsDown className={`h-4 w-4 ${userRating === -1 ? 'text-white' : ''}`} />
         </Button>
       </div>
 
@@ -131,7 +136,11 @@ export const MessageRating: React.FC<MessageRatingProps> = ({
       )}
 
       {/* User's Current Rating Indicator */}
-      {userRating !== 0 && (
+      {userRating === 0 ? (
+        <div className="text-xs text-muted-foreground">
+          Click thumbs up/down to rate this response
+        </div>
+      ) : (
         <div className="text-xs text-muted-foreground">
           {userRating === 1 ? 'You marked this as helpful' : 'You marked this as unhelpful'}
         </div>

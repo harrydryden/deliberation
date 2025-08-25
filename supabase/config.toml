@@ -24,12 +24,9 @@ import_map = "import_map.json"
 verify_jwt = true
 import_map = "import_map.json"
 
-[functions.create-ibis-node]
-verify_jwt = true
-import_map = "import_map.json"
+# create-ibis-node function removed - functionality integrated into generate-ibis-roots
 
-[functions.realtime-chat]
-verify_jwt = false
+# realtime-chat function removed - no frontend usage found
 
 [functions.realtime-session]
 verify_jwt = false
@@ -49,9 +46,7 @@ import_map = "import_map.json"
 verify_jwt = true
 import_map = "import_map.json"
 
-[functions.suggest-ibis-links]
-verify_jwt = true
-import_map = "import_map.json"
+# suggest-ibis-links function removed - no frontend usage found
 
 [functions.compute-ibis-embeddings]
 verify_jwt = true

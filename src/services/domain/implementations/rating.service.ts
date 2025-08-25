@@ -61,12 +61,36 @@ export class RatingService {
   }
 
   /**
+   * Remove a user's rating (set back to neutral)
+   */
+  async removeRating(messageId: string, userId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('agent_ratings')
+        .delete()
+        .eq('message_id', messageId)
+        .eq('user_id', userId);
+
+      if (error) {
+        logger.error('[RatingService] Error removing rating', { error, messageId, userId });
+        throw new Error(`Failed to remove rating: ${error.message}`);
+      }
+    } catch (error) {
+      logger.error('[RatingService] Unexpected error removing rating', { error, messageId, userId });
+      throw error;
+    }
+  }
+
+  /**
    * Get rating summary for a specific message
    */
   async getMessageRatingSummary(messageId: string, userId: string): Promise<RatingSummary> {
     try {
       const { data, error } = await supabase
-        .rpc('get_message_rating_summary', { message_uuid: messageId });
+        .rpc('get_message_rating_summary', { 
+          message_uuid: messageId,
+          user_uuid: userId 
+        });
 
       if (error) {
         logger.error('[RatingService] Error getting rating summary', { error, messageId, userId });

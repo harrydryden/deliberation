@@ -19,12 +19,10 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  define: {
-    'process.env.NODE_ENV': JSON.stringify(mode),
-    'global': 'globalThis',
-    // Force Rollup to use JS fallback instead of native binaries
-    'process.env.ROLLUP_DISABLE_NATIVE': JSON.stringify('1'),
-  },
+         define: {
+         'process.env.NODE_ENV': JSON.stringify(mode),
+         'global': 'globalThis',
+       },
   optimizeDeps: {
     exclude: ['canvas', 'jsdom', 'pdfjs-dist', 'rollup'],
     esbuildOptions: {
