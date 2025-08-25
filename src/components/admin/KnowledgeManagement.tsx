@@ -149,16 +149,25 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       console.log('KnowledgeManagement: Calling edge function with:', {
         function: processingFunction,
         fileName: file.name,
-        urlLength: signed.signedUrl.length
+        urlLength: signed.signedUrl.length,
+        selectedAgent: selectedAgent,
+        deliberationId: `default-${user.id}`
       });
       
       const { data, error } = await supabase.functions.invoke(processingFunction, {
         body: {
           fileUrl: signed.signedUrl, // Now using the proper signed URL
           fileName: file.name,
-          deliberationId: `default-${user.id}`,
+          deliberationId: selectedAgent, // Use the selected agent ID instead of default
           userId: user.id
         }
+      });
+
+      console.log('KnowledgeManagement: Edge function response:', {
+        hasData: !!data,
+        hasError: !!error,
+        dataKeys: data ? Object.keys(data) : [],
+        errorMessage: error?.message
       });
 
       if (error) {
