@@ -38,33 +38,12 @@ serve(async (req) => {
   try {
     console.log('Processing PDF extraction request...');
     
-    // Debug environment variables
-    console.log('Environment check:', {
-      SUPABASE_URL: Deno.env.get('SUPABASE_URL') ? 'SET' : 'NOT_SET',
-      SUPABASE_ANON_KEY: Deno.env.get('SUPABASE_ANON_KEY') ? 'SET' : 'NOT_SET', 
-      SUPABASE_SERVICE_ROLE_KEY: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'SET' : 'NOT_SET'
-    });
-    
     // Verify JWT token
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       console.error('No authorization header provided');
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'No authorization header',
-          text: '',
-          pages: 0,
-          strategy: 'none'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
-      );
+      throw new Error('No authorization header');
     }
-
-    console.log('Authorization header present:', authHeader.substring(0, 20) + '...');
 
     const supabaseClient = createClient(
       SUPABASE_URL,
@@ -80,19 +59,7 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
       console.error('Authentication failed:', authError);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Invalid authentication: ${authError?.message || 'No user'}`,
-          text: '',
-          pages: 0,
-          strategy: 'none'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 401,
-        }
-      );
+      throw new Error('Invalid authentication');
     }
 
     console.log('User authenticated:', user.id);
@@ -110,44 +77,6 @@ serve(async (req) => {
       throw new Error('Missing required parameters');
     }
 
-<<<<<<< Updated upstream
-    // Debug: Log the exact URL received
-    console.log('Raw fileUrl received:', fileUrl);
-    console.log('fileUrl type:', typeof fileUrl);
-    console.log('fileUrl length:', fileUrl?.length);
-    console.log('fileUrl starts with http:', fileUrl?.startsWith?.('http'));
-    
-    // Validate and potentially reconstruct the URL
-    let processedUrl: string;
-    try {
-      // Try to create URL object to validate
-      new URL(fileUrl);
-      processedUrl = fileUrl;
-      console.log('URL validation: PASSED - using original URL');
-    } catch (urlError) {
-      console.warn('URL validation failed:', urlError.message);
-      
-      // If it's a relative path, try to reconstruct the full URL
-      if (fileUrl.startsWith('/storage/v1/object/sign/') || fileUrl.includes('documents/')) {
-        const baseUrl = SUPABASE_URL.replace('/rest/v1', '');
-        processedUrl = fileUrl.startsWith('http') ? fileUrl : `${baseUrl}${fileUrl}`;
-        console.log('Reconstructed URL:', processedUrl);
-        
-        // Validate reconstructed URL
-        try {
-          new URL(processedUrl);
-          console.log('Reconstructed URL validation: PASSED');
-        } catch (reconstructError) {
-          console.error('Reconstructed URL validation: FAILED', reconstructError);
-          throw new Error(`Invalid file URL format: ${fileUrl}`);
-        }
-      } else {
-        throw new Error(`Invalid file URL format: ${fileUrl}`);
-      }
-    }
-
-    console.log('Starting PDF processing for:', fileName, 'with URL:', processedUrl);
-=======
     // Validate that fileUrl is a complete URL
     if (!fileUrl.startsWith('http')) {
       console.error('Invalid fileUrl format - expected complete URL, got:', fileUrl);
@@ -156,16 +85,26 @@ serve(async (req) => {
 
     console.log('Starting PDF processing for:', fileName);
     console.log('Using fileUrl:', fileUrl);
->>>>>>> Stashed changes
 
     // Process the PDF with multiple strategies
-    const result = await processPdfWithMultipleStrategies(processedUrl, fileName);
+    const result = await processPdfWithMultipleStrategies(fileUrl, fileName);
 
     if (result.success) {
       console.log('PDF processing successful, storing in knowledge base...');
-      // Store the extracted text in the knowledge base
-      await storeExtractedText(result, deliberationId, userId, fileName);
-      console.log('Knowledge chunks stored successfully');
+      try {
+        // Store the extracted text in the knowledge base
+        await storeExtractedText(result, deliberationId, userId, fileName);
+        console.log('Knowledge chunks stored successfully');
+      } catch (storageError) {
+        console.error('Failed to store knowledge chunks:', storageError);
+        // Return the extraction result but indicate storage failed
+        result.error = `Text extraction succeeded but storage failed: ${storageError.message}`;
+        result.metadata = {
+          ...result.metadata,
+          storageError: storageError.message,
+          storageFailed: true
+        };
+      }
     } else {
       console.warn('PDF processing failed:', result.error);
     }
@@ -231,37 +170,14 @@ async function processPdfWithMultipleStrategies(fileUrl: string, fileName: strin
 
 async function extractWithPdfJs(fileUrl: string, fileName: string): Promise<PdfProcessingResult> {
   try {
-    console.log(`PDF.js extraction: Downloading from URL: ${fileUrl}`);
-    
-    // Download the PDF file with detailed error logging
+    // Download the PDF file
     const response = await fetch(fileUrl);
-    console.log(`PDF.js extraction: Response status: ${response.status} ${response.statusText}`);
-    console.log(`PDF.js extraction: Response headers:`, Object.fromEntries(response.headers.entries()));
-    
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'No error text available');
-      console.error(`PDF.js extraction: Download failed with status ${response.status}:`, errorText);
-      throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to download PDF: ${response.statusText}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
-    
-    console.log(`PDF.js extraction: Downloaded ${uint8Array.length} bytes`);
-    
-    // Basic PDF file validation
-    if (uint8Array.length < 100) {
-      throw new Error('Downloaded file is too small to be a valid PDF');
-    }
-    
-    // Check for PDF signature
-    const pdfHeader = String.fromCharCode(...uint8Array.slice(0, 4));
-    if (pdfHeader !== '%PDF') {
-      console.warn(`PDF.js extraction: File doesn't start with PDF header, got: ${pdfHeader}`);
-      throw new Error('Downloaded file is not a valid PDF (missing PDF header)');
-    }
-    
-    console.log('PDF.js extraction: PDF file validation passed');
 
     // Use PDF.js for text extraction
     const pdfjsLib = await import('https://esm.sh/pdfjs-dist@4.0.379');
@@ -508,33 +424,43 @@ async function storeExtractedText(
     // Create knowledge chunks from the extracted text
     const chunks = createKnowledgeChunks(result.text, fileName);
     
+    console.log(`Creating ${chunks.length} knowledge chunks for ${fileName}`);
+    
     // Store chunks in the agent_knowledge table
     for (const chunk of chunks) {
-      await supabaseClient
+      const { error: insertError } = await supabaseClient
         .from('agent_knowledge')
         .insert({
+          agent_id: deliberationId, // Use deliberationId as agent_id
+          title: `${fileName} - Chunk ${chunk.index + 1}`,
           content: chunk.content,
+          content_type: 'pdf-extracted-text',
+          file_name: fileName,
+          chunk_index: chunk.index,
           metadata: {
             ...result.metadata,
             fileName,
             deliberationId,
             userId,
-            chunkIndex: chunk.index,
             extractionStrategy: result.strategy,
-            originalPages: result.pages
+            originalPages: result.pages,
+            chunkIndex: chunk.index,
+            totalChunks: chunks.length
           },
-          agent_id: deliberationId, // Use deliberationId as agent_id for now
-          created_by: userId,
-          processing_status: 'completed',
-          file_reference: fileName
+          created_by: userId
         });
+
+      if (insertError) {
+        console.error(`Failed to insert chunk ${chunk.index + 1}:`, insertError);
+        throw new Error(`Failed to insert chunk ${chunk.index + 1}: ${insertError.message}`);
+      }
     }
 
-    console.log(`Stored ${chunks.length} knowledge chunks for ${fileName}`);
+    console.log(`Successfully stored ${chunks.length} knowledge chunks for ${fileName}`);
 
   } catch (error) {
     console.error('Failed to store extracted text:', error);
-    // Don't throw - storage failure shouldn't break the extraction
+    throw error; // Re-throw to handle the error in the main function
   }
 }
 
