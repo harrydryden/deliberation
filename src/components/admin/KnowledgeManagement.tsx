@@ -142,11 +142,11 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         });
       }
       
-      // Use the robust PDF processor function
-      const processingFunction = 'robust-pdf-processor';
+      // Use the new OpenAI PDF processor function
+      const processingFunction = 'openai-pdf-processor';
       logger.component.update('KnowledgeManagement', { action: 'processingStart', function: processingFunction });
       
-      console.log('KnowledgeManagement: Calling edge function with:', {
+      console.log('KnowledgeManagement: Calling OpenAI edge function with:', {
         function: processingFunction,
         fileName: file.name,
         urlLength: signed.signedUrl.length,
