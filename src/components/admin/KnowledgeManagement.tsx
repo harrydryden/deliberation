@@ -146,6 +146,15 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       const processingFunction = 'robust-pdf-processor';
       logger.component.update('KnowledgeManagement', { action: 'processingStart', function: processingFunction });
       
+      console.log('KnowledgeManagement: About to call edge function...');
+      console.log('KnowledgeManagement: Function name:', processingFunction);
+      console.log('KnowledgeManagement: Request body:', {
+        fileUrl: signed.signedUrl,
+        fileName: file.name,
+        deliberationId: selectedAgent,
+        userId: user.id
+      });
+      
       console.log('KnowledgeManagement: Calling robust PDF processor with:', {
         function: processingFunction,
         fileName: file.name,
@@ -163,11 +172,13 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         }
       });
 
+      console.log('KnowledgeManagement: Edge function response received!');
       console.log('KnowledgeManagement: Edge function response:', {
         hasData: !!data,
         hasError: !!error,
         dataKeys: data ? Object.keys(data) : [],
-        errorMessage: error?.message
+        errorMessage: error?.message,
+        fullResponse: { data, error }
       });
 
       if (error) {
