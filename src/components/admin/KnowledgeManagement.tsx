@@ -179,7 +179,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
 
     setQuerying(true);
     try {
-      const { data, error } = await supabase.functions.invoke('query-agent-knowledge', {
+              const { data, error } = await supabase.functions.invoke('langchain-query-knowledge', {
         body: {
           query: query.trim(),
           agentId: selectedAgent,

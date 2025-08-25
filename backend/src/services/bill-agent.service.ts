@@ -166,7 +166,7 @@ YOUR ROLE:
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
         
         if (supabaseUrl && supabaseKey) {
-          const response = await fetch(`${supabaseUrl}/functions/v1/query-agent-knowledge`, {
+          const response = await fetch(`${supabaseUrl}/functions/v1/langchain-query-knowledge`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

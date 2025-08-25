@@ -63,7 +63,7 @@ export function RAGChat({ agents }: RAGChatProps) {
       if (error || !data?.success) {
         logger.component.update('RAGChat', { action: 'fallbackToOriginal', agentId: selectedAgent });
         
-        const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('query-agent-knowledge', {
+        const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('langchain-query-knowledge', {
           body: {
             query: inputMessage,
             agentId: selectedAgent,

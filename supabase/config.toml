@@ -69,13 +69,9 @@ import_map = "import_map.json"
 verify_jwt = true
 import_map = "import_map.json"
 
-[functions.query-agent-knowledge]
-verify_jwt = true
-import_map = "import_map.json"
+# query-agent-knowledge function removed - replaced by langchain-query-knowledge
 
-[functions.secure-file-processor]
-verify_jwt = true
-import_map = "import_map.json"
+# secure-file-processor function removed - replaced by robust-pdf-processor
 
 [functions.voice-to-text]
 verify_jwt = true

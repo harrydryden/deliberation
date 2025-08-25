@@ -700,23 +700,9 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
       console.log('📚 LangChain query failed, trying fallback...');
     }
 
-    // Fallback to direct query
-    try {
-      const { data, error } = await supabase.functions.invoke('query-agent-knowledge-optimized', {
-        body: { 
-          query, 
-          agentId, 
-          maxResults: 5 
-        }
-      });
-
-      if (!error && data?.response) {
-        console.log('📚 Fallback knowledge retrieved successfully');
-        return data.response;
-      }
-    } catch (fallbackError) {
-      console.log('📚 Fallback query also failed');
-    }
+    // Fallback removed - query-agent-knowledge-optimized function deleted
+    // If LangChain query fails, we'll return empty string
+    console.log('📚 LangChain query failed, no fallback available');
 
     return '';
   } catch (error) {
