@@ -38,12 +38,33 @@ serve(async (req) => {
   try {
     console.log('Processing PDF extraction request...');
     
+    // Debug environment variables
+    console.log('Environment check:', {
+      SUPABASE_URL: Deno.env.get('SUPABASE_URL') ? 'SET' : 'NOT_SET',
+      SUPABASE_ANON_KEY: Deno.env.get('SUPABASE_ANON_KEY') ? 'SET' : 'NOT_SET', 
+      SUPABASE_SERVICE_ROLE_KEY: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 'SET' : 'NOT_SET'
+    });
+    
     // Verify JWT token
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       console.error('No authorization header provided');
-      throw new Error('No authorization header');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'No authorization header',
+          text: '',
+          pages: 0,
+          strategy: 'none'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
     }
+
+    console.log('Authorization header present:', authHeader.substring(0, 20) + '...');
 
     const supabaseClient = createClient(
       SUPABASE_URL,
@@ -59,7 +80,19 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     if (authError || !user) {
       console.error('Authentication failed:', authError);
-      throw new Error('Invalid authentication');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Invalid authentication: ${authError?.message || 'No user'}`,
+          text: '',
+          pages: 0,
+          strategy: 'none'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
     }
 
     console.log('User authenticated:', user.id);

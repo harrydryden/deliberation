@@ -167,6 +167,9 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         });
         
         console.log('DocumentUpload: Edge function response:', response);
+        console.log('DocumentUpload: Response data:', response.data);
+        console.log('DocumentUpload: Response error:', response.error);
+        
         processResult = response.data;
         processError = response.error;
       } else {
