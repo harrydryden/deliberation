@@ -140,15 +140,15 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       let processResult, processError;
 
       if (file.type.includes('pdf')) {
-        // Handle PDF files with the new robust-pdf-processor
-        setProcessingStatus('Advanced PDF parsing with multiple extraction strategies...');
+        // Handle PDF files with the new OpenAI-based processor
+        setProcessingStatus('Advanced PDF parsing with OpenAI Vision API...');
         
         // Get the current deliberation ID from the selected agent context
         // For now, we'll create a default deliberation ID that matches the user
         // In production, this should come from the agent's deliberation context
         const deliberationId = `default-${user.id}`; // Create a unique default deliberation
         
-        console.log('DocumentUpload: About to call edge function with parameters:', {
+        console.log('DocumentUpload: About to call OpenAI edge function with parameters:', {
           fileUrl: signed.signedUrl,
           fileName: file.name,
           deliberationId: deliberationId,
@@ -159,24 +159,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         });
         
         try {
-          // TEMPORARY: Test with simple function first
-          console.log('DocumentUpload: Testing with simple function first...');
-          const testResponse = await supabase.functions.invoke('test-pdf-processor', {
-            body: {
-              test: 'connection',
-              fileName: file.name
-            }
-          });
-          
-          console.log('DocumentUpload: Test function response:', testResponse);
-          
-          if (testResponse.error) {
-            throw new Error(`Test function failed: ${testResponse.error.message}`);
-          }
-          
-          // Now try the real function
-          console.log('DocumentUpload: Test passed, calling real function...');
-          const response = await supabase.functions.invoke('robust-pdf-processor', {
+          const response = await supabase.functions.invoke('openai-pdf-processor', {
             body: {
               fileUrl: signed.signedUrl,
               fileName: file.name,
@@ -185,7 +168,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             }
           });
           
-          console.log('DocumentUpload: Edge function response received:', {
+          console.log('DocumentUpload: OpenAI edge function response received:', {
             hasData: !!response.data,
             hasError: !!response.error,
             errorMessage: response.error?.message,
@@ -196,7 +179,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
           processError = response.error;
           
         } catch (invokeError) {
-          console.error('DocumentUpload: Function invocation failed:', invokeError);
+          console.error('DocumentUpload: OpenAI function invocation failed:', invokeError);
           processError = invokeError;
           processResult = null;
         }

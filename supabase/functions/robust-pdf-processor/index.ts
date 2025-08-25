@@ -99,6 +99,9 @@ serve(async (req) => {
 
     const requestBody = await req.json();
     console.log('Request body received:', requestBody);
+    console.log('fileUrl type:', typeof requestBody.fileUrl);
+    console.log('fileUrl value:', requestBody.fileUrl);
+    console.log('fileUrl length:', requestBody.fileUrl?.length);
     
     const { fileUrl, fileName, deliberationId, userId }: PdfProcessingRequest = requestBody;
 
@@ -107,6 +110,7 @@ serve(async (req) => {
       throw new Error('Missing required parameters');
     }
 
+<<<<<<< Updated upstream
     // Debug: Log the exact URL received
     console.log('Raw fileUrl received:', fileUrl);
     console.log('fileUrl type:', typeof fileUrl);
@@ -143,6 +147,16 @@ serve(async (req) => {
     }
 
     console.log('Starting PDF processing for:', fileName, 'with URL:', processedUrl);
+=======
+    // Validate that fileUrl is a complete URL
+    if (!fileUrl.startsWith('http')) {
+      console.error('Invalid fileUrl format - expected complete URL, got:', fileUrl);
+      throw new Error(`Invalid fileUrl format: expected complete URL starting with 'http', got: ${fileUrl}`);
+    }
+
+    console.log('Starting PDF processing for:', fileName);
+    console.log('Using fileUrl:', fileUrl);
+>>>>>>> Stashed changes
 
     // Process the PDF with multiple strategies
     const result = await processPdfWithMultipleStrategies(processedUrl, fileName);
