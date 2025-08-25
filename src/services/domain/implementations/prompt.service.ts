@@ -27,6 +27,35 @@ export interface PromptVariable {
 
 export class PromptService {
   /**
+   * Get prompt templates, optionally filtered by category
+   */
+  async getPromptTemplates(category?: string): Promise<PromptTemplate[]> {
+    try {
+      let query = supabase
+        .from('prompt_templates')
+        .select('*')
+        .eq('is_active', true);
+
+      if (category) {
+        query = query.eq('category', category);
+      }
+
+      const { data, error } = await query
+        .order('category', { ascending: true })
+        .order('name', { ascending: true });
+
+      if (error) {
+        logger.error('[PromptService] Error getting prompt templates', { error, category });
+        throw new Error(`Failed to get prompt templates: ${error.message}`);
+      }
+
+      return (data || []).map(this.mapDatabaseToPromptTemplate);
+    } catch (error) {
+      logger.error('[PromptService] Unexpected error getting prompt templates', { error, category });
+      throw error;
+    }
+  }
+  /**
    * Get a prompt template by name
    */
   async getPromptTemplate(templateName: string): Promise<PromptTemplate | null> {

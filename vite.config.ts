@@ -41,14 +41,4 @@ export default defineConfig(({ mode }) => ({
   esbuild: {
     target: 'esnext',
   },
-  // Force esbuild for all operations
-  experimental: {
-    renderBuiltUrl(filename, { hostType }) {
-      if (hostType === 'js') {
-        return { js: `/${filename}` }
-      } else {
-        return { css: `/${filename}` }
-      }
-    }
-  }
 }));
