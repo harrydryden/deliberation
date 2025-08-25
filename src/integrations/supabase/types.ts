@@ -181,6 +181,41 @@ export type Database = {
           },
         ]
       }
+      agent_ratings: {
+        Row: {
+          created_at: string | null
+          id: string
+          message_id: string
+          rating: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message_id: string
+          rating: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message_id?: string
+          rating?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_ratings_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -541,7 +576,29 @@ export type Database = {
           source_node_id?: string
           target_node_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_ibr_deliberation"
+            columns: ["deliberation_id"]
+            isOneToOne: false
+            referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_ibr_source"
+            columns: ["source_node_id"]
+            isOneToOne: false
+            referencedRelation: "ibis_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_ibr_target"
+            columns: ["target_node_id"]
+            isOneToOne: false
+            referencedRelation: "ibis_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       item_keywords: {
         Row: {
@@ -819,45 +876,59 @@ export type Database = {
       }
       prompt_templates: {
         Row: {
-          agent_type: string | null
-          created_at: string
+          category: string
+          created_at: string | null
           created_by: string | null
+          deliberation_id: string | null
           description: string | null
           id: string
           is_active: boolean
-          is_default: boolean
+          metadata: Json | null
           name: string
-          prompt_type: string
-          template: string
-          updated_at: string
+          template_text: string
+          updated_at: string | null
+          variables: Json | null
+          version: number
         }
         Insert: {
-          agent_type?: string | null
-          created_at?: string
+          category?: string
+          created_at?: string | null
           created_by?: string | null
+          deliberation_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
-          is_default?: boolean
+          metadata?: Json | null
           name: string
-          prompt_type: string
-          template: string
-          updated_at?: string
+          template_text: string
+          updated_at?: string | null
+          variables?: Json | null
+          version?: number
         }
         Update: {
-          agent_type?: string | null
-          created_at?: string
+          category?: string
+          created_at?: string | null
           created_by?: string | null
+          deliberation_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean
-          is_default?: boolean
+          metadata?: Json | null
           name?: string
-          prompt_type?: string
-          template?: string
-          updated_at?: string
+          template_text?: string
+          updated_at?: string | null
+          variables?: Json | null
+          version?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_pt_deliberation"
+            columns: ["deliberation_id"]
+            isOneToOne: false
+            referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       simplified_events: {
         Row: {
@@ -987,6 +1058,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_stance_scores: {
+        Row: {
+          confidence_score: number
+          created_at: string | null
+          deliberation_id: string
+          id: string
+          last_updated: string | null
+          semantic_analysis: Json | null
+          stance_score: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          confidence_score: number
+          created_at?: string | null
+          deliberation_id: string
+          id?: string
+          last_updated?: string | null
+          semantic_analysis?: Json | null
+          stance_score: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          confidence_score?: number
+          created_at?: string | null
+          deliberation_id?: string
+          id?: string
+          last_updated?: string | null
+          semantic_analysis?: Json | null
+          stance_score?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_uss_delib"
+            columns: ["deliberation_id"]
+            isOneToOne: false
+            referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_stance_scores_deliberation_id_fkey"
+            columns: ["deliberation_id"]
+            isOneToOne: false
+            referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -1156,6 +1278,17 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_deliberation_stance_summary: {
+        Args: { deliberation_txt: string } | { deliberation_uuid: string }
+        Returns: {
+          average_confidence: number
+          average_stance: number
+          negative_users: number
+          neutral_users: number
+          positive_users: number
+          total_users: number
+        }[]
+      }
       get_local_agents_admin: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1176,9 +1309,30 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_message_rating_summary: {
+        Args:
+          | { message_uuid: string }
+          | { message_uuid: string; user_uuid: string }
+        Returns: {
+          average_rating: number
+          helpful_count: number
+          helpful_percentage: number
+          total_ratings: number
+          unhelpful_count: number
+        }[]
+      }
       get_profile_count: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      get_prompt_template: {
+        Args: { template_name: string; template_variables?: Json }
+        Returns: {
+          category: string
+          template_text: string
+          variables: Json
+          version: number
+        }[]
       }
       get_user_deliberation_ids: {
         Args: { user_uuid: string }
@@ -1196,6 +1350,16 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: {
           deliberation_id: string
+        }[]
+      }
+      get_user_stance_trend: {
+        Args:
+          | { deliberation_txt: string; user_uuid: string }
+          | { deliberation_uuid: string; user_uuid: string }
+        Returns: {
+          confidence_score: number
+          date: string
+          stance_score: number
         }[]
       }
       halfvec_avg: {
