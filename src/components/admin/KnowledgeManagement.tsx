@@ -111,6 +111,23 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
 
       logger.component.update('KnowledgeManagement', { action: 'uploadSuccess', path: uploadData.path });
 
+      // Create a signed URL for the uploaded file
+      const { data: signed, error: signErr } = await supabase
+        .storage
+        .from('documents')
+        .createSignedUrl(uploadData.path, 600); // 10 minute expiry
+
+      if (signErr || !signed?.signedUrl) {
+        console.error('Failed to create signed URL:', signErr);
+        throw new Error('Failed to create signed URL for processing');
+      }
+
+      console.log('KnowledgeManagement: Created signed URL for processing:', {
+        originalPath: uploadData.path,
+        signedUrlLength: signed.signedUrl.length,
+        signedUrlPreview: signed.signedUrl.substring(0, 100) + '...'
+      });
+
       // Trigger background processing using the enhanced processors
       // Convert MIME type to simple content type for database constraint
       const contentType = file.type === 'application/pdf' ? 'pdf' : 'text';
@@ -129,9 +146,15 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       const processingFunction = 'robust-pdf-processor';
       logger.component.update('KnowledgeManagement', { action: 'processingStart', function: processingFunction });
       
+      console.log('KnowledgeManagement: Calling edge function with:', {
+        function: processingFunction,
+        fileName: file.name,
+        urlLength: signed.signedUrl.length
+      });
+      
       const { data, error } = await supabase.functions.invoke(processingFunction, {
         body: {
-          fileUrl: uploadData.path, // robust-pdf-processor expects fileUrl
+          fileUrl: signed.signedUrl, // Now using the proper signed URL
           fileName: file.name,
           deliberationId: `default-${user.id}`,
           userId: user.id
