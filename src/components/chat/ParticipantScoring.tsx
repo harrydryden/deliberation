@@ -1,4 +1,4 @@
-import { MessageSquare, Share2, Clock, Star, ThumbsUp, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { MessageSquare, Share2, Clock, Star, ThumbsUp, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -88,18 +88,6 @@ export const ParticipantScoring = ({
   // Always add stance score (default to 0/neutral if not provided)
   const displayStanceScore = stanceScore !== undefined ? stanceScore : 0;
 
-  const getStanceIcon = () => {
-    if (displayStanceScore >= 0.3) return TrendingUp;
-    if (displayStanceScore <= -0.3) return TrendingDown;
-    return Minus;
-  };
-
-  const getStanceColor = () => {
-    if (displayStanceScore >= 0.3) return 'text-green-600';
-    if (displayStanceScore <= -0.3) return 'text-red-600';
-    return 'text-gray-600';
-  };
-
   const getStanceTooltip = () => {
     if (stanceScore === undefined) {
       return 'Stance: Neutral (No IBIS submissions yet)';
@@ -107,15 +95,37 @@ export const ParticipantScoring = ({
     return `Stance: ${displayStanceScore >= 0.3 ? 'Supporting' : displayStanceScore <= -0.3 ? 'Opposing' : 'Neutral'} (${displayStanceScore >= 0 ? '+' : ''}${displayStanceScore.toFixed(2)})`;
   };
 
+  const renderStanceLine = () => {
+    // Convert -1 to 1 range to 0-100% position
+    const position = ((displayStanceScore + 1) / 2) * 100;
+    
+    return (
+      <div className="relative w-20 h-4 flex items-center">
+        {/* Horizontal line */}
+        <div className="absolute w-full h-0.5 bg-border"></div>
+        {/* Center mark */}
+        <div className="absolute left-1/2 transform -translate-x-0.5 w-0.5 h-4 bg-muted-foreground"></div>
+        {/* Position indicator */}
+        <div 
+          className="absolute w-2 h-2 rounded-full bg-primary transform -translate-x-1"
+          style={{ left: `${Math.max(4, Math.min(96, position))}%` }}
+        ></div>
+        {/* Labels */}
+        <span className="absolute -left-1 -bottom-5 text-[10px] text-muted-foreground">Oppose</span>
+        <span className="absolute -right-1 -bottom-5 text-[10px] text-muted-foreground">For</span>
+      </div>
+    );
+  };
+
   scores.push({
     label: 'Stance',
     rawValue: displayStanceScore,
-    stars: Math.max(1, Math.min(5, Math.floor((displayStanceScore + 1) * 2.5))), // Convert -1 to 1 range to 1-5 stars
-    icon: getStanceIcon(),
+    stars: 0, // Not used for stance
+    icon: Minus,
     description: 'Your stance towards the deliberation topic based on IBIS submissions',
     tooltip: getStanceTooltip(),
-    renderMethod: 'stars',
-    customIconColor: getStanceColor()
+    renderMethod: 'stance',
+    customIconColor: undefined
   });
 
   return (
@@ -137,7 +147,9 @@ export const ParticipantScoring = ({
             </Popover>
           </div>
           <div className="flex items-center gap-1">
-            {score.renderMethod === 'thumbs' ? renderThumbs(score.stars) : renderStars(score.stars)}
+            {score.renderMethod === 'thumbs' ? renderThumbs(score.stars) : 
+             score.renderMethod === 'stance' ? renderStanceLine() :
+             renderStars(score.stars)}
           </div>
         </div>
       ))}
