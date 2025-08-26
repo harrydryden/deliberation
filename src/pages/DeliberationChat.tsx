@@ -74,6 +74,7 @@ const DeliberationChat = () => {
   const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<'chat' | 'ibis'>('chat');
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  const [modalContent, setModalContent] = useState<'description' | 'notion'>('description');
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   
 
@@ -325,7 +326,7 @@ const DeliberationChat = () => {
               <div className="px-3 pb-3">
                 <div className="rounded-lg border bg-muted/40 p-2">
                    <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
-                      onClick={() => setIsDescriptionOpen(true)} 
+                      onClick={() => { setModalContent('description'); setIsDescriptionOpen(true); }} 
                       title="Click to view full description">
                       <span className="font-bold">Description:</span> {deliberation.description}
                     </p>
@@ -337,11 +338,11 @@ const DeliberationChat = () => {
             {deliberation.notion && (
               <div className="px-3 pb-3">
                 <div className="rounded-lg border bg-muted/40 p-2">
-                  <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
-                     onClick={() => setIsDescriptionOpen(true)} 
-                     title="Click to view full notion">
-                    <span className="font-bold">Notion:</span> {deliberation.notion}
-                  </p>
+                   <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
+                      onClick={() => { setModalContent('notion'); setIsDescriptionOpen(true); }} 
+                      title="Click to view full notion">
+                     <span className="font-bold">Notion:</span> {deliberation.notion}
+                   </p>
                 </div>
               </div>
             )}
@@ -404,14 +405,14 @@ const DeliberationChat = () => {
                   </div>
                    {deliberation.description && (
                      <p className="text-sm text-muted-foreground mt-2 line-clamp-1 cursor-pointer truncate" 
-                        onClick={() => setIsDescriptionOpen(true)} 
+                        onClick={() => { setModalContent('description'); setIsDescriptionOpen(true); }} 
                         title="Click to view full description">
                        <span className="font-bold">Description:</span> {deliberation.description}
                      </p>
                   )}
                   {deliberation.notion && (
                     <p className="text-sm text-muted-foreground mt-2 line-clamp-1 cursor-pointer truncate" 
-                       onClick={() => setIsDescriptionOpen(true)} 
+                       onClick={() => { setModalContent('notion'); setIsDescriptionOpen(true); }} 
                        title="Click to view full notion">
                       <span className="font-bold">Notion:</span> {deliberation.notion}
                     </p>
@@ -461,13 +462,13 @@ const DeliberationChat = () => {
             </div>
           </div>
 
-          {/* Description Modal */}
-          {deliberation.description && (
+          {/* Content Modal */}
+          {(deliberation.description || deliberation.notion) && (
             <Dialog open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen}>
               <DialogContent className="max-w-none w-screen h-screen p-6 sm:p-10 overflow-hidden">
                 <div className="w-full h-full flex items-center justify-center">
                   <article className="max-w-3xl text-center text-foreground whitespace-pre-wrap break-words">
-                    {deliberation.description}
+                    {modalContent === 'description' ? deliberation.description : deliberation.notion}
                   </article>
                 </div>
               </DialogContent>
