@@ -325,10 +325,10 @@ const DeliberationChat = () => {
               <div className="px-3 pb-3">
                 <div className="rounded-lg border bg-muted/40 p-2">
                    <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
-                     onClick={() => setIsDescriptionOpen(true)} 
-                     title="Click to view full description">
-                     Description: {deliberation.description}
-                   </p>
+                      onClick={() => setIsDescriptionOpen(true)} 
+                      title="Click to view full description">
+                      <span className="font-bold">Description:</span> {deliberation.description}
+                    </p>
                 </div>
               </div>
             )}
@@ -340,7 +340,7 @@ const DeliberationChat = () => {
                   <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
                      onClick={() => setIsDescriptionOpen(true)} 
                      title="Click to view full notion">
-                    Notion: {deliberation.notion}
+                    <span className="font-bold">Notion:</span> {deliberation.notion}
                   </p>
                 </div>
               </div>
@@ -406,14 +406,14 @@ const DeliberationChat = () => {
                      <p className="text-sm text-muted-foreground mt-2 line-clamp-1 cursor-pointer truncate" 
                         onClick={() => setIsDescriptionOpen(true)} 
                         title="Click to view full description">
-                       Description: {deliberation.description}
+                       <span className="font-bold">Description:</span> {deliberation.description}
                      </p>
                   )}
                   {deliberation.notion && (
                     <p className="text-sm text-muted-foreground mt-2 line-clamp-1 cursor-pointer truncate" 
                        onClick={() => setIsDescriptionOpen(true)} 
                        title="Click to view full notion">
-                      Notion: {deliberation.notion}
+                      <span className="font-bold">Notion:</span> {deliberation.notion}
                     </p>
                   )}
                 </div>
