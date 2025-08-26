@@ -19,21 +19,41 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-         define: {
-         'process.env.NODE_ENV': JSON.stringify(mode),
-         'global': 'globalThis',
-       },
-  optimizeDeps: {
-    exclude: ['canvas', 'jsdom', 'pdfjs-dist', 'rollup'],
-    esbuildOptions: {
-      target: 'esnext',
-    },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(mode),
+    'global': 'globalThis',
   },
   build: {
-    target: 'esnext',
+    target: 'es2020',
     minify: 'esbuild',
+    sourcemap: mode === 'development',
     rollupOptions: {
-      external: ['canvas', 'jsdom', 'pdfjs-dist', 'rollup'],
+      output: {
+        chunkFileNames: (chunkInfo) => {
+          const facadeModuleId = chunkInfo.facadeModuleId ? chunkInfo.facadeModuleId.split('/').pop() : 'chunk';
+          return `js/[name]-[hash].js`;
+        },
+        assetFileNames: (assetInfo) => {
+          const info = assetInfo.name?.split('.') || ['asset'];
+          const ext = info[info.length - 1];
+          if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
+            return `images/[name]-[hash].[ext]`;
+          }
+          if (/woff2?|eot|ttf|otf/i.test(ext)) {
+            return `fonts/[name]-[hash].[ext]`;
+          }
+          return `assets/[name]-[hash].[ext]`;
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+    reportCompressedSize: true,
+  },
+  optimizeDeps: {
+    exclude: ['canvas', 'jsdom', 'pdfjs-dist', 'rollup'],
+    include: ['react', 'react-dom', 'react-router-dom'],
+    esbuildOptions: {
+      target: 'esnext',
     },
   },
   esbuild: {
