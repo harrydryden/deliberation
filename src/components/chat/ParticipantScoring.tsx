@@ -111,8 +111,8 @@ export const ParticipantScoring = ({
           style={{ left: `${Math.max(4, Math.min(96, position))}%` }}
         ></div>
         {/* Labels */}
-        <span className="absolute -left-1 -bottom-5 text-[10px] text-muted-foreground">No</span>
-        <span className="absolute -right-1 -bottom-5 text-[10px] text-muted-foreground">Yes</span>
+        <span className="absolute -left-1 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">No</span>
+        <span className="absolute -right-1 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">Yes</span>
       </div>
     );
   };
