@@ -681,7 +681,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
         </div>
       ) : (
         variant === 'panel' ? (
-          <div className="bg-card/50 border rounded-lg p-4 space-y-4">
+          <>
             <div className="flex items-center justify-between">
               {connected && sessionStatus.remainingTime > 0 && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -731,7 +731,8 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
                 Dictate to Text
               </Button>
             </div>
-          </div>
+          </>
+        
         ) : (
           <div className="flex items-center gap-2">
             <Button
