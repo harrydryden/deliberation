@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.52.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -180,10 +180,10 @@ async function extractWithPdfJs(fileUrl: string, fileName: string): Promise<PdfP
     const uint8Array = new Uint8Array(arrayBuffer);
 
     // Load PDF.js library
-    const pdfjsLib = await import('pdfjs-dist');
+    const pdfjsLib = await import('https://esm.sh/pdfjs-dist@4.0.379');
     
     // Configure PDF.js worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/build/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.min.js';
 
     // Load the PDF document
     const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
