@@ -90,9 +90,9 @@ export const ParticipantScoring = ({
 
   const getStanceTooltip = () => {
     if (stanceScore === undefined) {
-      return 'Stance: Neutral (No IBIS submissions yet)';
+      return 'Notion: Neutral (No IBIS submissions yet)';
     }
-    return `Stance: ${displayStanceScore >= 0.3 ? 'Supporting' : displayStanceScore <= -0.3 ? 'Opposing' : 'Neutral'} (${displayStanceScore >= 0 ? '+' : ''}${displayStanceScore.toFixed(2)})`;
+    return `Notion: ${displayStanceScore >= 0.3 ? 'Supporting' : displayStanceScore <= -0.3 ? 'Opposing' : 'Neutral'} (${displayStanceScore >= 0 ? '+' : ''}${displayStanceScore.toFixed(2)})`;
   };
 
   const renderStanceLine = () => {
@@ -111,18 +111,18 @@ export const ParticipantScoring = ({
           style={{ left: `${Math.max(4, Math.min(96, position))}%` }}
         ></div>
         {/* Labels */}
-        <span className="absolute -left-1 -bottom-5 text-[10px] text-muted-foreground">Oppose</span>
-        <span className="absolute -right-1 -bottom-5 text-[10px] text-muted-foreground">For</span>
+        <span className="absolute -left-1 -bottom-5 text-[10px] text-muted-foreground">No</span>
+        <span className="absolute -right-1 -bottom-5 text-[10px] text-muted-foreground">Yes</span>
       </div>
     );
   };
 
   scores.push({
-    label: 'Stance',
+    label: 'Notion',
     rawValue: displayStanceScore,
     stars: 0, // Not used for stance
     icon: Minus,
-    description: 'Your stance towards the deliberation topic based on IBIS submissions',
+    description: 'Your notion towards the deliberation topic based on IBIS submissions',
     tooltip: getStanceTooltip(),
     renderMethod: 'stance',
     customIconColor: undefined
