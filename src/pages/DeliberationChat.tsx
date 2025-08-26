@@ -403,40 +403,18 @@ const DeliberationChat = () => {
                     </div>
                   </div>
                   {deliberation.description && (
-                     <div 
-                       className="mt-3 p-2 rounded-md bg-background/50 border border-border/50 cursor-pointer hover:bg-background/70 transition-colors" 
-                       onClick={() => setIsDescriptionOpen(true)}
-                       title="Click to expand full description"
-                     >
-                       <div className="flex items-start justify-between gap-2">
-                         <div className="min-w-0 flex-1">
-                           <p className="text-xs font-medium text-foreground/70 mb-1">Description</p>
-                           <p className="text-sm text-muted-foreground line-clamp-2">
-                             {deliberation.description}
-                           </p>
-                         </div>
-                         <ChevronDown className="h-3 w-3 text-muted-foreground mt-1 shrink-0" />
-                       </div>
-                       <p className="text-xs text-muted-foreground/60 mt-1">Click to expand</p>
-                     </div>
+                     <p className="text-sm text-muted-foreground mt-2 line-clamp-3 cursor-pointer" 
+                        onClick={() => setIsDescriptionOpen(true)} 
+                        title="Click to view full description">
+                       Description: {deliberation.description}
+                     </p>
                   )}
                   {deliberation.notion && (
-                    <div 
-                      className="mt-2 p-2 rounded-md bg-background/50 border border-border/50 cursor-pointer hover:bg-background/70 transition-colors" 
-                      onClick={() => setIsDescriptionOpen(true)}
-                      title="Click to expand full notion"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium text-foreground/70 mb-1">Notion</p>
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {deliberation.notion}
-                          </p>
-                        </div>
-                        <ChevronDown className="h-3 w-3 text-muted-foreground mt-1 shrink-0" />
-                      </div>
-                      <p className="text-xs text-muted-foreground/60 mt-1">Click to expand</p>
-                    </div>
+                    <p className="text-sm text-muted-foreground mt-2 line-clamp-3 cursor-pointer" 
+                       onClick={() => setIsDescriptionOpen(true)} 
+                       title="Click to view full notion">
+                      Notion: {deliberation.notion}
+                    </p>
                   )}
                 </div>
               </div>
