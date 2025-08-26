@@ -402,15 +402,15 @@ const DeliberationChat = () => {
                       <span>{deliberation.participants?.length || deliberation.participant_count || 0}</span>
                     </div>
                   </div>
-                  {deliberation.description && (
-                     <p className="text-sm text-muted-foreground mt-2 line-clamp-3 cursor-pointer" 
+                   {deliberation.description && (
+                     <p className="text-sm text-muted-foreground mt-2 line-clamp-1 cursor-pointer truncate" 
                         onClick={() => setIsDescriptionOpen(true)} 
                         title="Click to view full description">
                        Description: {deliberation.description}
                      </p>
                   )}
                   {deliberation.notion && (
-                    <p className="text-sm text-muted-foreground mt-2 line-clamp-3 cursor-pointer" 
+                    <p className="text-sm text-muted-foreground mt-2 line-clamp-1 cursor-pointer truncate" 
                        onClick={() => setIsDescriptionOpen(true)} 
                        title="Click to view full notion">
                       Notion: {deliberation.notion}
