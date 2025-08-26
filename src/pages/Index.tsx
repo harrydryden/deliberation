@@ -100,7 +100,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <Brain className="h-5 w-5 text-democratic-green" />
-                  <span>AI-Guided Discussion</span>
+                  <span>Guided Discussion</span>
                 </CardTitle>
                 <CardDescription>
                   Three AI agents help guide the conversation: Bill provides facts particularly policy information, Flo mediates the discussion, and most importantly Pia facilitates the exchange of views between participants.
