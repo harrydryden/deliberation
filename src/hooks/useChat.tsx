@@ -77,34 +77,35 @@ export const useChat = (deliberationId?: string) => {
 
     try {
       const unsubscribe = realtimeService.subscribeToMessages((message) => {
-        console.log('📨 Realtime message received:', { 
+        logger.info('📨 Realtime message received', { 
           id: message.id, 
-          type: message.messageType, 
+          type: message.message_type, 
           content: message.content?.substring(0, 50) || '[empty]',
-          userId: message.userId
+          user_id: message.user_id
         });
         
         const chatMessage: ChatMessage = {
           id: message.id,
           content: message.content,
-          message_type: message.messageType as any,
-          created_at: message.createdAt,
-          user_id: message.userId,
+          message_type: message.message_type as ChatMessage['message_type'],
+          created_at: message.created_at,
+          user_id: message.user_id,
+          submitted_to_ibis: message.submitted_to_ibis || false
         };
 
         // Only add messages that belong to this deliberation (or all if no deliberationId)
         setMessages(prev => {
           // Avoid duplicates
           if (prev.some(msg => msg.id === chatMessage.id)) {
-            console.log('🔄 Duplicate message ignored:', chatMessage.id);
+            logger.info('🔄 Duplicate message ignored', { messageId: chatMessage.id });
             return prev;
           }
-          console.log('➕ Adding realtime message:', chatMessage.id);
+          logger.info('➕ Adding realtime message', { messageId: chatMessage.id });
           return [...prev, chatMessage];
         });
         
         // Only stop typing indicator when an agent message comes in
-        if (message.messageType && (message.messageType.includes('agent') || message.messageType === 'peer_agent' || message.messageType === 'bill_agent' || message.messageType === 'flow_agent')) {
+        if (message.message_type && (message.message_type.includes('agent') || message.message_type === 'peer_agent' || message.message_type === 'bill_agent' || message.message_type === 'flow_agent')) {
           setIsTyping(false);
         }
       }, deliberationId);
@@ -117,7 +118,7 @@ export const useChat = (deliberationId?: string) => {
 
   const loadChatHistory = useCallback(async () => {
     if (!user) {
-      console.log('loadChatHistory: No user found, skipping');
+      logger.info('loadChatHistory: No user found, skipping');
       return;
     }
 

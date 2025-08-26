@@ -9,7 +9,7 @@ import { Calendar, Users, Eye, Bot, User, FileText, Workflow, ChevronDown, Chevr
 import { formatToUKDate, formatToUKTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { MarkdownMessage } from '@/components/common/MarkdownMessage';
-// Legacy import removed - using header-based auth
+import { logger } from '@/utils/logger';
 import type { ChatMessage } from '@/types/index';
 interface Deliberation {
   id: string;
@@ -86,7 +86,7 @@ export const AdminDeliberationView = () => {
           .order('created_at', { ascending: true });
           
         if (messagesResult.error) {
-          console.error('Messages query error:', messagesResult.error);
+          logger.error('Messages query error', messagesResult.error as Error);
           throw messagesResult.error;
         }
         
@@ -114,7 +114,7 @@ export const AdminDeliberationView = () => {
         }));
         setMessages(chatMessages);
       } catch (err) {
-        console.error('Failed to load data:', err);
+        logger.error('Failed to load data', err as Error);
         setError('Failed to load deliberation');
       } finally {
         setLoading(false);

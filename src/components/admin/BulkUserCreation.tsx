@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Users, Copy, Check } from 'lucide-react';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 interface CreatedUser {
   email: string;
@@ -67,7 +68,7 @@ export const BulkUserCreation = ({ onUsersCreated }: BulkUserCreationProps) => {
         onUsersCreated();
       }
     } catch (error) {
-      console.error('Bulk creation failed:', error);
+      logger.error('Bulk creation failed', error as Error);
       toast({
         title: "Creation Failed",
         description: "Failed to create users. Please try again.",

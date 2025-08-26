@@ -1,7 +1,11 @@
-import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
-import './index.css'
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
+import './index.css';
 import { PerformanceProvider } from "@/components/layout/PerformanceProvider";
+import { setupConsoleReplacement } from "./utils/consoleReplacer";
+
+// Setup console replacement for production
+setupConsoleReplacement();
 
 createRoot(document.getElementById("root")!).render(
   <PerformanceProvider>

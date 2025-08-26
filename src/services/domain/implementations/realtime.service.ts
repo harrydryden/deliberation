@@ -18,20 +18,17 @@ export class RealtimeService implements IRealtimeService {
           },
            (payload) => {
             logger.info('New message received via realtime', { messageId: payload.new.id });
-            // Map database columns to TypeScript interface
-            const mappedMessage: Message = {
+            const message: Message = {
               id: payload.new.id,
               content: payload.new.content,
-              messageType: payload.new.message_type, // Map from database column name
-              userId: payload.new.user_id, // Map from database column name
-              deliberationId: payload.new.deliberation_id, // Map from database column name
-              createdAt: payload.new.created_at,
-              updatedAt: payload.new.updated_at,
-              agentContext: payload.new.agent_context,
-              parentMessageId: payload.new.parent_message_id,
-              submittedToIbis: payload.new.submitted_to_ibis,
-            } as Message;
-            callback(mappedMessage);
+              message_type: payload.new.message_type,
+              user_id: payload.new.user_id,
+              deliberation_id: payload.new.deliberation_id,
+              created_at: payload.new.created_at,
+              updated_at: payload.new.updated_at,
+              submitted_to_ibis: payload.new.submitted_to_ibis || false
+            };
+            callback(message);
           }
         )
         .subscribe();

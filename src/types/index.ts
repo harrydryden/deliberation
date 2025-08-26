@@ -105,6 +105,7 @@ export interface ChatMessage {
   message_type: 'user' | 'bill_agent' | 'peer_agent' | 'flow_agent';
   created_at: string;
   user_id?: string;
+  deliberation_id?: string;
   agent_context?: any;
   submitted_to_ibis?: boolean;
   // Client-only transient fields for UX
@@ -217,10 +218,13 @@ export interface LocalAgentCreate {
 export interface Message {
   id: string;
   content: string;
-  messageType: string;
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
+  message_type: string;
+  user_id?: string;
+  deliberation_id?: string;
+  submitted_to_ibis?: boolean;
+  created_at: string;
+  updated_at: string;
+  status?: 'sent' | 'pending' | 'failed';
 }
 
 export interface ApiError {

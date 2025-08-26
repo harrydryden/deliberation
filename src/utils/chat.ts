@@ -16,7 +16,10 @@ export function convertApiMessageToChatMessage(apiMessage: any): ChatMessage {
 export function convertChatMessageToApiMessage(chatMessage: Partial<ChatMessage>): Partial<Message> {
   return {
     content: chatMessage.content,
-    messageType: chatMessage.message_type,
+    message_type: chatMessage.message_type,
+    user_id: chatMessage.user_id,
+    deliberation_id: chatMessage.deliberation_id,
+    submitted_to_ibis: chatMessage.submitted_to_ibis
   };
 }
 

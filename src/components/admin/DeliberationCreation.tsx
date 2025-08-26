@@ -9,6 +9,7 @@ import { NotionExamples } from '@/components/forms/NotionExamples';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useDeliberationService } from '@/hooks/useDeliberationService';
+import { logger } from '@/utils/logger';
 
 interface DeliberationCreationProps {
   onDeliberationCreated: () => void;
@@ -84,13 +85,13 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
           });
 
           if (rootsError) {
-            console.error('Error generating IBIS roots:', rootsError);
+            logger.error('Error generating IBIS roots', rootsError as Error);
             toast.error('Deliberation created but failed to generate initial IBIS nodes. You can add them manually.');
           } else if (rootsData?.success) {
             toast.success(`Deliberation created with ${rootsData.count} AI-generated root issues`);
           }
         } catch (rootsError) {
-          console.error('Error generating IBIS roots:', rootsError);
+          logger.error('Error generating IBIS roots', rootsError as Error);
           toast.error('Deliberation created but failed to generate initial IBIS nodes');
         }
       } else {

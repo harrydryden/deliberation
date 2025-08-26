@@ -79,10 +79,12 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
     return {
       id: data.id,
       content: data.content,
-      messageType: data.message_type,
-      userId: data.user_id,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
+      message_type: data.message_type,
+      user_id: data.user_id,
+      deliberation_id: data.deliberation_id,
+      submitted_to_ibis: data.submitted_to_ibis || false,
+      created_at: data.created_at,
+      updated_at: data.updated_at
     };
   }
 
@@ -138,9 +140,10 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
       // Map the data to database column names
       const dbData = {
         content: data.content,
-        message_type: data.messageType,
-        user_id: data.userId,
-        deliberation_id: (data as any).deliberationId,
+        message_type: data.message_type,
+        user_id: data.user_id,
+        deliberation_id: data.deliberation_id,
+        submitted_to_ibis: data.submitted_to_ibis || false
       };
 
       const { data: result, error } = await supabase
@@ -156,7 +159,7 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
 
       // Agent orchestration is handled at the service layer, not repository layer
 
-      logger.info('Message created successfully', { messageId: result.id, type: data.messageType });
+      logger.info('Message created successfully', { messageId: result.id, type: data.message_type });
       
       // Map back to API format
       return this.mapToMessage(result);

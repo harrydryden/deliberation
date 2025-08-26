@@ -26,8 +26,6 @@ const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface")
 import { logger } from "@/utils/logger";
 import { supabase } from "@/integrations/supabase/client";
 
-// Helper function removed - will be implemented through service layer to avoid direct DB queries
-
 interface Deliberation {
   id: string;
   title: string;
@@ -138,25 +136,15 @@ const DeliberationChat = () => {
     }
   }, [user, isLoading, deliberationId, navigate]);
 
-  // Load user scores from database  
+  // Load user scores from database via service layer
   const loadUserScores = async () => {
     if (!user?.id || !deliberationId) return;
     
     try {
-      // Get actual engagement metrics from messages
-      const { data: messageCount } = await supabase
-        .from('messages')
-        .select('id', { count: 'exact' })
-        .eq('user_id', user.id)
-        .eq('deliberation_id', deliberationId);
-
-      // Get IBIS submissions count
-      const { data: ibisCount } = await supabase
-        .from('messages')
-        .select('id', { count: 'exact' })
-        .eq('user_id', user.id)
-        .eq('deliberation_id', deliberationId) 
-        .eq('submitted_to_ibis', true);
+      // Use message service to get user engagement metrics
+      const userMessages = await messageService.getUserMessages(user.id);
+      const deliberationMessages = userMessages.filter(m => m.deliberation_id === deliberationId);
+      const ibisSubmissions = deliberationMessages.filter(m => m.submitted_to_ibis);
 
       // Get stance score from user_stance_scores table
       const { data: stanceData } = await supabase
@@ -166,33 +154,31 @@ const DeliberationChat = () => {
         .eq('deliberation_id', deliberationId)
         .maybeSingle();
 
-      // Get helpfulness from agent ratings (placeholder for now)
-      const helpfulnessScore = 0; // TODO: Calculate from agent_ratings table
+      const helpfulnessScore = 0; // TODO: Calculate from agent_ratings table via service
 
       setUserScores({
-        engagement: messageCount?.length || 0,
-        shares: ibisCount?.length || 0,
+        engagement: deliberationMessages.length,
+        shares: ibisSubmissions.length,
         sessions: 1, // Placeholder - could track from user sessions
         helpfulness: helpfulnessScore,
-        stanceScore: stanceData?.stance_score || 0 // Default to neutral (0) if no stance score exists
+        stanceScore: stanceData?.stance_score || 0
       });
       
       logger.info('User scores loaded successfully', {
-        engagement: messageCount?.length || 0,
-        shares: ibisCount?.length || 0,
+        engagement: deliberationMessages.length,
+        shares: ibisSubmissions.length,
         stanceScore: stanceData?.stance_score || 0
       });
     } catch (error) {
       logger.error('Failed to load user scores', error as Error);
-      // Set default scores on error
       setUserScores({
         engagement: 0,
         shares: 0,
         sessions: 1,
         helpfulness: 0,
-        stanceScore: 0 // Default to neutral stance
+        stanceScore: 0
       });
-    }
+    }  
   };
 
   const loadAgentConfigs = async () => {
