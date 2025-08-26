@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useMemo } from 'react';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RatingService, RatingSummary } from '@/services/domain/implementations/rating.service';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { logger } from '@/utils/logger';
+import { cacheService } from '@/services/cache.service';
 
 interface MessageRatingProps {
   messageId: string;
@@ -11,7 +12,7 @@ interface MessageRatingProps {
   className?: string;
 }
 
-export const MessageRating: React.FC<MessageRatingProps> = ({
+const MessageRatingComponent: React.FC<MessageRatingProps> = ({
   messageId,
   messageType,
   className = ''
@@ -21,15 +22,21 @@ export const MessageRating: React.FC<MessageRatingProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ratingService = new RatingService();
+  // Memoize service instance to prevent recreating on every render
+  const ratingService = useMemo(() => new RatingService(), []);
 
-  // Fetch initial rating summary
+  // Fetch initial rating summary with caching
   useEffect(() => {
     if (!user?.id) return;
 
     const fetchRatingSummary = async () => {
       try {
-        const summary = await ratingService.getMessageRatingSummary(messageId, user.id);
+        const summary = await cacheService.memoizeAsync(
+          'rating-summary',
+          [messageId, user.id],
+          () => ratingService.getMessageRatingSummary(messageId, user.id),
+          { ttl: 60000 } // Cache for 1 minute
+        );
         setRatingSummary(summary);
       } catch (err) {
         logger.error('[MessageRating] Error fetching rating summary', { error: err, messageId });
@@ -38,7 +45,7 @@ export const MessageRating: React.FC<MessageRatingProps> = ({
     };
 
     fetchRatingSummary();
-  }, [messageId, user?.id]);
+  }, [messageId, user?.id, ratingService]);
 
   // Handle rating submission
   const handleRating = async (rating: -1 | 1) => {
@@ -58,7 +65,8 @@ export const MessageRating: React.FC<MessageRatingProps> = ({
         await ratingService.rateMessage(messageId, user.id, rating);
       }
       
-      // Refresh the rating summary
+      // Clear cache and refresh the rating summary
+      cacheService.clearNamespace('rating-summary');
       const summary = await ratingService.getMessageRatingSummary(messageId, user.id);
       setRatingSummary(summary);
     } catch (err) {
@@ -148,3 +156,9 @@ export const MessageRating: React.FC<MessageRatingProps> = ({
     </div>
   );
 };
+
+export const MessageRating = memo(MessageRatingComponent, (prev, next) => 
+  prev.messageId === next.messageId && 
+  prev.messageType === next.messageType && 
+  prev.className === next.className
+);

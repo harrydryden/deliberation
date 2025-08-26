@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useServices } from '@/hooks/useServices';
 import type { ChatMessage } from "@/types/index";
@@ -11,6 +11,8 @@ import { performanceMonitor } from '@/utils/performanceUtils';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 import { useToast } from '@/hooks/use-toast';
 import { useResponseStreaming } from '@/hooks/useResponseStreaming';
+import { cacheService } from '@/services/cache.service';
+import { useMemoryMonitor } from './useMemoryMonitor';
 
 export const useChat = (deliberationId?: string) => {
   const { user, isLoading: authLoading } = useSupabaseAuth();
@@ -23,6 +25,17 @@ export const useChat = (deliberationId?: string) => {
   const { streamingState, startStreaming, stopStreaming } = useResponseStreaming();
   
   useMemoryLeakDetection('useChat');
+  useMemoryMonitor({
+    componentName: 'useChat',
+    warningThreshold: 30,
+    criticalThreshold: 50
+  });
+
+  // Memoize services to prevent recreating instances
+  const services = useMemo(() => ({
+    messageService,
+    realtimeService
+  }), [messageService, realtimeService]);
 
   const { toast } = useToast();
 
@@ -114,15 +127,19 @@ export const useChat = (deliberationId?: string) => {
     await handleAsyncError(async () => {
       const timer = performanceMonitor.startTimer('loadChatHistory');
       
-      // Debug: Check user context before loading
-      console.log('loadChatHistory: About to call messageService.getMessages');
-      const data = await messageService.getMessages(deliberationId);
+      // Use cached message loading with deduplication
+      const data = await cacheService.memoizeAsync(
+        'chat-history',
+        [deliberationId, user.id],
+        () => services.messageService.getMessages(deliberationId),
+        { ttl: 60000 } // Cache for 1 minute
+      );
+      
       console.log('loadChatHistory: Received data', { 
         messageCount: data?.length || 0, 
         deliberationId,
         userId: user.id,
-        firstMessage: data?.[0],
-        lastMessage: data?.[data?.length - 1]
+        cached: true
       });
       
       setMessages(convertApiMessagesToChatMessages(data || []));
@@ -130,7 +147,7 @@ export const useChat = (deliberationId?: string) => {
       logger.api.response('GET', '/messages', 200, { deliberationId, messageCount: data?.length || 0 });
     }, 'loading chat history');
     setIsLoading(false);
-  }, [user, deliberationId, handleAsyncError, setMessages, messageService]);
+  }, [user, deliberationId, handleAsyncError, setMessages, services.messageService]);
 
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!user || !content.trim()) return;
@@ -152,7 +169,11 @@ export const useChat = (deliberationId?: string) => {
 
     try {
       const timer = performanceMonitor.startTimer('sendMessage');
-      const saved = await messageService.sendMessage(content.trim(), 'user', deliberationId, mode, user?.id);
+      
+      // Clear relevant caches when sending new messages
+      cacheService.clearNamespace('chat-history');
+      
+      const saved = await services.messageService.sendMessage(content.trim(), 'user', deliberationId, mode, user?.id);
       const savedChat = convertApiMessageToChatMessage(saved);
       timer();
       logger.api.response('POST', '/messages', 200, { deliberationId, mode, contentLength: content.length });
@@ -259,7 +280,7 @@ export const useChat = (deliberationId?: string) => {
       setIsTyping(false);
       throw error;
     }
-  }, [user, deliberationId, setMessages, messageService, startStreaming, loadChatHistory, toast]);
+  }, [user, deliberationId, setMessages, services.messageService, startStreaming, loadChatHistory, toast]);
 
   const retryMessage = useCallback(async (id: string) => {
     const target = messages.find(m => m.id === id);
@@ -267,7 +288,7 @@ export const useChat = (deliberationId?: string) => {
     // Mark pending
     setMessages(prev => prev.map(m => (m.id === id ? { ...m, status: 'pending', error: undefined } : m)));
     try {
-      const saved = await messageService.sendMessage(target.content, 'user', deliberationId, 'chat', user?.id);
+      const saved = await services.messageService.sendMessage(target.content, 'user', deliberationId, 'chat', user?.id);
       const savedChat = convertApiMessageToChatMessage(saved);
       setMessages(prev => prev.map(m => (m.id === id ? { ...savedChat, status: 'sent' } : m)));
       setIsTyping(true);
@@ -276,7 +297,7 @@ export const useChat = (deliberationId?: string) => {
       setMessages(prev => prev.map(m => (m.id === id ? { ...m, status: 'failed', error: errMsg } : m)));
       setIsTyping(false);
     }
-  }, [messages, deliberationId, setMessages, messageService]);
+  }, [messages, deliberationId, setMessages, services.messageService]);
 
   return {
     messages,

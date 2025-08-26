@@ -94,7 +94,7 @@ export class PerformanceMonitor {
     };
   }
 
-  private recordMetric(operation: string, duration: number): void {
+  recordMetric(operation: string, duration: number): void {
     if (!this.metrics.has(operation)) {
       this.metrics.set(operation, []);
     }
