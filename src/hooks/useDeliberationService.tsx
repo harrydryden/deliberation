@@ -38,58 +38,45 @@ export const useDeliberationService = (): DeliberationService => {
       const currentUserId = user?.id;
       logger.info('Current user ID for participation check', { currentUserId });
 
-      // Get participant counts for each deliberation
+      // Get participant counts for each deliberation - Fixed to get actual count
       const deliberationsWithCounts = await Promise.all(
         deliberations.map(async (deliberation) => {
           logger.info('Getting participant count', { deliberationId: deliberation.id });
           
-          const { count, error: countError } = await supabase
+          // Get actual participant count from participants table
+          const { data: participants, error: countError } = await supabase
             .from('participants')
-            .select('id', { count: 'exact', head: true })
+            .select('user_id')
             .eq('deliberation_id', deliberation.id);
 
           if (countError) {
-            logger.warn(`Error getting participant count for ${deliberation.id}`, countError as any);
+            logger.warn(`Error getting participants for ${deliberation.id}`, countError as any);
           }
+
+          const participantCount = participants?.length || 0;
 
           // Check if current user is a participant
           let isUserParticipant = false;
-          if (currentUserId) {
-            logger.info('Checking participation for user', { 
-              currentUserId, 
-              deliberationId: deliberation.id 
-            });
-            
-            const { data: userParticipation, error: participationError } = await supabase
-              .from('participants')
-              .select('id')
-              .eq('deliberation_id', deliberation.id)
-              .eq('user_id', currentUserId)
-              .maybeSingle();
-          
-            if (participationError) {
-              logger.error('Error checking user participation', participationError as any);
-            }
-            
-            isUserParticipant = !!userParticipation;
+          if (currentUserId && participants) {
+            isUserParticipant = participants.some(p => p.user_id === currentUserId);
             
             logger.info('Participation check result', { 
               deliberationId: deliberation.id, 
               currentUserId,
-              userParticipation,
-              isUserParticipant
+              isUserParticipant,
+              totalParticipants: participantCount
             });
           }
 
-          logger.info('Participant count', { 
+          logger.info('Final participant count', { 
             deliberationId: deliberation.id, 
-            count,
+            count: participantCount,
             isUserParticipant
           });
 
           return {
             ...deliberation,
-            participant_count: count || 0,
+            participant_count: participantCount,
             is_user_participant: isUserParticipant
           };
         })
