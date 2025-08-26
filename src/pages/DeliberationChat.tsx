@@ -120,11 +120,8 @@ const DeliberationChat = () => {
   const handleIbisSuccess = () => {
     // Reload chat messages to reflect the updated submitted_to_ibis status
     loadChatHistory();
-    // Update shares score when IBIS submission is successful
-    setUserScores(prev => ({
-      ...prev,
-      shares: prev.shares + 1
-    }));
+    // Reload user scores to get updated stance score from IBIS submission
+    loadUserScores();
   };
   useEffect(() => {
     setViewMode('chat');
@@ -146,37 +143,55 @@ const DeliberationChat = () => {
     if (!user?.id || !deliberationId) return;
     
     try {
-      // Implement proper score calculation through service layer
-      const { data: scores, error } = await supabase
+      // Get actual engagement metrics from messages
+      const { data: messageCount } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact' })
+        .eq('user_id', user.id)
+        .eq('deliberation_id', deliberationId);
+
+      // Get IBIS submissions count
+      const { data: ibisCount } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact' })
+        .eq('user_id', user.id)
+        .eq('deliberation_id', deliberationId) 
+        .eq('submitted_to_ibis', true);
+
+      // Get stance score from user_stance_scores table
+      const { data: stanceData } = await supabase
         .from('user_stance_scores')
         .select('stance_score, confidence_score')
         .eq('user_id', user.id)
         .eq('deliberation_id', deliberationId)
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        logger.warn('Score calculation not available, using defaults', { error });
-        setUserScores({
-          engagement: 0,
-          shares: 0, 
-          sessions: 1,
-          helpfulness: 0,
-          stanceScore: undefined
-        });
-      } else {
-        // Map stance scores to the expected format
-        setUserScores({
-          engagement: scores?.stance_score ? Math.abs(scores.stance_score) * 100 : 0,
-          shares: 0, 
-          sessions: 1,
-          helpfulness: scores?.confidence_score ? scores.confidence_score * 100 : 0,
-          stanceScore: scores?.stance_score || undefined
-        });
-      }
+      // Get helpfulness from agent ratings (placeholder for now)
+      const helpfulnessScore = 0; // TODO: Calculate from agent_ratings table
+
+      setUserScores({
+        engagement: messageCount?.length || 0,
+        shares: ibisCount?.length || 0,
+        sessions: 1, // Placeholder - could track from user sessions
+        helpfulness: helpfulnessScore,
+        stanceScore: stanceData?.stance_score || 0 // Default to neutral (0) if no stance score exists
+      });
       
-      logger.info('User scores loaded with defaults');
+      logger.info('User scores loaded successfully', {
+        engagement: messageCount?.length || 0,
+        shares: ibisCount?.length || 0,
+        stanceScore: stanceData?.stance_score || 0
+      });
     } catch (error) {
       logger.error('Failed to load user scores', error as Error);
+      // Set default scores on error
+      setUserScores({
+        engagement: 0,
+        shares: 0,
+        sessions: 1,
+        helpfulness: 0,
+        stanceScore: 0 // Default to neutral stance
+      });
     }
   };
 

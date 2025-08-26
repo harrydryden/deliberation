@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Lightbulb } from "lucide-react";
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { EnhancedRelationshipSelector } from './EnhancedRelationshipSelector';
+import { useStanceService } from '@/hooks/useServices';
 interface IbisSubmissionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -33,6 +34,7 @@ export const IbisSubmissionModal = ({
     toast
   } = useToast();
   const { user } = useSupabaseAuth();
+  const stanceService = useStanceService();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isClassifying, setIsClassifying] = useState(false);
   const [formData, setFormData] = useState({
@@ -206,6 +208,27 @@ export const IbisSubmissionModal = ({
           .insert(relationshipInserts);
         
         if (relErr) throw relErr;
+      }
+
+      // Store stance score if available from AI classification
+      if (aiSuggestions?.stanceScore !== undefined) {
+        try {
+          await stanceService.updateStanceScore(
+            user.id,
+            deliberationId,
+            aiSuggestions.stanceScore,
+            aiSuggestions.confidence || 0.5,
+            {
+              source: 'ibis_submission',
+              nodeType: formData.nodeType,
+              keywords: aiSuggestions.keywords,
+              messageId
+            }
+          );
+        } catch (stanceError) {
+          console.error('Failed to store stance score:', stanceError);
+          // Don't fail the entire submission if stance storage fails
+        }
       }
 
       // Mark message as submitted to IBIS

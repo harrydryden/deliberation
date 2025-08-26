@@ -10,6 +10,7 @@ import { DeliberationService } from './implementations/deliberation.service';
 import { MessageService } from './implementations/message.service';
 import { RealtimeService } from './implementations/realtime.service';
 import { PromptService } from './implementations/prompt.service';
+import { StanceService } from './implementations/stance.service';
 
 // Create repository instances
 const userRepository = new UserRepository();
@@ -25,6 +26,7 @@ const deliberationService = new DeliberationService(deliberationRepository);
 const messageService = new MessageService(messageRepository);
 const realtimeService = new RealtimeService();
 const promptService = new PromptService();
+const stanceService = new StanceService();
 
 const adminService = new AdminService(
   adminRepository,
@@ -42,6 +44,7 @@ export const serviceContainer = {
   messageService,
   realtimeService,
   promptService,
+  stanceService,
 };
 
 // Export individual services for convenience
@@ -52,5 +55,6 @@ export const {
   deliberationService: deliberationServiceInstance,
   messageService: messageServiceInstance,
   realtimeService: realtimeServiceInstance,
-  promptService: promptServiceInstance
+  promptService: promptServiceInstance,
+  stanceService: stanceServiceInstance
 } = serviceContainer;

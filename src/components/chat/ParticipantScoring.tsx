@@ -85,31 +85,38 @@ export const ParticipantScoring = ({
     customIconColor: undefined
   }];
 
-  // Add stance score if available
-  if (stanceScore !== undefined) {
-    const getStanceIcon = () => {
-      if (stanceScore >= 0.3) return TrendingUp;
-      if (stanceScore <= -0.3) return TrendingDown;
-      return Minus;
-    };
+  // Always add stance score (default to 0/neutral if not provided)
+  const displayStanceScore = stanceScore !== undefined ? stanceScore : 0;
 
-    const getStanceColor = () => {
-      if (stanceScore >= 0.3) return 'text-green-600';
-      if (stanceScore <= -0.3) return 'text-red-600';
-      return 'text-gray-600';
-    };
+  const getStanceIcon = () => {
+    if (displayStanceScore >= 0.3) return TrendingUp;
+    if (displayStanceScore <= -0.3) return TrendingDown;
+    return Minus;
+  };
 
-    scores.push({
-      label: 'Stance',
-      rawValue: stanceScore,
-      stars: Math.max(1, Math.min(5, Math.floor((stanceScore + 1) * 2.5))), // Convert -1 to 1 range to 1-5 stars
-      icon: getStanceIcon(),
-      description: 'Your stance towards the deliberation topic',
-      tooltip: `Stance: ${stanceScore >= 0.3 ? 'Supporting' : stanceScore <= -0.3 ? 'Opposing' : 'Neutral'} (${stanceScore >= 0 ? '+' : ''}${stanceScore.toFixed(2)})`,
-      renderMethod: 'stars',
-      customIconColor: getStanceColor()
-    });
-  }
+  const getStanceColor = () => {
+    if (displayStanceScore >= 0.3) return 'text-green-600';
+    if (displayStanceScore <= -0.3) return 'text-red-600';
+    return 'text-gray-600';
+  };
+
+  const getStanceTooltip = () => {
+    if (stanceScore === undefined) {
+      return 'Stance: Neutral (No IBIS submissions yet)';
+    }
+    return `Stance: ${displayStanceScore >= 0.3 ? 'Supporting' : displayStanceScore <= -0.3 ? 'Opposing' : 'Neutral'} (${displayStanceScore >= 0 ? '+' : ''}${displayStanceScore.toFixed(2)})`;
+  };
+
+  scores.push({
+    label: 'Stance',
+    rawValue: displayStanceScore,
+    stars: Math.max(1, Math.min(5, Math.floor((displayStanceScore + 1) * 2.5))), // Convert -1 to 1 range to 1-5 stars
+    icon: getStanceIcon(),
+    description: 'Your stance towards the deliberation topic based on IBIS submissions',
+    tooltip: getStanceTooltip(),
+    renderMethod: 'stars',
+    customIconColor: getStanceColor()
+  });
 
   return (
     <div className="flex flex-col gap-2 w-full">
