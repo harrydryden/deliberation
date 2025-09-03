@@ -117,9 +117,6 @@ export const SupabaseAuthForm = () => {
                 className="font-mono text-center"
                 required
               />
-              <p className="text-sm text-muted-foreground">
-                Enter exactly 6 digits
-              </p>
             </div>
 
             {error && (
