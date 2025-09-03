@@ -326,7 +326,7 @@ export const IbisSubmissionModal = ({
         {/* AI Classification Status */}
         {isClassifying && <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
             <LoadingSpinner className="h-4 w-4" />
-            <span className="text-sm text-muted-foreground">AI is analyzing your message...</span>
+            <span className="text-sm text-muted-foreground">Analysing message</span>
           </div>}
 
         {/* No existing nodes - suggest root issues */}
