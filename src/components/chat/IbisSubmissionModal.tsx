@@ -352,7 +352,7 @@ export const IbisSubmissionModal = ({
         {/* AI Suggestions */}
         {aiSuggestions && !isClassifying && <div className="p-3 bg-muted rounded-lg space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">AI Suggestions</span>
+              <span className="text-sm font-medium">Suggestions</span>
               <Badge variant="secondary" className="text-xs">
                 {Math.round(aiSuggestions.confidence * 100)}% confidence
               </Badge>
