@@ -85,7 +85,7 @@ export const SupabaseAuthForm = () => {
             Deliberation
           </CardTitle>
           <CardDescription>
-            Access the deliberation management system
+            Join the conversation
           </CardDescription>
         </CardHeader>
         <CardContent>
