@@ -12,7 +12,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Lightbulb } from "lucide-react";
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { EnhancedRelationshipSelector } from './EnhancedRelationshipSelector';
-import { IssueRecommendations } from '@/components/ibis/IssueRecommendations';
 import { useStanceService } from '@/hooks/useServices';
 interface IbisSubmissionModalProps {
   isOpen: boolean;
@@ -51,12 +50,6 @@ export const IbisSubmissionModal = ({
     confidence: number;
   }>>([]);
   
-  // Handle issue recommendation selection
-  const handleIssueSelected = (issueId: string) => {
-    setSelectedIssueId(issueId);
-    setLinkingMode('link');
-  };
-  
   const [aiSuggestions, setAiSuggestions] = useState<{
     title: string;
     keywords: string[];
@@ -75,10 +68,6 @@ export const IbisSubmissionModal = ({
     message: string;
     action: string;
   } | null>(null);
-  
-  // Issue recommendations state
-  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
-  const [linkingMode, setLinkingMode] = useState<'create' | 'link'>('create');
 
   // Load existing nodes and classify message when modal opens
   useEffect(() => {
@@ -172,57 +161,16 @@ export const IbisSubmissionModal = ({
   };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.id || !formData.title) return;
-    
-    // If we're in linking mode but no issue selected, or create mode but no node type, return
-    if (linkingMode === 'link' && !selectedIssueId) return;
-    if (linkingMode === 'create' && !formData.nodeType) return;
-    
+    if (!formData.title.trim() || !formData.nodeType) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Please provide a title and select a node type"
+      });
+      return;
+    }
     setIsSubmitting(true);
     try {
-      // Handle linking to existing issue
-      if (linkingMode === 'link' && selectedIssueId) {
-        // Create relationship to existing issue
-        const { error: relError } = await supabase
-          .from('ibis_relationships')
-          .insert({
-            source_node_id: selectedIssueId,
-            target_node_id: selectedIssueId, // This will be updated by relationship logic
-            relationship_type: 'relates_to',
-            created_by: user.id,
-            deliberation_id: deliberationId
-          });
-          
-        if (relError) throw relError;
-        
-        // Mark message as submitted to IBIS
-        const { error: messageError } = await supabase
-          .from('messages')
-          .update({ submitted_to_ibis: true })
-          .eq('id', messageId);
-          
-        if (messageError) throw messageError;
-        
-        toast({
-          title: "Success",
-          description: "Message linked to existing issue"
-        });
-        
-        onSuccess?.();
-        onClose();
-        return;
-      }
-      
-      // Handle creating new node (existing logic)
-      if (!formData.title.trim() || !formData.nodeType) {
-        toast({
-          variant: "destructive",
-          title: "Validation Error",
-          description: "Please provide a title and select a node type"
-        });
-        return;
-      }
-      
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -242,7 +190,6 @@ export const IbisSubmissionModal = ({
         })
         .select('id, node_type')
         .maybeSingle();
-        
       if (nodeError) throw nodeError;
       if (!inserted) throw new Error('Failed to create node');
 
@@ -290,9 +237,7 @@ export const IbisSubmissionModal = ({
       } = await supabase.from('messages').update({
         submitted_to_ibis: true
       }).eq('id', messageId);
-      
       if (messageError) throw messageError;
-      
       toast({
         title: "Success",
         description: "Message successfully submitted to IBIS"
@@ -432,6 +377,52 @@ export const IbisSubmissionModal = ({
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
+            <Label htmlFor="nodeType">Type</Label>
+            <Select value={formData.nodeType} onValueChange={(value: NodeType) => setFormData(prev => ({
+            ...prev,
+            nodeType: value
+          }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="issue">
+                  <div>
+                    <div className="font-medium">Issue</div>
+                    <div className="text-xs text-muted-foreground">
+                      A problem or question to be resolved
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="position">
+                  <div>
+                    <div className="font-medium">Position</div>
+                    <div className="text-xs text-muted-foreground">
+                      A proposed solution or stance
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="argument">
+                  <div>
+                    <div className="font-medium">Argument</div>
+                    <div className="text-xs text-muted-foreground">
+                      Supporting or opposing evidence
+                    </div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="uncategorized">
+                  <div>
+                    <div className="font-medium">Uncategorized</div>
+                    <div className="text-xs text-muted-foreground">
+                      AI failed to categorize - manual review needed
+                    </div>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
             <Label htmlFor="title">Title</Label>
             <Input id="title" value={formData.title} onChange={e => setFormData(prev => ({
             ...prev,
@@ -447,102 +438,17 @@ export const IbisSubmissionModal = ({
           }))} placeholder="Detailed description (optional)" rows={3} />
           </div>
 
-          {/* Issue Recommendations - Show when there are existing nodes and content */}
-          {existingNodes.length > 0 && formData.description.trim() && (
+          {/* Enhanced Relationship Selector - Always show if there are existing nodes */}
+          {existingNodes.length > 0 && (
             <div className="border-t pt-4 mt-4">
-              <IssueRecommendations
+              <EnhancedRelationshipSelector
                 deliberationId={deliberationId}
-                userContent={formData.description || messageContent}
-                onIssueSelected={handleIssueSelected}
+                content={formData.description || messageContent}
+                title={formData.title}
+                nodeType={(formData.nodeType || 'issue') as 'issue' | 'position' | 'argument'}
+                onRelationshipsChange={handleRelationshipsChange}
               />
             </div>
-          )}
-
-          {/* Mode Selection */}
-          {existingNodes.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-4">
-                <Button
-                  type="button"
-                  variant={linkingMode === 'link' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setLinkingMode('link')}
-                  disabled={!selectedIssueId}
-                >
-                  Link to Existing Issue
-                </Button>
-                <Button
-                  type="button"
-                  variant={linkingMode === 'create' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setLinkingMode('create')}
-                >
-                  Create New Node
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Show form only when creating new node */}
-          {linkingMode === 'create' && (
-            <>
-              <div>
-                <Label htmlFor="nodeType">Type</Label>
-                <Select value={formData.nodeType} onValueChange={(value: NodeType) => setFormData(prev => ({
-                ...prev,
-                nodeType: value
-              }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="issue">
-                      <div>
-                        <div className="font-medium">Issue</div>
-                        <div className="text-xs text-muted-foreground">
-                          A problem or question to be resolved
-                        </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="position">
-                      <div>
-                        <div className="font-medium">Position</div>
-                        <div className="text-xs text-muted-foreground">
-                          A proposed solution or stance
-                        </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="argument">
-                      <div>
-                        <div className="font-medium">Argument</div>
-                        <div className="text-xs text-muted-foreground">
-                          Supporting or opposing evidence
-                        </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="uncategorized">
-                      <div>
-                        <div className="font-medium">Uncategorized</div>
-                        <div className="text-xs text-muted-foreground">
-                          AI failed to categorize - manual review needed
-                        </div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Enhanced Relationship Selector - Show when creating new node */}
-              <div className="border-t pt-4 mt-4">
-                <EnhancedRelationshipSelector
-                  deliberationId={deliberationId}
-                  content={formData.description || messageContent}
-                  title={formData.title}
-                  nodeType={(formData.nodeType || 'issue') as 'issue' | 'position' | 'argument'}
-                  onRelationshipsChange={handleRelationshipsChange}
-                />
-              </div>
-            </>
           )}
 
           <DialogFooter>
