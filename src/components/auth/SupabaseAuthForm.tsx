@@ -102,9 +102,6 @@ export const SupabaseAuthForm = () => {
                 className="font-mono text-center uppercase"
                 required
               />
-              <p className="text-sm text-muted-foreground">
-                Enter exactly 5 letters
-              </p>
             </div>
             
             <div className="space-y-2">
