@@ -82,7 +82,7 @@ export const SupabaseAuthForm = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">
-            Deliberation Platform
+            Deliberation
           </CardTitle>
           <CardDescription>
             Access the deliberation management system
