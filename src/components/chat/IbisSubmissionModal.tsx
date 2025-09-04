@@ -9,10 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Lightbulb } from "lucide-react";
+import { Lightbulb, CheckCircle } from "lucide-react";
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { EnhancedRelationshipSelector } from './EnhancedRelationshipSelector';
 import { useStanceService } from '@/hooks/useServices';
+import { IssueRecommendations } from '@/components/ibis/IssueRecommendations';
 interface IbisSubmissionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -68,6 +69,10 @@ export const IbisSubmissionModal = ({
     message: string;
     action: string;
   } | null>(null);
+
+  // Issue recommendations state
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [isLinkingMode, setIsLinkingMode] = useState(false);
 
   // Load existing nodes and classify message when modal opens
   useEffect(() => {
@@ -159,6 +164,11 @@ export const IbisSubmissionModal = ({
   const handleRelationshipsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
     setSelectedRelationships(relationships);
   };
+
+  const handleIssueSelected = (issueId: string) => {
+    setSelectedIssueId(selectedIssueId === issueId ? null : issueId);
+    setIsLinkingMode(!!issueId);
+  };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim() || !formData.nodeType) {
@@ -175,28 +185,50 @@ export const IbisSubmissionModal = ({
         throw new Error('User not authenticated');
       }
 
-      const { data: inserted, error: nodeError } = await supabase
-        .from('ibis_nodes')
-        .insert({
-          title: formData.title.trim(),
-          description: formData.description.trim() || null,
-          node_type: formData.nodeType,
-          parent_node_id: formData.parentNodeId && formData.parentNodeId !== 'none' ? formData.parentNodeId : null,
-          deliberation_id: deliberationId,
-          message_id: messageId,
-          created_by: user.id,
-          position_x: Math.random() * 800 + 100,
-          position_y: Math.random() * 600 + 100
-        })
-        .select('id, node_type')
-        .maybeSingle();
-      if (nodeError) throw nodeError;
-      if (!inserted) throw new Error('Failed to create node');
+      let nodeId: string;
 
-      // Create enhanced relationships from AI analysis
-      if (selectedRelationships.length > 0) {
+      if (isLinkingMode && selectedIssueId) {
+        // Link to existing issue instead of creating new node
+        nodeId = selectedIssueId;
+        
+        // Create relationship to the selected issue
+        const { error: relError } = await supabase
+          .from('ibis_relationships')
+          .insert({
+            source_node_id: selectedIssueId,
+            target_node_id: selectedIssueId, // Self-reference for position linking
+            relationship_type: formData.nodeType === 'position' ? 'addresses' : 'supports',
+            created_by: user.id,
+            deliberation_id: deliberationId
+          });
+        
+        if (relError) throw relError;
+      } else {
+        // Create new node as before
+        const { data: inserted, error: nodeError } = await supabase
+          .from('ibis_nodes')
+          .insert({
+            title: formData.title.trim(),
+            description: formData.description.trim() || null,
+            node_type: formData.nodeType,
+            parent_node_id: formData.parentNodeId && formData.parentNodeId !== 'none' ? formData.parentNodeId : null,
+            deliberation_id: deliberationId,
+            message_id: messageId,
+            created_by: user.id,
+            position_x: Math.random() * 800 + 100,
+            position_y: Math.random() * 600 + 100
+          })
+          .select('id, node_type')
+          .maybeSingle();
+        if (nodeError) throw nodeError;
+        if (!inserted) throw new Error('Failed to create node');
+        nodeId = inserted.id;
+      }
+
+      // Create enhanced relationships from AI analysis (only for new nodes)
+      if (!isLinkingMode && selectedRelationships.length > 0) {
         const relationshipInserts = selectedRelationships.map(rel => ({
-          source_node_id: inserted.id,
+          source_node_id: nodeId,
           target_node_id: rel.id,
           relationship_type: rel.type,
           created_by: user.id,
@@ -240,7 +272,9 @@ export const IbisSubmissionModal = ({
       if (messageError) throw messageError;
       toast({
         title: "Success",
-        description: "Message successfully submitted to IBIS"
+        description: isLinkingMode 
+          ? "Message linked to existing issue successfully"
+          : "Message successfully submitted to IBIS"
       });
       onSuccess?.();
       onClose();
@@ -254,6 +288,8 @@ export const IbisSubmissionModal = ({
       });
       setAiSuggestions(null);
       setSelectedRelationships([]);
+      setSelectedIssueId(null);
+      setIsLinkingMode(false);
     } catch (error: any) {
       console.error('Error submitting to IBIS:', error);
       toast({
@@ -438,8 +474,44 @@ export const IbisSubmissionModal = ({
           }))} placeholder="Detailed description (optional)" rows={3} />
           </div>
 
-          {/* Enhanced Relationship Selector - Always show if there are existing nodes */}
-          {existingNodes.length > 0 && (
+          {/* Issue Recommendations - Show when there are existing nodes and user content */}
+          {existingNodes.length > 0 && formData.description.trim() && !isLinkingMode && (
+            <div className="border-t pt-4 mt-4">
+              <IssueRecommendations
+                deliberationId={deliberationId}
+                userContent={formData.description || messageContent}
+                onIssueSelected={handleIssueSelected}
+              />
+            </div>
+          )}
+
+          {/* Show linking mode indicator */}
+          {isLinkingMode && selectedIssueId && (
+            <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Linking to existing issue</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Your submission will be linked to the selected issue instead of creating a new node.
+              </p>
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setIsLinkingMode(false);
+                  setSelectedIssueId(null);
+                }}
+                className="mt-2 h-6 px-2 text-xs"
+              >
+                Create new node instead
+              </Button>
+            </div>
+          )}
+
+          {/* Enhanced Relationship Selector - Show only when creating new nodes */}
+          {existingNodes.length > 0 && !isLinkingMode && (
             <div className="border-t pt-4 mt-4">
               <EnhancedRelationshipSelector
                 deliberationId={deliberationId}
