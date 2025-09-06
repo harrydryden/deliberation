@@ -481,7 +481,17 @@ async function generateStreamingResponse(
     similarNodes,
     knowledgeContext
   };
+  
+  console.log('🔧 Enhancement context:', JSON.stringify(enhancementContext, null, 2));
+  
   const systemPrompt = orchestrator.generateSystemPrompt(agentConfig, agentType, enhancementContext);
+  
+  console.log('📝 Generated system prompt length:', systemPrompt?.length || 0);
+  console.log('📝 System prompt preview:', systemPrompt?.substring(0, 200) + '...');
+
+  if (!systemPrompt || systemPrompt.trim().length === 0) {
+    throw new Error('System prompt is empty or undefined');
+  }
 
   const requestBody: any = {
     model,
@@ -493,7 +503,15 @@ async function generateStreamingResponse(
     max_completion_tokens: 1500
   };
 
-  console.log(`🔧 Request body:`, JSON.stringify(requestBody, null, 2));
+  console.log('🔧 Request body preview:', JSON.stringify({
+    model: requestBody.model,
+    messages: [
+      { role: 'system', content: `${systemPrompt.substring(0, 100)}...` },
+      { role: 'user', content: content }
+    ],
+    stream: requestBody.stream,
+    max_completion_tokens: requestBody.max_completion_tokens
+  }, null, 2));
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
