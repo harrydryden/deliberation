@@ -30,7 +30,7 @@ const RELATIONSHIP_TYPES = [
   { value: 'relates_to', label: 'Relates to' },
   { value: 'addresses', label: 'Addresses' },
   { value: 'builds_on', label: 'Builds on' },
-  { value: 'questions', label: 'Questions' }
+  { value: 'responds_to', label: 'Responds to' }
 ];
 
 export const ManualNodeSelector: React.FC<ManualNodeSelectorProps> = ({

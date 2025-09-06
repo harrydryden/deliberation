@@ -350,15 +350,14 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                                <SelectTrigger className="h-7 text-xs">
                                  <SelectValue />
                                </SelectTrigger>
-                               <SelectContent className="bg-background border border-border shadow-lg z-50">
-                                 <SelectItem value="supports">Supports</SelectItem>
-                                 <SelectItem value="opposes">Opposes</SelectItem>
-                                 <SelectItem value="addresses">Addresses</SelectItem>
-                                 <SelectItem value="relates_to">Relates To</SelectItem>
-                                 <SelectItem value="builds_on">Builds On</SelectItem>
-                                 <SelectItem value="strengthens">Strengthens</SelectItem>
-                                 <SelectItem value="refines">Refines</SelectItem>
-                               </SelectContent>
+                                <SelectContent className="bg-background border border-border shadow-lg z-50">
+                                  <SelectItem value="supports">Supports</SelectItem>
+                                  <SelectItem value="opposes">Opposes</SelectItem>
+                                  <SelectItem value="addresses">Addresses</SelectItem>
+                                  <SelectItem value="relates_to">Relates To</SelectItem>
+                                  <SelectItem value="builds_on">Builds On</SelectItem>
+                                  <SelectItem value="responds_to">Responds To</SelectItem>
+                                </SelectContent>
                              </Select>
                            </div>
                          )}
@@ -456,15 +455,14 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                       <SelectTrigger className="h-8">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
-                      <SelectContent className="bg-background border border-border shadow-lg z-50">
-                        <SelectItem value="supports">Supports</SelectItem>
-                        <SelectItem value="opposes">Opposes</SelectItem>
-                        <SelectItem value="addresses">Addresses</SelectItem>
-                        <SelectItem value="relates_to">Relates To</SelectItem>
-                        <SelectItem value="builds_on">Builds On</SelectItem>
-                        <SelectItem value="strengthens">Strengthens</SelectItem>
-                        <SelectItem value="refines">Refines</SelectItem>
-                      </SelectContent>
+                       <SelectContent className="bg-background border border-border shadow-lg z-50">
+                         <SelectItem value="supports">Supports</SelectItem>
+                         <SelectItem value="opposes">Opposes</SelectItem>
+                         <SelectItem value="addresses">Addresses</SelectItem>
+                         <SelectItem value="relates_to">Relates To</SelectItem>
+                         <SelectItem value="builds_on">Builds On</SelectItem>
+                         <SelectItem value="responds_to">Responds To</SelectItem>
+                       </SelectContent>
                     </Select>
                   </div>
                 </div>
