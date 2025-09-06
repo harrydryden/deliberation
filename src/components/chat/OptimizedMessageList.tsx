@@ -236,6 +236,12 @@ export const OptimizedMessageList = memo(({
     }
   }, [messages.length]);
 
+  console.log('OptimizedMessageList render:', { 
+    isLoading, 
+    messagesLength: messages?.length || 0, 
+    messages: messages?.map(m => ({ id: m.id, type: m.message_type, content: m.content?.substring(0, 30) })) 
+  });
+
   if (isLoading) {
     return (
       <div className="flex-1 p-4 space-y-4">
@@ -262,6 +268,9 @@ export const OptimizedMessageList = memo(({
         </div>
       ) : (
         <>
+          <div className="mb-2 text-xs text-muted-foreground">
+            Debug: {messages.length} messages to render
+          </div>
           <Virtuoso
             ref={virtuosoRef}
             className="h-full"
