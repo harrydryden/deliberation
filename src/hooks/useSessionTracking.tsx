@@ -37,11 +37,7 @@ export const useSessionTracking = (): UseSessionTrackingReturn => {
     return `session_${Math.abs(hash).toString(36)}`;
   }, []);
 
-  // Get browser info for session tracking
-  const getBrowserInfo = useCallback(() => ({
-    userAgent: navigator.userAgent,
-    // Note: IP address would need to be obtained server-side for security
-  }), []);
+  // Removed browser info collection for enhanced anonymity
 
   // Create new session
   const createSession = useCallback(async () => {
@@ -51,11 +47,9 @@ export const useSessionTracking = (): UseSessionTrackingReturn => {
       setIsTracking(true);
       
       const sessionTokenHash = generateSessionTokenHash(session);
-      const browserInfo = getBrowserInfo();
 
       const newSession = await sessionService.createSession(user.id, {
-        sessionTokenHash,
-        userAgent: browserInfo.userAgent
+        sessionTokenHash
       });
 
       if (newSession) {
@@ -67,7 +61,7 @@ export const useSessionTracking = (): UseSessionTrackingReturn => {
       logger.error('Failed to create session', { error });
       setIsTracking(false);
     }
-  }, [user, session, generateSessionTokenHash, getBrowserInfo]);
+  }, [user, session, generateSessionTokenHash]);
 
   // Update session activity
   const updateActivity = useCallback(() => {

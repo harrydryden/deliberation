@@ -42,7 +42,7 @@ serve(async (req) => {
 
     switch (action) {
       case 'create': {
-        const { sessionTokenHash, ipAddress, userAgent } = sessionData;
+        const { sessionTokenHash } = sessionData;
         
         // End any existing active sessions for this user
         await supabase
@@ -51,14 +51,12 @@ serve(async (req) => {
           .eq('user_id', user.id)
           .eq('is_active', true);
 
-        // Create new session
+        // Create new session with minimal tracking for anonymity
         const { data, error } = await supabase
           .from('user_sessions')
           .insert({
             user_id: user.id,
             session_token_hash: sessionTokenHash,
-            ip_address: ipAddress,
-            user_agent: userAgent,
             is_active: true
           })
           .select()

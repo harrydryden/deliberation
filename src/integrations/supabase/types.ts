@@ -224,36 +224,30 @@ export type Database = {
           action: string
           created_at: string | null
           id: string
-          ip_address: unknown | null
           new_values: Json | null
           old_values: Json | null
           record_id: string | null
           table_name: string | null
-          user_agent: string | null
           user_id: string | null
         }
         Insert: {
           action: string
           created_at?: string | null
           id?: string
-          ip_address?: unknown | null
           new_values?: Json | null
           old_values?: Json | null
           record_id?: string | null
           table_name?: string | null
-          user_agent?: string | null
           user_id?: string | null
         }
         Update: {
           action?: string
           created_at?: string | null
           id?: string
-          ip_address?: unknown | null
           new_values?: Json | null
           old_values?: Json | null
           record_id?: string | null
           table_name?: string | null
-          user_agent?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -1076,33 +1070,27 @@ export type Database = {
           created_at: string | null
           expires_at: string | null
           id: string
-          ip_address: unknown | null
           is_active: boolean | null
           last_active: string | null
           session_token_hash: string
-          user_agent: string | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
           expires_at?: string | null
           id?: string
-          ip_address?: unknown | null
           is_active?: boolean | null
           last_active?: string | null
           session_token_hash: string
-          user_agent?: string | null
           user_id: string
         }
         Update: {
           created_at?: string | null
           expires_at?: string | null
           id?: string
-          ip_address?: unknown | null
           is_active?: boolean | null
           last_active?: string | null
           session_token_hash?: string
-          user_agent?: string | null
           user_id?: string
         }
         Relationships: []
@@ -1233,17 +1221,12 @@ export type Database = {
           updated_at: string
         }[]
       }
-      assign_access_codes_to_users: {
+      anonymize_old_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      audit_sensitive_operation: {
-        Args: {
-          details?: Json
-          operation_type: string
-          record_id?: string
-          table_name: string
-        }
+      assign_access_codes_to_users: {
+        Args: Record<PropertyKey, never>
         Returns: undefined
       }
       auth_is_admin: {
@@ -1285,16 +1268,6 @@ export type Database = {
       debug_storage_context: {
         Args: Record<PropertyKey, never>
         Returns: Json
-      }
-      enhanced_audit_log: {
-        Args: {
-          details?: Json
-          operation_type: string
-          record_id?: string
-          risk_level?: string
-          table_name?: string
-        }
-        Returns: undefined
       }
       generate_secure_access_code: {
         Args: Record<PropertyKey, never>
@@ -1513,6 +1486,10 @@ export type Database = {
           p_record_id?: string
           p_table_name?: string
         }
+        Returns: undefined
+      }
+      log_security_event: {
+        Args: { details?: Json; event_type: string }
         Returns: undefined
       }
       match_agent_knowledge: {

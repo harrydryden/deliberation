@@ -246,8 +246,6 @@ export const SecurityEventSchema = z.object({
   id: UUIDSchema,
   event_type: SecurityEventTypeSchema,
   user_id: UUIDSchema.nullable(),
-  ip_address: z.string().nullable(),
-  user_agent: z.string().nullable(),
   details: z.record(z.string(), z.unknown()),
   risk_level: ErrorSeveritySchema,
   resolved: z.boolean(),

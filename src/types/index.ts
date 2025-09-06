@@ -373,8 +373,6 @@ export interface AdminActionLog {
   record_id?: string;
   old_values?: Record<string, unknown>;
   new_values?: Record<string, unknown>;
-  ip_address?: string;
-  user_agent?: string;
   created_at: string;
 }
 

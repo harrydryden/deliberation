@@ -5,8 +5,6 @@ export interface UserSession {
   id: string;
   user_id: string;
   session_token_hash: string;
-  ip_address?: string;
-  user_agent?: string;
   created_at: string;
   last_active: string;
   expires_at: string;
@@ -23,8 +21,6 @@ export interface SessionMetrics {
 export class SessionService {
   async createSession(userId: string, sessionData: {
     sessionTokenHash: string;
-    ipAddress?: string;
-    userAgent?: string;
   }): Promise<UserSession | null> {
     try {
       const { data, error } = await supabase
@@ -32,8 +28,6 @@ export class SessionService {
         .insert({
           user_id: userId,
           session_token_hash: sessionData.sessionTokenHash,
-          ip_address: sessionData.ipAddress,
-          user_agent: sessionData.userAgent,
           is_active: true
         })
         .select()
