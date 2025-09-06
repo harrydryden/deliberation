@@ -226,12 +226,12 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
                     {selectedIssues.has(recommendation.issueId) && (
                       <div className="mt-2">
-                        <Label className="text-xs">Relationship Type</Label>
+                        <Label htmlFor={`relationship-type-${recommendation.issueId}`} className="text-xs">Relationship Type</Label>
                         <Select
                           value={issueRelationshipTypes.get(recommendation.issueId) || 'addresses'}
                           onValueChange={(value) => handleRelationshipTypeChange(recommendation.issueId, value)}
                         >
-                          <SelectTrigger className="h-7 text-xs">
+                          <SelectTrigger id={`relationship-type-${recommendation.issueId}`} className="h-7 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-background border border-border shadow-lg z-50">

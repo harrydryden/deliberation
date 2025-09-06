@@ -479,7 +479,7 @@ export const IbisSubmissionModal = ({
             ...prev,
             nodeType: value
           }))}>
-              <SelectTrigger>
+              <SelectTrigger id="nodeType">
                 <SelectValue placeholder="Select Type" />
               </SelectTrigger>
               <SelectContent>
@@ -575,7 +575,7 @@ export const IbisSubmissionModal = ({
                   <div className="mt-3">
                     <Label htmlFor="manualNodeSelection" className="text-xs">Or select manually:</Label>
                     <Select onValueChange={(value) => value !== 'none' && handleIssueSelected(value)}>
-                      <SelectTrigger className="mt-1 bg-background border-border z-50">
+                      <SelectTrigger id="manualNodeSelection" className="mt-1 bg-background border-border z-50">
                         <SelectValue placeholder="Choose an existing item to link to" />
                       </SelectTrigger>
                       <SelectContent className="bg-background border-border shadow-lg z-50 max-h-60">
