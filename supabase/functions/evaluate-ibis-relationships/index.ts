@@ -186,7 +186,7 @@ Respond in JSON format:
 }`;
 
     const aiResponse = await openai.chat.completions.create({
-      model: "gpt-4.1-2025-04-14",
+      model: "gpt-5-2025-08-07",
       messages: [
         { 
           role: "system", 
