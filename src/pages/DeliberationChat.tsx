@@ -165,7 +165,7 @@ const DeliberationChat = () => {
     setUiState(prev => ({ ...prev, viewMode: 'chat' }));
   }, [isMobile]);
   
-  // Load user scores from database via service layer
+  // Remove sessionMetrics from loadUserScores dependency to prevent circular updates
   const loadUserScores = useCallback(async () => {
     if (!user?.id || !deliberationId) return;
     
@@ -200,7 +200,7 @@ const DeliberationChat = () => {
       setUserScores({
         engagement: deliberationMessages.length,
         shares: ibisSubmissions.length,
-        sessions: sessionMetrics?.totalSessions || 1, // Update sessions here instead of initial state
+        sessions: sessionMetrics?.totalSessions || 1,
         helpfulness: helpfulnessScore,
         stanceScore: stanceData?.stance_score || 0
       });
@@ -257,11 +257,12 @@ const DeliberationChat = () => {
       // Check if current user is a participant
       const isUserParticipant = data.participants?.some((p: any) => p.user_id === user?.id);
       
-      setDeliberationState({
+      // Use functional update to avoid dependency on deliberationState
+      setDeliberationState(prev => ({
+        ...prev,
         deliberation: data,
-        agentConfigs: deliberationState.agentConfigs,
         isParticipant: isUserParticipant || false
-      });
+      }));
     } catch (error) {
       toast({
         title: "Error",
@@ -273,9 +274,10 @@ const DeliberationChat = () => {
       setUiState(prev => ({ ...prev, loading: false }));
       logger.info('Deliberation details loading completed');
     }
-  }, [deliberationId, user?.id, services.deliberationService, deliberationState.agentConfigs, toast]);
+  }, [deliberationId, user?.id, services.deliberationService, toast]);
 
   useEffect(() => {
+    console.log('DeliberationChat: Initial mount or key dependencies changed');
     if (!isLoading && !user) {
       navigate("/auth");
       return;
@@ -308,7 +310,7 @@ const DeliberationChat = () => {
     } finally {
       setUiState(prev => ({ ...prev, joiningDeliberation: false }));
     }
-  }, [user, deliberationId, services, sessionMetrics, loadDeliberation]);
+  }, [deliberationId, user, services.deliberationService, toast, loadDeliberation]);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
@@ -338,6 +340,14 @@ const DeliberationChat = () => {
         </div>
       </Layout>;
   }
+  
+  // Add emergency refresh if component seems stuck
+  if (!deliberationState.deliberation && !uiState.loading && user && deliberationId) {
+    console.log('DeliberationChat: Emergency state - refreshing page');
+    window.location.reload();
+    return null;
+  }
+  
   if (!user || !deliberationState.deliberation) return null;
 
   // Show simplified admin view for admin users
