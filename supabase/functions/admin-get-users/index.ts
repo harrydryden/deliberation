@@ -142,15 +142,11 @@ serve(async (req) => {
       }
     })
 
-    // Map profiles to user data with access codes
+    // Map profiles to user data
     const users = profiles.map(profile => {
       const role = profile.user_role || 'user'
       const deliberations = deliberationsMap.get(profile.id) || []
       const authUser = authUsersMap.get(profile.id)
-
-      // Extract access codes from auth metadata
-      const accessCode1 = authUser?.user_metadata?.access_code_1 || authUser?.raw_user_meta_data?.access_code_1
-      const accessCode2 = authUser?.user_metadata?.access_code_2 || authUser?.raw_user_meta_data?.access_code_2
       
       return {
         id: profile.id,
@@ -170,8 +166,6 @@ serve(async (req) => {
         archivedAt: profile.archived_at,
         archivedBy: profile.archived_by,
         archiveReason: profile.archive_reason,
-        accessCode1: accessCode1,
-        accessCode2: accessCode2,
       }
     })
 

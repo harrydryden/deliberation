@@ -13,7 +13,6 @@ import { DeliberationOverview } from './DeliberationOverview';
 import { DeliberationCreation } from './DeliberationCreation';
 import { KnowledgeManagement } from './KnowledgeManagement';
 import { SystemStats } from './SystemStats';
-import { BulkUserCreation } from './BulkUserCreation';
 import { PromptManagement } from './PromptManagement';
 import { AgentRatingDashboard } from './AgentRatingDashboard';
 
@@ -57,7 +56,7 @@ export const AdminDashboard = () => {
           <div>
             <h1 className="text-3xl font-bold">Admin Dashboard</h1>
             <p className="text-muted-foreground">
-              Manage users, access codes, agents, and deliberations
+              Manage users, agents, and deliberations
             </p>
           </div>
         </div>
@@ -74,7 +73,7 @@ export const AdminDashboard = () => {
       <Tabs defaultValue="users" className="w-full">
         <div className="sticky top-28 z-30 bg-deliberation-bg/95 backdrop-blur-sm py-2 -mx-6 px-6 border-b border-border/50">
           <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="users">Users & Access</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="agents">Agents</TabsTrigger>
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="deliberations">Deliberations</TabsTrigger>
@@ -83,12 +82,6 @@ export const AdminDashboard = () => {
         </div>
 
         <TabsContent value="users" className="space-y-4">
-          <BulkUserCreation 
-            onUsersCreated={() => {
-              adminData.fetchUsers();
-              adminData.fetchStats();
-            }}
-          />
           <UserAccessManagement
             users={adminData.users}
             loading={adminData.loadingUsers}

@@ -10,7 +10,6 @@ interface AuthContextType {
   isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
-  createAccessCodeUsers: (count: number, roleType: 'admin' | 'user') => Promise<{ users: Array<{ accessCode1: string; accessCode2: string; role: string }>, error?: any }>;
   createAdminUsers: () => Promise<{ success: boolean; error?: any }>;
 }
 
@@ -122,18 +121,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const generateAccessCode1 = (): string => {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    let result = '';
-    for (let i = 0; i < 5; i++) {
-      result += letters.charAt(Math.floor(Math.random() * letters.length));
-    }
-    return result;
-  };
-
-  const generateAccessCode2 = (): string => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
 
   const createAdminUsers = async () => {
     try {
@@ -160,8 +147,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (adminData.user) {
           await supabase
             .from('profiles')
-            .update({ user_role: 'admin' })
-            .eq('id', adminData.user.id);
+            .upsert({ 
+              id: adminData.user.id,
+              user_role: 'admin',
+              created_at: new Date().toISOString()
+            });
         }
       }
 
@@ -186,8 +176,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (superData.user) {
           await supabase
             .from('profiles')
-            .update({ user_role: 'admin' })
-            .eq('id', superData.user.id);
+            .upsert({ 
+              id: superData.user.id,
+              user_role: 'admin',
+              created_at: new Date().toISOString()
+            });
         }
       }
 
@@ -198,46 +191,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const createAccessCodeUsers = async (count: number, roleType: 'admin' | 'user' = 'user') => {
-    try {
-      const users = [];
-      
-      for (let i = 0; i < count; i++) {
-        const accessCode1 = generateAccessCode1();
-        const accessCode2 = generateAccessCode2();
-        const email = `${accessCode1}@deliberation.local`;
-        
-        // Create user in Supabase Auth using signUp
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password: accessCode2,
-          options: {
-            data: {
-              access_code_1: accessCode1,
-              access_code_2: accessCode2,
-              role: roleType
-            }
-          }
-        });
-
-        if (authError) {
-          logger.error('Error creating user:', authError);
-          continue;
-        }
-
-        users.push({
-          accessCode1,
-          accessCode2,
-          role: roleType
-        });
-      }
-
-      return { users };
-    } catch (error) {
-      logger.error('Error creating access code users:', error);
-      return { users: [], error };
-    }
-  };
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -274,7 +227,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isAdmin,
     signIn,
     signOut,
-    createAccessCodeUsers,
     createAdminUsers
   };
 

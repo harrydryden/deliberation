@@ -83,8 +83,7 @@ export const UserAccessManagement = ({
                 <TableHeader>
                   <TableRow>
                     <TableHead>User ID</TableHead>
-                    <TableHead>Access Code 1</TableHead>
-                    <TableHead>Access Code 2</TableHead>
+                    <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Deliberations</TableHead>
                     <TableHead>Actions</TableHead>
@@ -98,39 +97,12 @@ export const UserAccessManagement = ({
                           {user.id.slice(0, 8)}...
                         </code>
                       </TableCell>
+                      <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <code className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                            {user.accessCode1 || 'N/A'}
-                          </code>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyToClipboard(user.accessCode1 || 'N/A')}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                          {user.role === 'admin' ? 'Admin' : 'User'}
+                        </Badge>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <code className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                            {user.accessCode2 || 'N/A'}
-                          </code>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyToClipboard(user.accessCode2 || 'N/A')}
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                       <TableCell>
-                         <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                           {user.role === 'admin' ? 'Admin' : 'User'}
-                         </Badge>
-                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
                           {user.deliberations && user.deliberations.length > 0 ? (

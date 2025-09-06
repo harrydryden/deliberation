@@ -5,7 +5,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider as SupabaseAuthProvider } from "@/hooks/useSupabaseAuth";
 import { OptimizedAuthProvider, useOptimizedAuthContext } from "@/components/auth/OptimizedAuthProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { SupabaseAuthForm } from "@/components/auth/SupabaseAuthForm";
 import { Suspense, lazy } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -68,7 +67,7 @@ const App = () => (
               <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-center space-y-4"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" /><p className="text-muted-foreground">Loading...</p></div></div>}>
                 <Routes>
                   <Route path="/" element={<AuthGuard><Index /></AuthGuard>} />
-                  <Route path="/auth" element={<SupabaseAuthForm />} />
+                  <Route path="/auth" element={<Auth />} />
                   
                   <Route path="/admin" element={<AuthGuard><AdminGuard><Admin /></AdminGuard></AuthGuard>} />
                   <Route path="/deliberations" element={<AuthGuard><Deliberations /></AuthGuard>} />

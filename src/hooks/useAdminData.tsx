@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useServices } from '@/hooks/useServices';
 import { useDeliberationService } from '@/hooks/useDeliberationService';
-import { User, Agent, Deliberation, LocalAgentCreate, AccessCode, SystemStats } from '@/types/index';
+import { User, Agent, Deliberation, LocalAgentCreate, SystemStats } from '@/types/index';
 import { toast } from 'sonner';
 import { useErrorHandler } from './useErrorHandler';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
@@ -18,10 +18,6 @@ export const useAdminData = () => {
   // Users
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-
-  // Access Codes (for user provisioning)
-  const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
-  const [loadingAccessCodes, setLoadingAccessCodes] = useState(false);
 
   // Agents
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -96,22 +92,7 @@ export const useAdminData = () => {
   }, [services.adminService, fetchUsers]);
 
 
-  // Access code functions for user provisioning
-  const fetchAccessCodes = async () => {
-    // No-op: access codes are managed through Supabase Auth
-    setAccessCodes([]);
-    setLoadingAccessCodes(false);
-  };
-
-  const createAccessCode = async (codeType: string) => {
-    // No-op: access codes are managed through Supabase Auth
-    toast.error('Access codes are managed through Supabase Auth. Use Bulk User Creation instead.');
-  };
-
-  const deleteAccessCode = async (id: string) => {
-    // No-op: access codes are managed through Supabase Auth
-    toast.error('Access codes are managed through Supabase Auth. Use Supabase Dashboard to manage users.');
-  };
+  // Note: Access code functions are deprecated - access codes no longer exist
 
   // Agent operations
   const fetchAgents = useCallback(async () => {
@@ -292,14 +273,12 @@ export const useAdminData = () => {
   return {
     // States
     users,
-    accessCodes,
     agents,
     localAgents,
     deliberations,
     stats,
     loading,
     loadingUsers,
-    loadingAccessCodes,
     loadingAgents,
     loadingLocalAgents,
     loadingDeliberations,
@@ -311,9 +290,6 @@ export const useAdminData = () => {
     updateUserRole,
     archiveUser,
     unarchiveUser,
-    fetchAccessCodes,
-    createAccessCode,
-    deleteAccessCode,
     fetchAgents,
     updateAgent,
     createAgent,

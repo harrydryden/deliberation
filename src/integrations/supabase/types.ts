@@ -832,8 +832,6 @@ export type Database = {
       }
       profiles: {
         Row: {
-          access_code_1: string | null
-          access_code_2: string | null
           archive_reason: string | null
           archived_at: string | null
           archived_by: string | null
@@ -844,8 +842,6 @@ export type Database = {
           user_role: Database["public"]["Enums"]["app_role"] | null
         }
         Insert: {
-          access_code_1?: string | null
-          access_code_2?: string | null
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
@@ -856,8 +852,6 @@ export type Database = {
           user_role?: Database["public"]["Enums"]["app_role"] | null
         }
         Update: {
-          access_code_1?: string | null
-          access_code_2?: string | null
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
@@ -1258,10 +1252,6 @@ export type Database = {
         Args: { ts: string }
         Returns: string
       }
-      assign_access_codes_to_users: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
       auth_is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -1274,21 +1264,9 @@ export type Database = {
         Args: { new_role: string; target_user_id: string }
         Returns: boolean
       }
-      cleanup_expired_access_codes: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
       cleanup_orphaned_sessions: {
         Args: Record<PropertyKey, never>
         Returns: number
-      }
-      create_user_with_access_code: {
-        Args: { p_user_role?: string }
-        Returns: {
-          access_code: string
-          profile_created: boolean
-          user_id: string
-        }[]
       }
       debug_auth_functions: {
         Args: Record<PropertyKey, never>
@@ -1301,22 +1279,6 @@ export type Database = {
       debug_storage_context: {
         Args: Record<PropertyKey, never>
         Returns: Json
-      }
-      generate_secure_access_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_simple_access_code: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_access_code_count: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      get_access_code_type: {
-        Args: { access_code: string }
-        Returns: string
       }
       get_admin_system_stats: {
         Args: Record<PropertyKey, never>
@@ -1458,10 +1420,6 @@ export type Database = {
         Args: { "": unknown }
         Returns: unknown
       }
-      increment_access_code_usage: {
-        Args: { input_code: string }
-        Returns: boolean
-      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -1548,10 +1506,6 @@ export type Database = {
           title: string
         }[]
       }
-      secure_increment_access_code_usage: {
-        Args: { input_code: string }
-        Returns: boolean
-      }
       set_config: {
         Args: { is_local?: boolean; new_value: string; setting_name: string }
         Returns: string
@@ -1583,23 +1537,6 @@ export type Database = {
       user_participates_in_deliberation_safe: {
         Args: { deliberation_uuid: string; user_uuid: string }
         Returns: boolean
-      }
-      validate_access_code: {
-        Args: { input_code: string }
-        Returns: {
-          code_type: string
-          expired: boolean
-          max_uses_reached: boolean
-          valid: boolean
-        }[]
-      }
-      validate_access_code_secure: {
-        Args: { input_code: string }
-        Returns: Json
-      }
-      validate_access_code_simple: {
-        Args: { input_code: string }
-        Returns: Json
       }
       vector_avg: {
         Args: { "": number[] }

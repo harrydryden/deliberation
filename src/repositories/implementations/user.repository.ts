@@ -71,9 +71,7 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
       isArchived: data.is_archived,
       archivedAt: data.archived_at,
       archivedBy: data.archived_by,
-      archiveReason: data.archive_reason,
-      accessCode1: data.access_code_1,
-      accessCode2: data.access_code_2
+      archiveReason: data.archive_reason
     };
   }
 
@@ -217,8 +215,6 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
           archivedAt: profile.archived_at,
           archivedBy: profile.archived_by,
           archiveReason: profile.archive_reason,
-          accessCode1: profile.access_code_1 || 'N/A',
-          accessCode2: profile.access_code_2 || 'N/A',
         };
       });
 
