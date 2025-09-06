@@ -384,7 +384,7 @@ export const IbisSubmissionModal = ({
     }
   };
   return <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add to Deliberation Map</DialogTitle>
         </DialogHeader>
@@ -585,9 +585,9 @@ export const IbisSubmissionModal = ({
               )}
 
               {/* Enhanced Relationship Selector with 3-connection limit */}
-              <div className="space-y-4">
-                <h5 className="text-xs font-medium text-muted-foreground mb-2">
-                  Smart Connections (Select up to 3)
+              <div className="space-y-4 p-4 border border-dashed border-primary/30 rounded-lg bg-primary/5">
+                <h5 className="text-sm font-medium text-foreground mb-2">
+                  🔗 Smart Connections (Select up to 3)
                 </h5>
                 
                 {/* AI-powered relationship analysis */}
