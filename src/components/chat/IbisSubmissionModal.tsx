@@ -586,21 +586,6 @@ export const IbisSubmissionModal = ({
                     nodeType={(formData.nodeType || 'issue') as 'issue' | 'position' | 'argument'}
                     onRelationshipsChange={handleRelationshipsChange}
                   />
-                  
-                  {/* Info about manual connections */}
-                  <div className="mt-3 p-3 border border-border rounded-lg bg-muted/20">
-                    <div className="flex items-start gap-2">
-                      <Lightbulb className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs font-medium mb-1">
-                          About Connections
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          AI analyzes your content to suggest meaningful relationships. You can select up to 3 connections that will be created automatically, or add more connections later in the IBIS map editor.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
