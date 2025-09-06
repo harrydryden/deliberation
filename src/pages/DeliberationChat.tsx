@@ -241,7 +241,7 @@ const DeliberationChat = () => {
     }
   }, [deliberationId, services.agentService]);
 
-  const loadDeliberation = async () => {
+  const loadDeliberation = useCallback(async () => {
     if (!deliberationId) {
       logger.warn('No deliberationId provided');
       return;
@@ -263,7 +263,6 @@ const DeliberationChat = () => {
         isParticipant: isUserParticipant || false
       });
     } catch (error) {
-
       toast({
         title: "Error",
         description: "Failed to load deliberation details",
