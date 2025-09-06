@@ -144,8 +144,8 @@ const OptimizedDeliberationChat = () => {
         loading: false
       }));
 
-      // Load user scores
-      if (user.id) {
+      // Load user scores - skip for admins since they see all messages
+      if (user.id && !isAdmin) {
         try {
           const userMessages = await messageService.getUserMessages(user.id);
           const deliberationMessages = userMessages.filter(m => m.deliberation_id === deliberationId);
@@ -284,14 +284,6 @@ const OptimizedDeliberationChat = () => {
   if (!user || !state.deliberation) return null;
 
   if (isAdmin) {
-    console.log('Admin view rendering:', { 
-      isAdmin, 
-      messagesLength: messages.length, 
-      chatLoading, 
-      deliberationTitle: state.deliberation?.title,
-      userId: user?.id
-    });
-    
     return (
       <Layout>
         <div className="container mx-auto px-4 py-6 max-w-4xl">
@@ -301,9 +293,6 @@ const OptimizedDeliberationChat = () => {
               <div>
                 <h1 className="text-2xl font-bold text-primary">Admin View: {state.deliberation.title}</h1>
                 <p className="text-muted-foreground">Read-only access to all messages in chronological order</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Debug: {messages.length} messages loaded, chatLoading: {chatLoading.toString()}
-                </p>
               </div>
               <Badge className={`${getStatusColor(state.deliberation.status)} text-white`}>
                 {state.deliberation.status}
