@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
@@ -13,7 +14,8 @@ interface DeliberationService {
 export const useDeliberationService = (): DeliberationService => {
   const { user } = useSupabaseAuth();
   
-  return {
+  // 🔧 FIX: Memoize the service object to prevent recreation on every render
+  return useMemo(() => ({
     async getDeliberations(): Promise<any[]> {
       logger.info('Starting getDeliberations with Supabase Auth');
       
@@ -212,5 +214,6 @@ export const useDeliberationService = (): DeliberationService => {
 
       if (error) throw error;
     }
-  };
+    // 🔧 FIX: Close useMemo with user dependency
+  }), [user]);
 };

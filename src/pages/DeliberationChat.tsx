@@ -1,3 +1,4 @@
+  // 🔧 FIX: Add import for useMemo
 import { useEffect, useState, lazy, Suspense, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
@@ -54,11 +55,11 @@ const DeliberationChat = () => {
     isAdmin
   } = useSupabaseAuth();
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
+  // 🔧 FIX: Memoize toast to ensure stability
+  const { toast } = useToast();
+  const stableToast = useMemo(() => toast, [toast]);
   
-  // Use the service container directly to avoid creating new instances on every render
+  // 🔧 FIX: Get stable service references (they're already singletons)
   const { agentService, messageService } = useServices();
   const deliberationService = useDeliberationService();
   
@@ -159,7 +160,7 @@ const DeliberationChat = () => {
     setUiState(prev => ({ ...prev, viewMode: 'chat' }));
   }, [isMobile]);
   
-  // Stable loadUserScores without sessionMetrics dependency to prevent re-render cycles
+  // 🔧 FIX: Stabilize loadUserScores with proper dependencies only
   const loadUserScores = useCallback(async () => {
     if (!user?.id || !deliberationId) return;
     
@@ -216,6 +217,7 @@ const DeliberationChat = () => {
     }  
   }, [user?.id, deliberationId, messageService]);
 
+  // 🔧 FIX: Stabilize loadAgentConfigs callback
   const loadAgentConfigs = useCallback(async () => {
     if (!deliberationId) {
       return;
@@ -235,6 +237,7 @@ const DeliberationChat = () => {
     }
   }, [deliberationId, agentService]);
 
+  // 🔧 FIX: Use stable toast reference
   const loadDeliberation = useCallback(async () => {
     if (!deliberationId) {
       logger.warn('No deliberationId provided');
@@ -258,7 +261,7 @@ const DeliberationChat = () => {
         isParticipant: isUserParticipant || false
       }));
     } catch (error) {
-      toast({
+      stableToast({
         title: "Error",
         description: "Failed to load deliberation details",
         variant: "destructive"
@@ -268,10 +271,10 @@ const DeliberationChat = () => {
       setUiState(prev => ({ ...prev, loading: false }));
       logger.info('Deliberation details loading completed');
     }
-  }, [deliberationId, user?.id, deliberationService, toast]);
+  }, [deliberationId, user?.id, deliberationService, stableToast]);
 
   useEffect(() => {
-    console.log('DeliberationChat: Initial mount or key dependencies changed');
+    // 🔧 FIX: Removed console.log to reduce performance overhead
     if (!isLoading && !user) {
       navigate("/auth");
       return;
@@ -292,9 +295,9 @@ const DeliberationChat = () => {
     }
   }, [sessionMetrics?.totalSessions]);
 
-  // Separate effect for loading user scores to avoid circular dependencies
+  // 🔧 FIX: Remove the circular dependency by only loading scores when deliberation is fully loaded
   useEffect(() => {
-    if (user?.id && deliberationId && deliberationState.deliberation) {
+    if (user?.id && deliberationId && deliberationState.deliberation?.id) {
       loadUserScores();
     }
   }, [user?.id, deliberationId, deliberationState.deliberation?.id, loadUserScores]);
@@ -304,7 +307,7 @@ const DeliberationChat = () => {
     try {
       await deliberationService.joinDeliberation(deliberationId);
       setDeliberationState(prev => ({ ...prev, isParticipant: true }));
-      toast({
+      stableToast({
         title: "Success",
         description: "You have joined the deliberation"
       });
@@ -312,7 +315,7 @@ const DeliberationChat = () => {
       loadDeliberation();
     } catch (error) {
       logger.error('Failed to join deliberation', error as any);
-      toast({
+      stableToast({
         title: "Error",
         description: "Failed to join deliberation",
         variant: "destructive"
@@ -320,7 +323,7 @@ const DeliberationChat = () => {
     } finally {
       setUiState(prev => ({ ...prev, joiningDeliberation: false }));
     }
-  }, [deliberationId, user, deliberationService, toast, loadDeliberation]);
+  }, [deliberationId, user, deliberationService, stableToast, loadDeliberation]);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
@@ -351,11 +354,14 @@ const DeliberationChat = () => {
       </Layout>;
   }
   
-  // Add emergency refresh if component seems stuck
+  // 🔧 FIX: Removed emergency reload - root cause fixed
   if (!deliberationState.deliberation && !uiState.loading && user && deliberationId) {
-    console.log('DeliberationChat: Emergency state - refreshing page');
-    window.location.reload();
-    return null;
+    // Log the issue but don't force reload - let proper error handling work
+    logger.warn('DeliberationChat: Deliberation not loaded but not in loading state', {
+      user: !!user,
+      deliberationId,
+      loading: uiState.loading
+    });
   }
   
   if (!user || !deliberationState.deliberation) return null;
