@@ -122,14 +122,27 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     instructions: string;
   }> => {
     try {
-      const { data: nodes, error } = await supabase
-        .from('ibis_nodes')
-        .select('id, title, description, node_type, created_at')
-        .eq('deliberation_id', delibId)
-        .order('created_at', { ascending: true });
-      if (error) throw error;
+      const [nodesResult, promptsResult] = await Promise.all([
+        supabase
+          .from('ibis_nodes')
+          .select('id, title, description, node_type, created_at')
+          .eq('deliberation_id', delibId)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('prompt_templates')
+          .select('name, content')
+          .in('name', ['voice_interface_short', 'voice_interface_medium', 'voice_interface_long', 'voice_interface_fallback'])
+      ]);
 
-      const totalNodes = (nodes || []).length;
+      if (nodesResult.error) throw nodesResult.error;
+      if (promptsResult.error) throw promptsResult.error;
+
+      const nodes = nodesResult.data || [];
+      const prompts = promptsResult.data || [];
+      const totalNodes = nodes.length;
+      
+      // Create prompt lookup map
+      const promptMap = prompts.reduce((acc, p) => ({ ...acc, [p.name]: p.content }), {} as Record<string, string>);
       
       // Calculate dynamic duration and content based on complexity
       let duration: string;
@@ -140,28 +153,45 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
         // Small deliberation: 30-60 seconds
         duration = "30–60 seconds";
         maxItems = 5;
-        instructions = "You are a civic deliberation assistant. Always speak responses. When asked to analyze policy, first search the local agent knowledge with the 'search_knowledge' tool to ground your answer. When asked for IBIS highlights or a summary, use the 'get_ibis_context' tool and then narrate a clear, concise 30–60 second spoken summary focusing on the key issues.";
+        instructions = promptMap['voice_interface_short'] || "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a clear, concise spoken summary.";
       } else if (totalNodes < 50) {
         // Medium deliberation: 2-3 minutes
         duration = "2–3 minutes";
         maxItems = 15;
-        instructions = "You are a civic deliberation assistant. Always speak responses. When asked to analyze policy, first search the local agent knowledge with the 'search_knowledge' tool to ground your answer. When asked for IBIS highlights or a summary, use the 'get_ibis_context' tool and then narrate a comprehensive 2–3 minute spoken summary that covers key issues, positions, and their relationships. Provide detailed context for participants.";
+        instructions = promptMap['voice_interface_medium'] || "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a comprehensive spoken summary.";
       } else {
         // Large deliberation: 5-7 minutes
         duration = "5–7 minutes";
         maxItems = 30;
-        instructions = "You are a civic deliberation assistant. Always speak responses. When asked to analyze policy, first search the local agent knowledge with the 'search_knowledge' tool to ground your answer. When asked for IBIS highlights or a summary, use the 'get_ibis_context' tool and then narrate a complete 5–7 minute spoken analysis that thoroughly covers all major themes, issue-position relationships, argument patterns, and deliberation evolution. Provide comprehensive insights for participants.";
+        instructions = promptMap['voice_interface_long'] || "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a thorough spoken analysis.";
       }
 
       return { duration, maxItems, totalNodes, instructions };
     } catch (err) {
       logger.error('complexity analysis error', err as Error);
-      return {
-        duration: "30–60 seconds",
-        maxItems: 5,
-        totalNodes: 0,
-        instructions: "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a clear, concise spoken summary."
-      };
+      
+      // Fallback to database prompt or hardcoded fallback
+      try {
+        const { data: fallbackPrompt } = await supabase
+          .from('prompt_templates')
+          .select('content')
+          .eq('name', 'voice_interface_fallback')
+          .single();
+        
+        return {
+          duration: "30–60 seconds",
+          maxItems: 5,
+          totalNodes: 0,
+          instructions: fallbackPrompt?.content || "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a clear, concise spoken summary."
+        };
+      } catch {
+        return {
+          duration: "30–60 seconds",
+          maxItems: 5,
+          totalNodes: 0,
+          instructions: "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a clear, concise spoken summary."
+        };
+      }
     }
   };
 
