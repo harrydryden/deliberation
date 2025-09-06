@@ -56,13 +56,10 @@ const DeliberationChat = () => {
   } = useSupabaseAuth();
   const navigate = useNavigate();
   
-  // Memoize services and core dependencies ONCE
-  const services = useMemo(() => {
-    const { agentService, messageService } = useServices();
-    const deliberationService = useDeliberationService();
-    const { toast } = useToast();
-    return { agentService, messageService, deliberationService, toast };
-  }, []); // Empty deps - services are singletons
+  // Get services without memoization to avoid hook calls in useMemo
+  const { agentService, messageService } = useServices();
+  const deliberationService = useDeliberationService();
+  const { toast } = useToast();
   
   const { sessionMetrics, updateActivity } = useSessionTracking();
   const isMobile = useIsMobile();
@@ -121,10 +118,17 @@ const DeliberationChat = () => {
     deliberationId: deliberationId || '',
     enabled: appState.isParticipant && appState.deliberation?.status === 'active'
   });
+  // Use current state in sendMessage without dependency
   const sendMessage = useCallback(async (content: string) => {
-    await originalSendMessage(content, appState.chatMode);
+    // Get current state values
+    const currentChatMode = appState.chatMode;
+    
+    // Call the original sendMessage with current mode
+    await originalSendMessage(content, currentChatMode);
+    
     // Update session activity for tracking and proactive prompts
     updateActivity();
+    
     // Update engagement score when message is sent
     setAppState(prev => ({
       ...prev,
@@ -133,7 +137,7 @@ const DeliberationChat = () => {
         engagement: prev.userScores.engagement + 1
       }
     }));
-  }, [originalSendMessage, appState.chatMode, updateActivity]);
+  }, [originalSendMessage, updateActivity]); // Stable dependencies only
   
   const handleAddToIbis = useCallback((messageId: string, messageContent: string) => {
     setAppState(prev => ({
@@ -168,7 +172,7 @@ const DeliberationChat = () => {
     
     try {
       // Use message service to get user engagement metrics
-      const userMessages = await services.messageService.getUserMessages(user.id);
+      const userMessages = await messageService.getUserMessages(user.id);
       const deliberationMessages = userMessages.filter(m => m.deliberation_id === deliberationId);
       const ibisSubmissions = deliberationMessages.filter(m => m.submitted_to_ibis);
 
@@ -217,13 +221,13 @@ const DeliberationChat = () => {
         }
       }));
     }  
-  }, [user?.id, deliberationId, services.messageService]);
+  }, [user?.id, deliberationId, messageService]);
 
   const loadAgentConfigs = useCallback(async () => {
     if (!deliberationId) return;
     
     try {
-      const agents = await services.agentService.getAgentsByDeliberation(deliberationId);
+      const agents = await agentService.getAgentsByDeliberation(deliberationId);
       const mappedConfigs = agents.map(agent => ({
         agent_type: agent.agent_type,
         name: agent.name,
@@ -234,7 +238,7 @@ const DeliberationChat = () => {
     } catch (error) {
       logger.error('Failed to load agent configs', error as Error);
     }
-  }, [deliberationId, services.agentService]);
+  }, [deliberationId, agentService]);
 
   const loadDeliberation = useCallback(async () => {
     if (!deliberationId) {
@@ -243,7 +247,7 @@ const DeliberationChat = () => {
     }
     try {
       setAppState(prev => ({ ...prev, loading: true }));
-      const data = await services.deliberationService.getDeliberation(deliberationId);
+      const data = await deliberationService.getDeliberation(deliberationId);
       
       // Check if current user is a participant
       const isUserParticipant = data.participants?.some((p: any) => p.user_id === user?.id);
@@ -255,14 +259,14 @@ const DeliberationChat = () => {
         loading: false
       }));
     } catch (error) {
-      services.toast({
+      toast({
         title: "Error",
         description: "Failed to load deliberation details",
         variant: "destructive"
       });
       setAppState(prev => ({ ...prev, loading: false }));
     }
-  }, [deliberationId, user?.id, services.deliberationService, services.toast]);
+  }, [deliberationId, user?.id, deliberationService, toast]);
 
   // Single effect for authentication and initial data loading
   useEffect(() => {
@@ -306,9 +310,9 @@ const DeliberationChat = () => {
     if (!deliberationId || !user) return;
     setAppState(prev => ({ ...prev, joiningDeliberation: true }));
     try {
-      await services.deliberationService.joinDeliberation(deliberationId);
+      await deliberationService.joinDeliberation(deliberationId);
       setAppState(prev => ({ ...prev, isParticipant: true }));
-      services.toast({
+      toast({
         title: "Success",
         description: "You have joined the deliberation"
       });
@@ -316,7 +320,7 @@ const DeliberationChat = () => {
       loadDeliberation();
     } catch (error) {
       logger.error('Failed to join deliberation', error as any);
-      services.toast({
+      toast({
         title: "Error",
         description: "Failed to join deliberation",
         variant: "destructive"
@@ -324,7 +328,7 @@ const DeliberationChat = () => {
     } finally {
       setAppState(prev => ({ ...prev, joiningDeliberation: false }));
     }
-  }, [deliberationId, user, services.deliberationService, services.toast, loadDeliberation]);
+  }, [deliberationId, user, deliberationService, toast, loadDeliberation]);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
