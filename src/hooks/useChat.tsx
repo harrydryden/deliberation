@@ -5,7 +5,7 @@ import type { ChatMessage } from "@/types/index";
 import { convertApiMessagesToChatMessages, convertApiMessageToChatMessage } from "@/utils/chat";
 import { getErrorMessage } from "@/utils/errors";
 import { useErrorHandler } from './useErrorHandler';
-import { useOptimizedArray } from './useOptimizedState';
+import { useOptimizedState } from './useOptimizedState';
 import { logger } from '@/utils/logger';
 import { performanceMonitor } from '@/utils/performanceUtils';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
@@ -18,9 +18,16 @@ export const useChat = (deliberationId?: string) => {
   const { user, isLoading: authLoading } = useSupabaseAuth();
   const { messageService, realtimeService } = useServices();
   const { handleError, handleAsyncError } = useErrorHandler();
-  const [messages, setMessages] = useOptimizedArray<ChatMessage>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
+  
+  // Combine related state to reduce re-renders
+  const [chatState, setChatState] = useOptimizedState({
+    initialValue: {
+      messages: [] as ChatMessage[],
+      isLoading: false,
+      isTyping: false
+    }
+  });
+  
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const { streamingState, startStreaming, stopStreaming } = useResponseStreaming();
   
@@ -59,7 +66,7 @@ export const useChat = (deliberationId?: string) => {
   // Listen for agent failure events (e.g., OpenAI quota exceeded)
   useEffect(() => {
     const handler = () => {
-      setIsTyping(false);
+      setChatState(prev => ({ ...prev, isTyping: false }));
       toast({ title: 'Contact Platform Admin', description: 'AI responses are temporarily unavailable.', variant: 'destructive' });
     };
     if (typeof window !== 'undefined') {
@@ -94,20 +101,19 @@ export const useChat = (deliberationId?: string) => {
         };
 
         // Only add messages that belong to this deliberation (or all if no deliberationId)
-        setMessages(prev => {
+        setChatState(prev => {
           // Avoid duplicates
-          if (prev.some(msg => msg.id === chatMessage.id)) {
+          if (prev.messages.some(msg => msg.id === chatMessage.id)) {
             logger.info('🔄 Duplicate message ignored', { messageId: chatMessage.id });
             return prev;
           }
           logger.info('➕ Adding realtime message', { messageId: chatMessage.id });
-          return [...prev, chatMessage];
+          return {
+            ...prev,
+            messages: [...prev.messages, chatMessage],
+            isTyping: message.message_type && (message.message_type.includes('agent') || message.message_type === 'peer_agent' || message.message_type === 'bill_agent' || message.message_type === 'flow_agent') ? false : prev.isTyping
+          };
         });
-        
-        // Only stop typing indicator when an agent message comes in
-        if (message.message_type && (message.message_type.includes('agent') || message.message_type === 'peer_agent' || message.message_type === 'bill_agent' || message.message_type === 'flow_agent')) {
-          setIsTyping(false);
-        }
       }, deliberationId);
 
       unsubscribeRef.current = unsubscribe;
@@ -123,7 +129,7 @@ export const useChat = (deliberationId?: string) => {
     }
 
     console.log('loadChatHistory: Starting load for', { userId: user.id, deliberationId });
-    setIsLoading(true);
+    setChatState(prev => ({ ...prev, isLoading: true }));
     
     await handleAsyncError(async () => {
       const timer = performanceMonitor.startTimer('loadChatHistory');
@@ -143,12 +149,15 @@ export const useChat = (deliberationId?: string) => {
         cached: true
       });
       
-      setMessages(convertApiMessagesToChatMessages(data || []));
+      setChatState(prev => ({ 
+        ...prev, 
+        messages: convertApiMessagesToChatMessages(data || []),
+        isLoading: false
+      }));
       timer();
       logger.api.response('GET', '/messages', 200, { deliberationId, messageCount: data?.length || 0 });
     }, 'loading chat history');
-    setIsLoading(false);
-  }, [user, deliberationId, handleAsyncError, setMessages, services.messageService]);
+  }, [user, deliberationId, handleAsyncError, setChatState, services.messageService]);
 
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!user || !content.trim()) return;
@@ -165,8 +174,11 @@ export const useChat = (deliberationId?: string) => {
     };
 
     // Optimistic append
-    setMessages(prev => [...prev, optimistic]);
-    setIsTyping(true);
+    setChatState(prev => ({
+      ...prev,
+      messages: [...prev.messages, optimistic],
+      isTyping: true
+    }));
 
     try {
       const timer = performanceMonitor.startTimer('sendMessage');
@@ -180,7 +192,10 @@ export const useChat = (deliberationId?: string) => {
       logger.api.response('POST', '/messages', 200, { deliberationId, mode, contentLength: content.length });
 
       // Replace optimistic with saved
-      setMessages(prev => prev.map(m => (m.id === tempId ? { ...savedChat, status: 'sent' } : m)));
+      setChatState(prev => ({
+        ...prev,
+        messages: prev.messages.map(m => (m.id === tempId ? { ...savedChat, status: 'sent' } : m))
+      }));
 
       // Start streaming the agent response
       if (deliberationId) {
@@ -209,18 +224,24 @@ export const useChat = (deliberationId?: string) => {
 
             console.log('📝 Creating/updating streaming message:', streamingMessage.id);
 
-            setMessages(prev => {
-              const existingStreamingIndex = prev.findIndex(m => m.id === `streaming-${saved.id}`);
+            setChatState(prev => {
+              const existingStreamingIndex = prev.messages.findIndex(m => m.id === `streaming-${saved.id}`);
               if (existingStreamingIndex >= 0) {
                 console.log('🔄 Updating existing streaming message at index:', existingStreamingIndex);
                 // Update existing streaming message
-                return prev.map((msg, index) => 
-                  index === existingStreamingIndex ? streamingMessage : msg
-                );
+                return {
+                  ...prev,
+                  messages: prev.messages.map((msg, index) => 
+                    index === existingStreamingIndex ? streamingMessage : msg
+                  )
+                };
               } else {
                 console.log('➕ Adding new streaming message');
                 // Only add streaming message when we have actual content
-                return [...prev, streamingMessage];
+                return {
+                  ...prev,
+                  messages: [...prev.messages, streamingMessage]
+                };
               }
             });
           },
@@ -228,12 +249,12 @@ export const useChat = (deliberationId?: string) => {
           async (finalContent: string, agentType: string) => {
             console.log('✅ onComplete called:', { finalContent: finalContent.substring(0, 50), agentType });
             
-            // Don't create messages with empty content
-            if (!finalContent.trim()) {
-              console.log('⚠️ Skipping onComplete due to empty finalContent');
-              setIsTyping(false);
-              return;
-            }
+              // Don't create messages with empty content
+              if (!finalContent.trim()) {
+                console.log('⚠️ Skipping onComplete due to empty finalContent');
+                setChatState(prev => ({ ...prev, isTyping: false }));
+                return;
+              }
             
             try {
               // Replace streaming placeholder with final agent message locally to avoid full reload
@@ -247,23 +268,29 @@ export const useChat = (deliberationId?: string) => {
                 agent_context: { agentType }
               };
               console.log('🏁 Creating final message:', finalMessage.id);
-              setMessages(prev => {
-                const withoutStreaming = prev.filter(m => m.id !== `streaming-${saved.id}`);
+              setChatState(prev => {
+                const withoutStreaming = prev.messages.filter(m => m.id !== `streaming-${saved.id}`);
                 console.log('🧹 Filtered out streaming messages, remaining:', withoutStreaming.length);
-                return [...withoutStreaming, finalMessage];
+                return {
+                  ...prev,
+                  messages: [...withoutStreaming, finalMessage],
+                  isTyping: false
+                };
               });
             } catch (error) {
               logger.error('Error applying final message', { error });
-            } finally {
-              setIsTyping(false);
+              setChatState(prev => ({ ...prev, isTyping: false }));
             }
           },
           // onError callback
           (error: string) => {
             logger.error('Streaming error', { error });
             // Clean up any streaming messages on error
-            setMessages(prev => prev.filter(m => m.id !== `streaming-${saved.id}` && !m.id.startsWith('streaming-')));
-            setIsTyping(false);
+            setChatState(prev => ({
+              ...prev,
+              messages: prev.messages.filter(m => m.id !== `streaming-${saved.id}` && !m.id.startsWith('streaming-')),
+              isTyping: false
+            }));
             toast({
               title: "Response Error",
               description: "Failed to get agent response. Please try again.",
@@ -272,38 +299,50 @@ export const useChat = (deliberationId?: string) => {
           }
         );
       } else {
-        setIsTyping(false);
+        setChatState(prev => ({ ...prev, isTyping: false }));
       }
 
     } catch (error) {
       const errMsg = getErrorMessage(error);
-      setMessages(prev => prev.map(m => (m.id === tempId ? { ...m, status: 'failed', error: errMsg } : m)));
-      setIsTyping(false);
+      setChatState(prev => ({
+        ...prev,
+        messages: prev.messages.map(m => (m.id === tempId ? { ...m, status: 'failed', error: errMsg } : m)),
+        isTyping: false
+      }));
       throw error;
     }
-  }, [user, deliberationId, setMessages, services.messageService, startStreaming, loadChatHistory, toast]);
+  }, [user, deliberationId, setChatState, services.messageService, startStreaming, loadChatHistory, toast]);
 
   const retryMessage = useCallback(async (id: string) => {
-    const target = messages.find(m => m.id === id);
+    const target = chatState.messages.find(m => m.id === id);
     if (!target || target.status !== 'failed') return;
     // Mark pending
-    setMessages(prev => prev.map(m => (m.id === id ? { ...m, status: 'pending', error: undefined } : m)));
+    setChatState(prev => ({
+      ...prev,
+      messages: prev.messages.map(m => (m.id === id ? { ...m, status: 'pending', error: undefined } : m))
+    }));
     try {
       const saved = await services.messageService.sendMessage(target.content, 'user', deliberationId, 'chat', user?.id);
       const savedChat = convertApiMessageToChatMessage(saved);
-      setMessages(prev => prev.map(m => (m.id === id ? { ...savedChat, status: 'sent' } : m)));
-      setIsTyping(true);
+      setChatState(prev => ({
+        ...prev,
+        messages: prev.messages.map(m => (m.id === id ? { ...savedChat, status: 'sent' } : m)),
+        isTyping: true
+      }));
     } catch (error) {
       const errMsg = getErrorMessage(error);
-      setMessages(prev => prev.map(m => (m.id === id ? { ...m, status: 'failed', error: errMsg } : m)));
-      setIsTyping(false);
+      setChatState(prev => ({
+        ...prev,
+        messages: prev.messages.map(m => (m.id === id ? { ...m, status: 'failed', error: errMsg } : m)),
+        isTyping: false
+      }));
     }
-  }, [messages, deliberationId, setMessages, services.messageService]);
+  }, [chatState.messages, deliberationId, setChatState, services.messageService]);
 
   return {
-    messages,
-    isLoading,
-    isTyping: isTyping || streamingState.isStreaming,
+    messages: chatState.messages,
+    isLoading: chatState.isLoading,
+    isTyping: chatState.isTyping || streamingState.isStreaming,
     sendMessage,
     loadChatHistory,
     retryMessage,

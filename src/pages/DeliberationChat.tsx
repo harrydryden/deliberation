@@ -66,26 +66,30 @@ const DeliberationChat = () => {
     componentName: 'DeliberationChat',
     enableLogging: true
   });
-  const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
-  const [agentConfigs, setAgentConfigs] = useState<Array<{agent_type: string; name: string; description?: string;}>>([]);
-  const [loading, setLoading] = useState(true);
-  const [isParticipant, setIsParticipant] = useState(false);
-  const [joiningDeliberation, setJoiningDeliberation] = useState(false);
-  const [chatMode, setChatMode] = useState<ChatMode>('chat');
-  const [ibisModal, setIbisModal] = useState<{
-    isOpen: boolean;
-    messageId: string;
-    messageContent: string;
-  }>({
+  // Combine related state to reduce re-renders
+  const [uiState, setUiState] = useState({
+    loading: true,
+    joiningDeliberation: false,
+    chatMode: 'chat' as ChatMode,
+    viewMode: 'chat' as 'chat' | 'ibis',
+    isDescriptionOpen: false,
+    modalContent: 'description' as 'description' | 'notion',
+    isHeaderCollapsed: false
+  });
+  
+  const [deliberationState, setDeliberationState] = useState({
+    deliberation: null as Deliberation | null,
+    agentConfigs: [] as Array<{agent_type: string; name: string; description?: string;}>,
+    isParticipant: false
+  });
+  
+  const [ibisModal, setIbisModal] = useState({
     isOpen: false,
     messageId: '',
     messageContent: ''
   });
+  
   const isMobile = useIsMobile();
-  const [viewMode, setViewMode] = useState<'chat' | 'ibis'>('chat');
-  const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
-  const [modalContent, setModalContent] = useState<'description' | 'notion'>('description');
-  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
   
 
   // Scoring state - loaded from actual user activity in database
@@ -116,10 +120,10 @@ const DeliberationChat = () => {
   } = useEnhancedProactivePrompts({
     userId: user?.id || '',
     deliberationId: deliberationId || '',
-    enabled: isParticipant && deliberation?.status === 'active'
+    enabled: deliberationState.isParticipant && deliberationState.deliberation?.status === 'active'
   });
-  const sendMessage = async (content: string) => {
-    await originalSendMessage(content, chatMode);
+  const sendMessage = createOptimizedCallback(async (content: string) => {
+    await originalSendMessage(content, uiState.chatMode);
     // Update session activity for tracking and proactive prompts
     updateActivity();
     // Update engagement score when message is sent
@@ -127,21 +131,22 @@ const DeliberationChat = () => {
       ...prev,
       engagement: prev.engagement + 1
     }));
-  };
-  const handleAddToIbis = (messageId: string, messageContent: string) => {
+  }, [originalSendMessage, uiState.chatMode, updateActivity]);
+  const handleAddToIbis = createOptimizedCallback((messageId: string, messageContent: string) => {
     setIbisModal({
       isOpen: true,
       messageId,
       messageContent
     });
-  };
-  const handleIbisModalClose = () => {
+  }, []);
+  
+  const handleIbisModalClose = createOptimizedCallback(() => {
     setIbisModal({
       isOpen: false,
       messageId: '',
       messageContent: ''
     });
-  };
+  }, []);
   const handleIbisSuccess = () => {
     // Reload chat messages to reflect the updated submitted_to_ibis status
     loadChatHistory();
@@ -149,8 +154,9 @@ const DeliberationChat = () => {
     loadUserScores();
   };
   useEffect(() => {
-    setViewMode('chat');
+    setUiState(prev => ({ ...prev, viewMode: 'chat' }));
   }, [isMobile]);
+  
   useEffect(() => {
     if (!isLoading && !user) {
       navigate("/auth");
@@ -233,7 +239,7 @@ const DeliberationChat = () => {
         description: agent.description
       }));
       
-      setAgentConfigs(mappedConfigs);
+      setDeliberationState(prev => ({ ...prev, agentConfigs: mappedConfigs }));
     } catch (error) {
 
     }
@@ -248,14 +254,18 @@ const DeliberationChat = () => {
       logger.info('Loading deliberation details', {
         deliberationId
       });
-      setLoading(true);
+      setUiState(prev => ({ ...prev, loading: true }));
       const data = await deliberationService.getDeliberation(deliberationId);
       logger.info('Deliberation details loaded successfully', data);
-      setDeliberation(data);
-
+      
       // Check if current user is a participant
       const isUserParticipant = data.participants?.some((p: any) => p.user_id === user?.id);
-      setIsParticipant(isUserParticipant || false);
+      
+      setDeliberationState({
+        deliberation: data,
+        agentConfigs: deliberationState.agentConfigs,
+        isParticipant: isUserParticipant || false
+      });
     } catch (error) {
 
       toast({
@@ -265,16 +275,16 @@ const DeliberationChat = () => {
       });
       // Don't automatically redirect - let user see the error and try again
     } finally {
-      setLoading(false);
+      setUiState(prev => ({ ...prev, loading: false }));
       logger.info('Deliberation details loading completed');
     }
   };
-  const handleJoinDeliberation = async () => {
+  const handleJoinDeliberation = createOptimizedCallback(async () => {
     if (!deliberationId || !user) return;
-    setJoiningDeliberation(true);
+    setUiState(prev => ({ ...prev, joiningDeliberation: true }));
     try {
       await deliberationService.joinDeliberation(deliberationId);
-      setIsParticipant(true);
+      setDeliberationState(prev => ({ ...prev, isParticipant: true }));
       toast({
         title: "Success",
         description: "You have joined the deliberation"
@@ -289,9 +299,9 @@ const DeliberationChat = () => {
         variant: "destructive"
       });
     } finally {
-      setJoiningDeliberation(false);
+      setUiState(prev => ({ ...prev, joiningDeliberation: false }));
     }
-  };
+  }, [deliberationId, user, deliberationService, toast, loadDeliberation]);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
@@ -304,14 +314,14 @@ const DeliberationChat = () => {
   };
   const ChatPanel = () => <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-hidden min-h-0">
-        <OptimizedMessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} deliberationId={deliberationId} agentConfigs={agentConfigs} />
+        <OptimizedMessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} deliberationId={deliberationId} agentConfigs={deliberationState.agentConfigs} />
       </div>
       <MessageInput 
         onSendMessage={sendMessage} 
         disabled={chatLoading} 
       />
     </div>;
-  if (isLoading || loading) {
+  if (isLoading || uiState.loading) {
     return <Layout>
         <div className="h-[calc(100vh-120px)] flex items-center justify-center">
           <div className="animate-pulse text-center">
@@ -321,7 +331,7 @@ const DeliberationChat = () => {
         </div>
       </Layout>;
   }
-  if (!user || !deliberation) return null;
+  if (!user || !deliberationState.deliberation) return null;
 
   // Show simplified admin view for admin users
   if (isAdmin) {
@@ -343,57 +353,57 @@ const DeliberationChat = () => {
             <div className="p-3 flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <h1 className="text-lg font-semibold text-democratic-blue truncate">
-                  {deliberation.title}
+                  {deliberationState.deliberation.title}
                 </h1>
-                <Badge className={`${getStatusColor(deliberation.status)} text-white text-xs shrink-0`}>
-                  {deliberation.status}
+                <Badge className={`${getStatusColor(deliberationState.deliberation.status)} text-white text-xs shrink-0`}>
+                  {deliberationState.deliberation.status}
                 </Badge>
               </div>
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
+                onClick={() => setUiState(prev => ({ ...prev, isHeaderCollapsed: !prev.isHeaderCollapsed }))}
                 className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
               >
-                {isHeaderCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                {uiState.isHeaderCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
               </Button>
             </div>
             
             {/* Description - Always visible under title */}
-            {deliberation.description && (
+            {deliberationState.deliberation.description && (
               <div className="px-3 pb-3">
                 <div className="rounded-lg border bg-muted/40 p-2">
                    <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
-                      onClick={() => { setModalContent('description'); setIsDescriptionOpen(true); }} 
+                      onClick={() => { setUiState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true })); }} 
                       title="Click to view full description">
-                      <span className="font-bold">Description:</span> {deliberation.description}
+                      <span className="font-bold">Description:</span> {deliberationState.deliberation.description}
                     </p>
                 </div>
               </div>
             )}
             
             {/* Notion Focus - Always visible under description */}
-            {deliberation.notion && (
+            {deliberationState.deliberation.notion && (
               <div className="px-3 pb-3">
                 <div className="rounded-lg border bg-muted/40 p-2">
                    <p className="text-xs text-muted-foreground line-clamp-2 cursor-pointer" 
-                      onClick={() => { setModalContent('notion'); setIsDescriptionOpen(true); }} 
+                      onClick={() => { setUiState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true })); }} 
                       title="Click to view full notion">
-                     <span className="font-bold">Notion:</span> {deliberation.notion}
+                     <span className="font-bold">Notion:</span> {deliberationState.deliberation.notion}
                    </p>
                 </div>
               </div>
             )}
             
-            {!isHeaderCollapsed && (
+            {!uiState.isHeaderCollapsed && (
               <div className="px-3 pb-3 space-y-3">
                 {/* Mobile Controls */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg border bg-muted/40 p-2">
-                    <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
+                    <ChatModeSelector mode={uiState.chatMode} onModeChange={(mode) => setUiState(prev => ({ ...prev, chatMode: mode }))} variant="bare" />
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-2">
-                    <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
+                    <ViewModeSelector mode={uiState.viewMode} onModeChange={v => v && setUiState(prev => ({ ...prev, viewMode: v }))} />
                   </div>
                 </div>
                 
@@ -401,7 +411,7 @@ const DeliberationChat = () => {
                   <div className="rounded-lg border bg-muted/40 p-2 flex-1">
                     <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
                       <VoiceInterfaceLazy 
-                        deliberationId={deliberation.id} 
+                        deliberationId={deliberationState.deliberation.id} 
                         variant="panel" 
                         sendMessage={sendMessage} 
                       />
@@ -430,29 +440,29 @@ const DeliberationChat = () => {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <h1 className="text-lg font-semibold text-democratic-blue truncate">
-                        {deliberation.title}
+                        {deliberationState.deliberation.title}
                       </h1>
                       <Badge className="bg-blue-500 text-white text-sm shrink-0">
-                        {deliberation.status}
+                        {deliberationState.deliberation.status}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
                       <Users className="h-4 w-4" />
-                      <span>{deliberation.participants?.length || deliberation.participant_count || 0}</span>
+                      <span>{deliberationState.deliberation.participants?.length || deliberationState.deliberation.participant_count || 0}</span>
                     </div>
                   </div>
-                   {deliberation.description && (
+                    {deliberationState.deliberation.description && (
                      <p className="text-sm text-muted-foreground mt-2 line-clamp-1 cursor-pointer truncate" 
-                        onClick={() => { setModalContent('description'); setIsDescriptionOpen(true); }} 
+                        onClick={() => { setUiState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true })); }} 
                         title="Click to view full description">
-                       <span className="font-bold">Description:</span> {deliberation.description}
+                       <span className="font-bold">Description:</span> {deliberationState.deliberation.description}
                      </p>
                   )}
-                  {deliberation.notion && (
+                  {deliberationState.deliberation.notion && (
                     <p className="text-sm text-muted-foreground mt-2 line-clamp-1 cursor-pointer truncate" 
-                       onClick={() => { setModalContent('notion'); setIsDescriptionOpen(true); }} 
+                       onClick={() => { setUiState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true })); }} 
                        title="Click to view full notion">
-                      <span className="font-bold">Notion:</span> {deliberation.notion}
+                      <span className="font-bold">Notion:</span> {deliberationState.deliberation.notion}
                     </p>
                   )}
                 </div>
@@ -463,11 +473,11 @@ const DeliberationChat = () => {
                 <div className="rounded-lg border bg-muted/40 px-3 py-2 h-32 flex flex-col justify-center space-y-2">
                   <div>
                     <div className="text-xs font-medium text-muted-foreground mb-1">Text Mode</div>
-                    <ChatModeSelector mode={chatMode} onModeChange={setChatMode} variant="bare" />
+                    <ChatModeSelector mode={uiState.chatMode} onModeChange={(mode) => setUiState(prev => ({ ...prev, chatMode: mode }))} variant="bare" />
                   </div>
                   <div>
                     <div className="text-xs font-medium text-muted-foreground mb-1">View Mode</div>
-                    <ViewModeSelector mode={viewMode} onModeChange={v => v && setViewMode(v)} />
+                    <ViewModeSelector mode={uiState.viewMode} onModeChange={v => v && setUiState(prev => ({ ...prev, viewMode: v }))} />
                   </div>
                 </div>
               </div>
@@ -477,7 +487,7 @@ const DeliberationChat = () => {
                 <div className="rounded-lg border bg-muted/40 px-3 py-2 h-32 flex flex-col justify-center">
                   <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
                     <VoiceInterfaceLazy 
-                      deliberationId={deliberation.id} 
+                      deliberationId={deliberationState.deliberation.id}
                       variant="panel" 
                       sendMessage={sendMessage} 
                     />
@@ -501,12 +511,12 @@ const DeliberationChat = () => {
           </div>
 
           {/* Content Modal */}
-          {(deliberation.description || deliberation.notion) && (
-            <Dialog open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen}>
+          {(deliberationState.deliberation.description || deliberationState.deliberation.notion) && (
+            <Dialog open={uiState.isDescriptionOpen} onOpenChange={(open) => setUiState(prev => ({ ...prev, isDescriptionOpen: open }))}>
               <DialogContent className="max-w-none w-screen h-screen p-6 sm:p-10 overflow-hidden">
                 <div className="w-full h-full flex items-center justify-center">
                   <article className="max-w-3xl text-center text-foreground whitespace-pre-wrap break-words">
-                    {modalContent === 'description' ? deliberation.description : deliberation.notion}
+                    {uiState.modalContent === 'description' ? deliberationState.deliberation.description : deliberationState.deliberation.notion}
                   </article>
                 </div>
               </DialogContent>
@@ -516,13 +526,13 @@ const DeliberationChat = () => {
         
         {/* Main Content */}
         <div className="flex-1 flex flex-col min-h-0">
-          {viewMode === 'chat' ? <ChatPanel /> : <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading map…</div></div>}>
-              <IbisMapVisualizationLazy deliberationId={deliberation.id} />
+          {uiState.viewMode === 'chat' ? <ChatPanel /> : <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading map…</div></div>}>
+              <IbisMapVisualizationLazy deliberationId={deliberationState.deliberation.id} />
             </Suspense>}
         </div>
         
         {/* IBIS Submission Modal */}
-        {deliberation && <IbisSubmissionModal isOpen={ibisModal.isOpen} onClose={handleIbisModalClose} messageId={ibisModal.messageId} messageContent={ibisModal.messageContent} deliberationId={deliberation.id} onSuccess={handleIbisSuccess} />}
+        {deliberationState.deliberation && <IbisSubmissionModal isOpen={ibisModal.isOpen} onClose={handleIbisModalClose} messageId={ibisModal.messageId} messageContent={ibisModal.messageContent} deliberationId={deliberationState.deliberation.id} onSuccess={handleIbisSuccess} />}
 
         {/* Proactive Prompt Modal */}
         {currentPrompt && (
