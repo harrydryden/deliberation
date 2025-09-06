@@ -86,7 +86,6 @@ export class IssueRecommendationService {
         .select('id, title, description')
         .eq('deliberation_id', deliberationId)
         .eq('node_type', 'issue')
-        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) {
