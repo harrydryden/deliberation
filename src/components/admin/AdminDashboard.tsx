@@ -8,7 +8,6 @@ import { useToast } from '@/hooks/use-toast';
 
 import { UserAccessManagement } from './UserAccessManagement';
 import { AccessCodeCreation } from './AccessCodeCreation';
-import { PasswordSyncButton } from './PasswordSyncButton';
 import { AgentManagement } from './AgentManagement';
 import { LocalAgentManagement } from './LocalAgentManagement';
 import { DeliberationOverview } from './DeliberationOverview';
@@ -85,7 +84,6 @@ export const AdminDashboard = () => {
 
         <TabsContent value="users" className="space-y-4">
           <AccessCodeCreation />
-          <PasswordSyncButton />
           <UserAccessManagement
             users={adminData.users}
             loading={adminData.loadingUsers}
