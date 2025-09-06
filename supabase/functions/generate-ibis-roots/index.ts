@@ -110,7 +110,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5-2025-08-07',
         max_completion_tokens: 1000,
         messages: [
           {

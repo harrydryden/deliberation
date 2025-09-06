@@ -51,7 +51,7 @@ Generate a single, clear notion statement for this deliberation (150-240 charact
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5-2025-08-07',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }

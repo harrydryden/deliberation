@@ -102,7 +102,7 @@ serve(async (req) => {
 
     const llm = new ChatOpenAI({
       openAIApiKey: openAIApiKey,
-      modelName: 'gpt-4o', // Reliable model for knowledge queries
+      modelName: 'gpt-5-2025-08-07', // Best model for knowledge queries
     });
 
     // Create vector store instance for retrieval
