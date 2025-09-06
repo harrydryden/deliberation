@@ -31,7 +31,6 @@ export type Database = {
           preset_questions: Json | null
           prompt_overrides: Json | null
           response_style: string | null
-          updated_at: string
         }
         Insert: {
           agent_type: string
@@ -49,7 +48,6 @@ export type Database = {
           preset_questions?: Json | null
           prompt_overrides?: Json | null
           response_style?: string | null
-          updated_at?: string
         }
         Update: {
           agent_type?: string
@@ -67,7 +65,6 @@ export type Database = {
           preset_questions?: Json | null
           prompt_overrides?: Json | null
           response_style?: string | null
-          updated_at?: string
         }
         Relationships: []
       }
@@ -114,6 +111,13 @@ export type Database = {
             foreignKeyName: "agent_interactions_message_id_fkey"
             columns: ["message_id"]
             isOneToOne: false
+            referencedRelation: "anonymized_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_interactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
             referencedRelation: "messages"
             referencedColumns: ["id"]
           },
@@ -136,7 +140,6 @@ export type Database = {
           processing_status: string | null
           storage_path: string | null
           title: string
-          updated_at: string
         }
         Insert: {
           agent_id?: string | null
@@ -154,7 +157,6 @@ export type Database = {
           processing_status?: string | null
           storage_path?: string | null
           title: string
-          updated_at?: string
         }
         Update: {
           agent_id?: string | null
@@ -172,7 +174,6 @@ export type Database = {
           processing_status?: string | null
           storage_path?: string | null
           title?: string
-          updated_at?: string
         }
         Relationships: [
           {
@@ -190,7 +191,6 @@ export type Database = {
           id: string
           message_id: string
           rating: number
-          updated_at: string | null
           user_id: string
         }
         Insert: {
@@ -198,7 +198,6 @@ export type Database = {
           id?: string
           message_id: string
           rating: number
-          updated_at?: string | null
           user_id: string
         }
         Update: {
@@ -206,10 +205,16 @@ export type Database = {
           id?: string
           message_id?: string
           rating?: number
-          updated_at?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "agent_ratings_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "anonymized_messages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "agent_ratings_message_id_fkey"
             columns: ["message_id"]
@@ -222,7 +227,6 @@ export type Database = {
       audit_logs: {
         Row: {
           action: string
-          created_at: string | null
           id: string
           new_values: Json | null
           old_values: Json | null
@@ -232,7 +236,6 @@ export type Database = {
         }
         Insert: {
           action: string
-          created_at?: string | null
           id?: string
           new_values?: Json | null
           old_values?: Json | null
@@ -242,7 +245,6 @@ export type Database = {
         }
         Update: {
           action?: string
-          created_at?: string | null
           id?: string
           new_values?: Json | null
           old_values?: Json | null
@@ -266,7 +268,6 @@ export type Database = {
           stance_score: number | null
           status: string | null
           submission_id: string | null
-          updated_at: string | null
           user_edited: boolean | null
         }
         Insert: {
@@ -282,7 +283,6 @@ export type Database = {
           stance_score?: number | null
           status?: string | null
           submission_id?: string | null
-          updated_at?: string | null
           user_edited?: boolean | null
         }
         Update: {
@@ -298,7 +298,6 @@ export type Database = {
           stance_score?: number | null
           status?: string | null
           submission_id?: string | null
-          updated_at?: string | null
           user_edited?: boolean | null
         }
         Relationships: [
@@ -331,7 +330,6 @@ export type Database = {
           start_time: string | null
           status: Database["public"]["Enums"]["deliberation_status"] | null
           title: string
-          updated_at: string | null
         }
         Insert: {
           created_at?: string | null
@@ -345,7 +343,6 @@ export type Database = {
           start_time?: string | null
           status?: Database["public"]["Enums"]["deliberation_status"] | null
           title: string
-          updated_at?: string | null
         }
         Update: {
           created_at?: string | null
@@ -359,7 +356,6 @@ export type Database = {
           start_time?: string | null
           status?: Database["public"]["Enums"]["deliberation_status"] | null
           title?: string
-          updated_at?: string | null
         }
         Relationships: []
       }
@@ -373,7 +369,6 @@ export type Database = {
           last_prompt_time: string | null
           prompts_sent_count: number | null
           session_state: Json | null
-          updated_at: string | null
           user_id: string
         }
         Insert: {
@@ -385,7 +380,6 @@ export type Database = {
           last_prompt_time?: string | null
           prompts_sent_count?: number | null
           session_state?: Json | null
-          updated_at?: string | null
           user_id: string
         }
         Update: {
@@ -397,7 +391,6 @@ export type Database = {
           last_prompt_time?: string | null
           prompts_sent_count?: number | null
           session_state?: Json | null
-          updated_at?: string | null
           user_id?: string
         }
         Relationships: [
@@ -420,7 +413,6 @@ export type Database = {
           id: string
           processing_status: string | null
           security_scan_status: string | null
-          updated_at: string | null
           user_id: string | null
         }
         Insert: {
@@ -432,7 +424,6 @@ export type Database = {
           id?: string
           processing_status?: string | null
           security_scan_status?: string | null
-          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
@@ -444,7 +435,6 @@ export type Database = {
           id?: string
           processing_status?: string | null
           security_scan_status?: string | null
-          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -457,7 +447,6 @@ export type Database = {
           id: string
           message_id: string
           rating: number
-          updated_at: string
           user_id: string
         }
         Insert: {
@@ -467,7 +456,6 @@ export type Database = {
           id?: string
           message_id: string
           rating: number
-          updated_at?: string
           user_id: string
         }
         Update: {
@@ -477,7 +465,6 @@ export type Database = {
           id?: string
           message_id?: string
           rating?: number
-          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -496,7 +483,6 @@ export type Database = {
           position_x: number | null
           position_y: number | null
           title: string
-          updated_at: string | null
         }
         Insert: {
           created_at?: string | null
@@ -511,7 +497,6 @@ export type Database = {
           position_x?: number | null
           position_y?: number | null
           title: string
-          updated_at?: string | null
         }
         Update: {
           created_at?: string | null
@@ -526,9 +511,15 @@ export type Database = {
           position_x?: number | null
           position_y?: number | null
           title?: string
-          updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ibis_nodes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "anonymized_messages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ibis_nodes_message_id_fkey"
             columns: ["message_id"]
@@ -792,6 +783,13 @@ export type Database = {
             foreignKeyName: "messages_parent_message_id_fkey"
             columns: ["parent_message_id"]
             isOneToOne: false
+            referencedRelation: "anonymized_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_parent_message_id_fkey"
+            columns: ["parent_message_id"]
+            isOneToOne: false
             referencedRelation: "messages"
             referencedColumns: ["id"]
           },
@@ -843,7 +841,6 @@ export type Database = {
           id: string
           is_archived: boolean | null
           role: string | null
-          updated_at: string | null
         }
         Insert: {
           access_code_1?: string | null
@@ -855,7 +852,6 @@ export type Database = {
           id: string
           is_archived?: boolean | null
           role?: string | null
-          updated_at?: string | null
         }
         Update: {
           access_code_1?: string | null
@@ -867,7 +863,6 @@ export type Database = {
           id?: string
           is_archived?: boolean | null
           role?: string | null
-          updated_at?: string | null
         }
         Relationships: []
       }
@@ -883,7 +878,6 @@ export type Database = {
           metadata: Json | null
           name: string
           template_text: string
-          updated_at: string | null
           variables: Json | null
           version: number
         }
@@ -898,7 +892,6 @@ export type Database = {
           metadata?: Json | null
           name: string
           template_text: string
-          updated_at?: string | null
           variables?: Json | null
           version?: number
         }
@@ -913,7 +906,6 @@ export type Database = {
           metadata?: Json | null
           name?: string
           template_text?: string
-          updated_at?: string | null
           variables?: Json | null
           version?: number
         }
@@ -957,7 +949,6 @@ export type Database = {
           processing_status: string | null
           raw_content: string
           submission_type: string | null
-          updated_at: string | null
           user_id: string
         }
         Insert: {
@@ -968,7 +959,6 @@ export type Database = {
           processing_status?: string | null
           raw_content: string
           submission_type?: string | null
-          updated_at?: string | null
           user_id: string
         }
         Update: {
@@ -979,7 +969,6 @@ export type Database = {
           processing_status?: string | null
           raw_content?: string
           submission_type?: string | null
-          updated_at?: string | null
           user_id?: string
         }
         Relationships: [
@@ -988,6 +977,13 @@ export type Database = {
             columns: ["deliberation_id"]
             isOneToOne: false
             referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "anonymized_messages"
             referencedColumns: ["id"]
           },
           {
@@ -1003,7 +999,6 @@ export type Database = {
         Row: {
           activity_data: Json | null
           activity_type: string
-          created_at: string | null
           deliberation_id: string | null
           id: string
           session_id: string | null
@@ -1012,7 +1007,6 @@ export type Database = {
         Insert: {
           activity_data?: Json | null
           activity_type: string
-          created_at?: string | null
           deliberation_id?: string | null
           id?: string
           session_id?: string | null
@@ -1021,7 +1015,6 @@ export type Database = {
         Update: {
           activity_data?: Json | null
           activity_type?: string
-          created_at?: string | null
           deliberation_id?: string | null
           id?: string
           session_id?: string | null
@@ -1071,7 +1064,7 @@ export type Database = {
           expires_at: string | null
           id: string
           is_active: boolean | null
-          last_active: string | null
+          recently_active: boolean | null
           session_token_hash: string
           user_id: string
         }
@@ -1080,7 +1073,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_active?: boolean | null
-          last_active?: string | null
+          recently_active?: boolean | null
           session_token_hash: string
           user_id: string
         }
@@ -1089,7 +1082,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           is_active?: boolean | null
-          last_active?: string | null
+          recently_active?: boolean | null
           session_token_hash?: string
           user_id?: string
         }
@@ -1104,7 +1097,6 @@ export type Database = {
           last_updated: string | null
           semantic_analysis: Json | null
           stance_score: number
-          updated_at: string | null
           user_id: string
         }
         Insert: {
@@ -1115,7 +1107,6 @@ export type Database = {
           last_updated?: string | null
           semantic_analysis?: Json | null
           stance_score: number
-          updated_at?: string | null
           user_id: string
         }
         Update: {
@@ -1126,7 +1117,6 @@ export type Database = {
           last_updated?: string | null
           semantic_analysis?: Json | null
           stance_score?: number
-          updated_at?: string | null
           user_id?: string
         }
         Relationships: [
@@ -1148,7 +1138,60 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      anonymized_messages: {
+        Row: {
+          agent_context: Json | null
+          content: string | null
+          created_at_daily: string | null
+          created_at_hourly: string | null
+          deliberation_id: string | null
+          id: string | null
+          message_type: Database["public"]["Enums"]["message_type"] | null
+          parent_message_id: string | null
+          submitted_to_ibis: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          agent_context?: Json | null
+          content?: string | null
+          created_at_daily?: never
+          created_at_hourly?: never
+          deliberation_id?: string | null
+          id?: string | null
+          message_type?: Database["public"]["Enums"]["message_type"] | null
+          parent_message_id?: string | null
+          submitted_to_ibis?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          agent_context?: Json | null
+          content?: string | null
+          created_at_daily?: never
+          created_at_hourly?: never
+          deliberation_id?: string | null
+          id?: string | null
+          message_type?: Database["public"]["Enums"]["message_type"] | null
+          parent_message_id?: string | null
+          submitted_to_ibis?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_parent_message_id_fkey"
+            columns: ["parent_message_id"]
+            isOneToOne: false
+            referencedRelation: "anonymized_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_parent_message_id_fkey"
+            columns: ["parent_message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       admin_create_ibis_relationship: {
@@ -1224,6 +1267,14 @@ export type Database = {
       anonymize_old_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      anonymize_timestamp_to_day: {
+        Args: { ts: string }
+        Returns: string
+      }
+      anonymize_timestamp_to_hour: {
+        Args: { ts: string }
+        Returns: string
       }
       assign_access_codes_to_users: {
         Args: Record<PropertyKey, never>
@@ -1492,6 +1543,10 @@ export type Database = {
         Args: { details?: Json; event_type: string }
         Returns: undefined
       }
+      mark_sessions_inactive: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       match_agent_knowledge: {
         Args: {
           input_agent_id: string
@@ -1531,6 +1586,10 @@ export type Database = {
       sparsevec_typmod_in: {
         Args: { "": unknown[] }
         Returns: number
+      }
+      update_session_activity_simple: {
+        Args: { session_uuid: string }
+        Returns: boolean
       }
       user_participates_in_deliberation: {
         Args: { deliberation_uuid: string; user_uuid: string }
