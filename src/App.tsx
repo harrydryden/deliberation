@@ -53,6 +53,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Deliberations = lazy(() => import("./pages/Deliberations"));
 const DeliberationChat = lazy(() => import("./pages/DeliberationChat"));
+const UserMetrics = lazy(() => import("./pages/UserMetrics"));
 
 const App = () => (
   <ErrorBoundary>
@@ -70,6 +71,7 @@ const App = () => (
                 <Route path="/admin" element={<AuthGuard><AdminGuard><Admin /></AdminGuard></AuthGuard>} />
                 <Route path="/deliberations" element={<AuthGuard><Deliberations /></AuthGuard>} />
                 <Route path="/deliberations/:deliberationId" element={<AuthGuard><DeliberationChat /></AuthGuard>} />
+                <Route path="/metrics" element={<AuthGuard><UserMetrics /></AuthGuard>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

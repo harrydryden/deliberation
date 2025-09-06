@@ -173,7 +173,19 @@ const DeliberationChat = () => {
         .eq('deliberation_id', deliberationId)
         .maybeSingle();
 
-      const helpfulnessScore = 0; // TODO: Calculate from agent_ratings table via service
+      // Get user's helpfulness score from agent_ratings table  
+      const { data: ratingsData, error: ratingsError } = await supabase
+        .from('agent_ratings')
+        .select('rating')
+        .eq('user_id', user.id);
+
+      let helpfulnessScore = 0;
+      if (!ratingsError && ratingsData) {
+        // Calculate net positive ratings (helpful - unhelpful)
+        const helpfulRatings = ratingsData.filter(r => r.rating === 1).length;
+        const unhelpfulRatings = ratingsData.filter(r => r.rating === -1).length;
+        helpfulnessScore = Math.max(0, helpfulRatings - unhelpfulRatings);
+      }
 
       setUserScores({
         engagement: deliberationMessages.length,
