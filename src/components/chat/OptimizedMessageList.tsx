@@ -330,6 +330,14 @@ export const OptimizedMessageList = memo(({
     );
   }
 
+  console.log('OptimizedMessageList: About to render', {
+    messagesLength: messages.length,
+    isLoading,
+    isTyping,
+    shouldShowEmptyState: messages.length === 0 && !isTyping,
+    shouldShowVirtuoso: messages.length > 0 || isTyping
+  });
+
   return (
     <div className="relative h-full overflow-hidden p-4">
       {messages.length === 0 && !isTyping ? (
@@ -337,42 +345,50 @@ export const OptimizedMessageList = memo(({
           <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <h3 className="text-lg font-medium mb-2">Welcome to Democratic Deliberation</h3>
           <p>Start a conversation with our AI agents to explore ideas and engage in thoughtful dialogue.</p>
+          <div className="text-xs mt-4 p-2 bg-muted rounded">
+            Debug: messages.length = {messages.length}, isTyping = {isTyping.toString()}
+          </div>
         </div>
       ) : (
-        <Virtuoso
-          ref={virtuosoRef}
-          className="h-full"
-          data={messages}
-          initialTopMostItemIndex={Math.max(0, messages.length - 1)}
-          followOutput="auto"
-          atBottomStateChange={setAtBottom}
-          itemContent={renderItem}
-          increaseViewportBy={200}
-          overscan={3} // Reduced for memory optimization
-          components={{
-            Footer: () => (
-              isTyping ? (
-                <div className="flex gap-3 mt-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-muted-foreground">
-                      <Bot className="h-4 w-4 text-white" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium mb-1">Deliberating...</div>
-                    <Card className="p-3 bg-muted">
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                      </div>
-                    </Card>
+        <>
+          <div className="mb-4 p-2 bg-muted rounded text-xs">
+            Debug: Rendering Virtuoso with {messages.length} messages
+          </div>
+          <Virtuoso
+            ref={virtuosoRef}
+            className="h-full border-2 border-red-500"
+            data={messages}
+            initialTopMostItemIndex={Math.max(0, messages.length - 1)}
+            followOutput="auto"
+            atBottomStateChange={setAtBottom}
+            itemContent={renderItem}
+            increaseViewportBy={200}
+            overscan={3}
+            components={{
+              Footer: () => (
+                isTyping ? (
+                  <div className="flex gap-3 mt-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-muted-foreground">
+                        <Bot className="h-4 w-4 text-white" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium mb-1">Deliberating...</div>
+                      <Card className="p-3 bg-muted">
+                        <div className="flex gap-1">
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
+                      </Card>
+                    </div>
                   </div>
-                </div>
-              ) : <div />
-            ),
-          }}
-        />
+                ) : <div />
+              ),
+            }}
+          />
+        </>
       )}
 
       {!atBottom && messages.length > 0 && (
