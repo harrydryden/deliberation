@@ -239,12 +239,14 @@ async function processStreamingOrchestration(
       );
 
       console.log(`✅ Generated response length: ${response.length}`);
+      console.log(`✅ Response preview: ${response.substring(0, 200)}...`);
 
       // Cache the final response
       cacheResponse(message.content, response, selectedAgent, deliberationId);
 
       // Store final response using service client
-      await serviceSupabase.from('messages').insert({
+      console.log('💾 Storing response in database...');
+      const { data: insertData, error: insertError } = await serviceSupabase.from('messages').insert({
         content: response,
         message_type: selectedAgent,
         user_id: message.user_id,
@@ -256,6 +258,12 @@ async function processStreamingOrchestration(
         }
       });
 
+      if (insertError) {
+        console.error('❌ Database insert error:', insertError);
+      } else {
+        console.log('✅ Response stored successfully in database');
+      }
+
     } catch (responseError) {
       console.error('❌ Error generating response:', responseError);
       sendData({ 
@@ -265,6 +273,7 @@ async function processStreamingOrchestration(
     }
 
     sendData({ done: true });
+    console.log('🏁 Sent final completion signal');
 
   } catch (error) {
     console.error('❌ Streaming processing error:', error);
@@ -513,6 +522,8 @@ async function generateStreamingResponse(
     max_completion_tokens: requestBody.max_completion_tokens
   }, null, 2));
 
+  console.log('🚀 About to make OpenAI API call...');
+
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -529,32 +540,54 @@ async function generateStreamingResponse(
   }
 
   console.log(`✅ OpenAI API call successful for ${agentType}`);
+  console.log('📡 Response status:', response.status);
+  console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
   const reader = response.body?.getReader();
   const decoder = new TextDecoder();
   let fullResponse = '';
 
+  console.log('🔍 Reader available:', !!reader);
+
   if (reader) {
+    console.log('📖 Starting to read stream chunks...');
+    let chunkCount = 0;
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      chunkCount++;
+      console.log(`📦 Chunk ${chunkCount}: done=${done}, value size=${value?.length || 0}`);
+      
+      if (done) {
+        console.log(`🏁 Stream completed after ${chunkCount} chunks`);
+        break;
+      }
 
       const chunk = decoder.decode(value);
+      console.log(`📝 Raw chunk ${chunkCount}:`, chunk.substring(0, 200) + '...');
+      
       const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
+      console.log(`📋 Found ${lines.length} data lines in chunk ${chunkCount}`);
       
       for (const line of lines) {
-        if (line.includes('[DONE]')) continue;
+        if (line.includes('[DONE]')) {
+          console.log('🔚 Found [DONE] marker');
+          continue;
+        }
         
         try {
           const data = JSON.parse(line.slice(6));
-          console.log(`📦 Received chunk:`, JSON.stringify(data, null, 2));
+          console.log(`📦 Parsed data from chunk ${chunkCount}:`, JSON.stringify(data, null, 2));
           const content = data.choices?.[0]?.delta?.content || '';
           if (content) {
+            console.log(`💬 Content found: "${content}"`);
             fullResponse += content;
             sendData({ content, done: false });
+          } else {
+            console.log('📭 No content in this chunk');
           }
         } catch (e) {
-          console.warn('⚠️ Parse error:', e);
+          console.warn(`⚠️ Parse error in chunk ${chunkCount}:`, e);
+          console.warn(`⚠️ Problematic line: "${line}"`);
         }
       }
     }
