@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSupabaseAuth } from './useSupabaseAuth';
 import { sessionService, type UserSession, type SessionMetrics } from '@/services/domain/implementations/session.service';
 import { logger } from '@/utils/logger';
@@ -169,11 +169,11 @@ export const useSessionTracking = (): UseSessionTrackingReturn => {
     return () => clearInterval(interval);
   }, [user, loadSessionMetrics]);
 
-  return {
+  return useMemo(() => ({
     currentSession,
     sessionMetrics,
     isTracking,
     updateActivity,
     endCurrentSession
-  };
+  }), [currentSession, sessionMetrics, isTracking, updateActivity, endCurrentSession]);
 };

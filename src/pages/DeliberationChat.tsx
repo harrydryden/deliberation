@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from "react";
+import { useEffect, useState, lazy, Suspense, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
@@ -61,6 +61,14 @@ const DeliberationChat = () => {
   const deliberationService = useDeliberationService();
   const agentService = useAgentService();
   const messageService = useMessageService();
+  
+  // Memoize service hooks to prevent new objects on every render
+  const services = useMemo(() => ({
+    deliberationService,
+    agentService,
+    messageService
+  }), [deliberationService, agentService, messageService]);
+  
   const { sessionMetrics, updateActivity } = useSessionTracking();
   const { createOptimizedCallback } = usePerformanceOptimization({
     componentName: 'DeliberationChat',
@@ -92,11 +100,11 @@ const DeliberationChat = () => {
   const isMobile = useIsMobile();
   
 
-  // Scoring state - loaded from actual user activity in database
+  // Scoring state - loaded from actual user activity in database (removed sessionMetrics dependency)
   const [userScores, setUserScores] = useState({
     engagement: 0, // Count of user messages sent total
     shares: 0, // Count of IBIS submissions total
-    sessions: sessionMetrics?.totalSessions || 1, // Real session tracking data
+    sessions: 1, // Will be updated when session metrics load
     helpfulness: 0, // Count of net positive IBIS contribution ratings
     stanceScore: undefined as number | undefined // User's stance towards deliberation topic (-1.0 to 1.0)
   });
@@ -157,25 +165,13 @@ const DeliberationChat = () => {
     setUiState(prev => ({ ...prev, viewMode: 'chat' }));
   }, [isMobile]);
   
-  useEffect(() => {
-    if (!isLoading && !user) {
-      navigate("/auth");
-      return;
-    }
-    if (user && deliberationId) {
-      loadDeliberation();
-      loadUserScores();
-      loadAgentConfigs();
-    }
-  }, [user, isLoading, deliberationId, navigate]);
-
   // Load user scores from database via service layer
-  const loadUserScores = async () => {
+  const loadUserScores = useCallback(async () => {
     if (!user?.id || !deliberationId) return;
     
     try {
       // Use message service to get user engagement metrics
-      const userMessages = await messageService.getUserMessages(user.id);
+      const userMessages = await services.messageService.getUserMessages(user.id);
       const deliberationMessages = userMessages.filter(m => m.deliberation_id === deliberationId);
       const ibisSubmissions = deliberationMessages.filter(m => m.submitted_to_ibis);
 
@@ -204,7 +200,7 @@ const DeliberationChat = () => {
       setUserScores({
         engagement: deliberationMessages.length,
         shares: ibisSubmissions.length,
-        sessions: sessionMetrics?.totalSessions || 1, // Real session data from tracking
+        sessions: sessionMetrics?.totalSessions || 1, // Update sessions here instead of initial state
         helpfulness: helpfulnessScore,
         stanceScore: stanceData?.stance_score || 0
       });
@@ -224,15 +220,15 @@ const DeliberationChat = () => {
         stanceScore: 0
       });
     }  
-  };
+  }, [user?.id, deliberationId, services.messageService, sessionMetrics]);
 
-  const loadAgentConfigs = async () => {
+  const loadAgentConfigs = useCallback(async () => {
     if (!deliberationId) {
       return;
     }
     
     try {
-      const agents = await agentService.getAgentsByDeliberation(deliberationId);
+      const agents = await services.agentService.getAgentsByDeliberation(deliberationId);
       const mappedConfigs = agents.map(agent => ({
         agent_type: agent.agent_type,
         name: agent.name,
@@ -243,7 +239,7 @@ const DeliberationChat = () => {
     } catch (error) {
 
     }
-  };
+  }, [deliberationId, services.agentService]);
 
   const loadDeliberation = async () => {
     if (!deliberationId) {
@@ -255,7 +251,7 @@ const DeliberationChat = () => {
         deliberationId
       });
       setUiState(prev => ({ ...prev, loading: true }));
-      const data = await deliberationService.getDeliberation(deliberationId);
+      const data = await services.deliberationService.getDeliberation(deliberationId);
       logger.info('Deliberation details loaded successfully', data);
       
       // Check if current user is a participant
@@ -278,12 +274,24 @@ const DeliberationChat = () => {
       setUiState(prev => ({ ...prev, loading: false }));
       logger.info('Deliberation details loading completed');
     }
-  };
+  }, [deliberationId, user?.id, services.deliberationService, deliberationState.agentConfigs, toast]);
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigate("/auth");
+      return;
+    }
+    if (user && deliberationId) {
+      loadDeliberation();
+      loadUserScores();
+      loadAgentConfigs();
+    }
+  }, [user, isLoading, deliberationId, navigate, loadDeliberation, loadUserScores, loadAgentConfigs]);
   const handleJoinDeliberation = createOptimizedCallback(async () => {
     if (!deliberationId || !user) return;
     setUiState(prev => ({ ...prev, joiningDeliberation: true }));
     try {
-      await deliberationService.joinDeliberation(deliberationId);
+      await services.deliberationService.joinDeliberation(deliberationId);
       setDeliberationState(prev => ({ ...prev, isParticipant: true }));
       toast({
         title: "Success",
@@ -301,7 +309,7 @@ const DeliberationChat = () => {
     } finally {
       setUiState(prev => ({ ...prev, joiningDeliberation: false }));
     }
-  }, [deliberationId, user, deliberationService, toast, loadDeliberation]);
+  }, [user, deliberationId, services, sessionMetrics, loadDeliberation]);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
