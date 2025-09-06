@@ -364,6 +364,13 @@ const OptimizedDeliberationChat = () => {
                       <span className="font-bold">Description:</span> {state.deliberation.description}
                     </p>
                   )}
+                  {state.deliberation.notion && (
+                    <p className="text-sm text-muted-foreground mt-1 line-clamp-1 cursor-pointer truncate" 
+                       onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
+                       title="Click to view full notion statement">
+                      <span className="font-bold">Notion:</span> {state.deliberation.notion}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -408,7 +415,7 @@ const OptimizedDeliberationChat = () => {
           </div>
 
           {/* Content Modal */}
-          {state.deliberation.description && (
+          {(state.deliberation.description || state.deliberation.notion) && (
             <Dialog open={state.isDescriptionOpen} onOpenChange={(open) => setState(prev => ({ ...prev, isDescriptionOpen: open }))}>
               <DialogContent className="max-w-none w-screen h-screen p-6 sm:p-10 overflow-hidden">
                 <div className="w-full h-full flex items-center justify-center">
