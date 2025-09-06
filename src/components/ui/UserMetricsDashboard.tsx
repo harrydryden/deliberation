@@ -202,9 +202,9 @@ export const UserMetricsDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.totalMessages}</div>
-            <p className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               Total messages across all deliberations
-            </p>
+            </span>
           </CardContent>
         </Card>
 
@@ -215,9 +215,9 @@ export const UserMetricsDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.ibisSubmissions}</div>
-            <p className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               Messages shared to knowledge map
-            </p>
+            </span>
           </CardContent>
         </Card>
 
@@ -228,9 +228,9 @@ export const UserMetricsDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{satisfactionRate.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               Of your messages rated as helpful
-            </p>
+            </span>
           </CardContent>
         </Card>
 
@@ -241,9 +241,9 @@ export const UserMetricsDashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.participatingDeliberations}</div>
-            <p className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               Deliberations participated in
-            </p>
+            </span>
           </CardContent>
         </Card>
       </div>
@@ -287,9 +287,9 @@ export const UserMetricsDashboard: React.FC = () => {
                 </div>
 
                 <div className="pt-2 border-t">
-                  <p className="text-sm text-muted-foreground">
+                  <span className="text-sm text-muted-foreground">
                     Total: {metrics.ratingsReceived.total} ratings on your messages
-                  </p>
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -324,9 +324,9 @@ export const UserMetricsDashboard: React.FC = () => {
                 </div>
 
                 <div className="pt-2 border-t">
-                  <p className="text-sm text-muted-foreground">
+                  <span className="text-sm text-muted-foreground">
                     Total: {metrics.ratingsGiven.total} ratings you've given
-                  </p>
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -344,15 +344,15 @@ export const UserMetricsDashboard: React.FC = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center p-4 bg-muted/50 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">{metrics.totalMessages}</p>
-                  <p className="text-sm text-muted-foreground">Total Messages</p>
+                  <div className="text-2xl font-bold text-primary">{metrics.totalMessages}</div>
+                  <span className="text-sm text-muted-foreground">Total Messages</span>
                 </div>
                 
                 <div className="text-center p-4 bg-muted/50 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">
+                  <div className="text-2xl font-bold text-primary">
                     {metrics.totalMessages > 0 ? ((metrics.ibisSubmissions / metrics.totalMessages) * 100).toFixed(0) : 0}%
-                  </p>
-                  <p className="text-sm text-muted-foreground">Contribution Rate</p>
+                  </div>
+                  <span className="text-sm text-muted-foreground">Contribution Rate</span>
                 </div>
               </div>
 
