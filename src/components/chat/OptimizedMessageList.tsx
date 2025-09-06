@@ -104,9 +104,6 @@ const OptimizedMessageItem = memo(({
   return (
     <div className="pb-4">
       <div className="flex gap-3">
-        <div className="text-xs text-red-500 absolute -left-20">
-          Debug: Message {message.id.substring(0, 8)} - {message.message_type}
-        </div>
         <Avatar className="h-8 w-8">
           <AvatarFallback className={isUser ? 'bg-primary' : agentInfo?.color || 'bg-muted-foreground'}>
             {isUser ? (
@@ -167,13 +164,6 @@ export const OptimizedMessageList = memo(({
   deliberationId, 
   agentConfigs 
 }: MessageListProps) => {
-  console.log('OptimizedMessageList: Received props', {
-    messagesCount: messages?.length || 0,
-    isLoading,
-    isTyping,
-    deliberationId,
-    messages: messages?.map(m => ({ id: m.id, type: m.message_type, content: m.content?.substring(0, 30) }))
-  });
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [unreadIndex, setUnreadIndex] = useState<number | null>(null);
@@ -278,9 +268,6 @@ export const OptimizedMessageList = memo(({
         </div>
       ) : (
         <>
-          <div className="mb-2 text-xs text-muted-foreground">
-            Debug: {messages.length} messages to render
-          </div>
           <Virtuoso
             ref={virtuosoRef}
             className="h-full"

@@ -136,7 +136,6 @@ export const useAdminData = () => {
   const fetchStats = useCallback(async () => {
     // Only fetch stats if the user is an admin
     if (!isAdmin) {
-      console.log('Skipping stats fetch - user is not admin');
       setStats(null);
       setLoadingStats(false);
       return;

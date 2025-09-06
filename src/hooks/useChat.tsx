@@ -50,28 +50,22 @@ export const useChat = (deliberationId?: string) => {
   // Stable callback references to prevent infinite loops
   const stableLoadChatHistory = useCallback(async () => {
     if (!user) {
-      console.log('useChat: No user found, skipping loadChatHistory');
       return;
     }
 
-    console.log('useChat: Starting loadChatHistory', { deliberationId, userId: user.id });
     setChatState(prev => ({ ...prev, isLoading: true }));
     
     await handleAsyncError(async () => {
-      console.log('useChat: About to call messageService.getMessages with deliberationId:', deliberationId);
       const data = await cacheService.memoizeAsync(
         'chat-history',
         [deliberationId, user.id],
         () => {
-          console.log('useChat: Inside cache function, calling getMessages');
           return services.messageService.getMessages(deliberationId);
         },
         { ttl: 60000 }
       );
       
-      console.log('useChat: Got raw data from messageService:', data);
       const convertedMessages = convertApiMessagesToChatMessages(data || []);
-      console.log('useChat: Converted messages:', convertedMessages);
       
       setChatState(prev => ({ 
         ...prev, 
@@ -129,7 +123,6 @@ export const useChat = (deliberationId?: string) => {
     if (!authLoading && user) {
       // Clear cache to ensure fresh data
       cacheService.clearNamespace('chat-history');
-      console.log('useChat: useEffect triggered, about to load chat history');
       stableLoadChatHistory();
       stableSetupRealTimeUpdates();
     }

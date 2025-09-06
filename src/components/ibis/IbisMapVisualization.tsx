@@ -661,14 +661,6 @@ const { user, isAdmin } = useSupabaseAuth();
     const canvasHeight = 1000;
     const center = { x: canvasWidth / 2, y: canvasHeight / 2 };
     
-    if (process.env.NODE_ENV === 'development') {
-      logger.debug('🎯 Rendering zones:', {
-        zones,
-        reactFlowBounds,
-        center
-      });
-    }
-    
     return (
       <>
         {/* Zone background circles as ReactFlow Panel */}

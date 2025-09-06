@@ -105,13 +105,6 @@ export const applyConcentricLayout = (
     uncategorized: nodes.filter(n => n.node_type === 'uncategorized').length
   };
   
-  console.log('🎯 Zone layout - Starting calculation:', {
-    canvas,
-    center,
-    nodeTypeCounts,
-    totalNodes: nodes.length
-  });
-  
   const zones = calculateZoneBoundaries(canvas, nodeTypeCounts);
   if (process.env.NODE_ENV === 'development') {  
     logger.debug('Zone boundaries calculated:', zones);

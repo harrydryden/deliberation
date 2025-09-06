@@ -87,24 +87,14 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
       
       logger.component.update('DocumentUpload', { action: 'uploadStart', fileName });
       
-      console.log('DocumentUpload: Starting file upload to storage');
-      console.log('DocumentUpload: File details:', {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        extension: fileExt
-      });
-      
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('documents')
         .upload(fileName, file);
 
       if (uploadError) {
-        console.error('DocumentUpload: Storage upload failed:', uploadError);
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
-      console.log('DocumentUpload: Storage upload successful:', uploadData);
       setUploadProgress(50);
       setProcessingStatus('Creating secure access URL for processing...');
 
@@ -115,22 +105,13 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         .createSignedUrl(uploadData.path, 600); // 10 minute expiry
 
       if (signErr || !signed?.signedUrl) {
-        console.error('Failed to create signed URL:', signErr);
         throw new Error('Failed to create signed URL for processing');
       }
 
-      // Debug: Log the exact URL being sent
-      console.log('Upload path:', uploadData.path);
-      console.log('Signed URL created:', signed.signedUrl);
-      console.log('URL length:', signed.signedUrl.length);
-      console.log('URL starts with http:', signed.signedUrl.startsWith('http'));
-      
       // Validate the URL format
       try {
         new URL(signed.signedUrl);
-        console.log('URL validation: PASSED');
       } catch (urlError) {
-        console.error('URL validation: FAILED', urlError);
         throw new Error('Generated signed URL is invalid');
       }
 
@@ -148,16 +129,6 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         // In production, this should come from the agent's deliberation context
         const deliberationId = `default-${user.id}`; // Create a unique default deliberation
         
-        console.log('DocumentUpload: About to call robust PDF processor with parameters:', {
-          fileUrl: signed.signedUrl,
-          fileName: file.name,
-          deliberationId: deliberationId,
-          userId: user.id,
-          urlLength: signed.signedUrl.length,
-          urlStartsWith: signed.signedUrl.startsWith('https://'),
-          urlContains: signed.signedUrl.includes('supabase')
-        });
-        
         try {
           const response = await supabase.functions.invoke('robust-pdf-processor', {
             body: {
@@ -168,18 +139,10 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
             }
           });
           
-          console.log('DocumentUpload: Robust PDF processor response received:', {
-            hasData: !!response.data,
-            hasError: !!response.error,
-            errorMessage: response.error?.message,
-            dataKeys: response.data ? Object.keys(response.data) : []
-          });
-          
           processResult = response.data;
           processError = response.error;
           
         } catch (invokeError) {
-          console.error('DocumentUpload: Robust PDF processor invocation failed:', invokeError);
           processError = invokeError;
           processResult = null;
         }
