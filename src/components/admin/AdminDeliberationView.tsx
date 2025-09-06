@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Calendar, Users, Eye, Bot, User, FileText, Workflow, ChevronDown, ChevronRight } from 'lucide-react';
+import { Layout } from '@/components/layout/Layout';
 import { formatToUKDate, formatToUKTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { MarkdownMessage } from '@/components/common/MarkdownMessage';
@@ -185,7 +186,8 @@ export const AdminDeliberationView = () => {
     active: 'default',
     completed: 'outline'
   } as const;
-  return <div className="container mx-auto px-4 py-6 max-w-4xl">
+  return <Layout>
+    <div className="container mx-auto px-4 py-6 max-w-4xl">
       {/* Header */}
       <Card className="mb-4">
         <CardHeader className="py-[2px]">
@@ -324,5 +326,6 @@ export const AdminDeliberationView = () => {
             </div>}
         </CardContent>
       </Card>
-    </div>;
+    </div>
+  </Layout>;
 };
