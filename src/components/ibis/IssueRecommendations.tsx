@@ -72,16 +72,23 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
   // Handle issue selection
   const handleIssueSelect = (issueId: string) => {
+    console.log('🟠 ISSUE SELECT CALLED:', {issueId, currentSelected: Array.from(selectedIssues)});
+    
     const newSelected = new Set(selectedIssues);
     const newRelTypes = new Map(issueRelationshipTypes);
     
     if (newSelected.has(issueId)) {
       newSelected.delete(issueId);
       newRelTypes.delete(issueId);
+      console.log('🟠 DESELECTING ISSUE:', issueId);
     } else {
       newSelected.add(issueId);
       newRelTypes.set(issueId, 'addresses'); // Default relationship type
+      console.log('🟠 SELECTING ISSUE:', issueId, 'with default type: addresses');
     }
+    
+    console.log('🟠 NEW SELECTED ISSUES:', Array.from(newSelected));
+    console.log('🟠 NEW RELATIONSHIP TYPES:', Array.from(newRelTypes.entries()));
     
     setSelectedIssues(newSelected);
     setIssueRelationshipTypes(newRelTypes);
@@ -94,15 +101,19 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
   // Handle relationship type change
   const handleRelationshipTypeChange = (issueId: string, relationshipType: string) => {
-    console.log('🟠 MANUAL CONNECTION UPDATE:', {index: 0, field: 'relationshipType', value: relationshipType});
+    console.log('🟠 MANUAL CONNECTION UPDATE:', {issueId, relationshipType});
     const newRelTypes = new Map(issueRelationshipTypes);
     newRelTypes.set(issueId, relationshipType);
+    console.log('🟠 UPDATED RELATIONSHIP TYPES:', Array.from(newRelTypes.entries()));
     setIssueRelationshipTypes(newRelTypes);
   };
 
   // Notify parent when relationships change
   useEffect(() => {
     console.log('🟠 UPDATING PARENT WITH RELATIONSHIPS');
+    console.log('🟠 Current selectedIssues:', Array.from(selectedIssues));
+    console.log('🟠 Current issueRelationshipTypes:', Array.from(issueRelationshipTypes.entries()));
+    
     if (onRelationshipsChange) {
       const relationships = Array.from(selectedIssues).map(issueId => ({
         id: issueId,
