@@ -32,9 +32,9 @@ export class MessageService implements IMessageService {
 
       const messageData = {
         content: content.trim(),
-        messageType: messageType as any,
-        userId: userId,
-        deliberationId: deliberationId,
+        message_type: messageType as any,
+        user_id: userId,
+        deliberation_id: deliberationId,
       } as any;
 
       const message = await this.messageRepository.create(messageData);
