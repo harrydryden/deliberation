@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Lightbulb, CheckCircle } from "lucide-react";
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { EnhancedRelationshipSelector } from './EnhancedRelationshipSelector';
+import { ManualNodeSelector } from './ManualNodeSelector';
 import { useStanceService } from '@/hooks/useServices';
 import { IssueRecommendations } from '@/components/ibis/IssueRecommendations';
 interface IbisSubmissionModalProps {
@@ -161,13 +161,8 @@ export const IbisSubmissionModal = ({
     }));
   };
 
-  const handleRelationshipsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
-    console.log('🔗 RELATIONSHIPS CHANGED FROM EnhancedRelationshipSelector:', relationships);
-    setSelectedRelationships(relationships);
-  };
-
   const handleIssueRecommendationsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
-    console.log('🔗 RELATIONSHIPS CHANGED FROM IssueRecommendations:', relationships);
+    console.log('🔗 RELATIONSHIPS CHANGED:', relationships);
     console.log('🔗 SETTING SELECTED RELATIONSHIPS IN MODAL STATE');
     setSelectedRelationships(relationships);
     console.log('🔗 AFTER SETTING - selectedRelationships length:', relationships.length);
@@ -573,71 +568,38 @@ export const IbisSubmissionModal = ({
                     onRelationshipsChange={handleIssueRecommendationsChange}
                   />
                   
-                  {/* Manual Selection Dropdown */}
-                  <div className="mt-3">
-                    <Label htmlFor="manualNodeSelection" className="text-xs">Or select manually:</Label>
-                    <Select onValueChange={(value) => value !== 'none' && handleIssueSelected(value)}>
-                      <SelectTrigger id="manualNodeSelection" className="mt-1 bg-background border-border z-50">
-                        <SelectValue placeholder="Choose an existing item to link to" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background border-border shadow-lg z-50 max-h-60">
-                        <SelectItem value="none">
-                          <span className="text-muted-foreground">No connection</span>
-                        </SelectItem>
-                        {existingNodes.map((node) => (
-                          <SelectItem key={node.id} value={node.id}>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">
-                                {node.node_type}
-                              </Badge>
-                              <span className="truncate">{node.title}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* Manual Node Selection */}
+                  <div className="mt-4 p-4 border border-dashed border-muted/30 rounded-lg">
+                    <ManualNodeSelector
+                      existingNodes={existingNodes}
+                      onConnectionsChange={handleIssueRecommendationsChange}
+                    />
                   </div>
+
+                  {/* Summary of selected connections */}
+                  {selectedRelationships.length > 0 && (
+                    <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                      <h6 className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-primary" />
+                        Ready to Create {selectedRelationships.length} Connection{selectedRelationships.length > 1 ? 's' : ''}
+                      </h6>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        These connections will be established when you click "Share":
+                      </p>
+                      <div className="space-y-1">
+                        {selectedRelationships.map((rel, index) => (
+                          <div key={`${rel.id}-${rel.type}`} className="flex items-center gap-2 text-xs">
+                            <span className="font-medium text-primary">#{index + 1}</span>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="font-medium">{rel.type.replace(/_/g, ' ')}</span>
+                            <span className="text-muted-foreground">connection</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-
-              {/* Enhanced Relationship Selector with 3-connection limit */}
-              <div className="space-y-4 p-4 border border-dashed border-primary/30 rounded-lg bg-primary/5">
-                <h5 className="text-sm font-medium text-foreground mb-2">
-                  🔗 Smart Connections (Select up to 3)
-                </h5>
-                
-                {/* AI-powered relationship analysis */}
-                <EnhancedRelationshipSelector
-                  deliberationId={deliberationId}
-                  content={formData.description || messageContent}
-                  title={formData.title || "New contribution"}
-                  nodeType={(formData.nodeType || 'issue') as 'issue' | 'position' | 'argument'}
-                  onRelationshipsChange={handleRelationshipsChange}
-                />
-                
-                {/* Summary of selected connections to be created on submit */}
-                {selectedRelationships.length > 0 && (
-                  <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                    <h6 className="text-sm font-medium mb-2 flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-primary" />
-                      Ready to Create {selectedRelationships.length} Connection{selectedRelationships.length > 1 ? 's' : ''}
-                    </h6>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      These connections will be established when you click "Share":
-                    </p>
-                    <div className="space-y-1">
-                      {selectedRelationships.map((rel, index) => (
-                        <div key={`${rel.id}-${rel.type}`} className="flex items-center gap-2 text-xs">
-                          <span className="font-medium text-primary">#{index + 1}</span>
-                          <span className="text-muted-foreground">→</span>
-                          <span className="font-medium">{rel.type.replace(/_/g, ' ')}</span>
-                          <span className="text-muted-foreground">connection</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
