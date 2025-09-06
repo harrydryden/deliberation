@@ -1,14 +1,7 @@
-import { formatAnonymizedTime, anonymizeTimestamp, ANONYMITY_CONFIG } from './anonymityUtils';
-
 /**
- * Display timestamps with privacy-enhanced formatting
+ * Display timestamps with standard formatting
  */
 export const formatMessageTime = (timestamp: string | Date): string => {
-  if (!ANONYMITY_CONFIG.USE_PRECISE_TIMESTAMPS) {
-    return formatAnonymizedTime(timestamp);
-  }
-  
-  // Fallback to regular formatting if precise timestamps are enabled
   const date = new Date(timestamp);
   return date.toLocaleTimeString([], { 
     hour: '2-digit', 
@@ -17,11 +10,10 @@ export const formatMessageTime = (timestamp: string | Date): string => {
 };
 
 /**
- * Format timestamps for anonymized display (rounded to hour)
+ * Format timestamps for standard display
  */
-export const formatAnonymizedTimestamp = (timestamp: string | Date): string => {
-  const anonymized = anonymizeTimestamp(timestamp);
-  return new Date(anonymized).toLocaleString([], {
+export const formatTimestamp = (timestamp: string | Date): string => {
+  return new Date(timestamp).toLocaleString([], {
     month: 'short',
     day: 'numeric', 
     hour: '2-digit',

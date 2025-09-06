@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { Activity, Clock, Users, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { formatSessionActivity, formatAnonymizedTimestamp } from '@/utils/timeDisplay';
+import { formatSessionActivity, formatTimestamp } from '@/utils/timeDisplay';
 
 interface UserSession {
   id: string;
@@ -183,8 +183,8 @@ export const SessionsManagement: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                      <span>Created: {formatAnonymizedTimestamp(session.created_at)}</span>
-                      <span>Expires: {formatAnonymizedTimestamp(session.expires_at)}</span>
+                      <span>Created: {formatTimestamp(session.created_at)}</span>
+                      <span>Expires: {formatTimestamp(session.expires_at)}</span>
                       <span>Session: {session.session_token_hash.slice(0, 8)}...</span>
                     </div>
                   </div>
