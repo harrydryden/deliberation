@@ -11,8 +11,13 @@ export function PasswordSyncButton() {
   const syncPasswords = async () => {
     setIsLoading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
       const { data, error } = await supabase.functions.invoke('sync-user-passwords', {
-        body: {}
+        body: {},
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        }
       });
 
       if (error) throw error;
