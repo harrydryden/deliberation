@@ -227,159 +227,29 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
     }
   };
 
-  if (!suggestions.length && !loading && evaluated) {
-    // Show manual connection interface when no AI suggestions
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Label className="flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            Manual Connections
-          </Label>
-          <Badge variant="secondary" className="text-xs">
-            {manualConnections.filter(c => c.nodeId && c.relationshipType).length}/{MAX_CONNECTIONS}
-          </Badge>
-        </div>
-        
-        {manualConnections.length === 0 && (
-          <div className="text-sm text-muted-foreground">
-            No AI suggestions available. Add manual connections below.
-          </div>
-        )}
-        
-        {/* Manual connection forms */}
-        <div className="space-y-3">
-          {manualConnections.map((connection, index) => (
-            <Card key={index} className="p-3">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Connection #{index + 1}</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeManualConnection(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs">Connect to</Label>
-                    <Select
-                      value={connection.nodeId}
-                      onValueChange={(value) => updateManualConnection(index, 'nodeId', value)}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Select node" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background border border-border shadow-lg z-50">
-                        {existingNodes.map(node => (
-                          <SelectItem key={node.id} value={node.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{getNodeTypeIcon(node.node_type)}</span>
-                              <span className="truncate">{node.title}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-xs">Relationship</Label>
-                    <Select
-                      value={connection.relationshipType}
-                      onValueChange={(value) => updateManualConnection(index, 'relationshipType', value)}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background border border-border shadow-lg z-50">
-                        <SelectItem value="supports">Supports</SelectItem>
-                        <SelectItem value="opposes">Opposes</SelectItem>
-                        <SelectItem value="addresses">Addresses</SelectItem>
-                        <SelectItem value="relates_to">Relates To</SelectItem>
-                        <SelectItem value="builds_on">Builds On</SelectItem>
-                        <SelectItem value="questions">Questions</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-        
-        {manualConnections.length < MAX_CONNECTIONS && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={addManualConnection}
-            className="flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add Connection
-          </Button>
-        )}
-      </div>
-    );
-  }
-
-  if (!suggestions.length && !loading && !evaluated) {
-    return (
-      <div className="space-y-3">
-        <Label className="flex items-center gap-2">
-          <Brain className="h-4 w-4" />
-          Smart Connections
-        </Label>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={evaluateRelationships}
-          className="flex items-center gap-2"
-        >
-          <Zap className="h-3 w-3" />
-          Analyze Content
-        </Button>
-        
-        {/* Allow manual connections even before AI analysis */}
-        <div className="mt-4">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={addManualConnection}
-            className="flex items-center gap-2 text-muted-foreground"
-          >
-            <Plus className="h-4 w-4" />
-            Add Manual Connection
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
+  // Always show connection interface regardless of AI status
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Label className="flex items-center gap-2">
           <Brain className="h-4 w-4" />
-          Smart Connections ({suggestions.length} found)
+          Connect to Existing Items
         </Label>
         <div className="flex items-center gap-2">
-          {selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length}/{MAX_CONNECTIONS} selected
-            </Badge>
-          )}
-          {selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length >= MAX_CONNECTIONS && (
-            <Badge variant="outline" className="text-xs text-amber-600">
-              Max reached
-            </Badge>
+          <Badge variant="secondary" className="text-xs">
+            {selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length}/{MAX_CONNECTIONS}
+          </Badge>
+          {!evaluated && !loading && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={evaluateRelationships}
+              className="flex items-center gap-2"
+            >
+              <Zap className="h-3 w-3" />
+              Get AI Suggestions
+            </Button>
           )}
         </div>
       </div>
@@ -391,169 +261,177 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
         </div>
       )}
 
-      <div className="space-y-2 max-h-60 overflow-y-auto">
-        {suggestions.slice(0, 8).map((suggestion, index) => {
-          const key = `${suggestion.nodeId}-${suggestion.relationshipType}`;
-          const isSelected = selectedRelationships.has(key);
-          const totalConnections = selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length;
-          const canSelect = totalConnections < MAX_CONNECTIONS || isSelected;
-          
-          return (
-            <Card
-              key={key}
-              className={`cursor-pointer transition-all hover:shadow-sm ${
-                isSelected 
-                  ? 'ring-2 ring-primary bg-primary/5' 
-                  : canSelect 
-                    ? 'hover:border-primary/50'
-                    : 'opacity-60 cursor-not-allowed hover:border-border'
-              }`}
-              onClick={() => canSelect && toggleRelationship(suggestion)}
-            >
-              <CardContent className="p-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 mt-1">
-                    {isSelected ? (
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
-                    ) : canSelect ? (
-                      <div className="h-4 w-4 rounded-full border-2 border-border hover:border-primary transition-colors" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">{getNodeTypeIcon(suggestion.nodeType)}</span>
-                      <span className="font-medium text-sm truncate">
-                        {suggestion.nodeTitle}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge 
-                        variant="outline" 
-                        className={`text-xs ${getRelationshipColor(suggestion.relationshipType)}`}
-                      >
-                        <ArrowRight className="h-3 w-3 mr-1" />
-                        {formatRelationshipType(suggestion.relationshipType)}
-                      </Badge>
-                      <Badge variant="outline" className={`text-xs ${getConfidenceColor(suggestion.confidence)}`}>
-                        {Math.round(suggestion.confidence * 100)}% confidence
-                      </Badge>
-                    </div>
-                    
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {suggestion.reasoning}
-                    </p>
-                    
-                    {suggestion.semanticSimilarity && (
-                      <div className="mt-1">
-                        <Badge variant="secondary" className="text-xs">
-                          {Math.round(suggestion.semanticSimilarity * 100)}% similarity
-                        </Badge>
+      {/* AI Suggestions Section */}
+      {suggestions.length > 0 && (
+        <div className="space-y-3">
+          <Label className="text-sm font-medium">AI Suggestions</Label>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {suggestions.slice(0, 8).map((suggestion, index) => {
+              const key = `${suggestion.nodeId}-${suggestion.relationshipType}`;
+              const isSelected = selectedRelationships.has(key);
+              const totalConnections = selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length;
+              const canSelect = totalConnections < MAX_CONNECTIONS || isSelected;
+              
+              return (
+                <Card
+                  key={key}
+                  className={`cursor-pointer transition-all hover:shadow-sm ${
+                    isSelected 
+                      ? 'ring-2 ring-primary bg-primary/5' 
+                      : canSelect 
+                        ? 'hover:border-primary/50'
+                        : 'opacity-60 cursor-not-allowed hover:border-border'
+                  }`}
+                  onClick={() => canSelect && toggleRelationship(suggestion)}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-1">
+                        {isSelected ? (
+                          <CheckCircle2 className="h-4 w-4 text-primary" />
+                        ) : canSelect ? (
+                          <div className="h-4 w-4 rounded-full border-2 border-border hover:border-primary transition-colors" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {suggestions.length === 0 && evaluated && !loading && (
-        <div className="text-center py-4 text-sm text-muted-foreground">
-          No meaningful relationships detected with existing content.
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">{getNodeTypeIcon(suggestion.nodeType)}</span>
+                          <span className="font-medium text-sm truncate">
+                            {suggestion.nodeTitle}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs ${getRelationshipColor(suggestion.relationshipType)}`}
+                          >
+                            <ArrowRight className="h-3 w-3 mr-1" />
+                            {formatRelationshipType(suggestion.relationshipType)}
+                          </Badge>
+                          <Badge variant="outline" className={`text-xs ${getConfidenceColor(suggestion.confidence)}`}>
+                            {Math.round(suggestion.confidence * 100)}% confidence
+                          </Badge>
+                        </div>
+                        
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {suggestion.reasoning}
+                        </p>
+                        
+                        {suggestion.semanticSimilarity && (
+                          <div className="mt-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {Math.round(suggestion.semanticSimilarity * 100)}% similarity
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Manual connections section when AI suggestions exist */}
-      {suggestions.length > 0 && manualConnections.filter(c => c.nodeId && c.relationshipType).length < MAX_CONNECTIONS - selectedRelationships.size && (
-        <div className="mt-4">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={addManualConnection}
-            className="flex items-center gap-2 text-muted-foreground"
-          >
-            <Plus className="h-4 w-4" />
-            Add Manual Connection
-          </Button>
+      {/* Manual Connections Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-medium">Manual Connections</Label>
+          {manualConnections.filter(c => c.nodeId && c.relationshipType).length < MAX_CONNECTIONS - selectedRelationships.size && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addManualConnection}
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Connection
+            </Button>
+          )}
         </div>
-      )}
 
-      {manualConnections.length > 0 && (
-        <div className="space-y-2">
-          <Label className="text-sm">Manual Connections</Label>
-          {manualConnections.map((connection, index) => (
-            <Card key={index} className="p-3 bg-muted/20">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs">Connection #{index + 1}</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeManualConnection(index)}
+        {manualConnections.length === 0 && (
+          <div className="text-sm text-muted-foreground">
+            {existingNodes.length === 0 ? 'No existing items to connect to.' : 'Click "Add Connection" to manually link to existing items.'}
+          </div>
+        )}
+
+        {manualConnections.map((connection, index) => (
+          <Card key={index} className="p-3 bg-muted/20">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Connection #{index + 1}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeManualConnection(index)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Connect to</Label>
+                  <Select
+                    value={connection.nodeId}
+                    onValueChange={(value) => updateManualConnection(index, 'nodeId', value)}
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Select item" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border border-border shadow-lg z-50">
+                      {existingNodes.map(node => (
+                        <SelectItem key={node.id} value={node.id}>
+                          <div className="flex items-center gap-2">
+                            <span>{getNodeTypeIcon(node.node_type)}</span>
+                            <span className="truncate">{node.title}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs">Connect to</Label>
-                    <Select
-                      value={connection.nodeId}
-                      onValueChange={(value) => updateManualConnection(index, 'nodeId', value)}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Select node" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background border border-border shadow-lg z-50">
-                        {existingNodes.map(node => (
-                          <SelectItem key={node.id} value={node.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{getNodeTypeIcon(node.node_type)}</span>
-                              <span className="truncate">{node.title}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label className="text-xs">Relationship</Label>
-                    <Select
-                      value={connection.relationshipType}
-                      onValueChange={(value) => updateManualConnection(index, 'relationshipType', value)}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background border border-border shadow-lg z-50">
-                        <SelectItem value="supports">Supports</SelectItem>
-                        <SelectItem value="opposes">Opposes</SelectItem>
-                        <SelectItem value="addresses">Addresses</SelectItem>
-                        <SelectItem value="relates_to">Relates To</SelectItem>
-                        <SelectItem value="builds_on">Builds On</SelectItem>
-                        <SelectItem value="questions">Questions</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div>
+                  <Label className="text-xs">Relationship</Label>
+                  <Select
+                    value={connection.relationshipType}
+                    onValueChange={(value) => updateManualConnection(index, 'relationshipType', value)}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border border-border shadow-lg z-50">
+                      <SelectItem value="supports">Supports</SelectItem>
+                      <SelectItem value="opposes">Opposes</SelectItem>
+                      <SelectItem value="addresses">Addresses</SelectItem>
+                      <SelectItem value="relates_to">Relates To</SelectItem>
+                      <SelectItem value="builds_on">Builds On</SelectItem>
+                      <SelectItem value="questions">Questions</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-            </Card>
-          ))}
-        </div>
-      )}
+            </div>
+          </Card>
+        ))}
+      </div>
 
-      {selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length > 0 && (
+      {/* Summary of selected connections */}
+      {(selectedRelationships.size > 0 || manualConnections.filter(c => c.nodeId && c.relationshipType).length > 0) && (
         <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-          <h6 className="text-sm font-medium mb-2">Selected Connections ({selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length}/{MAX_CONNECTIONS})</h6>
+          <h6 className="text-sm font-medium mb-2 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-primary" />
+            Selected Connections ({selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length}/{MAX_CONNECTIONS})
+          </h6>
           <div className="space-y-1 text-xs text-muted-foreground">
             {suggestions
               .filter(s => selectedRelationships.has(`${s.nodeId}-${s.relationshipType}`))
