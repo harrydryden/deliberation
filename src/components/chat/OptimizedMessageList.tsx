@@ -104,21 +104,47 @@ const OptimizedMessageItem = memo(({
   }, [onRetry, message.id, message.content]);
 
   return (
-    <div className="pb-4" style={{ minHeight: '80px', border: '1px solid green', backgroundColor: 'rgba(0,255,0,0.1)' }}>
-      <div style={{ padding: '8px', fontSize: '12px', color: 'red', backgroundColor: 'yellow' }}>
-        DEBUG: Message {message.id} - {message.message_type} - Content: {message.content?.substring(0, 50)}
-      </div>
-      
-      {/* Simplified rendering for debugging */}
-      <div style={{ padding: '16px', border: '2px solid blue', margin: '8px', backgroundColor: 'white' }}>
-        <div style={{ fontWeight: 'bold', color: 'black' }}>
-          {isUser ? 'You' : `Agent (${message.message_type})`}
-        </div>
-        <div style={{ color: 'black', marginTop: '8px', whiteSpace: 'pre-wrap' }}>
-          {message.content}
-        </div>
-        <div style={{ fontSize: '10px', color: 'gray', marginTop: '4px' }}>
-          {formatMessageTime(message.created_at)}
+    <div className="pb-4">
+      <div className="flex gap-3">
+        <Avatar className="h-8 w-8">
+          <AvatarFallback className={isUser ? 'bg-primary' : agentInfo?.color || 'bg-muted-foreground'}>
+            {isUser ? (
+              <User className="h-4 w-4 text-white" />
+            ) : (
+              <AgentIcon className="h-4 w-4 text-white" />
+            )}
+          </AvatarFallback>
+        </Avatar>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-medium">
+              {isUser ? 'You' : (agentInfo?.name || 'Assistant')}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {formatMessageTime(message.created_at)}
+            </span>
+          </div>
+          
+          <Card className="p-3 bg-card">
+            <Suspense fallback={<Skeleton className="h-4 w-full" />}>
+              <LazyMarkdownMessage content={message.content} />
+            </Suspense>
+          </Card>
+          
+          {!isUser && deliberationId && (
+            <div className="mt-2 flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddToIbis}
+                className="text-xs"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Add to IBIS
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -172,22 +198,16 @@ export const OptimizedMessageList = memo(({
   // Optimize renderItem with stable dependencies
   const renderItem = createOptimizedCallback(
     (index: number, message: ChatMessage) => {
-      console.log('renderItem called:', { index, messageId: message.id, messageType: message.message_type });
       return (
-        <div style={{ border: '1px solid blue', margin: '2px', padding: '4px' }}>
-          <div style={{ fontSize: '10px', color: 'red' }}>
-            Debug: Item {index} - {message.id} - {message.message_type}
-          </div>
-          <OptimizedMessageItem
-            message={message}
-            index={index}
-            unreadIndex={unreadIndex}
-            onAddToIbis={onAddToIbis}
-            onRetry={onRetry}
-            agentConfigsMap={agentConfigsMap}
-            deliberationId={deliberationId}
-          />
-        </div>
+        <OptimizedMessageItem
+          message={message}
+          index={index}
+          unreadIndex={unreadIndex}
+          onAddToIbis={onAddToIbis}
+          onRetry={onRetry}
+          agentConfigsMap={agentConfigsMap}
+          deliberationId={deliberationId}
+        />
       );
     },
     [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId],
@@ -262,12 +282,9 @@ export const OptimizedMessageList = memo(({
         </div>
       ) : (
         <>
-          <div className="mb-4 p-2 bg-muted rounded text-xs">
-            Debug: Rendering Virtuoso with {messages.length} messages
-          </div>
           <Virtuoso
             ref={virtuosoRef}
-            className="h-full border-2 border-red-500"
+            className="h-full"
             data={messages}
             initialTopMostItemIndex={Math.max(0, messages.length - 1)}
             followOutput="auto"

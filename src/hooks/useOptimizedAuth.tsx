@@ -20,25 +20,12 @@ export const useOptimizedAuth = () => {
   });
 
   // Stable callback for checking admin status
-  const checkAdminStatus = useCallback(async (userId: string) => {
+  const checkAdminStatus = useCallback(async (userId: string, userEmail?: string) => {
     try {
-      // Ensure profile exists first
-      await supabase
-        .from('profiles')
-        .upsert({ 
-          id: userId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          is_archived: false
-        });
-      
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('user_role')
-        .eq('id', userId)
-        .single();
-      
-      return profile?.user_role === 'admin' || false;
+      // Simple email-based admin check (no database required)
+      const isAdminUser = userEmail === 'ADMIN@deliberation.local' || 
+                         userEmail === 'SUPER@deliberation.local';
+      return isAdminUser;
     } catch (error) {
       logger.error('Error checking admin status:', error);
       return false;
@@ -67,7 +54,7 @@ export const useOptimizedAuth = () => {
           }));
 
           // Then update admin status asynchronously
-          checkAdminStatus(session.user.id).then(isAdmin => {
+          checkAdminStatus(session.user.id, session.user.email).then(isAdmin => {
             if (mounted) {
               setAuthState(prev => ({ ...prev, isAdmin }));
             }
@@ -95,7 +82,7 @@ export const useOptimizedAuth = () => {
           isLoading: false
         }));
 
-        checkAdminStatus(session.user.id).then(isAdmin => {
+        checkAdminStatus(session.user.id, session.user.email).then(isAdmin => {
           if (mounted) {
             setAuthState(prev => ({ ...prev, isAdmin }));
           }
