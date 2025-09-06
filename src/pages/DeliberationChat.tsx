@@ -1,4 +1,5 @@
 import { useEffect, useState, lazy, Suspense, useCallback, useRef } from "react";
+import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
@@ -294,6 +295,40 @@ const OptimizedDeliberationChat = () => {
   if (!user || !state.deliberation) return null;
 
   if (isAdmin) {
+    // Test direct admin access to messages
+    const testAdminAccess = async () => {
+      try {
+        console.log('Admin test: Testing direct supabase access');
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('deliberation_id', deliberationId)
+          .order('created_at', { ascending: true });
+        
+        console.log('Admin test results:', { data, error, count: data?.length });
+        
+        // Test auth status
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log('Admin test auth:', { user: user?.email, id: user?.id });
+        
+        // Test profile check  
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('user_role')
+          .eq('id', user?.id)
+          .single();
+        console.log('Admin test profile:', { profile });
+        
+      } catch (e) {
+        console.error('Admin test error:', e);
+      }
+    };
+
+    // Run test on mount
+    React.useEffect(() => {
+      testAdminAccess();
+    }, []);
+
     return (
       <Layout>
         <div className="container mx-auto px-4 py-6 max-w-4xl">
@@ -303,6 +338,9 @@ const OptimizedDeliberationChat = () => {
               <div>
                 <h1 className="text-2xl font-bold text-primary">Admin View: {state.deliberation.title}</h1>
                 <p className="text-muted-foreground">Read-only access to all messages in chronological order</p>
+                <div className="text-xs mt-2 text-muted-foreground">
+                  Debug: isAdmin={isAdmin.toString()}, user={user?.email}, messagesCount={messages.length}
+                </div>
               </div>
               <Badge className={`${getStatusColor(state.deliberation.status)} text-white`}>
                 {state.deliberation.status}
@@ -319,12 +357,16 @@ const OptimizedDeliberationChat = () => {
             ) : messages.length === 0 ? (
               <div className="text-center p-8 text-muted-foreground">
                 No messages found in this deliberation.
-                <div className="text-xs mt-2">Debug: messages.length = {messages.length}, chatLoading = {chatLoading.toString()}</div>
+                <div className="text-xs mt-2">
+                  Debug: messages.length = {messages.length}, chatLoading = {chatLoading.toString()}
+                  <br />Auth: user_id = {user?.id}, email = {user?.email}
+                  <br />Admin check: isAdmin = {isAdmin.toString()}
+                </div>
               </div>
             ) : (
               <>
                 <div className="text-xs text-muted-foreground mb-2">
-                  Debug: Rendering {messages.length} messages
+                  Debug: Rendering {messages.length} messages for admin {user?.email}
                 </div>
                 <OptimizedMessageList 
                   messages={messages} 
