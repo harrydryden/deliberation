@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { RefreshCw, Trash2, UserCog, Copy } from 'lucide-react';
+import { RefreshCw, Archive, ArchiveRestore, UserCog } from 'lucide-react';
 import { User } from '@/types/index';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ interface UserAccessManagementProps {
   onLoadUsers: () => void;
   onArchiveUser: (userId: string, reason?: string) => void;
   onUnarchiveUser: (userId: string) => void;
+  onUpdateRole?: (userId: string, role: string) => void;
 }
 
 export const UserAccessManagement = ({ 
@@ -23,9 +24,12 @@ export const UserAccessManagement = ({
   loading, 
   onLoadUsers, 
   onArchiveUser,
-  onUnarchiveUser
+  onUnarchiveUser,
+  onUpdateRole
 }: UserAccessManagementProps) => {
   const [archivingUser, setArchivingUser] = useState<string | null>(null);
+  const [unarchivingUser, setUnarchivingUser] = useState<string | null>(null);
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null);
 
   useEffect(() => {
     if (users.length === 0 && !loading) {
@@ -43,9 +47,26 @@ export const UserAccessManagement = ({
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard');
+  const handleUnarchiveUser = async (userId: string) => {
+    setUnarchivingUser(userId);
+    try {
+      await onUnarchiveUser(userId);
+    } finally {
+      setUnarchivingUser(null);
+    }
+  };
+
+  const handleRoleUpdate = async (userId: string, newRole: string) => {
+    if (!onUpdateRole) return;
+    setUpdatingRole(userId);
+    try {
+      await onUpdateRole(userId, newRole);
+      toast.success(`User role updated to ${newRole}`);
+    } catch (error) {
+      toast.error('Failed to update user role');
+    } finally {
+      setUpdatingRole(null);
+    }
   };
 
   return (
@@ -110,9 +131,25 @@ export const UserAccessManagement = ({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                          {user.role === 'admin' ? 'Admin' : 'User'}
-                        </Badge>
+                        {onUpdateRole ? (
+                          <Select
+                            value={user.role || 'user'}
+                            onValueChange={(value) => handleRoleUpdate(user.id, value)}
+                            disabled={updatingRole === user.id || user.isArchived}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">User</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                            {user.role === 'admin' ? 'Admin' : 'User'}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
@@ -129,34 +166,64 @@ export const UserAccessManagement = ({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
+                        <div className="flex gap-2">
+                          {user.isArchived ? (
                             <Button 
-                              variant="destructive" 
+                              variant="outline" 
                               size="sm"
-                              disabled={archivingUser === user.id}
+                              disabled={unarchivingUser === user.id}
+                              onClick={() => handleUnarchiveUser(user.id)}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              {unarchivingUser === user.id ? (
+                                <LoadingSpinner size="sm" />
+                              ) : (
+                                <>
+                                  <ArchiveRestore className="h-4 w-4 mr-1" />
+                                  Unarchive
+                                </>
+                              )}
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Archive User</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will archive the user and revoke their access. Their data will be preserved but they cannot log in.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction 
-                                onClick={() => handleArchiveUser(user.id)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Archive
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                          ) : (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button 
+                                  variant="destructive" 
+                                  size="sm"
+                                  disabled={archivingUser === user.id}
+                                >
+                                  {archivingUser === user.id ? (
+                                    <LoadingSpinner size="sm" />
+                                  ) : (
+                                    <>
+                                      <Archive className="h-4 w-4 mr-1" />
+                                      Archive
+                                    </>
+                                  )}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Archive User</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will archive the user account and revoke their access. 
+                                    The user's data and participation history will be preserved, 
+                                    but they will no longer be able to access the system. 
+                                    This action can be reversed by unarchiving the user.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleArchiveUser(user.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Archive User
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
