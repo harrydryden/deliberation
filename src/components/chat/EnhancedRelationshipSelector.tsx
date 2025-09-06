@@ -252,8 +252,8 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
 
   // Always show connection interface regardless of AI status
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+      <div className="flex items-center justify-between sticky top-0 bg-background z-10 pb-2">
         <Label className="flex items-center gap-2">
           <Brain className="h-4 w-4" />
           Connect to Existing Items
@@ -288,7 +288,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
       {suggestions.length > 0 && (
         <div className="space-y-3">
           <Label className="text-sm font-medium">AI Suggestions</Label>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
              {suggestions.slice(0, 8).map((suggestion, index) => {
                const key = `${suggestion.nodeId}-${suggestion.relationshipType}`;
                const isSelected = selectedRelationships.has(key);
@@ -407,67 +407,69 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
           </div>
         )}
 
-        {manualConnections.map((connection, index) => (
-          <Card key={index} className="p-3 bg-muted/20">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm">Connection #{index + 1}</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeManualConnection(index)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">Connect to</Label>
-                  <Select
-                    value={connection.nodeId}
-                    onValueChange={(value) => updateManualConnection(index, 'nodeId', value)}
+        <div className="space-y-3 max-h-40 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+          {manualConnections.map((connection, index) => (
+            <Card key={index} className="p-3 bg-muted/20">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Connection #{index + 1}</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeManualConnection(index)}
                   >
-                    <SelectTrigger className="h-8">
-                      <SelectValue placeholder="Select item" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-background border border-border shadow-lg z-50">
-                      {existingNodes.map(node => (
-                        <SelectItem key={node.id} value={node.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{getNodeTypeIcon(node.node_type)}</span>
-                            <span className="truncate">{node.title}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
                 
-                <div>
-                  <Label className="text-xs">Relationship</Label>
-                  <Select
-                    value={connection.relationshipType}
-                    onValueChange={(value) => updateManualConnection(index, 'relationshipType', value)}
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-background border border-border shadow-lg z-50">
-                      <SelectItem value="supports">Supports</SelectItem>
-                      <SelectItem value="opposes">Opposes</SelectItem>
-                      <SelectItem value="addresses">Addresses</SelectItem>
-                      <SelectItem value="relates_to">Relates To</SelectItem>
-                      <SelectItem value="builds_on">Builds On</SelectItem>
-                      <SelectItem value="questions">Questions</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Connect to</Label>
+                    <Select
+                      value={connection.nodeId}
+                      onValueChange={(value) => updateManualConnection(index, 'nodeId', value)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Select item" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border border-border shadow-lg z-50">
+                        {existingNodes.map(node => (
+                          <SelectItem key={node.id} value={node.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{getNodeTypeIcon(node.node_type)}</span>
+                              <span className="truncate">{node.title}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label className="text-xs">Relationship</Label>
+                    <Select
+                      value={connection.relationshipType}
+                      onValueChange={(value) => updateManualConnection(index, 'relationshipType', value)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border border-border shadow-lg z-50">
+                        <SelectItem value="supports">Supports</SelectItem>
+                        <SelectItem value="opposes">Opposes</SelectItem>
+                        <SelectItem value="addresses">Addresses</SelectItem>
+                        <SelectItem value="relates_to">Relates To</SelectItem>
+                        <SelectItem value="builds_on">Builds On</SelectItem>
+                        <SelectItem value="questions">Questions</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          ))}
+        </div>
       </div>
 
        {/* Summary of selected connections */}
