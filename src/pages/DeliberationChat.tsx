@@ -262,7 +262,7 @@ const OptimizedDeliberationChat = () => {
   };
 
   // Chat panel component
-  const ChatPanel = () => (
+  const ChatPanel = useCallback(() => (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-hidden min-h-0">
         <OptimizedMessageList 
@@ -277,7 +277,7 @@ const OptimizedDeliberationChat = () => {
       </div>
       <MessageInput ref={messageInputRef} onSendMessage={sendMessage} disabled={chatLoading} />
     </div>
-  );
+  ), [messages, chatLoading, isTyping, handleAddToIbis, retryMessage, deliberationId, state.agentConfigs, sendMessage]);
 
   if (isLoading || state.loading) {
     return (
