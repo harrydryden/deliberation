@@ -1,8 +1,7 @@
 import { useEffect, useState, lazy, Suspense, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
-import { useDeliberationService } from "@/hooks/useDeliberationService";
-import { useAgentService, useMessageService } from "@/hooks/useServices";
+import { useServices } from "@/hooks/useServices";
 import { Layout } from "@/components/layout/Layout";
 import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
@@ -58,16 +57,58 @@ const DeliberationChat = () => {
   const {
     toast
   } = useToast();
-  const deliberationService = useDeliberationService();
-  const agentService = useAgentService();
-  const messageService = useMessageService();
   
-  // Memoize service hooks to prevent new objects on every render
-  const services = useMemo(() => ({
-    deliberationService,
-    agentService,
-    messageService
-  }), [deliberationService, agentService, messageService]);
+  // Use the service container directly to avoid creating new instances on every render
+  const { deliberationService: baseDeliberationService, agentService, messageService } = useServices();
+  
+  // Create a memoized wrapper for the deliberation service methods we need
+  const deliberationService = useMemo(() => ({
+    async getDeliberation(deliberationId: string) {
+      const { data, error } = await supabase
+        .from('deliberations')
+        .select(`
+          *,
+          participants(
+            user_id,
+            role,
+            joined_at
+          )
+        `)
+        .eq('id', deliberationId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) throw new Error('Deliberation not found');
+      
+      data.participant_count = data.participants?.length || 0;
+      return data;
+    },
+    
+    async joinDeliberation(deliberationId: string) {
+      if (!user) throw new Error('User not authenticated');
+      
+      const { data: existing } = await supabase
+        .from('participants')
+        .select('id')
+        .eq('deliberation_id', deliberationId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existing) return; // Already a participant
+
+      const { error } = await supabase
+        .from('participants')
+        .insert({
+          deliberation_id: deliberationId,
+          user_id: user.id,
+          role: 'participant'
+        });
+
+      if (error && !(error.code === '23505' && error.message.includes('participants_deliberation_id_user_id_key'))) {
+        throw error;
+      }
+    }
+  }), [user]);
   
   const { sessionMetrics, updateActivity } = useSessionTracking();
   const { createOptimizedCallback } = usePerformanceOptimization({
@@ -171,7 +212,7 @@ const DeliberationChat = () => {
     
     try {
       // Use message service to get user engagement metrics
-      const userMessages = await services.messageService.getUserMessages(user.id);
+      const userMessages = await messageService.getUserMessages(user.id);
       const deliberationMessages = userMessages.filter(m => m.deliberation_id === deliberationId);
       const ibisSubmissions = deliberationMessages.filter(m => m.submitted_to_ibis);
 
@@ -220,7 +261,7 @@ const DeliberationChat = () => {
         stanceScore: 0
       });
     }  
-  }, [user?.id, deliberationId, services.messageService, sessionMetrics]);
+  }, [user?.id, deliberationId, messageService, sessionMetrics]);
 
   const loadAgentConfigs = useCallback(async () => {
     if (!deliberationId) {
@@ -228,7 +269,7 @@ const DeliberationChat = () => {
     }
     
     try {
-      const agents = await services.agentService.getAgentsByDeliberation(deliberationId);
+      const agents = await agentService.getAgentsByDeliberation(deliberationId);
       const mappedConfigs = agents.map(agent => ({
         agent_type: agent.agent_type,
         name: agent.name,
@@ -239,7 +280,7 @@ const DeliberationChat = () => {
     } catch (error) {
 
     }
-  }, [deliberationId, services.agentService]);
+  }, [deliberationId, agentService]);
 
   const loadDeliberation = useCallback(async () => {
     if (!deliberationId) {
@@ -251,7 +292,7 @@ const DeliberationChat = () => {
         deliberationId
       });
       setUiState(prev => ({ ...prev, loading: true }));
-      const data = await services.deliberationService.getDeliberation(deliberationId);
+      const data = await deliberationService.getDeliberation(deliberationId);
       logger.info('Deliberation details loaded successfully', data);
       
       // Check if current user is a participant
@@ -274,7 +315,7 @@ const DeliberationChat = () => {
       setUiState(prev => ({ ...prev, loading: false }));
       logger.info('Deliberation details loading completed');
     }
-  }, [deliberationId, user?.id, services.deliberationService, toast]);
+  }, [deliberationId, user?.id, deliberationService, toast]);
 
   useEffect(() => {
     console.log('DeliberationChat: Initial mount or key dependencies changed');
@@ -292,7 +333,7 @@ const DeliberationChat = () => {
     if (!deliberationId || !user) return;
     setUiState(prev => ({ ...prev, joiningDeliberation: true }));
     try {
-      await services.deliberationService.joinDeliberation(deliberationId);
+      await deliberationService.joinDeliberation(deliberationId);
       setDeliberationState(prev => ({ ...prev, isParticipant: true }));
       toast({
         title: "Success",
@@ -310,7 +351,7 @@ const DeliberationChat = () => {
     } finally {
       setUiState(prev => ({ ...prev, joiningDeliberation: false }));
     }
-  }, [deliberationId, user, services.deliberationService, toast, loadDeliberation]);
+  }, [deliberationId, user, deliberationService, toast, loadDeliberation]);
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active':
