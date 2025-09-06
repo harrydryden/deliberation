@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useServices } from '@/hooks/useServices';
 import { User, Agent, Deliberation, LocalAgentCreate, AccessCode, SystemStats } from '@/types/index';
 import { toast } from 'sonner';
@@ -48,7 +48,7 @@ export const useAdminData = () => {
   };
 
   // User operations
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
       const data = await services.userService.getUsers();
@@ -58,9 +58,9 @@ export const useAdminData = () => {
     } finally {
       setLoadingUsers(false);
     }
-  };
+  }, [services.userService]);
 
-  const updateUserRole = async (userId: string, role: string) => {
+  const updateUserRole = useCallback(async (userId: string, role: string) => {
     try {
       await services.userService.updateUserRole(userId, role);
       toast.success('User role updated successfully');
@@ -68,9 +68,9 @@ export const useAdminData = () => {
     } catch (error) {
       handleError(error, 'update user role');
     }
-  };
+  }, [services.userService, fetchUsers]);
 
-  const archiveUser = async (userId: string, reason?: string) => {
+  const archiveUser = useCallback(async (userId: string, reason?: string) => {
     try {
       if (!user?.id) {
         throw new Error('User not authenticated');
@@ -81,9 +81,9 @@ export const useAdminData = () => {
     } catch (error) {
       handleError(error, 'archive user');
     }
-  };
+  }, [services.adminService, user?.id, fetchUsers]);
 
-  const unarchiveUser = async (userId: string) => {
+  const unarchiveUser = useCallback(async (userId: string) => {
     try {
       await services.adminService.unarchiveUser(userId);
       toast.success('User unarchived successfully');
@@ -91,7 +91,7 @@ export const useAdminData = () => {
     } catch (error) {
       handleError(error, 'unarchive user');
     }
-  };
+  }, [services.adminService, fetchUsers]);
 
 
   // Access code functions for user provisioning
@@ -112,7 +112,7 @@ export const useAdminData = () => {
   };
 
   // Agent operations
-  const fetchAgents = async () => {
+  const fetchAgents = useCallback(async () => {
     setLoadingAgents(true);
     try {
       const data = await services.agentService.getGlobalAgents();
@@ -122,10 +122,10 @@ export const useAdminData = () => {
     } finally {
       setLoadingAgents(false);
     }
-  };
+  }, [services.agentService]);
 
   // Local Agent operations
-  const fetchLocalAgents = async () => {
+  const fetchLocalAgents = useCallback(async () => {
     setLoadingLocalAgents(true);
     try {
       const data = await services.agentService.getLocalAgents();
@@ -135,10 +135,10 @@ export const useAdminData = () => {
     } finally {
       setLoadingLocalAgents(false);
     }
-  };
+  }, [services.agentService]);
 
   // Deliberation operations
-  const fetchDeliberations = async () => {
+  const fetchDeliberations = useCallback(async () => {
     setLoadingDeliberations(true);
     try {
       const data = await services.deliberationService.getDeliberations();
@@ -148,9 +148,9 @@ export const useAdminData = () => {
     } finally {
       setLoadingDeliberations(false);
     }
-  };
+  }, [services.deliberationService]);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     // Only fetch stats if the user is an admin
     if (!isAdmin) {
       console.log('Skipping stats fetch - user is not admin');
@@ -168,7 +168,7 @@ export const useAdminData = () => {
     } finally {
       setLoadingStats(false);
     }
-  };
+  }, [isAdmin, services.adminService]);
 
   // Agent update and creation operations
   const updateAgent = async (id: string, updates: Partial<Agent>) => {

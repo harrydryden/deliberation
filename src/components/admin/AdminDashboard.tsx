@@ -46,7 +46,7 @@ export const AdminDashboard = () => {
     };
     
     initializeData();
-  }, [handleAsyncError, adminData]);
+  }, []); // Run once on mount
 
 
   return (
