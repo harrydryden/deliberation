@@ -98,7 +98,7 @@ export class IBISService {
   /**
    * Create multiple IBIS relationships
    */
-  async createRelationships(relationships: Array<{\
+  async createRelationships(relationships: Array<{
     id: string;
     type: string;
     confidence?: number;
@@ -193,7 +193,7 @@ export class IBISService {
   /**
    * Get existing nodes for a deliberation
    */
-  async getExistingNodes(deliberationId: string): Promise<Array<{\
+  async getExistingNodes(deliberationId: string): Promise<Array<{
     id: string;
     title: string;
     node_type: string;

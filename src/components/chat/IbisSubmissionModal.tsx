@@ -7,13 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { Lightbulb, CheckCircle } from "lucide-react";
-import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { ManualNodeSelector } from './ManualNodeSelector';
-import { useStanceService } from '@/hooks/useServices';
 import { IssueRecommendations } from '@/components/ibis/IssueRecommendations';
+import { IBISService } from '@/services/domain/implementations/ibis.service';
+import { useIbisSubmission } from '@/hooks/useIbisSubmission';
+import { useIbisClassification } from '@/hooks/useIbisClassification';
+import { NODE_TYPE_OPTIONS } from '@/constants/ibisTypes';
+
 interface IbisSubmissionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -22,7 +23,9 @@ interface IbisSubmissionModalProps {
   deliberationId: string;
   onSuccess?: () => void;
 }
+
 type NodeType = 'issue' | 'position' | 'argument' | 'uncategorized';
+
 export const IbisSubmissionModal = ({
   isOpen,
   onClose,
@@ -31,19 +34,16 @@ export const IbisSubmissionModal = ({
   deliberationId,
   onSuccess
 }: IbisSubmissionModalProps) => {
-  const {
-    toast
-  } = useToast();
-  const { user } = useSupabaseAuth();
-  const stanceService = useStanceService();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isClassifying, setIsClassifying] = useState(false);
+  const ibisService = new IBISService();
+  
+  // Form state
   const [formData, setFormData] = useState({
     title: '',
     description: messageContent,
     nodeType: '' as NodeType | '',
     parentNodeId: ''
   });
+
   // Enhanced relationship management - separate tracking for different sources
   const [issueRecommendationRelationships, setIssueRecommendationRelationships] = useState<Array<{
     id: string;
@@ -56,113 +56,96 @@ export const IbisSubmissionModal = ({
     type: string;
     confidence: number;
   }>>([]);
-  
+
   // Combined relationships for submission
   const selectedRelationships = [...issueRecommendationRelationships, ...manualRelationships];
-  
-  const [aiSuggestions, setAiSuggestions] = useState<{
-    title: string;
-    keywords: string[];
-    nodeType: NodeType;
-    description: string;
-    confidence: number;
-    stanceScore?: number;
-  } | null>(null);
+
   const [existingNodes, setExistingNodes] = useState<Array<{
     id: string;
     title: string;
     node_type: string;
   }>>([]);
   const [isGeneratingRoots, setIsGeneratingRoots] = useState(false);
-  const [rootSuggestion, setRootSuggestion] = useState<{
-    message: string;
-    action: string;
-  } | null>(null);
 
   // Issue recommendations state
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [isLinkingMode, setIsLinkingMode] = useState(false);
+  
+  // Use custom hooks for better separation of concerns
+  const { submitToIbis, isSubmitting } = useIbisSubmission(
+    deliberationId,
+    messageId,
+    messageContent,
+    () => {
+      onSuccess?.();
+      onClose();
+      resetForm();
+    }
+  );
+  
+  const { aiSuggestions, rootSuggestion, isClassifying } = useIbisClassification(
+    messageContent,
+    deliberationId,
+    isOpen
+  );
 
-  // Load existing nodes and classify message when modal opens
+  // Load existing nodes when modal opens
   useEffect(() => {
     if (isOpen) {
       loadExistingNodes();
-      classifyMessage();
     }
-  }, [isOpen, deliberationId, messageContent]);
+  }, [isOpen, deliberationId]);
+
+  // Pre-populate form with AI suggestions
+  useEffect(() => {
+    if (aiSuggestions && !formData.title) {
+      setFormData(prev => ({
+        ...prev,
+        title: aiSuggestions.title,
+        nodeType: aiSuggestions.nodeType as NodeType
+      }));
+    }
+  }, [aiSuggestions]);
+
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      description: messageContent,
+      nodeType: '',
+      parentNodeId: ''
+    });
+    setIssueRecommendationRelationships([]);
+    setManualRelationships([]);
+    setSelectedIssueId(null);
+    setIsLinkingMode(false);
+  };
+
   const loadExistingNodes = async () => {
     try {
-      const {
-        data,
-        error
-      } = await supabase.from('ibis_nodes').select('id, title, node_type').eq('deliberation_id', deliberationId).order('created_at', {
-        ascending: false
-      });
-      if (error) throw error;
-      setExistingNodes(data || []);
+      const nodes = await ibisService.getExistingNodes(deliberationId);
+      setExistingNodes(nodes);
     } catch (error) {
       console.error('Error loading existing nodes:', error);
     }
   };
-  const classifyMessage = async () => {
-    if (!messageContent.trim()) return;
-    setIsClassifying(true);
-    try {
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke('classify-message', {
-        body: {
-          content: messageContent,
-          deliberationId: deliberationId
-        }
-      });
-      if (error) throw error;
-      if (data.success && data.classification) {
-        const classification = data.classification;
-        setAiSuggestions({
-          title: classification.title,
-          keywords: classification.keywords,
-          nodeType: classification.nodeType,
-          description: classification.description,
-          confidence: classification.confidence,
-          stanceScore: classification.stanceScore
-        });
 
-        // Pre-populate form with AI suggestions
-        setFormData(prev => ({
-          ...prev,
-          title: classification.title,
-          nodeType: classification.nodeType
-        }));
-      }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const submissionData = {
+      title: formData.title,
+      description: formData.description,
+      nodeType: formData.nodeType,
+      parentNodeId: formData.parentNodeId,
+      issueRecommendationRelationships,
+      manualRelationships,
+      selectedIssueId,
+      isLinkingMode
+    };
 
-      // Handle root suggestion if provided
-      if (data.rootSuggestion) {
-        setRootSuggestion(data.rootSuggestion);
-      }
-    } catch (error: any) {
-      console.error('Error classifying message:', error);
-      
-      // Set fallback state for AI classification failure
-      setAiSuggestions({
-        title: '',
-        keywords: [],
-        nodeType: 'issue' as NodeType, // Default to issue
-        description: 'AI analysis failed to categorize this message',
-        confidence: 0,
-        stanceScore: 0
-      });
-      
-      toast({
-        title: "AI Classification Failed",
-        description: "Unable to get AI suggestions. Please categorize manually or use the uncategorized option.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsClassifying(false);
-    }
+    await submitToIbis(submissionData, aiSuggestions || undefined);
   };
+
   const applyAiSuggestion = (field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
@@ -171,267 +154,54 @@ export const IbisSubmissionModal = ({
   };
 
   const handleIssueRecommendationsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
-    console.log('🔗 ISSUE RECOMMENDATIONS CHANGED:', relationships);
     setIssueRecommendationRelationships(relationships);
   };
 
   const handleManualConnectionsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
-    console.log('🔗 MANUAL CONNECTIONS CHANGED:', relationships);
     setManualRelationships(relationships);
   };
 
   const handleIssueSelected = (issueId: string) => {
     setSelectedIssueId(selectedIssueId === issueId ? null : issueId);
-    // Don't automatically switch to linking mode - let user choose relationships
   };
-  const handleSubmit = async (e: React.FormEvent) => {
-    console.log('🔴 FORM SUBMISSION TRIGGERED:', {
-      target: e.target,
-      currentTarget: e.currentTarget,
-      type: e.type,
-      timeStamp: e.timeStamp,
-      stack: new Error().stack
-    });
-    e.preventDefault();
-    if (!formData.title.trim() || !formData.nodeType) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Please provide a title and select a node type"
-      });
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
 
-      let nodeId: string;
-
-      if (isLinkingMode && selectedIssueId) {
-        // Link to existing issue instead of creating new node
-        nodeId = selectedIssueId;
-        
-        // Create relationship to the selected issue
-        const { error: relError } = await supabase
-          .from('ibis_relationships')
-          .insert({
-            source_node_id: selectedIssueId,
-            target_node_id: selectedIssueId, // Self-reference for position linking
-            relationship_type: formData.nodeType === 'position' ? 'addresses' : 'supports',
-            created_by: user.id,
-            deliberation_id: deliberationId
-          });
-        
-        if (relError) throw relError;
-      } else {
-        // Create new node as before
-        // Calculate intelligent position based on node type and existing nodes
-        const calculateNodePosition = (nodeType: string, parentNodeId?: string) => {
-          const basePositions = {
-            issue: { x: 200, y: 150 },
-            position: { x: 400, y: 300 },
-            argument: { x: 600, y: 450 }
-          };
-          
-          const base = basePositions[nodeType as keyof typeof basePositions] || { x: 400, y: 300 };
-          
-          // Add some variation while keeping nodes organized
-          const variation = 100;
-          const offsetX = Math.random() * variation - variation / 2;
-          const offsetY = Math.random() * variation - variation / 2;
-          
-          return {
-            x: Math.max(50, Math.min(800, base.x + offsetX)),
-            y: Math.max(50, Math.min(600, base.y + offsetY))
-          };
-        };
-        
-        const position = calculateNodePosition(formData.nodeType, formData.parentNodeId);
-
-        const { data: inserted, error: nodeError } = await supabase
-          .from('ibis_nodes')
-          .insert({
-            title: formData.title.trim(),
-            description: formData.description.trim() || null,
-            node_type: formData.nodeType,
-            parent_node_id: formData.parentNodeId && formData.parentNodeId !== 'none' ? formData.parentNodeId : null,
-            deliberation_id: deliberationId,
-            message_id: messageId,
-            created_by: user.id,
-            position_x: position.x,
-            position_y: position.y
-          })
-          .select('id, node_type')
-          .maybeSingle();
-        if (nodeError) throw nodeError;
-        if (!inserted) throw new Error('Failed to create node');
-        nodeId = inserted.id;
-      }
-
-      // Create enhanced relationships from AI analysis (only for new nodes)
-      console.log('🔗 RELATIONSHIP DEBUG:', {
-        isLinkingMode,
-        selectedRelationshipsCount: selectedRelationships.length,
-        selectedRelationships,
-        willCreateRelationships: !isLinkingMode && selectedRelationships.length > 0
-      });
-      
-      if (!isLinkingMode && selectedRelationships.length > 0) {
-        console.log('🔗 CREATING RELATIONSHIPS:', selectedRelationships);
-        const relationshipInserts = selectedRelationships.map(rel => ({
-          source_node_id: nodeId,
-          target_node_id: rel.id,
-          relationship_type: rel.type,
-          created_by: user.id,
-          deliberation_id: deliberationId
-        }));
-        
-        console.log('🔗 RELATIONSHIP INSERTS:', relationshipInserts);
-        
-        const { error: relErr } = await supabase
-          .from('ibis_relationships')
-          .insert(relationshipInserts);
-        
-        if (relErr) {
-          console.error('🔗 RELATIONSHIP INSERT ERROR:', relErr);
-          throw relErr;
-        } else {
-          console.log('🔗 RELATIONSHIPS CREATED SUCCESSFULLY');
-        }
-      } else {
-        console.log('🔗 SKIPPING RELATIONSHIPS:', {
-          reason: isLinkingMode ? 'linking mode' : 'no relationships selected'
-        });
-      }
-
-      // Store stance score if available from AI classification
-      if (aiSuggestions?.stanceScore !== undefined) {
-        try {
-          await stanceService.updateStanceScore(
-            user.id,
-            deliberationId,
-            aiSuggestions.stanceScore,
-            aiSuggestions.confidence || 0.5,
-            {
-              source: 'ibis_submission',
-              nodeType: formData.nodeType,
-              keywords: aiSuggestions.keywords,
-              messageId
-            }
-          );
-        } catch (stanceError) {
-          console.error('Failed to store stance score:', stanceError);
-          // Don't fail the entire submission if stance storage fails
-        }
-      }
-
-      // Mark message as submitted to IBIS
-      const {
-        error: messageError
-      } = await supabase.from('messages').update({
-        submitted_to_ibis: true
-      }).eq('id', messageId);
-      if (messageError) throw messageError;
-      toast({
-        title: "Success",
-        description: isLinkingMode 
-          ? "Message linked to existing issue successfully"
-          : "Message successfully submitted to IBIS"
-      });
-      onSuccess?.();
-      onClose();
-
-      // Reset form and AI suggestions
-      setFormData({
-        title: '',
-        description: messageContent,
-        nodeType: '',
-        parentNodeId: ''
-      });
-      setAiSuggestions(null);
-      setIssueRecommendationRelationships([]);
-      setManualRelationships([]);
-      setSelectedIssueId(null);
-      setIsLinkingMode(false);
-    } catch (error: any) {
-      console.error('Error submitting to IBIS:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to submit message to IBIS"
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
   const handleGenerateRootIssues = async () => {
     setIsGeneratingRoots(true);
     try {
-      // Get deliberation details
-      const {
-        data: deliberation,
-        error: deliberationError
-      } = await supabase.from('deliberations').select('title, description, notion').eq('id', deliberationId).single();
-      if (deliberationError) throw deliberationError;
-      const {
-        data: rootsData,
-        error: rootsError
-      } = await supabase.functions.invoke('generate-ibis-roots', {
-        body: {
-          deliberationId,
-          deliberationTitle: deliberation.title,
-          deliberationDescription: deliberation.description,
-          notion: deliberation.notion
-        }
-      });
-      if (rootsError) throw rootsError;
-      if (rootsData?.success) {
-        toast({
-          title: "Success",
-          description: `Generated ${rootsData.count} root issues for this deliberation`
-        });
-        // Reload existing nodes to show the new ones
-        await loadExistingNodes();
+      const result = await ibisService.generateRootIssues(deliberationId);
+      if (result.success) {
+        await loadExistingNodes(); // Reload nodes to show new ones
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error generating root issues:', error);
-      toast({
-        title: "Error",
-        description: "Failed to generate root issues. Please try again.",
-        variant: "destructive"
-      });
     } finally {
       setIsGeneratingRoots(false);
     }
   };
+
   const getNodeTypeDescription = (nodeType: string) => {
-    switch (nodeType) {
-      case 'issue':
-        return 'A problem or question that needs to be resolved';
-      case 'position':
-        return 'A proposed solution or stance on an issue';
-      case 'argument':
-        return 'Supporting or opposing evidence for a position';
-      default:
-        return '';
-    }
+    const option = NODE_TYPE_OPTIONS.find(opt => opt.value === nodeType);
+    return option?.description || '';
   };
-  return <Dialog open={isOpen} onOpenChange={onClose}>
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add to Deliberation Map</DialogTitle>
         </DialogHeader>
 
         {/* AI Classification Status */}
-        {isClassifying && <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+        {isClassifying && (
+          <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
             <LoadingSpinner className="h-4 w-4" />
             <span className="text-sm text-muted-foreground">Analysing message</span>
-          </div>}
+          </div>
+        )}
 
         {/* No existing nodes - suggest root issues */}
-        {existingNodes.length === 0 && !isClassifying && <div className="p-3 bg-muted rounded-lg space-y-3">
+        {existingNodes.length === 0 && !isClassifying && (
+          <div className="p-3 bg-muted rounded-lg space-y-3">
             <div className="flex items-center gap-2">
               <Lightbulb className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">No IBIS nodes exist yet</span>
@@ -439,19 +209,32 @@ export const IbisSubmissionModal = ({
             <p className="text-xs text-muted-foreground">
               Start this deliberation by generating AI-suggested root issues, or create your own manually.
             </p>
-            <Button type="button" variant="outline" size="sm" onClick={handleGenerateRootIssues} disabled={isGeneratingRoots} className="flex items-center gap-2">
-              {isGeneratingRoots ? <>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm" 
+              onClick={handleGenerateRootIssues} 
+              disabled={isGeneratingRoots}
+              className="flex items-center gap-2"
+            >
+              {isGeneratingRoots ? (
+                <>
                   <LoadingSpinner className="h-3 w-3" />
                   Generating...
-                </> : <>
+                </>
+              ) : (
+                <>
                   <Lightbulb className="h-3 w-3" />
                   Suggest Root Issues
-                </>}
+                </>
+              )}
             </Button>
-          </div>}
+          </div>
+        )}
 
         {/* AI Suggestions */}
-        {aiSuggestions && !isClassifying && <div className="p-3 bg-muted rounded-lg space-y-2">
+        {aiSuggestions && !isClassifying && (
+          <div className="p-3 bg-muted rounded-lg space-y-2">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Suggestions</span>
               <Badge variant="secondary" className="text-xs">
@@ -459,229 +242,161 @@ export const IbisSubmissionModal = ({
               </Badge>
             </div>
             
-            {aiSuggestions.keywords.length > 0 && <div>
+            {aiSuggestions.keywords.length > 0 && (
+              <div>
                 <span className="text-xs text-muted-foreground">Keywords: </span>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {aiSuggestions.keywords.map((keyword, index) => <Badge key={index} variant="outline" className="text-xs">
+                  {aiSuggestions.keywords.map((keyword, index) => (
+                    <Badge key={index} variant="outline" className="text-xs">
                       {keyword}
-                    </Badge>)}
+                    </Badge>
+                  ))}
                 </div>
-              </div>}
+              </div>
+            )}
             
-            {aiSuggestions.stanceScore !== undefined && <div>
+            {aiSuggestions.stanceScore !== undefined && (
+              <div>
                 <span className="text-xs text-muted-foreground">Stance: </span>
-                <Badge variant={aiSuggestions.stanceScore > 0.3 ? "default" : aiSuggestions.stanceScore < -0.3 ? "destructive" : "secondary"} className="text-xs">
-                  {aiSuggestions.stanceScore > 0.3 ? "Supporting" : aiSuggestions.stanceScore < -0.3 ? "Opposing" : "Neutral"} ({(aiSuggestions.stanceScore >= 0 ? '+' : '') + aiSuggestions.stanceScore.toFixed(2)})
+                <Badge 
+                  variant={aiSuggestions.stanceScore > 0.3 ? "default" : aiSuggestions.stanceScore < -0.3 ? "destructive" : "secondary"} 
+                  className="text-xs"
+                >
+                  {aiSuggestions.stanceScore > 0.3 ? "Supporting" : aiSuggestions.stanceScore < -0.3 ? "Opposing" : "Neutral"} 
+                  ({(aiSuggestions.stanceScore >= 0 ? '+' : '') + aiSuggestions.stanceScore.toFixed(2)})
                 </Badge>
-              </div>}
-          </div>}
+              </div>
+            )}
+          </div>
+        )}
         
-        <form onSubmit={handleSubmit} className="space-y-4" onKeyDown={(e) => {
-          // Prevent Enter key from submitting the form accidentally
-          if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
-            console.log('🔵 PREVENTED ENTER KEY SUBMISSION:', e.target);
-            e.preventDefault();
-          }
-        }}>
-          <div>
-            <Label htmlFor="nodeType">Type</Label>
-            <Select value={formData.nodeType} onValueChange={(value: NodeType) => setFormData(prev => ({
-            ...prev,
-            nodeType: value
-          }))}>
-              <SelectTrigger id="nodeType">
-                <SelectValue placeholder="Select Type" />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Title Field */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="title">Title *</Label>
+              {aiSuggestions?.title && formData.title !== aiSuggestions.title && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => applyAiSuggestion('title', aiSuggestions.title)}
+                  className="h-6 text-xs"
+                >
+                  Use AI suggestion
+                </Button>
+              )}
+            </div>
+            <Input
+              id="title"
+              value={formData.title}
+              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              placeholder="Enter a clear, descriptive title"
+              required
+            />
+          </div>
+
+          {/* Node Type Selection */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="nodeType">Type *</Label>
+              {aiSuggestions?.nodeType && formData.nodeType !== aiSuggestions.nodeType && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => applyAiSuggestion('nodeType', aiSuggestions.nodeType)}
+                  className="h-6 text-xs"
+                >
+                  Use AI suggestion: {aiSuggestions.nodeType}
+                </Button>
+              )}
+            </div>
+            <Select value={formData.nodeType} onValueChange={(value) => setFormData(prev => ({ ...prev, nodeType: value as NodeType }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select node type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="issue">
-                  <div>
-                    <div className="font-medium">Issue</div>
-                    <div className="text-xs text-muted-foreground">
-                      A problem or question to be resolved
+                {NODE_TYPE_OPTIONS.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{type.label}</span>
+                      <span className="text-xs text-muted-foreground">{type.description}</span>
                     </div>
-                  </div>
-                </SelectItem>
-                <SelectItem value="position">
-                  <div>
-                    <div className="font-medium">Position</div>
-                    <div className="text-xs text-muted-foreground">
-                      A proposed solution or stance
-                    </div>
-                  </div>
-                </SelectItem>
-                <SelectItem value="argument">
-                  <div>
-                    <div className="font-medium">Argument</div>
-                    <div className="text-xs text-muted-foreground">
-                      Supporting or opposing evidence
-                    </div>
-                  </div>
-                </SelectItem>
-                <SelectItem value="uncategorized">
-                  <div>
-                    <div className="font-medium">Uncategorized</div>
-                    <div className="text-xs text-muted-foreground">
-                      AI failed to categorize - manual review needed
-                    </div>
-                  </div>
-                </SelectItem>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
-          <div>
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" value={formData.title} onChange={e => setFormData(prev => ({
-            ...prev,
-            title: e.target.value
-          }))} placeholder="Enter concise title for the map" required />
+          {/* Description Field */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description (Optional)</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Add additional context or details"
+              rows={3}
+            />
           </div>
 
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea id="description" value={formData.description} onChange={e => setFormData(prev => ({
-            ...prev,
-            description: e.target.value
-          }))} placeholder="Detailed description (optional)" rows={3} />
-          </div>
-
-          {/* Connections Section - Show when there are existing nodes */}
+          {/* Issue Recommendations */}
           {existingNodes.length > 0 && (
-            <div className="border-t pt-4 mt-4 space-y-4">
-              <div>
-                <h4 className="text-sm font-medium mb-2">Connect to Existing Items</h4>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Link your contribution to existing issues, positions, or arguments in the deliberation map.
-                </p>
-              </div>
+            <IssueRecommendations
+              deliberationId={deliberationId}
+              userContent={messageContent}
+              onIssueSelected={handleIssueSelected}
+              onRelationshipsChange={handleIssueRecommendationsChange}
+            />
+          )}
 
-              {/* Show linking mode indicator */}
-              {isLinkingMode && selectedIssueId && (
-                <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">Linking to existing issue</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Your submission will be linked to the selected issue instead of creating a new node.
-                  </p>
-                </div>
-              )}
+          {/* Manual Node Selector */}
+          {existingNodes.length > 0 && (
+            <ManualNodeSelector
+              existingNodes={existingNodes}
+              onConnectionsChange={handleManualConnectionsChange}
+            />
+          )}
 
-              {/* Issue Recommendations and Manual Selection */}
-              {!isLinkingMode && (
-                <div>
-                  <h5 className="text-xs font-medium text-muted-foreground mb-2">Link to Existing Issues</h5>
-                  
-                  {/* AI Recommendations */}
-                  <IssueRecommendations
-                    deliberationId={deliberationId}
-                    userContent={formData.description || messageContent || formData.title}
-                    onIssueSelected={handleIssueSelected}
-                    onRelationshipsChange={handleIssueRecommendationsChange}
-                  />
-                  
-                  {/* Manual Node Selection */}
-                  <div className="mt-4 p-4 border border-dashed border-muted/30 rounded-lg">
-                    <ManualNodeSelector
-                      existingNodes={existingNodes}
-                      onConnectionsChange={handleManualConnectionsChange}
-                    />
-                  </div>
-
-                  {/* Summary of selected connections */}
-                  {selectedRelationships.length > 0 && (
-                    <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                      <h6 className="text-sm font-medium mb-2 flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 text-primary" />
-                        Ready to Create {selectedRelationships.length} Connection{selectedRelationships.length > 1 ? 's' : ''}
-                      </h6>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        These connections will be established when you click "Share":
-                      </p>
-                      <div className="space-y-2">
-                        {issueRecommendationRelationships.length > 0 && (
-                          <div className="space-y-2">
-                            <h6 className="text-xs font-semibold text-primary">AI Recommendations:</h6>
-                            {issueRecommendationRelationships.map((rel, index) => {
-                              const connectedNode = existingNodes.find(node => node.id === rel.id);
-                              return (
-                                <div key={`ai-${rel.id}-${rel.type}`} className="flex items-start gap-3 p-2 bg-background/50 rounded border">
-                                  <span className="font-medium text-primary text-xs mt-0.5">#{index + 1}</span>
-                                  <div className="flex-1 space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      {connectedNode && (
-                                        <Badge variant="outline" className="text-xs">
-                                          {connectedNode.node_type}
-                                        </Badge>
-                                      )}
-                                      <span className="text-sm font-medium">
-                                        {connectedNode?.title || 'Unknown item'}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                      <span>Relationship:</span>
-                                      <span className="font-medium text-foreground">
-                                        {rel.type ? rel.type.replace(/_/g, ' ') : 'No specific type'}
-                                      </span>
-                                      <Badge variant="secondary" className="text-xs">AI</Badge>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                        
-                        {manualRelationships.length > 0 && (
-                          <div className="space-y-2">
-                            <h6 className="text-xs font-semibold text-green-600">Manual Connections:</h6>
-                            {manualRelationships.map((rel, index) => {
-                              const connectedNode = existingNodes.find(node => node.id === rel.id);
-                              return (
-                                <div key={`manual-${rel.id}-${rel.type}`} className="flex items-start gap-3 p-2 bg-background/50 rounded border">
-                                  <span className="font-medium text-green-600 text-xs mt-0.5">#{index + 1}</span>
-                                  <div className="flex-1 space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      {connectedNode && (
-                                        <Badge variant="outline" className="text-xs">
-                                          {connectedNode.node_type}
-                                        </Badge>
-                                      )}
-                                      <span className="text-sm font-medium">
-                                        {connectedNode?.title || 'Unknown item'}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                      <span>Relationship:</span>
-                                      <span className="font-medium text-foreground">
-                                        {rel.type ? rel.type.replace(/_/g, ' ') : 'No specific type'}
-                                      </span>
-                                      <Badge variant="secondary" className="text-xs">Manual</Badge>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
+          {/* Relationship Summary */}
+          {selectedRelationships.length > 0 && (
+            <div className="p-3 bg-muted rounded-lg">
+              <Label className="text-sm font-medium">Selected Relationships ({selectedRelationships.length})</Label>
+              <div className="mt-2 space-y-1">
+                {selectedRelationships.map((rel, index) => {
+                  const node = existingNodes.find(n => n.id === rel.id);
+                  return (
+                    <div key={`${rel.id}-${rel.type}-${index}`} className="text-xs text-muted-foreground">
+                      {rel.type} → {node?.title || 'Unknown node'}
                     </div>
-                  )}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          <DialogFooter>
+          {/* Submit Button */}
+          <DialogFooter className="flex justify-between">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting || !formData.title.trim() || !formData.nodeType}>
-              {isSubmitting ? 'Sharing...' : 'Share'}
+              {isSubmitting ? (
+                <>
+                  <LoadingSpinner className="w-4 h-4 mr-2" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Submit to IBIS
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>;
+    </Dialog>
+  );
 };
