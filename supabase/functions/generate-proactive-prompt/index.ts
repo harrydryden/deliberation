@@ -35,15 +35,62 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get deliberation details
-    const { data: deliberation, error: deliberationError } = await supabase
-      .from('deliberations')
-      .select('title, description, notion')
-      .eq('id', deliberationId)
-      .single();
+    // Get deliberation details and local Flo agent configuration
+    const [{ data: deliberation, error: deliberationError }, { data: floAgent, error: floAgentError }] = await Promise.all([
+      supabase
+        .from('deliberations')
+        .select('title, description, notion')
+        .eq('id', deliberationId)
+        .single(),
+      supabase
+        .from('agent_configurations')
+        .select('name, description, goals, response_style, prompt_overrides')
+        .eq('deliberation_id', deliberationId)
+        .eq('agent_type', 'flow_agent')
+        .eq('is_active', true)
+        .maybeSingle()
+    ]);
 
     if (deliberationError) {
       throw new Error(`Error fetching deliberation: ${deliberationError.message}`);
+    }
+
+    // Fallback to global Flo agent if no local one exists
+    let agentConfig = floAgent;
+    if (!floAgent) {
+      console.log('No local Flo agent found, using global template');
+      const { data: globalFloAgent, error: globalError } = await supabase
+        .from('agent_configurations')
+        .select('name, description, goals, response_style, prompt_overrides')
+        .eq('agent_type', 'flow_agent')
+        .eq('is_default', true)
+        .is('deliberation_id', null)
+        .maybeSingle();
+      
+      if (globalError) {
+        console.warn('Error fetching global Flo agent:', globalError);
+      }
+      agentConfig = globalFloAgent;
+    }
+
+    // Generate system prompt from agent configuration
+    let floSystemPrompt = '';
+    if (agentConfig) {
+      // Use custom system prompt if available
+      floSystemPrompt = agentConfig.prompt_overrides?.system_prompt || 
+        `You are ${agentConfig.name || 'Flo'}, ${agentConfig.description || 'a helpful facilitation assistant'}`;
+      
+      if (agentConfig.goals?.length) {
+        floSystemPrompt += `\n\nYour goals are:\n${agentConfig.goals.map((g: string) => `- ${g}`).join('\n')}`;
+      }
+      
+      if (agentConfig.response_style) {
+        floSystemPrompt += `\n\nResponse style: ${agentConfig.response_style}`;
+      }
+    } else {
+      // Fallback system prompt if no agent configuration found
+      console.warn('No Flo agent configuration found, using fallback prompt');
+      floSystemPrompt = `You are Flo, a helpful facilitation assistant in deliberative discussions. You guide conversation flow, encourage participation, and help users explore different perspectives on important topics.`;
     }
 
     // Get recent conversation context (last 5 messages)
@@ -90,11 +137,11 @@ serve(async (req) => {
       adaptivePrompting: true
     } : { adaptivePrompting: false };
 
-    // Create enhanced AI prompt with session context
-    const aiPrompt = `You are Flo, a helpful facilitation assistant in a deliberative discussion about "${deliberation.title}".
+    // Create enhanced AI prompt with session context using agent configuration
+    const aiPrompt = `${floSystemPrompt}
 
-CONTEXT:
-- Deliberation topic: ${deliberation.title}
+CURRENT DELIBERATION CONTEXT:
+- Topic: ${deliberation.title}
 - Description: ${deliberation.description || 'No description available'}
 - Notion statement: ${deliberation.notion || 'No notion statement'}
 - User engagement: ${userEngagement.totalMessages} messages, last type: ${userEngagement.lastMessageType}
@@ -111,16 +158,17 @@ ENHANCED SESSION CONTEXT:
 - Is long-running session: ${sessionContext.isLongSession ? 'yes' : 'no'}
 ` : ''}
 
-TASK: Generate a thoughtful, engaging proactive prompt to re-engage this user who has been inactive for a personalized duration. The prompt should:
+PROACTIVE FACILITATION TASK: 
+Generate a thoughtful, engaging proactive prompt to re-engage this user who has been inactive. The prompt should align with your facilitation style and goals while being:
 
-1. Be contextually relevant to the ongoing discussion
-2. ${sessionAnalysis.userExperience === 'new' ? 'Be welcoming and provide gentle guidance for new participants' : ''}
-3. ${sessionAnalysis.userExperience === 'experienced' ? 'Build on their experience and encourage deeper insights' : ''}
-4. ${sessionAnalysis.sessionPhase === 'extended' ? 'Acknowledge their continued engagement and suggest valuable contributions' : ''}
-5. ${sessionAnalysis.engagementLevel === 'low' ? 'Use a different approach since previous prompts haven\'t led to engagement' : ''}
-6. Be encouraging but not pushy
-7. Offer specific, actionable ways to contribute
-8. Be concise (1-2 sentences)
+1. Contextually relevant to the ongoing discussion
+2. ${sessionAnalysis.userExperience === 'new' ? 'Welcoming and providing gentle guidance for new participants' : ''}
+3. ${sessionAnalysis.userExperience === 'experienced' ? 'Building on their experience and encouraging deeper insights' : ''}
+4. ${sessionAnalysis.sessionPhase === 'extended' ? 'Acknowledging their continued engagement and suggesting valuable contributions' : ''}
+5. ${sessionAnalysis.engagementLevel === 'low' ? 'Using a different approach since previous prompts haven\'t led to engagement' : ''}
+6. Encouraging but not pushy
+7. Offering specific, actionable ways to contribute
+8. Concise (1-2 sentences)
 
 Consider these contexts:
 - If new participant: Welcome and guide them with specific first steps
@@ -147,7 +195,9 @@ Respond with JSON in this format:
         messages: [
           {
             role: 'system',
-            content: 'You are Flo, an expert facilitator skilled at engaging participants in meaningful deliberation. Always respond with valid JSON.'
+            content: agentConfig ? 
+              `You are ${agentConfig.name || 'Flo'}, an expert facilitator skilled at engaging participants in meaningful deliberation. Always respond with valid JSON.` :
+              'You are Flo, an expert facilitator skilled at engaging participants in meaningful deliberation. Always respond with valid JSON.'
           },
           {
             role: 'user',
@@ -199,7 +249,14 @@ Respond with JSON in this format:
       promptData.context = sessionContext?.isLongSession ? "extended_session" : "engagement";
     }
 
-    console.log('✅ Generated enhanced proactive prompt:', promptData);
+    console.log('✅ Generated enhanced proactive prompt with agent config:', { 
+      prompt: promptData,
+      agentUsed: agentConfig ? {
+        name: agentConfig.name,
+        type: floAgent ? 'local' : 'global',
+        hasCustomPrompt: !!agentConfig.prompt_overrides?.system_prompt
+      } : 'fallback'
+    });
 
     return new Response(JSON.stringify({ 
       prompt: promptData,
