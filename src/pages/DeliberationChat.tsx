@@ -26,6 +26,7 @@ const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVis
 })));
 
 const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface"));
+import { AdminDeliberationView } from "@/components/admin/AdminDeliberationView";
 
 interface Deliberation {
   id: string;
@@ -329,61 +330,9 @@ const OptimizedDeliberationChat = () => {
 
   if (!user || !state.deliberation) return null;
 
+  // Render admin view for admins
   if (isAdmin) {
-    return (
-      <Layout>
-        <div className="container mx-auto px-4 py-6 max-w-4xl">
-          {/* Admin Header */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-primary">Admin View: {state.deliberation.title}</h1>
-                <p className="text-muted-foreground">Read-only access to all messages in chronological order</p>
-                <div className="text-xs mt-2 text-muted-foreground">
-                  Debug: isAdmin={isAdmin.toString()}, user={user?.email}, messagesCount={messages.length}
-                </div>
-              </div>
-              <Badge className={`${getStatusColor(state.deliberation.status)} text-white`}>
-                {state.deliberation.status}
-              </Badge>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="space-y-4">
-            {chatLoading ? (
-              <div className="flex items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="text-center p-8 text-muted-foreground">
-                No messages found in this deliberation.
-                <div className="text-xs mt-2">
-                  Debug: messages.length = {messages.length}, chatLoading = {chatLoading.toString()}
-                  <br />Auth: user_id = {user?.id}, email = {user?.email}
-                  <br />Admin check: isAdmin = {isAdmin.toString()}
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="text-xs text-muted-foreground mb-2">
-                  Debug: Rendering {messages.length} messages for admin {user?.email}
-                </div>
-                <OptimizedMessageList 
-                  messages={messages} 
-                  isLoading={chatLoading} 
-                  isTyping={isTyping} 
-                  onAddToIbis={() => {}} // Read-only for admin
-                  onRetry={() => {}} // Read-only for admin
-                  deliberationId={deliberationId} 
-                  agentConfigs={state.agentConfigs}
-                />
-              </>
-            )}
-          </div>
-        </div>
-      </Layout>
-    );
+    return <AdminDeliberationView />;
   }
 
   return (
