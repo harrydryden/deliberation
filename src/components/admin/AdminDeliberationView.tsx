@@ -80,13 +80,21 @@ export const AdminDeliberationView = () => {
         }
 
         // Get messages - admin should be able to see all messages
+        console.log('AdminDeliberationView: About to fetch messages for deliberation:', deliberationId);
         const messagesResult = await supabase
           .from('messages')
           .select('*')
           .eq('deliberation_id', deliberationId)
           .order('created_at', { ascending: true });
           
+        console.log('AdminDeliberationView: Messages query result:', {
+          error: messagesResult.error,
+          data: messagesResult.data,
+          count: messagesResult.data?.length || 0
+        });
+          
         if (messagesResult.error) {
+          console.error('AdminDeliberationView: Messages query error', messagesResult.error);
           logger.error('Messages query error', messagesResult.error as Error);
           throw messagesResult.error;
         }
