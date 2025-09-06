@@ -83,8 +83,8 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
       console.log('🟠 DESELECTING ISSUE:', issueId);
     } else {
       newSelected.add(issueId);
-      newRelTypes.set(issueId, 'addresses'); // Default relationship type
-      console.log('🟠 SELECTING ISSUE:', issueId, 'with default type: addresses');
+      newRelTypes.set(issueId, 'supports'); // Default relationship type
+      console.log('🟠 SELECTING ISSUE:', issueId, 'with default type: supports');
     }
     
     console.log('🟠 NEW SELECTED ISSUES:', Array.from(newSelected));
@@ -117,7 +117,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
       
       const relationships = Array.from(selectedIssues).map(issueId => ({
         id: issueId,
-        type: issueRelationshipTypes.get(issueId) || 'addresses',
+        type: issueRelationshipTypes.get(issueId) || 'supports',
         confidence: 0.8
       }));
       console.log('🟠 SENDING RELATIONSHIPS TO PARENT:', relationships);
@@ -228,7 +228,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
                       <div className="mt-2">
                         <Label htmlFor={`relationship-type-${recommendation.issueId}`} className="text-xs">Relationship Type</Label>
                         <Select
-                          value={issueRelationshipTypes.get(recommendation.issueId) || 'addresses'}
+                          value={issueRelationshipTypes.get(recommendation.issueId) || 'supports'}
                           onValueChange={(value) => handleRelationshipTypeChange(recommendation.issueId, value)}
                         >
                           <SelectTrigger id={`relationship-type-${recommendation.issueId}`} className="h-7 text-xs">
@@ -237,11 +237,8 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
                           <SelectContent className="bg-background border border-border shadow-lg z-50">
                             <SelectItem value="supports">Supports</SelectItem>
                             <SelectItem value="opposes">Opposes</SelectItem>
-                            <SelectItem value="addresses">Addresses</SelectItem>
                             <SelectItem value="relates_to">Relates To</SelectItem>
-                            <SelectItem value="builds_on">Builds On</SelectItem>
-                            <SelectItem value="strengthens">Strengthens</SelectItem>
-                            <SelectItem value="refines">Refines</SelectItem>
+                            <SelectItem value="responds_to">Responds To</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
