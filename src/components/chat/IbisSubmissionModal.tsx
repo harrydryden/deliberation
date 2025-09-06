@@ -434,7 +434,12 @@ export const IbisSubmissionModal = ({
               </div>}
           </div>}
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4" onKeyDown={(e) => {
+          // Prevent Enter key from submitting the form accidentally
+          if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+            e.preventDefault();
+          }
+        }}>
           <div>
             <Label htmlFor="nodeType">Type</Label>
             <Select value={formData.nodeType} onValueChange={(value: NodeType) => setFormData(prev => ({
@@ -616,7 +621,7 @@ export const IbisSubmissionModal = ({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || !formData.title.trim() || !formData.nodeType}>
               {isSubmitting ? 'Sharing...' : 'Share'}
             </Button>
           </DialogFooter>
