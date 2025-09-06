@@ -78,13 +78,27 @@ export const useEnhancedProactivePrompts = ({
 
         setFacilitatorSession(updatedSession);
       } else {
+        // Get default facilitator agent (flow_agent)
+        const { data: defaultAgent } = await supabase
+          .from('agent_configurations')
+          .select('id')
+          .eq('agent_type', 'flow_agent')
+          .eq('is_active', true)
+          .eq('is_default', true)
+          .single();
+
+        if (!defaultAgent) {
+          console.error('No default flow_agent configuration found for facilitator session');
+          return;
+        }
+
         // Create new facilitator session
         const { data: newSession } = await supabase
           .from('facilitator_sessions')
           .insert({
             user_id: userId,
             deliberation_id: deliberationId,
-            agent_config_id: '00000000-0000-0000-0000-000000000000', // Default facilitator agent
+            agent_config_id: defaultAgent.id,
             session_state: {
               currentSessionId: currentSession.id,
               sessionStartedAt: currentSession.created_at,
