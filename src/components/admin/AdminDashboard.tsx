@@ -16,8 +16,6 @@ import { SystemStats } from './SystemStats';
 import { BulkUserCreation } from './BulkUserCreation';
 import { PromptManagement } from './PromptManagement';
 import { AgentRatingDashboard } from './AgentRatingDashboard';
-import { AnonymityDashboard } from './AnonymityDashboard';
-import { SessionsManagement } from './SessionsManagement';
 
 import { useAdminData } from '@/hooks/useAdminData';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
@@ -75,13 +73,11 @@ export const AdminDashboard = () => {
       {/* Main Content Tabs - Sticky */}
       <Tabs defaultValue="users" className="w-full">
         <div className="sticky top-28 z-30 bg-deliberation-bg/95 backdrop-blur-sm py-2 -mx-6 px-6 border-b border-border/50">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Users & Access</TabsTrigger>
           <TabsTrigger value="agents">Agents</TabsTrigger>
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="deliberations">Deliberations</TabsTrigger>
-          <TabsTrigger value="privacy">Privacy</TabsTrigger>
-          <TabsTrigger value="sessions">Sessions</TabsTrigger>
           <TabsTrigger value="ratings">Agent Ratings</TabsTrigger>
           </TabsList>
         </div>
@@ -142,14 +138,6 @@ export const AdminDashboard = () => {
               });
             }} // Implemented status update handler
           />
-        </TabsContent>
-
-        <TabsContent value="privacy" className="space-y-4">
-          <AnonymityDashboard />
-        </TabsContent>
-
-        <TabsContent value="sessions" className="space-y-4">
-          <SessionsManagement />
         </TabsContent>
 
         <TabsContent value="ratings" className="space-y-4">
