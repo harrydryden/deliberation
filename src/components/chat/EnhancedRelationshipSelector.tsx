@@ -357,6 +357,9 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                                  <SelectItem value="relates_to">Relates To</SelectItem>
                                  <SelectItem value="builds_on">Builds On</SelectItem>
                                  <SelectItem value="questions">Questions</SelectItem>
+                                 <SelectItem value="counters">Counters</SelectItem>
+                                 <SelectItem value="strengthens">Strengthens</SelectItem>
+                                 <SelectItem value="refines">Refines</SelectItem>
                                </SelectContent>
                              </Select>
                            </div>
@@ -462,6 +465,9 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                         <SelectItem value="relates_to">Relates To</SelectItem>
                         <SelectItem value="builds_on">Builds On</SelectItem>
                         <SelectItem value="questions">Questions</SelectItem>
+                        <SelectItem value="counters">Counters</SelectItem>
+                        <SelectItem value="strengthens">Strengthens</SelectItem>
+                        <SelectItem value="refines">Refines</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
