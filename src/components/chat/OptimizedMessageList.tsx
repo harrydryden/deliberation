@@ -104,6 +104,9 @@ const OptimizedMessageItem = memo(({
   return (
     <div className="pb-4">
       <div className="flex gap-3">
+        <div className="text-xs text-red-500 absolute -left-20">
+          Debug: Message {message.id.substring(0, 8)} - {message.message_type}
+        </div>
         <Avatar className="h-8 w-8">
           <AvatarFallback className={isUser ? 'bg-primary' : agentInfo?.color || 'bg-muted-foreground'}>
             {isUser ? (
