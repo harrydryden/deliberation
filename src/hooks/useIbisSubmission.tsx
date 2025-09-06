@@ -1,0 +1,160 @@
+import { useState, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useStanceService } from '@/hooks/useServices';
+import { IBISService } from '@/services/domain/implementations/ibis.service';
+import { logger } from '@/utils/logger';
+
+export interface IbisSubmissionData {
+  title: string;
+  description: string;
+  nodeType: string;
+  parentNodeId?: string;
+  issueRecommendationRelationships: Array<{
+    id: string;
+    type: string;
+    confidence: number;
+  }>;
+  manualRelationships: Array<{
+    id: string;
+    type: string;
+    confidence: number;
+  }>;
+  selectedIssueId?: string;
+  isLinkingMode: boolean;
+}
+
+export interface AIClassification {
+  title: string;
+  keywords: string[];
+  nodeType: string;
+  description: string;
+  confidence: number;
+  stanceScore?: number;
+}
+
+export const useIbisSubmission = (
+  deliberationId: string,
+  messageId: string,
+  messageContent: string,
+  onSuccess?: () => void
+) => {
+  const { toast } = useToast();
+  const { user } = useSupabaseAuth();
+  const stanceService = useStanceService();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const ibisService = new IBISService();
+
+  const submitToIbis = useCallback(async (
+    submissionData: IbisSubmissionData,
+    aiSuggestions?: AIClassification
+  ) => {
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    if (!submissionData.title.trim() || !submissionData.nodeType) {
+      throw new Error('Please provide a title and select a node type');
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      logger.info('[useIbisSubmission] Starting IBIS submission', { submissionData });
+
+      let nodeId: string;
+      const allRelationships = [
+        ...submissionData.issueRecommendationRelationships,
+        ...submissionData.manualRelationships
+      ];
+
+      if (submissionData.isLinkingMode && submissionData.selectedIssueId) {
+        // Link to existing issue
+        nodeId = submissionData.selectedIssueId;
+        await ibisService.linkMessageToIssue(
+          messageId,
+          submissionData.selectedIssueId,
+          user.id,
+          deliberationId
+        );
+      } else {
+        // Create new node
+        const nodeData = {
+          title: submissionData.title.trim(),
+          description: submissionData.description.trim() || undefined,
+          node_type: submissionData.nodeType,
+          parent_node_id: submissionData.parentNodeId && submissionData.parentNodeId !== 'none' 
+            ? submissionData.parentNodeId 
+            : undefined,
+          deliberation_id: deliberationId,
+          message_id: messageId,
+          created_by: user.id
+        };
+
+        const inserted = await ibisService.createNode(nodeData);
+        nodeId = inserted.id;
+
+        // Create relationships if not in linking mode
+        if (!submissionData.isLinkingMode && allRelationships.length > 0) {
+          await ibisService.createRelationships(
+            allRelationships,
+            nodeId,
+            deliberationId,
+            user.id
+          );
+        }
+      }
+
+      // Store stance score if available from AI classification
+      if (aiSuggestions?.stanceScore !== undefined) {
+        try {
+          await stanceService.updateStanceScore(
+            user.id,
+            deliberationId,
+            aiSuggestions.stanceScore,
+            aiSuggestions.confidence || 0.5,
+            {
+              source: 'ibis_submission',
+              nodeType: submissionData.nodeType,
+              keywords: aiSuggestions.keywords,
+              messageId
+            }
+          );
+        } catch (stanceError) {
+          logger.error('[useIbisSubmission] Failed to store stance score', { error: stanceError });
+          // Don't fail the entire submission if stance storage fails
+        }
+      }
+
+      // Mark message as submitted to IBIS
+      await ibisService.markMessageAsSubmitted(messageId);
+
+      toast({
+        title: "Success",
+        description: submissionData.isLinkingMode 
+          ? "Message linked to existing issue successfully"
+          : "Message successfully submitted to IBIS"
+      });
+
+      onSuccess?.();
+      logger.info('[useIbisSubmission] IBIS submission completed successfully', { nodeId });
+
+    } catch (error: any) {
+      logger.error('[useIbisSubmission] Error submitting to IBIS', { error });
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to submit message to IBIS"
+      });
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [user, deliberationId, messageId, toast, onSuccess, stanceService]);
+
+  return {
+    submitToIbis,
+    isSubmitting
+  };
+};
