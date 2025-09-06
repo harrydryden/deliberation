@@ -26,7 +26,6 @@ export class AuthLoadingBoundary extends Component<Props, State> {
   }
 
   render() {
-    logger.debug('AuthLoadingBoundary render', { hasError: this.state.hasError });
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center">

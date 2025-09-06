@@ -21,34 +21,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  const checkAdminStatus = async (userId: string) => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_role')
+        .eq('id', userId)
+        .single();
+      
+      const hasAdminRole = profile?.user_role === 'admin' || false;
+      setIsAdmin(hasAdminRole);
+      return hasAdminRole;
+    } catch (error) {
+      logger.error('Error checking admin status:', error);
+      setIsAdmin(false);
+      return false;
+    }
+  };
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         logger.info('Auth state changed', { event, userId: session?.user?.id });
         
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Check admin status when user signs in
+        // Check admin status when user signs in/out
         if (session?.user) {
-          // Check admin status from database
-          setTimeout(async () => {
-            try {
-              const { data: profile, error } = await supabase
-                .from('profiles')
-                .select('user_role')
-                .eq('id', session.user.id)
-                .single();
-              
-              const hasAdminRole = profile?.user_role === 'admin' || false;
-              setIsAdmin(hasAdminRole);
-            } catch (error) {
-              console.error('Error checking admin status:', error);
-              logger.error('Error checking admin status:', error);
-              setIsAdmin(false);
-            }
-          }, 0);
+          setTimeout(() => checkAdminStatus(session.user.id), 0);
         } else {
           setIsAdmin(false);
         }
@@ -64,22 +66,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       // Check admin status for existing session
       if (session?.user) {
-        setTimeout(async () => {
-          try {
-            const { data: profile, error } = await supabase
-              .from('profiles')
-              .select('user_role')
-              .eq('id', session.user.id)
-              .single();
-            
-            const hasAdminRole = profile?.user_role === 'admin' || false;
-            setIsAdmin(hasAdminRole);
-          } catch (error) {
-            console.error('Error checking admin status:', error);
-            logger.error('Error checking admin status:', error);
-            setIsAdmin(false);
-          }
-          setIsLoading(false);
+        setTimeout(() => {
+          checkAdminStatus(session.user.id).finally(() => setIsLoading(false));
         }, 0);
       } else {
         setIsLoading(false);
@@ -92,69 +80,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const createAdminUsers = async () => {
     try {
-      console.log('Creating admin users...');
+      logger.info('Creating admin users...');
       
-      // Create ADMIN user
-      const { data: adminData, error: adminError } = await supabase.auth.signUp({
-        email: 'ADMIN@deliberation.local',
-        password: '123456',
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            role: 'admin'
-          }
-        }
-      });
+      const adminUsers = [
+        { email: 'ADMIN@deliberation.local', password: '123456' },
+        { email: 'SUPER@deliberation.local', password: '543210' }
+      ];
 
-      if (adminError) {
-        console.error('Error creating admin user:', adminError);
-      } else {
-        console.log('Admin user created successfully', adminData);
-        
-        // Set admin role in profiles table
-        if (adminData.user) {
-          await supabase
-            .from('profiles')
-            .upsert({ 
-              id: adminData.user.id,
-              user_role: 'admin',
-              created_at: new Date().toISOString()
-            });
+      const results = [];
+      
+      for (const { email, password } of adminUsers) {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: { role: 'admin' }
+          }
+        });
+
+        if (error) {
+          logger.error(`Error creating user ${email}:`, error);
+          results.push({ email, success: false, error });
+        } else {
+          logger.info(`User ${email} created successfully`);
+          
+          // Set admin role in profiles table
+          if (data.user) {
+            await supabase
+              .from('profiles')
+              .upsert({ 
+                id: data.user.id,
+                user_role: 'admin',
+                created_at: new Date().toISOString()
+              });
+          }
+          results.push({ email, success: true });
         }
       }
 
-      // Create SUPER user
-      const { data: superData, error: superError } = await supabase.auth.signUp({
-        email: 'SUPER@deliberation.local',
-        password: '543210',
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            role: 'admin'
-          }
-        }
-      });
-
-      if (superError) {
-        console.error('Error creating super user:', superError);
-      } else {
-        console.log('Super user created successfully', superData);
-        
-        // Set admin role in profiles table
-        if (superData.user) {
-          await supabase
-            .from('profiles')
-            .upsert({ 
-              id: superData.user.id,
-              user_role: 'admin',
-              created_at: new Date().toISOString()
-            });
-        }
-      }
-
-      return { success: true };
+      return { success: true, results };
     } catch (error) {
-      console.error('Error in createAdminUsers:', error);
+      logger.error('Error in createAdminUsers:', error);
       return { success: false, error };
     }
   };
