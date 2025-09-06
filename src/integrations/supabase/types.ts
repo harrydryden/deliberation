@@ -1382,7 +1382,6 @@ export type Database = {
           preset_questions: Json
           prompt_overrides: Json
           response_style: string
-          updated_at: string
         }[]
       }
       get_message_rating_summary: {
