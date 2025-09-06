@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { MessageSquare, Users, Vote, Brain, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
+import { logError } from '@/utils/consoleLogger';
 const Index = () => {
   const {
     user
@@ -25,7 +26,7 @@ const Index = () => {
       const data = await deliberationService.getDeliberations();
       setDeliberations(data);
     } catch (error) {
-      console.error('Failed to load deliberations:', error);
+      logError('Failed to load deliberations', error);
       setDeliberations([]);
     }
   };

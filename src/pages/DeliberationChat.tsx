@@ -27,6 +27,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface"));
 import { logger } from "@/utils/logger";
 import { useEnhancedProactivePrompts } from "@/hooks/useEnhancedProactivePrompts";
+import { OptimizedMessageList } from "@/components/chat/OptimizedMessageList";
 import { ProactivePrompt } from "@/components/chat/ProactivePrompt";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -303,7 +304,7 @@ const DeliberationChat = () => {
   };
   const ChatPanel = () => <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-hidden min-h-0">
-        <MessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} deliberationId={deliberationId} agentConfigs={agentConfigs} />
+        <OptimizedMessageList messages={messages} isLoading={chatLoading} isTyping={isTyping} onAddToIbis={handleAddToIbis} onRetry={retryMessage} deliberationId={deliberationId} agentConfigs={agentConfigs} />
       </div>
       <MessageInput 
         onSendMessage={sendMessage} 

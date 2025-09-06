@@ -11,6 +11,22 @@ export interface ApiResponse<T = unknown> {
   };
 }
 
+export interface AgentConfig {
+  id?: string;
+  agent_type: string;
+  name: string;
+  description?: string;
+  goals?: string[];
+  response_style?: string;
+  is_active?: boolean;
+  is_default?: boolean;
+  deliberation_id?: string;
+  created_by?: string;
+  preset_questions?: Record<string, unknown>;
+  facilitator_config?: Record<string, unknown>;
+  prompt_overrides?: Record<string, unknown>;
+}
+
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {
   meta: {
     page: number;

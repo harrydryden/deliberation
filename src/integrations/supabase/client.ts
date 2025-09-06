@@ -18,13 +18,4 @@ export const getCurrentUser = async () => {
   return user
 }
 
-// Legacy compatibility functions (deprecated - these are no longer needed)
-export const setUserContext = async (): Promise<boolean> => {
-  console.warn('setUserContext is deprecated - using Supabase Auth');
-  return true;
-};
-
-export const ensureUserContext = async (): Promise<boolean> => {
-  console.warn('ensureUserContext is deprecated - using Supabase Auth');
-  return true;
-};
+// Note: Legacy compatibility functions have been removed - use Supabase Auth directly
