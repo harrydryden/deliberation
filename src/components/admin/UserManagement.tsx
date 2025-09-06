@@ -61,7 +61,9 @@ export function UserManagement({ users, loading, onLoad, onUpdateRole, onArchive
       render: (user: User) => (
         <div>
           <div className="font-medium">{user.profile?.displayName || 'Unknown User'}</div>
-          <div className="text-sm text-muted-foreground font-mono">{user.email}</div>
+          <div className="text-sm text-muted-foreground font-mono">
+            {user.accessCode1 ? `${user.accessCode1}@deliberation.local` : 'No access code'}
+          </div>
         </div>
       )
     },

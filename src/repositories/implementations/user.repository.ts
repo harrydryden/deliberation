@@ -203,13 +203,13 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         
         return {
           id: profile.id,
-          email: `user-${profile.id.slice(0, 8)}@example.com`,
+          email: profile.access_code_1 ? `${profile.access_code_1}@deliberation.local` : '',
           emailConfirmedAt: profile.created_at,
           createdAt: profile.created_at,
           lastSignInAt: profile.updated_at,
           role: role,
           profile: {
-            displayName: `User ${profile.id.slice(0, 8)}`,
+            displayName: profile.access_code_1 ? `User ${profile.access_code_1}` : `User ${profile.id.slice(0, 8)}`,
             avatarUrl: '',
             bio: '',
             expertiseAreas: [],
