@@ -19,7 +19,11 @@ serve(async (req) => {
       throw new Error('Missing required fields: userId or deliberationId');
     }
 
-    console.log('🤖 Generating proactive prompt', { userId, deliberationId });
+    console.log('🤖 Generating enhanced proactive prompt', { 
+      userId, 
+      deliberationId, 
+      sessionContext: sessionContext || 'no session context provided' 
+    });
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -78,7 +82,15 @@ serve(async (req) => {
       isNewToDiscussion: (userMessages?.length || 0) < 3
     };
 
-    // Create AI prompt for generating proactive prompt
+    // Enhanced session context analysis
+    const sessionAnalysis = sessionContext ? {
+      userExperience: sessionContext.totalSessions > 5 ? 'experienced' : sessionContext.totalSessions > 2 ? 'moderate' : 'new',
+      sessionPhase: sessionContext.currentSessionAge > sessionContext.averageSessionDuration ? 'extended' : 'normal',
+      engagementLevel: sessionContext.promptsSentThisSession > 2 ? 'low' : 'moderate',
+      adaptivePrompting: true
+    } : { adaptivePrompting: false };
+
+    // Create enhanced AI prompt with session context
     const aiPrompt = `You are Flo, a helpful facilitation assistant in a deliberative discussion about "${deliberation.title}".
 
 CONTEXT:
@@ -89,24 +101,38 @@ CONTEXT:
 - Recent conversation:
 ${conversationSummary}
 
-TASK: Generate a thoughtful, engaging proactive prompt to re-engage this user who has been inactive for 5 minutes. The prompt should:
+${sessionContext ? `
+ENHANCED SESSION CONTEXT:
+- User experience level: ${sessionAnalysis.userExperience} (${sessionContext.totalSessions} total sessions)
+- Current session duration: ${Math.round(sessionContext.currentSessionAge / 60000)} minutes
+- Average session duration: ${Math.round(sessionContext.averageSessionDuration / 60000)} minutes  
+- Session phase: ${sessionAnalysis.sessionPhase}
+- Prompts sent this session: ${sessionContext.promptsSentThisSession}
+- Is long-running session: ${sessionContext.isLongSession ? 'yes' : 'no'}
+` : ''}
+
+TASK: Generate a thoughtful, engaging proactive prompt to re-engage this user who has been inactive for a personalized duration. The prompt should:
 
 1. Be contextually relevant to the ongoing discussion
-2. Encourage meaningful participation 
-3. Be welcoming and not pushy
-4. Offer specific ways to contribute
-5. Be concise (1-2 sentences)
+2. ${sessionAnalysis.userExperience === 'new' ? 'Be welcoming and provide gentle guidance for new participants' : ''}
+3. ${sessionAnalysis.userExperience === 'experienced' ? 'Build on their experience and encourage deeper insights' : ''}
+4. ${sessionAnalysis.sessionPhase === 'extended' ? 'Acknowledge their continued engagement and suggest valuable contributions' : ''}
+5. ${sessionAnalysis.engagementLevel === 'low' ? 'Use a different approach since previous prompts haven\'t led to engagement' : ''}
+6. Be encouraging but not pushy
+7. Offer specific, actionable ways to contribute
+8. Be concise (1-2 sentences)
 
 Consider these contexts:
-- If new participant: Welcome and guide them
-- If experienced participant: Build on their previous contributions  
-- If discussion is quiet: Encourage broader participation
-- If discussion is active: Help them catch up or add perspective
+- If new participant: Welcome and guide them with specific first steps
+- If experienced participant: Build on their previous contributions and session history
+- If discussion is quiet: Encourage broader participation with specific conversation starters
+- If discussion is active: Help them catch up or add fresh perspective
+- If extended session: Acknowledge their dedication and suggest high-value contributions
 
 Respond with JSON in this format:
 {
   "question": "Your engaging proactive prompt here",
-  "context": "engagement|onboarding|catch_up|perspective"
+  "context": "engagement|onboarding|catch_up|perspective|extended_session"
 }`;
 
     // Call OpenAI API
@@ -169,16 +195,17 @@ Respond with JSON in this format:
       promptData.question = "What are your thoughts on the current discussion? I'd love to hear your perspective.";
     }
 
-    if (!promptData.context || !['engagement', 'onboarding', 'catch_up', 'perspective'].includes(promptData.context)) {
-      promptData.context = "engagement";
+    if (!promptData.context || !['engagement', 'onboarding', 'catch_up', 'perspective', 'extended_session'].includes(promptData.context)) {
+      promptData.context = sessionContext?.isLongSession ? "extended_session" : "engagement";
     }
 
-    console.log('✅ Generated proactive prompt:', promptData);
+    console.log('✅ Generated enhanced proactive prompt:', promptData);
 
     return new Response(JSON.stringify({ 
       prompt: promptData,
       deliberationTitle: deliberation.title,
-      userEngagement
+      userEngagement,
+      sessionAnalysis: sessionContext ? sessionAnalysis : null
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
