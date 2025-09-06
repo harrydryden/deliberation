@@ -606,11 +606,6 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
     } catch (langchainError) {
       console.warn('📚 LangChain function not available, using fallback:', langchainError);
     }
-        return data.response;
-      }
-    } catch (langchainError) {
-      console.log('📚 LangChain query failed, trying fallback...');
-    }
 
     // Fallback removed - query-agent-knowledge-optimized function deleted
     // If LangChain query fails, we'll return empty string
