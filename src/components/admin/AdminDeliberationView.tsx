@@ -114,6 +114,16 @@ export const AdminDeliberationView = () => {
           agent_context: msg.agent_context
         }));
         setMessages(chatMessages);
+
+        // Auto-expand all user messages with agent responses for admin view
+        const userMessagesWithResponses = new Set<string>();
+        const tempGroups = groupMessages(chatMessages);
+        tempGroups.forEach(group => {
+          if (group.agentResponses.length > 0) {
+            userMessagesWithResponses.add(group.userMessage.id);
+          }
+        });
+        setExpandedMessages(userMessagesWithResponses);
       } catch (err) {
         logger.error('Failed to load data', err as Error);
         setError('Failed to load deliberation');
