@@ -316,20 +316,20 @@ const OptimizedDeliberationChat = () => {
                 <div className="space-y-2">
                   {state.deliberation.description && (
                     <div>
-                      <p className="text-sm text-muted-foreground line-clamp-2 cursor-pointer" 
+                      <p className="text-sm text-muted-foreground cursor-pointer" 
                          onClick={() => setState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
                          title="Click to view full description">
-                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description}
+                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description.length > 50 ? `${state.deliberation.description.slice(0, 50)}...` : state.deliberation.description}
                       </p>
                     </div>
                   )}
                   
                   {state.deliberation.notion && (
                     <div>
-                      <p className="text-sm text-muted-foreground line-clamp-1 cursor-pointer" 
+                      <p className="text-sm text-muted-foreground cursor-pointer" 
                          onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
                          title="Click to view full notion statement">
-                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion}
+                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion.length > 50 ? `${state.deliberation.notion.slice(0, 50)}...` : state.deliberation.notion}
                       </p>
                     </div>
                   )}
@@ -392,18 +392,18 @@ const OptimizedDeliberationChat = () => {
                   {/* Description and Notion - Desktop */}
                   <div className="space-y-1 flex-1 overflow-hidden">
                     {state.deliberation.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-1 cursor-pointer" 
+                      <p className="text-xs text-muted-foreground cursor-pointer" 
                          onClick={() => setState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
                          title="Click to view full description">
-                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description}
+                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description.length > 50 ? `${state.deliberation.description.slice(0, 50)}...` : state.deliberation.description}
                       </p>
                     )}
                     
                     {state.deliberation.notion && (
-                      <p className="text-xs text-muted-foreground line-clamp-1 cursor-pointer" 
+                      <p className="text-xs text-muted-foreground cursor-pointer" 
                          onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
                          title="Click to view full notion statement">
-                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion}
+                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion.length > 50 ? `${state.deliberation.notion.slice(0, 50)}...` : state.deliberation.notion}
                       </p>
                     )}
                   </div>
