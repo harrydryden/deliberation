@@ -19,6 +19,10 @@ interface RelationshipSuggestion {
   semanticSimilarity: number;
 }
 
+interface SelectedSuggestion extends RelationshipSuggestion {
+  selectedRelationshipType: string;
+}
+
 interface EnhancedRelationshipSelectorProps {
   deliberationId: string;
   content: string;
@@ -36,6 +40,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
 }) => {
   const [suggestions, setSuggestions] = useState<RelationshipSuggestion[]>([]);
   const [selectedRelationships, setSelectedRelationships] = useState<Set<string>>(new Set());
+  const [suggestionRelationshipTypes, setSuggestionRelationshipTypes] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
   const [evaluated, setEvaluated] = useState(false);
   const [existingNodes, setExistingNodes] = useState<Array<{id: string, title: string, node_type: string}>>([]);
@@ -123,8 +128,16 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
     
     if (newSelected.has(key)) {
       newSelected.delete(key);
+      // Remove the custom relationship type when deselecting
+      const newRelTypes = new Map(suggestionRelationshipTypes);
+      newRelTypes.delete(key);
+      setSuggestionRelationshipTypes(newRelTypes);
     } else if (newSelected.size < MAX_CONNECTIONS) {
       newSelected.add(key);
+      // Initialize with AI suggested type
+      const newRelTypes = new Map(suggestionRelationshipTypes);
+      newRelTypes.set(key, suggestion.relationshipType);
+      setSuggestionRelationshipTypes(newRelTypes);
     } else {
       toast({
         title: "Maximum Connections Reached",
@@ -135,17 +148,39 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
     }
     
     setSelectedRelationships(newSelected);
-    
-    // Update parent component
+    updateParentWithCurrentSelections(newSelected);
+  };
+
+  const updateSuggestionRelationshipType = (suggestionKey: string, newType: string) => {
+    const newRelTypes = new Map(suggestionRelationshipTypes);
+    newRelTypes.set(suggestionKey, newType);
+    setSuggestionRelationshipTypes(newRelTypes);
+    updateParentWithCurrentSelections(selectedRelationships);
+  };
+
+  const updateParentWithCurrentSelections = (selected: Set<string>) => {
+    // Update parent component with current selections
     const relationships = suggestions
-      .filter(s => newSelected.has(`${s.nodeId}-${s.relationshipType}`))
-      .map(s => ({
-        id: s.nodeId,
-        type: s.relationshipType,
-        confidence: s.confidence
-      }));
+      .filter(s => {
+        const key = `${s.nodeId}-${s.relationshipType}`;
+        return selected.has(key);
+      })
+      .map(s => {
+        const key = `${s.nodeId}-${s.relationshipType}`;
+        const selectedType = suggestionRelationshipTypes.get(key) || s.relationshipType;
+        return {
+          id: s.nodeId,
+          type: selectedType,
+          confidence: s.confidence
+        };
+      });
     
-    onRelationshipsChange(relationships);
+    // Add manual connections
+    const manualRels = manualConnections
+      .filter(conn => conn.nodeId && conn.relationshipType)
+      .map(conn => ({ id: conn.nodeId, type: conn.relationshipType, confidence: 0.8 }));
+    
+    onRelationshipsChange([...relationships, ...manualRels]);
   };
 
   const addManualConnection = () => {
@@ -171,15 +206,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
       // Update parent when both fields are filled
       if (updated[index].nodeId && updated[index].relationshipType) {
         console.log('🟠 UPDATING PARENT WITH RELATIONSHIPS');
-        const allConnections = [
-          ...suggestions
-            .filter(s => selectedRelationships.has(`${s.nodeId}-${s.relationshipType}`))
-            .map(s => ({ id: s.nodeId, type: s.relationshipType, confidence: s.confidence })),
-          ...updated
-            .filter(conn => conn.nodeId && conn.relationshipType)
-            .map(conn => ({ id: conn.nodeId, type: conn.relationshipType, confidence: 0.8 }))
-        ];
-        onRelationshipsChange(allConnections);
+        updateParentWithCurrentSelections(selectedRelationships);
       }
       
       return updated;
@@ -189,18 +216,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   const removeManualConnection = (index: number) => {
     setManualConnections(prev => {
       const updated = prev.filter((_, i) => i !== index);
-      
-      // Update parent
-      const allConnections = [
-        ...suggestions
-          .filter(s => selectedRelationships.has(`${s.nodeId}-${s.relationshipType}`))
-          .map(s => ({ id: s.nodeId, type: s.relationshipType, confidence: s.confidence })),
-        ...updated
-          .filter(conn => conn.nodeId && conn.relationshipType)
-          .map(conn => ({ id: conn.nodeId, type: conn.relationshipType, confidence: 0.8 }))
-      ];
-      onRelationshipsChange(allConnections);
-      
+      updateParentWithCurrentSelections(selectedRelationships);
       return updated;
     });
   };
@@ -277,69 +293,92 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                const key = `${suggestion.nodeId}-${suggestion.relationshipType}`;
                const isSelected = selectedRelationships.has(key);
                const canSelect = totalConnections < MAX_CONNECTIONS || isSelected;
-              
-              return (
-                <Card
-                  key={key}
-                  className={`cursor-pointer transition-all hover:shadow-sm ${
-                    isSelected 
-                      ? 'ring-2 ring-primary bg-primary/5' 
-                      : canSelect 
-                        ? 'hover:border-primary/50'
-                        : 'opacity-60 cursor-not-allowed hover:border-border'
-                  }`}
-                  onClick={() => canSelect && toggleRelationship(suggestion)}
-                >
-                  <CardContent className="p-3">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-1">
-                        {isSelected ? (
-                          <CheckCircle2 className="h-4 w-4 text-primary" />
-                        ) : canSelect ? (
-                          <div className="h-4 w-4 rounded-full border-2 border-border hover:border-primary transition-colors" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-lg">{getNodeTypeIcon(suggestion.nodeType)}</span>
-                          <span className="font-medium text-sm truncate">
-                            {suggestion.nodeTitle}
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge 
-                            variant="outline" 
-                            className={`text-xs ${getRelationshipColor(suggestion.relationshipType)}`}
-                          >
-                            <ArrowRight className="h-3 w-3 mr-1" />
-                            {formatRelationshipType(suggestion.relationshipType)}
-                          </Badge>
-                          <Badge variant="outline" className={`text-xs ${getConfidenceColor(suggestion.confidence)}`}>
-                            {Math.round(suggestion.confidence * 100)}% confidence
-                          </Badge>
-                        </div>
-                        
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {suggestion.reasoning}
-                        </p>
-                        
-                        {suggestion.semanticSimilarity && (
-                          <div className="mt-1">
-                            <Badge variant="secondary" className="text-xs">
-                              {Math.round(suggestion.semanticSimilarity * 100)}% similarity
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+               const selectedRelType = suggestionRelationshipTypes.get(key) || suggestion.relationshipType;
+               
+               return (
+                 <Card
+                   key={key}
+                   className={`transition-all hover:shadow-sm ${
+                     isSelected 
+                       ? 'ring-2 ring-primary bg-primary/5' 
+                       : canSelect 
+                         ? 'hover:border-primary/50'
+                         : 'opacity-60 cursor-not-allowed hover:border-border'
+                   }`}
+                 >
+                   <CardContent className="p-3">
+                     <div className="flex items-start gap-3">
+                       <div className="flex-shrink-0 mt-1">
+                         <div 
+                           className={`h-4 w-4 rounded-full border-2 cursor-pointer transition-colors ${
+                             isSelected 
+                               ? 'bg-primary border-primary' 
+                               : canSelect 
+                                 ? 'border-border hover:border-primary'
+                                 : 'border-muted-foreground'
+                           }`}
+                           onClick={() => canSelect && toggleRelationship(suggestion)}
+                         >
+                           {isSelected && <CheckCircle2 className="h-4 w-4 text-primary-foreground" />}
+                         </div>
+                       </div>
+                       
+                       <div className="flex-1 min-w-0">
+                         <div className="flex items-center gap-2 mb-1">
+                           <span className="text-lg">{getNodeTypeIcon(suggestion.nodeType)}</span>
+                           <span className="font-medium text-sm truncate">
+                             {suggestion.nodeTitle}
+                           </span>
+                         </div>
+                         
+                         <div className="flex items-center gap-2 mb-2">
+                           <Badge variant="outline" className="text-xs bg-muted/50">
+                             AI suggests: {formatRelationshipType(suggestion.relationshipType)}
+                           </Badge>
+                           <Badge variant="outline" className={`text-xs ${getConfidenceColor(suggestion.confidence)}`}>
+                             {Math.round(suggestion.confidence * 100)}% confidence
+                           </Badge>
+                         </div>
+
+                         {isSelected && (
+                           <div className="mb-2">
+                             <Label className="text-xs">Connection Type</Label>
+                             <Select
+                               value={selectedRelType}
+                               onValueChange={(value) => updateSuggestionRelationshipType(key, value)}
+                             >
+                               <SelectTrigger className="h-7 text-xs">
+                                 <SelectValue />
+                               </SelectTrigger>
+                               <SelectContent className="bg-background border border-border shadow-lg z-50">
+                                 <SelectItem value="supports">Supports</SelectItem>
+                                 <SelectItem value="opposes">Opposes</SelectItem>
+                                 <SelectItem value="addresses">Addresses</SelectItem>
+                                 <SelectItem value="relates_to">Relates To</SelectItem>
+                                 <SelectItem value="builds_on">Builds On</SelectItem>
+                                 <SelectItem value="questions">Questions</SelectItem>
+                               </SelectContent>
+                             </Select>
+                           </div>
+                         )}
+                         
+                         <p className="text-xs text-muted-foreground line-clamp-2">
+                           {suggestion.reasoning}
+                         </p>
+                         
+                         {suggestion.semanticSimilarity && (
+                           <div className="mt-1">
+                             <Badge variant="secondary" className="text-xs">
+                               {Math.round(suggestion.semanticSimilarity * 100)}% similarity
+                             </Badge>
+                           </div>
+                         )}
+                       </div>
+                     </div>
+                   </CardContent>
+                 </Card>
+               );
+             })}
           </div>
         </div>
       )}
@@ -438,33 +477,37 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
              <CheckCircle2 className="h-4 w-4 text-primary" />
              Selected Connections ({totalConnections}/{MAX_CONNECTIONS})
            </h6>
-          <div className="space-y-1 text-xs text-muted-foreground">
-            {suggestions
-              .filter(s => selectedRelationships.has(`${s.nodeId}-${s.relationshipType}`))
-              .map(s => (
-                <div key={`${s.nodeId}-${s.relationshipType}`} className="flex items-center gap-2">
-                  <span>{getNodeTypeIcon(s.nodeType)}</span>
-                  <span className="font-medium">{s.nodeTitle.slice(0, 30)}...</span>
-                  <ArrowRight className="h-3 w-3 text-primary" />
-                  <span className="text-primary">{formatRelationshipType(s.relationshipType)}</span>
-                  <Badge variant="outline" className="text-xs">AI</Badge>
-                </div>
-              ))}
-            {manualConnections
-              .filter(conn => conn.nodeId && conn.relationshipType)
-              .map((conn, index) => {
-                const node = existingNodes.find(n => n.id === conn.nodeId);
-                return (
-                  <div key={`manual-${index}`} className="flex items-center gap-2">
-                    <span>{node ? getNodeTypeIcon(node.node_type) : '📄'}</span>
-                    <span className="font-medium">{node ? node.title.slice(0, 30) + '...' : 'Unknown'}</span>
-                    <ArrowRight className="h-3 w-3 text-primary" />
-                    <span className="text-primary">{formatRelationshipType(conn.relationshipType)}</span>
-                    <Badge variant="outline" className="text-xs">Manual</Badge>
-                  </div>
-                );
-              })}
-          </div>
+           <div className="space-y-1 text-xs text-muted-foreground">
+             {suggestions
+               .filter(s => selectedRelationships.has(`${s.nodeId}-${s.relationshipType}`))
+               .map(s => {
+                 const key = `${s.nodeId}-${s.relationshipType}`;
+                 const selectedType = suggestionRelationshipTypes.get(key) || s.relationshipType;
+                 return (
+                   <div key={key} className="flex items-center gap-2">
+                     <span>{getNodeTypeIcon(s.nodeType)}</span>
+                     <span className="font-medium">{s.nodeTitle.slice(0, 30)}...</span>
+                     <ArrowRight className="h-3 w-3 text-primary" />
+                     <span className="text-primary">{formatRelationshipType(selectedType)}</span>
+                     <Badge variant="outline" className="text-xs">AI</Badge>
+                   </div>
+                 );
+               })}
+             {manualConnections
+               .filter(conn => conn.nodeId && conn.relationshipType)
+               .map((conn, index) => {
+                 const node = existingNodes.find(n => n.id === conn.nodeId);
+                 return (
+                   <div key={`manual-${index}`} className="flex items-center gap-2">
+                     <span>{node ? getNodeTypeIcon(node.node_type) : '📄'}</span>
+                     <span className="font-medium">{node ? node.title.slice(0, 30) + '...' : 'Unknown'}</span>
+                     <ArrowRight className="h-3 w-3 text-primary" />
+                     <span className="text-primary">{formatRelationshipType(conn.relationshipType)}</span>
+                     <Badge variant="outline" className="text-xs">Manual</Badge>
+                   </div>
+                 );
+               })}
+           </div>
         </div>
       )}
     </div>
