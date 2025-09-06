@@ -1,7 +1,6 @@
 // Memory monitoring and leak detection hook
 import { useEffect, useRef, useCallback } from 'react';
 import { logger } from '@/utils/logger';
-import { performanceMonitor } from '@/utils/performanceUtils';
 
 interface MemoryStats {
   usedJSHeapSize?: number;
@@ -164,7 +163,7 @@ export const useGlobalMemoryMonitor = () => {
             limit: (memory.jsHeapSizeLimit / (1024 * 1024)).toFixed(2)
           };
           
-          performanceMonitor.recordMetric('global-memory', memory.usedJSHeapSize);
+          // performanceMonitor.recordMetric('global-memory', memory.usedJSHeapSize);
           
           // Log to performance monitor
           logger.performance.mark('Global memory usage', stats);

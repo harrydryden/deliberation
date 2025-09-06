@@ -12,15 +12,10 @@ import { toast } from 'sonner';
 
 interface UserAccessManagementProps {
   users: User[];
-  accessCodes: any[]; // Deprecated but kept for interface compatibility
   loading: boolean;
-  loadingAccessCodes: boolean; // Deprecated but kept for interface compatibility
   onLoadUsers: () => void;
-  onLoadAccessCodes: () => void; // Deprecated but kept for interface compatibility
   onArchiveUser: (userId: string, reason?: string) => void;
   onUnarchiveUser: (userId: string) => void;
-  onCreateAccessCode: (codeType: string) => void; // Deprecated but kept for interface compatibility
-  onDeleteAccessCode: (id: string) => void; // Deprecated but kept for interface compatibility
 }
 
 export const UserAccessManagement = ({ 
@@ -28,6 +23,7 @@ export const UserAccessManagement = ({
   loading, 
   onLoadUsers, 
   onArchiveUser,
+  onUnarchiveUser
 }: UserAccessManagementProps) => {
   const [archivingUser, setArchivingUser] = useState<string | null>(null);
 

@@ -7,7 +7,6 @@ import { getErrorMessage } from "@/utils/errors";
 import { useErrorHandler } from './useErrorHandler';
 import { useOptimizedState } from './useOptimizedState';
 import { logger } from '@/utils/logger';
-import { performanceMonitor } from '@/utils/performanceUtils';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 import { useToast } from '@/hooks/use-toast';
 import { useResponseStreaming } from '@/hooks/useResponseStreaming';
@@ -132,7 +131,7 @@ export const useChat = (deliberationId?: string) => {
     setChatState(prev => ({ ...prev, isLoading: true }));
     
     await handleAsyncError(async () => {
-      const timer = performanceMonitor.startTimer('loadChatHistory');
+      // const timer = performanceMonitor.startTimer('loadChatHistory');
       
       // Use cached message loading with deduplication
       const data = await cacheService.memoizeAsync(
@@ -154,7 +153,7 @@ export const useChat = (deliberationId?: string) => {
         messages: convertApiMessagesToChatMessages(data || []),
         isLoading: false
       }));
-      timer();
+        // timer();
       logger.api.response('GET', '/messages', 200, { deliberationId, messageCount: data?.length || 0 });
     }, 'loading chat history');
   }, [user, deliberationId, handleAsyncError, setChatState, services.messageService]);
@@ -181,14 +180,14 @@ export const useChat = (deliberationId?: string) => {
     }));
 
     try {
-      const timer = performanceMonitor.startTimer('sendMessage');
+      // const timer = performanceMonitor.startTimer('sendMessage');
       
       // Clear relevant caches when sending new messages
       cacheService.clearNamespace('chat-history');
       
       const saved = await services.messageService.sendMessage(content.trim(), 'user', deliberationId, mode, user?.id);
       const savedChat = convertApiMessageToChatMessage(saved);
-      timer();
+      // timer();
       logger.api.response('POST', '/messages', 200, { deliberationId, mode, contentLength: content.length });
 
       // Replace optimistic with saved

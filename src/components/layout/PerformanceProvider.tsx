@@ -1,7 +1,6 @@
 // Performance monitoring provider for global app performance
 import React, { useEffect } from 'react';
 import { useGlobalMemoryMonitor } from '@/hooks/useMemoryMonitor';
-import { performanceMonitor } from '@/utils/performanceUtils';
 import { logger } from '@/utils/logger';
 
 interface PerformanceProviderProps {
@@ -36,7 +35,7 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({ childr
             
             // Record each valid metric
             Object.entries(validMetrics).forEach(([name, value]) => {
-              performanceMonitor.recordMetric(`page.${name}`, value as number);
+              // performanceMonitor.recordMetric(`page.${name}`, value as number);
             });
           }
         }
@@ -53,7 +52,7 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({ childr
                   duration: `${entry.duration.toFixed(2)}ms`,
                   startTime: entry.startTime
                 });
-                performanceMonitor.recordMetric('long-task', entry.duration);
+                // performanceMonitor.recordMetric('long-task', entry.duration);
               }
             }
           });
@@ -78,7 +77,7 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({ childr
                   value: cls.value,
                   sources: cls.sources?.length || 0
                 });
-                performanceMonitor.recordMetric('layout-shift', cls.value);
+                // performanceMonitor.recordMetric('layout-shift', cls.value);
               }
             }
           });
@@ -96,10 +95,10 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({ childr
   // Log performance metrics periodically
   useEffect(() => {
     const interval = setInterval(() => {
-      const metrics = performanceMonitor.getAllMetrics();
-      if (Object.keys(metrics).length > 0) {
-        logger.performance.mark('Performance summary', metrics);
-      }
+      // const metrics = performanceMonitor.getAllMetrics();
+      // if (Object.keys(metrics).length > 0) {
+      //   logger.performance.mark('Performance summary', metrics);
+      // }
     }, 60000); // Every minute
 
     return () => clearInterval(interval);

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@/test/utils';
 import { performance } from 'perf_hooks';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
-import { MessageList } from '@/components/chat/MessageList';
+import { OptimizedMessageList } from '@/components/chat/OptimizedMessageList';
 
 // Mock heavy dependencies
 vi.mock('@/hooks/useStandardizedAdminData', () => ({
@@ -36,7 +36,7 @@ describe('Component Performance Tests', () => {
     expect(screen.getByTestId('admin-dashboard')).toBeInTheDocument();
   });
 
-  it('MessageList handles large message lists efficiently', async () => {
+  it('OptimizedMessageList handles large message lists efficiently', async () => {
     const largeMessageList = Array.from({ length: 1000 }, (_, i) => ({
       id: `message-${i}`,
       content: `Message ${i}`,
@@ -49,7 +49,7 @@ describe('Component Performance Tests', () => {
     
     const startTime = performance.now();
     
-    render(<MessageList messages={largeMessageList} isLoading={false} isTyping={false} />);
+    render(<OptimizedMessageList messages={largeMessageList} isLoading={false} isTyping={false} />);
     
     const endTime = performance.now();
     const renderTime = endTime - startTime;

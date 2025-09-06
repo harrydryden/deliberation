@@ -2,7 +2,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useServices } from '@/hooks/useServices';
 import { cacheService } from '@/services/cache.service';
-import { performanceMonitor } from '@/utils/performanceUtils';
 import { logger } from '@/utils/logger';
 import type { Message } from '@/types/index';
 
@@ -37,7 +36,7 @@ export const useOptimizedMessageLoading = (options: UseOptimizedMessageLoadingOp
     setError(null);
 
     try {
-      const timer = performanceMonitor.startTimer('loadMessages');
+      // const timer = performanceMonitor.startTimer('loadMessages');
 
       // Use caching for message requests
       const cacheKey = enablePagination 
@@ -69,7 +68,7 @@ export const useOptimizedMessageLoading = (options: UseOptimizedMessageLoadingOp
         currentPageRef.current = page;
       }
 
-      timer();
+      // timer();
       logger.performance.mark('Messages loaded', { 
         page, 
         count: data?.length || 0,

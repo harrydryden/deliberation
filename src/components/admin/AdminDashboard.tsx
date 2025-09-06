@@ -23,7 +23,6 @@ import { logger } from '@/utils/logger';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { usePerformanceOptimization, useComponentMetrics } from '@/hooks/usePerformanceOptimization';
 
 export const AdminDashboard = () => {
   const adminData = useAdminData();
@@ -32,16 +31,9 @@ export const AdminDashboard = () => {
   const { toast } = useToast();
   
   useMemoryLeakDetection('AdminDashboard');
-  
-  // Performance optimization
-  const { createOptimizedCallback, createBatchedUpdater } = usePerformanceOptimization({
-    componentName: 'AdminDashboard',
-    enableLogging: true
-  });
-  const { getMetrics } = useComponentMetrics('AdminDashboard');
 
   useEffect(() => {
-    const initializeData = createOptimizedCallback(async () => {
+    const initializeData = async () => {
       await handleAsyncError(async () => {
         await Promise.all([
           adminData.fetchStats(),
@@ -51,10 +43,10 @@ export const AdminDashboard = () => {
         ]);
         logger.component.mount('AdminDashboard', { message: 'Admin dashboard initialized successfully' });
       }, 'admin dashboard initialization');
-    }, [handleAsyncError, adminData], 'initializeData');
+    };
     
     initializeData();
-  }, [createOptimizedCallback, handleAsyncError, adminData]);
+  }, [handleAsyncError, adminData]);
 
 
   return (
@@ -99,15 +91,10 @@ export const AdminDashboard = () => {
           />
           <UserAccessManagement
             users={adminData.users}
-            accessCodes={adminData.accessCodes}
             loading={adminData.loadingUsers}
-            loadingAccessCodes={adminData.loadingAccessCodes}
             onLoadUsers={adminData.fetchUsers}
-            onLoadAccessCodes={adminData.fetchAccessCodes}
             onArchiveUser={adminData.archiveUser}
             onUnarchiveUser={adminData.unarchiveUser}
-            onCreateAccessCode={adminData.createAccessCode}
-            onDeleteAccessCode={adminData.deleteAccessCode}
           />
         </TabsContent>
 
