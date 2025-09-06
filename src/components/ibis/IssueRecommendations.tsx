@@ -9,6 +9,7 @@ import { Lightbulb, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { IssueRecommendationService, IssueRecommendation } from '@/services/domain/implementations/issue-recommendation.service';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { logger } from '@/utils/logger';
+import { CONFIDENCE_LEVELS, RELATIONSHIP_TYPE_OPTIONS } from '@/constants/ibisTypes';
 
 interface IssueRecommendationsProps {
   deliberationId: string;
@@ -118,7 +119,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
       const relationships = Array.from(selectedIssues).map(issueId => ({
         id: issueId,
         type: issueRelationshipTypes.get(issueId) || 'supports',
-        confidence: 0.8
+        confidence: CONFIDENCE_LEVELS.AI_RECOMMENDATION
       }));
       console.log('🟠 SENDING RELATIONSHIPS TO PARENT:', relationships);
       onRelationshipsChange(relationships);
@@ -235,10 +236,11 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-background border border-border shadow-lg z-50">
-                            <SelectItem value="supports">Supports</SelectItem>
-                            <SelectItem value="opposes">Opposes</SelectItem>
-                            <SelectItem value="relates_to">Relates To</SelectItem>
-                            <SelectItem value="responds_to">Responds To</SelectItem>
+                            {RELATIONSHIP_TYPE_OPTIONS.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>

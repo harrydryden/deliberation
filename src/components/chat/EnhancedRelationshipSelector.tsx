@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Brain, Zap, ArrowRight, CheckCircle2, XCircle, Lightbulb, Plus, Trash2 } from 'lucide-react';
+import { RELATIONSHIP_TYPE_OPTIONS } from '@/constants/ibisTypes';
 
 interface RelationshipSuggestion {
   nodeId: string;
@@ -351,10 +352,11 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                                  <SelectValue />
                                </SelectTrigger>
                                 <SelectContent className="bg-background border border-border shadow-lg z-50">
-                                  <SelectItem value="supports">Supports</SelectItem>
-                                  <SelectItem value="opposes">Opposes</SelectItem>
-                                  <SelectItem value="relates_to">Relates To</SelectItem>
-                                  <SelectItem value="responds_to">Responds To</SelectItem>
+                                  {RELATIONSHIP_TYPE_OPTIONS.map((type) => (
+                                    <SelectItem key={type.value} value={type.value}>
+                                      {type.label}
+                                    </SelectItem>
+                                  ))}
                                 </SelectContent>
                              </Select>
                            </div>
@@ -454,10 +456,11 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                        <SelectContent className="bg-background border border-border shadow-lg z-50">
-                         <SelectItem value="supports">Supports</SelectItem>
-                         <SelectItem value="opposes">Opposes</SelectItem>
-                         <SelectItem value="relates_to">Relates To</SelectItem>
-                         <SelectItem value="responds_to">Responds To</SelectItem>
+                         {RELATIONSHIP_TYPE_OPTIONS.map((type) => (
+                           <SelectItem key={type.value} value={type.value}>
+                             {type.label}
+                           </SelectItem>
+                         ))}
                        </SelectContent>
                     </Select>
                   </div>

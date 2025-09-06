@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Trash2, Plus } from "lucide-react";
+import { CONFIDENCE_LEVELS } from '@/constants/ibisTypes';
 
 interface Node {
   id: string;
@@ -24,12 +25,7 @@ interface ManualNodeSelectorProps {
   className?: string;
 }
 
-const RELATIONSHIP_TYPES = [
-  { value: 'supports', label: 'Supports' },
-  { value: 'opposes', label: 'Opposes' },
-  { value: 'relates_to', label: 'Relates to' },
-  { value: 'responds_to', label: 'Responds to' }
-];
+import { RELATIONSHIP_TYPE_OPTIONS } from '@/constants/ibisTypes';
 
 export const ManualNodeSelector: React.FC<ManualNodeSelectorProps> = ({
   existingNodes,
@@ -73,7 +69,7 @@ export const ManualNodeSelector: React.FC<ManualNodeSelectorProps> = ({
       .map(conn => ({
         id: conn.nodeId,
         type: conn.relationshipType,
-        confidence: 1.0
+        confidence: CONFIDENCE_LEVELS.MANUAL_CONNECTION
       }));
     
     onConnectionsChange(validConnections);
@@ -89,7 +85,7 @@ export const ManualNodeSelector: React.FC<ManualNodeSelectorProps> = ({
       .map(conn => ({
         id: conn.nodeId,
         type: conn.relationshipType,
-        confidence: 1.0
+        confidence: CONFIDENCE_LEVELS.MANUAL_CONNECTION
       }));
     
     onConnectionsChange(validConnections);
@@ -168,7 +164,7 @@ export const ManualNodeSelector: React.FC<ManualNodeSelectorProps> = ({
                     <SelectValue placeholder="Choose relationship type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {RELATIONSHIP_TYPES.map((type) => (
+                    {RELATIONSHIP_TYPE_OPTIONS.map((type) => (
                       <SelectItem key={type.value} value={type.value}>
                         {type.label}
                       </SelectItem>
