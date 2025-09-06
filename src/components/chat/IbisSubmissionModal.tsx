@@ -162,6 +162,12 @@ export const IbisSubmissionModal = ({
   };
 
   const handleRelationshipsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
+    console.log('🔗 RELATIONSHIPS CHANGED FROM EnhancedRelationshipSelector:', relationships);
+    setSelectedRelationships(relationships);
+  };
+
+  const handleIssueRecommendationsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
+    console.log('🔗 RELATIONSHIPS CHANGED FROM IssueRecommendations:', relationships);
     setSelectedRelationships(relationships);
   };
 
@@ -562,6 +568,7 @@ export const IbisSubmissionModal = ({
                     deliberationId={deliberationId}
                     userContent={formData.description || messageContent || formData.title}
                     onIssueSelected={handleIssueSelected}
+                    onRelationshipsChange={handleIssueRecommendationsChange}
                   />
                   
                   {/* Manual Selection Dropdown */}

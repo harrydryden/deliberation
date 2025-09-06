@@ -14,6 +14,7 @@ interface IssueRecommendationsProps {
   deliberationId: string;
   userContent: string;
   onIssueSelected?: (issueId: string) => void;
+  onRelationshipsChange?: (relationships: Array<{id: string, type: string, confidence: number}>) => void;
   className?: string;
 }
 
@@ -21,6 +22,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
   deliberationId,
   userContent,
   onIssueSelected,
+  onRelationshipsChange,
   className = ''
 }) => {
   const { user } = useSupabaseAuth();
@@ -92,10 +94,25 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
   // Handle relationship type change
   const handleRelationshipTypeChange = (issueId: string, relationshipType: string) => {
+    console.log('🟠 MANUAL CONNECTION UPDATE:', {index: 0, field: 'relationshipType', value: relationshipType});
     const newRelTypes = new Map(issueRelationshipTypes);
     newRelTypes.set(issueId, relationshipType);
     setIssueRelationshipTypes(newRelTypes);
   };
+
+  // Notify parent when relationships change
+  useEffect(() => {
+    console.log('🟠 UPDATING PARENT WITH RELATIONSHIPS');
+    if (onRelationshipsChange) {
+      const relationships = Array.from(selectedIssues).map(issueId => ({
+        id: issueId,
+        type: issueRelationshipTypes.get(issueId) || 'addresses',
+        confidence: 0.8
+      }));
+      console.log('🟠 SENDING RELATIONSHIPS TO PARENT:', relationships);
+      onRelationshipsChange(relationships);
+    }
+  }, [selectedIssues, issueRelationshipTypes, onRelationshipsChange]);
 
   // Handle issue creation from recommendation
   const handleCreateFromRecommendation = async (recommendation: IssueRecommendation) => {
