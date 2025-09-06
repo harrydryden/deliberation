@@ -50,7 +50,7 @@ src/
 
 ### Unit Testing
 - **Component Tests**: Render, interaction, and state testing
-- **Hook Tests**: Custom hook behavior and state management
+- **Hook Tests**: Custom hook behaviour and state management
 - **Service Tests**: Business logic and error handling
 
 ### Integration Testing
@@ -89,7 +89,7 @@ export const render = (ui: ReactElement, options?: RenderOptions) => {
 - **Database**: In-memory database for integration tests
 
 ## Testing Guidelines
-1. **Test Behavior, Not Implementation**: Focus on what the code does, not how
+1. **Test Behaviour, Not Implementation**: Focus on what the code does, not how
 2. **Arrange-Act-Assert**: Clear test structure
 3. **Descriptive Names**: Test names should describe the scenario
 4. **Independent Tests**: Each test should be isolated

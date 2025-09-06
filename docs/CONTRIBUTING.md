@@ -101,7 +101,7 @@ export class UserService implements IUserService {
 ### Styling
 - Use Tailwind CSS utility classes
 - Follow the design system in `src/index.css`
-- Use semantic color tokens (not direct colors)
+- Use semantic colour tokens (not direct colours)
 - Ensure responsive design for all components
 
 ### Error Handling

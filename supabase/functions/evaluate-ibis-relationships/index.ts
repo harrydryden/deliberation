@@ -42,7 +42,7 @@ const RELATIONSHIP_TYPES = {
   // Argument relationships
   'argument_to_argument': ['supports', 'counters', 'strengthens', 'contradicts'],
   'issue_to_argument': ['necessitates', 'contextualizes'],
-  'position_to_argument': ['justifies', 'requires_defense_from']
+  'position_to_argument': ['justifies', 'requires_defence_from']
 };
 
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -190,7 +190,7 @@ Respond in JSON format:
       messages: [
         { 
           role: "system", 
-          content: "You are an expert in argument analysis and democratic deliberation. Analyze logical relationships between contributions accurately." 
+          content: "You are an expert in argument analysis and democratic deliberation. Analyse logical relationships between contributions accurately. Use British English spelling and grammar in all responses." 
         },
         { role: "user", content: relationshipPrompt }
       ],

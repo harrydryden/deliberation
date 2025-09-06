@@ -31,7 +31,7 @@ async function getClassificationPrompt(supabase: any, content: string, deliberat
   }
 
   // Fallback to hardcoded prompt
-  return `Analyze this message from a democratic deliberation and extract the following information:
+  return `Analyse this message from a democratic deliberation and extract the following information:
 
 Message: "${content}"${deliberationContext}
 
@@ -41,7 +41,7 @@ Please respond with a JSON object containing:
 3. "nodeType": One of "issue", "position", or "argument" based on IBIS methodology
 4. "confidence": A number between 0 and 1 indicating confidence in the classification
 5. "description": A brief description explaining the classification
-6. "stanceScore": A number between -1 and 1 indicating the stance relative to the deliberation topic (-1 = strongly against, 0 = neutral, 1 = strongly in favor)
+6. "stanceScore": A number between -1 and 1 indicating the stance relative to the deliberation topic (-1 = strongly against, 0 = neutral, 1 = strongly in favour)
 
 IBIS Guidelines:
 - "issue": Questions, problems, or topics to be discussed
@@ -49,13 +49,13 @@ IBIS Guidelines:
 - "argument": Supporting or opposing evidence for positions
 
 Stance Analysis:
-- Analyze the message's position relative to the deliberation's NOTION: "${deliberationNotion}"
+- Analyse the message's position relative to the deliberation's NOTION: "${deliberationNotion}"
 - Consider the emotional tone, supporting/opposing language, and explicit positions taken
 - Return a score between -1 (strongly opposing) and 1 (strongly supporting) with 0 being neutral
 - Base the stance specifically on the deliberation's notion, not the general topic or sub-issues
 - If no notion is provided, base it on the overall deliberation topic
 
-Respond only with valid JSON.`
+Use British English spelling and grammar throughout. Respond only with valid JSON.`
 }
 
 serve(async (req) => {

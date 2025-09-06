@@ -81,7 +81,7 @@ serve(async (req) => {
       console.warn('Error fetching user messages:', userMessagesError);
     }
 
-    // Analyze conversation context for prompt generation
+    // Analyse conversation context for prompt generation
     const conversationSummary = recentMessages?.map(msg => 
       `${msg.message_type}: ${msg.content.slice(0, 100)}...`
     ).join('\n') || 'No recent messages';
@@ -159,8 +159,8 @@ Respond with JSON in this format:
           {
             role: 'system',
             content: agentConfig ? 
-              `You are ${agentConfig.name || 'Flo'}, an expert facilitator skilled at engaging participants in meaningful deliberation. Always respond with valid JSON.` :
-              'You are Flo, an expert facilitator skilled at engaging participants in meaningful deliberation. Always respond with valid JSON.'
+              `You are ${agentConfig.name || 'Flo'}, an expert facilitator skilled at engaging participants in meaningful deliberation. Always respond with valid JSON. Use British English spelling and grammar throughout.` :
+              'You are Flo, an expert facilitator skilled at engaging participants in meaningful deliberation. Always respond with valid JSON. Use British English spelling and grammar throughout.'
           },
           {
             role: 'user',

@@ -82,7 +82,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
       console.error('Error evaluating relationships:', error);
       toast({
         title: "Analysis Failed", 
-        description: "Could not analyze relationships with existing content",
+        description: "Could not analyse relationships with existing content",
         variant: "destructive"
       });
     } finally {

@@ -126,8 +126,10 @@ serve(async (req) => {
 
     // Create enhanced prompt template for policy analysis
     const promptTemplate = PromptTemplate.fromTemplate(`
-You are an expert policy analyst specializing in legislative documents and policy interpretation. 
+You are an expert policy analyst specialising in legislative documents and policy interpretation. 
 Your role is to provide insightful, contextual analysis rather than simple factual recitation.
+
+Use British English spelling and grammar throughout your response.
 
 Context from relevant documents:
 {context}
@@ -135,7 +137,7 @@ Context from relevant documents:
 Question: {input}
 
 Instructions:
-1. Analyze the provided context thoroughly
+1. Analyse the provided context thoroughly
 2. Provide comprehensive insights, not just basic facts
 3. Include practical implications and applications
 4. Connect related concepts when relevant

@@ -57,7 +57,7 @@ serve(async (req) => {
     ).join('\n');
 
     // Create AI prompt for issue recommendations
-    const aiPrompt = `You are analyzing user content to recommend existing issues from a deliberation discussion. Your task is to find the most relevant existing issues that the user's content relates to.
+    const aiPrompt = `You are analysing user content to recommend existing issues from a deliberation discussion. Your task is to find the most relevant existing issues that the user's content relates to.
 
 USER CONTENT:
 "${content}"
@@ -65,7 +65,7 @@ USER CONTENT:
 EXISTING ISSUES:
 ${issuesContext}
 
-Please analyze the user's content and identify the ${maxRecommendations} most relevant existing issues. For each recommendation, provide:
+Please analyse the user's content and identify the ${maxRecommendations} most relevant existing issues. For each recommendation, provide:
 1. The exact issue ID (from the list above)
 2. A relevance score between 0.6-1.0 (only recommend if score >= 0.6)  
 3. A clear explanation of why this issue is relevant to the user's content
@@ -93,7 +93,7 @@ Only include issues with relevance score >= 0.6. If no issues meet this threshol
         messages: [
           {
             role: 'system',
-            content: 'You are an expert at analyzing content and finding relevant issues in deliberative discussions. Always respond with valid JSON.'
+            content: 'You are an expert at analysing content and finding relevant issues in deliberative discussions. Always respond with valid JSON. Use British English spelling and grammar throughout.'
           },
           {
             role: 'user',
@@ -168,7 +168,7 @@ Only include issues with relevance score >= 0.6. If no issues meet this threshol
 
     return new Response(JSON.stringify({ 
       recommendations: finalRecommendations,
-      totalIssuesAnalyzed: existingIssues.length 
+      totalIssuesAnalysed: existingIssues.length 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
