@@ -110,6 +110,14 @@ const OptimizedDeliberationChat = () => {
         agentService.getAgentsByDeliberation(deliberationId)
       ]);
 
+      logger.info('Deliberation data loaded:', { 
+        title: deliberationData.title,
+        hasDescription: !!deliberationData.description,
+        hasNotion: !!deliberationData.notion,
+        description: deliberationData.description?.slice(0, 100) + '...',
+        notion: deliberationData.notion
+      });
+
       const isUserParticipant = deliberationData.participants?.some((p: any) => p.user_id === user.id) || false;
       
       const mappedConfigs = agentsData.map(agent => ({
@@ -304,6 +312,29 @@ const OptimizedDeliberationChat = () => {
 
             {!state.isHeaderCollapsed && (
               <div className="px-3 pb-3 space-y-3">
+                {/* Description and Notion - Mobile */}
+                <div className="space-y-2">
+                  {state.deliberation.description && (
+                    <div>
+                      <p className="text-sm text-muted-foreground line-clamp-2 cursor-pointer" 
+                         onClick={() => setState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
+                         title="Click to view full description">
+                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {state.deliberation.notion && (
+                    <div>
+                      <p className="text-sm text-muted-foreground line-clamp-1 cursor-pointer" 
+                         onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
+                         title="Click to view full notion statement">
+                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg border bg-muted/40 p-2">
                     <ChatModeSelector 
@@ -343,7 +374,7 @@ const OptimizedDeliberationChat = () => {
             <div className="flex items-stretch gap-4">
               <div className="flex-1 min-w-0">
                 <div className="rounded-lg border bg-muted/40 p-3 h-32 flex flex-col justify-center">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3 mb-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <h1 className="text-lg font-semibold text-democratic-blue truncate">
                         {state.deliberation.title}
@@ -357,20 +388,25 @@ const OptimizedDeliberationChat = () => {
                       <span>{state.deliberation.participants?.length || state.deliberation.participant_count || 0}</span>
                     </div>
                   </div>
-                  {state.deliberation.description && (
-                    <p className="text-sm text-muted-foreground mt-2 line-clamp-1 cursor-pointer truncate" 
-                       onClick={() => setState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
-                       title="Click to view full description">
-                      <span className="font-bold">Description:</span> {state.deliberation.description}
-                    </p>
-                  )}
-                  {state.deliberation.notion && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-1 cursor-pointer truncate" 
-                       onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
-                       title="Click to view full notion statement">
-                      <span className="font-bold">Notion:</span> {state.deliberation.notion}
-                    </p>
-                  )}
+                  
+                  {/* Description and Notion - Desktop */}
+                  <div className="space-y-1 flex-1 overflow-hidden">
+                    {state.deliberation.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-1 cursor-pointer" 
+                         onClick={() => setState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
+                         title="Click to view full description">
+                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description}
+                      </p>
+                    )}
+                    
+                    {state.deliberation.notion && (
+                      <p className="text-xs text-muted-foreground line-clamp-1 cursor-pointer" 
+                         onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
+                         title="Click to view full notion statement">
+                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
