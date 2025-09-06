@@ -536,6 +536,32 @@ async function generateStreamingResponse(
   if (!response.ok) {
     const errorText = await response.text();
     console.error(`❌ OpenAI API error: ${response.status} - ${errorText}`);
+    
+    // If streaming fails due to organization verification, try non-streaming
+    if (errorText.includes('organization must be verified') && requestBody.stream) {
+      console.log('🔄 Retrying with non-streaming mode...');
+      const nonStreamBody = { ...requestBody, stream: false };
+      
+      const nonStreamResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(nonStreamBody),
+      });
+      
+      if (nonStreamResponse.ok) {
+        const data = await nonStreamResponse.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        console.log(`✅ Non-streaming response received: ${content.length} characters`);
+        
+        // Send the content as if it were streamed
+        sendData({ content, done: false });
+        return content;
+      }
+    }
+    
     throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
   }
 
