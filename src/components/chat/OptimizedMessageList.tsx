@@ -104,118 +104,21 @@ const OptimizedMessageItem = memo(({
   }, [onRetry, message.id, message.content]);
 
   return (
-    <div className="pb-4" style={{ minHeight: '80px' }}>
-      {unreadIndex !== null && index === unreadIndex && (
-        <div className="my-3 flex items-center gap-2">
-          <div className="h-px flex-1 bg-border" />
-          <span className="text-xs text-muted-foreground">Unread</span>
-          <div className="h-px flex-1 bg-border" />
+    <div className="pb-4" style={{ minHeight: '80px', border: '1px solid green', backgroundColor: 'rgba(0,255,0,0.1)' }}>
+      <div style={{ padding: '8px', fontSize: '12px', color: 'red', backgroundColor: 'yellow' }}>
+        DEBUG: Message {message.id} - {message.message_type} - Content: {message.content?.substring(0, 50)}
+      </div>
+      
+      {/* Simplified rendering for debugging */}
+      <div style={{ padding: '16px', border: '2px solid blue', margin: '8px', backgroundColor: 'white' }}>
+        <div style={{ fontWeight: 'bold', color: 'black' }}>
+          {isUser ? 'You' : `Agent (${message.message_type})`}
         </div>
-      )}
-
-      <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
-        <Avatar className="h-8 w-8 flex-shrink-0">
-          <AvatarFallback className={isUser ? 'bg-user-message' : agentInfo?.color}>
-            {isUser ? <User className="h-4 w-4 text-white" /> : <AgentIcon className="h-4 w-4 text-white" />}
-          </AvatarFallback>
-        </Avatar>
-
-        <div className={`flex-1 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
-          <div className={`flex items-center gap-2 mb-1 ${isUser ? 'justify-end' : ''}`}>
-            <span className={`text-sm font-semibold ${isUser ? 'text-muted-foreground' : 'text-foreground'}`}>
-              {isUser ? 'You' : agentInfo?.name}
-            </span>
-            {!isUser && agentInfo?.description && (
-              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                {agentInfo.description}
-              </span>
-            )}
-            <span className="text-xs text-muted-foreground">
-              {formatMessageTime(message.created_at)}
-            </span>
-          </div>
-
-          <Card className={`p-3 transition-all duration-200 ${isUser ? 'bg-user-message text-white' : agentInfo?.bgColor || 'bg-muted'}`}>
-            <div className="text-sm leading-relaxed">
-              <Suspense fallback={<div className="h-6 w-32 bg-muted rounded animate-pulse" />}> 
-                <LazyMarkdownMessage 
-                  content={message.content} 
-                  className={isUser ? 'prose-invert' : ''}
-                />
-              </Suspense>
-            </div>
-
-            {!isUser && message.agent_context?.isProactive && (
-              <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Workflow className="h-3 w-3" />
-                  <span>Proactive facilitation</span>
-                </div>
-              </div>
-            )}
-
-            {onAddToIbis && isUser && !message.submitted_to_ibis && (
-              <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleAddToIbis}
-                  className="h-6 px-2 text-xs text-white hover:bg-white/20"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Share
-                </Button>
-              </div>
-            )}
-
-            {isUser && message.submitted_to_ibis && (
-              <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                <div className="flex items-center gap-2 text-xs text-white/80">
-                  <FileText className="h-3 w-3" />
-                  <span>Submitted to IBIS</span>
-                </div>
-              </div>
-            )}
-
-            {isUser && message.status === 'pending' && (
-              <div className="mt-2 flex items-center justify-end gap-2 text-xs text-white/90">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span>Sending…</span>
-              </div>
-            )}
-
-            {isUser && message.status === 'failed' && (
-              <div className="mt-2 flex items-center justify-end gap-2 text-xs">
-                <span className="text-destructive">Failed</span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="h-6 px-2 text-xs"
-                  onClick={handleRetry}
-                >
-                  Retry
-                </Button>
-              </div>
-            )}
-
-            {!isUser && (
-              <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-                <MessageRating
-                  messageId={message.id}
-                  messageType={message.message_type}
-                  className="justify-start"
-                />
-              </div>
-            )}
-          </Card>
-
-          {!isUser && message.agent_context?.similar_nodes && (
-            <SimilarIbisNodes
-              nodes={message.agent_context.similar_nodes}
-              messageId={message.id}
-              deliberationId={deliberationId}
-            />
-          )}
+        <div style={{ color: 'black', marginTop: '8px', whiteSpace: 'pre-wrap' }}>
+          {message.content}
+        </div>
+        <div style={{ fontSize: '10px', color: 'gray', marginTop: '4px' }}>
+          {formatMessageTime(message.created_at)}
         </div>
       </div>
     </div>
