@@ -100,6 +100,41 @@ const OptimizedDeliberationChat = () => {
     messages: messages?.map(m => ({ id: m.id, type: m.message_type, content: m.content?.substring(0, 30) }))
   });
 
+  // Admin auth testing - moved outside conditional render
+  React.useEffect(() => {
+    if (isAdmin && deliberationId) {
+      const testAdminAccess = async () => {
+        try {
+          console.log('Admin test: Testing direct supabase access');
+          const { data, error } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('deliberation_id', deliberationId)
+            .order('created_at', { ascending: true });
+          
+          console.log('Admin test results:', { data, error, count: data?.length });
+          
+          // Test auth status
+          const { data: { user } } = await supabase.auth.getUser();
+          console.log('Admin test auth:', { user: user?.email, id: user?.id });
+          
+          // Test profile check  
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('user_role')
+            .eq('id', user?.id)
+            .single();
+          console.log('Admin test profile:', { profile });
+          
+        } catch (e) {
+          console.error('Admin test error:', e);
+        }
+      };
+
+      testAdminAccess();
+    }
+  }, [isAdmin, deliberationId]);
+
   // Optimized sendMessage
   const sendMessage = useCallback(async (content: string) => {
     await originalSendMessage(content, chatModeRef.current);
@@ -295,40 +330,6 @@ const OptimizedDeliberationChat = () => {
   if (!user || !state.deliberation) return null;
 
   if (isAdmin) {
-    // Test direct admin access to messages
-    const testAdminAccess = async () => {
-      try {
-        console.log('Admin test: Testing direct supabase access');
-        const { data, error } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('deliberation_id', deliberationId)
-          .order('created_at', { ascending: true });
-        
-        console.log('Admin test results:', { data, error, count: data?.length });
-        
-        // Test auth status
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log('Admin test auth:', { user: user?.email, id: user?.id });
-        
-        // Test profile check  
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('user_role')
-          .eq('id', user?.id)
-          .single();
-        console.log('Admin test profile:', { profile });
-        
-      } catch (e) {
-        console.error('Admin test error:', e);
-      }
-    };
-
-    // Run test on mount
-    React.useEffect(() => {
-      testAdminAccess();
-    }, []);
-
     return (
       <Layout>
         <div className="container mx-auto px-4 py-6 max-w-4xl">
