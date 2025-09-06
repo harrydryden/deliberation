@@ -168,7 +168,9 @@ export const IbisSubmissionModal = ({
 
   const handleIssueRecommendationsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
     console.log('🔗 RELATIONSHIPS CHANGED FROM IssueRecommendations:', relationships);
+    console.log('🔗 SETTING SELECTED RELATIONSHIPS IN MODAL STATE');
     setSelectedRelationships(relationships);
+    console.log('🔗 AFTER SETTING - selectedRelationships length:', relationships.length);
   };
 
   const handleIssueSelected = (issueId: string) => {
