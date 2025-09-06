@@ -321,7 +321,7 @@ async function generateFastResponse(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-5-2025-08-07',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'system',
@@ -463,8 +463,8 @@ async function generateStreamingResponse(
   // Get agent configuration through orchestrator
   const agentConfig = await orchestrator.getAgentConfig(agentType, deliberationId);
   
-  // Select standardized model
-  const model = 'gpt-5-2025-08-07';
+  // Select standardized model (using gpt-4o for reliability without verification requirements)
+  const model = 'gpt-4o';
   
   console.log(`🧠 Using ${model} for ${agentType} response (config: ${agentConfig ? 'custom' : 'default'})`);
 

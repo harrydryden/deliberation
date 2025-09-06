@@ -57,8 +57,8 @@ export class AgentOrchestrator {
       return agentConfig.preferred_model;
     }
     
-    // Always use flagship model for consistency
-    return 'gpt-5-2025-08-07';
+    // Always use reliable model without verification requirements
+    return 'gpt-4o';
   }
 
   // UNIFIED AGENT CONFIGURATION FETCHING
@@ -264,7 +264,7 @@ export class AgentOrchestrator {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5-2025-08-07',
+          model: 'gpt-4o',
           messages: [
             {
               role: 'system',

@@ -122,7 +122,7 @@ Notion: "${deliberationNotion}"`
         'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'gpt-4o',
         max_completion_tokens: 1000,
         messages: [{
           role: 'user',
