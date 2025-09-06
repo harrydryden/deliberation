@@ -1,140 +1,12 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
-import { getDefaultSystemPrompt, generateSystemPromptFromAgent } from './helpers.ts';
+import { AgentOrchestrator, type AnalysisResult, type ConversationContext } from '../shared/agent-orchestrator.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// Agent configuration cache (5-minute TTL)
-interface AgentCacheEntry {
-  agent: any;
-  timestamp: number;
-}
-
-const agentConfigCache = new Map<string, AgentCacheEntry>();
-const AGENT_CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
-const MAX_AGENT_CACHE_SIZE = 100;
-
-// Standardized agent config fetching with caching
-async function getAgentConfig(supabase: any, agentType: string, deliberationId?: string): Promise<any> {
-  const cacheKey = `${agentType}:${deliberationId || 'global'}`;
-  
-  // Check cache first
-  const cached = agentConfigCache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp) < AGENT_CACHE_DURATION) {
-    console.log(`🚀 Agent config cache hit: ${agentType}`);
-    return cached.agent;
-  }
-  
-  console.log(`🔄 Fetching agent config: ${agentType} for deliberation: ${deliberationId}`);
-  
-  try {
-    // Step 1: Try local agent for this deliberation (if deliberationId provided)
-    if (deliberationId) {
-      const { data: localAgent, error: localError } = await supabase
-        .from('agent_configurations')
-        .select('*')
-        .eq('deliberation_id', deliberationId)
-        .eq('agent_type', agentType)
-        .eq('is_active', true)
-        .maybeSingle();
-      
-      if (localError) {
-        console.warn(`Error fetching local ${agentType} agent:`, localError);
-      }
-      
-      if (localAgent) {
-        console.log(`✅ Found local ${agentType} agent`);
-        cacheAgentConfig(cacheKey, localAgent);
-        return localAgent;
-      }
-    }
-    
-    // Step 2: Fallback to global agent
-    console.log(`No local ${agentType} agent found, trying global agent`);
-    const { data: globalAgent, error: globalError } = await supabase
-      .from('agent_configurations')
-      .select('*')
-      .eq('agent_type', agentType)
-      .eq('is_default', true)
-      .is('deliberation_id', null)
-      .eq('is_active', true)
-      .maybeSingle();
-    
-    if (globalError) {
-      console.warn(`Error fetching global ${agentType} agent:`, globalError);
-    }
-    
-    if (globalAgent) {
-      console.log(`✅ Found global ${agentType} agent`);
-      cacheAgentConfig(cacheKey, globalAgent);
-      return globalAgent;
-    }
-    
-    // Step 3: Return null for hardcoded fallback
-    console.log(`No ${agentType} agent configuration found, will use hardcoded fallback`);
-    cacheAgentConfig(cacheKey, null);
-    return null;
-    
-  } catch (error) {
-    console.error(`Failed to fetch ${agentType} agent configuration:`, error);
-    return null;
-  }
-}
-
-function cacheAgentConfig(key: string, agent: any): void {
-  // Clean up cache if it's getting too large
-  if (agentConfigCache.size >= MAX_AGENT_CACHE_SIZE) {
-    cleanupAgentCache();
-  }
-  
-  agentConfigCache.set(key, {
-    agent,
-    timestamp: Date.now()
-  });
-}
-
-function cleanupAgentCache(): void {
-  const now = Date.now();
-  const keysToDelete: string[] = [];
-  
-  // Remove expired entries
-  for (const [key, entry] of agentConfigCache.entries()) {
-    if ((now - entry.timestamp) > AGENT_CACHE_DURATION) {
-      keysToDelete.push(key);
-    }
-  }
-  
-  // If still too many, remove oldest entries
-  if (agentConfigCache.size - keysToDelete.length > MAX_AGENT_CACHE_SIZE) {
-    const sortedEntries = Array.from(agentConfigCache.entries())
-      .filter(([key]) => !keysToDelete.includes(key))
-      .sort(([,a], [,b]) => a.timestamp - b.timestamp);
-    
-    const toRemove = sortedEntries.slice(0, 20); // Remove oldest 20
-    keysToDelete.push(...toRemove.map(([key]) => key));
-  }
-  
-  keysToDelete.forEach(key => agentConfigCache.delete(key));
-  console.log(`🧹 Agent cache cleanup: removed ${keysToDelete.length} entries`);
-}
-
-// Standardized fallback prompts
-function getFallbackSystemPrompt(agentType: string): string {
-  switch (agentType) {
-    case 'flow_agent':
-      return `You are Flo, a helpful facilitation assistant in deliberative discussions. You guide conversation flow, encourage participation, and help users explore different perspectives on important topics.`;
-    case 'bill_agent':
-      return `You are Bill, a specialized AI assistant for policy analysis and legislative frameworks. You provide factual, balanced information about policy matters and help clarify complex legislative issues.`;
-    case 'peer_agent':
-      return `You are Pia, representing the collective voice and diverse perspectives in this discussion. You synthesize different viewpoints and help participants understand how their views relate to others.`;
-    default:
-      return `You are a helpful AI assistant facilitating meaningful discussion and engagement.`;
-  }
-}
 
 // Streaming response handler for real-time agent responses
 serve(async (req) => {
@@ -215,6 +87,9 @@ async function processStreamingOrchestration(
 
     // Service client for writing agent messages (bypasses RLS)
     const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Initialize orchestrator with service client
+    const orchestrator = new AgentOrchestrator(serviceSupabase);
 
     // Get message details using user client (respects RLS)
     const { data: message, error: messageError } = await userSupabase
@@ -316,24 +191,32 @@ async function processStreamingOrchestration(
       return;
     }
 
-    // Full orchestration with parallel processing
-    console.log('🔄 Using full orchestration');
+    // Enhanced orchestration using unified service
+    console.log('🔄 Using enhanced orchestration');
     
-    const analysisPromise = analyzeMessage(message.content, openAIApiKey);
+    // Parallel analysis and context gathering
+    const analysisPromise = orchestrator.analyzeMessage(message.content, openAIApiKey);
     const conversationPromise = getConversationState(userSupabase, deliberationId, message.user_id);
     const similarNodesPromise = findSimilarNodes(userSupabase, message.content);
+    const knowledgePromise = checkAvailableKnowledge(serviceSupabase, deliberationId);
 
     // Wait for all parallel operations
-    const [analysis, conversationState, similarNodes] = await Promise.all([
+    const [analysis, conversationState, similarNodes, availableKnowledge] = await Promise.all([
       analysisPromise,
       conversationPromise,
-      similarNodesPromise
+      similarNodesPromise,
+      knowledgePromise
     ]);
 
-    console.log('📊 Analysis complete, selecting agent...');
+    console.log('📊 Analysis complete, selecting optimal agent...');
 
-    // Select best agent
-    const selectedAgent = selectOptimalAgent(analysis, conversationState, similarNodes);
+    // Enhanced agent selection using orchestrator
+    const selectedAgent = await orchestrator.selectOptimalAgent(
+      analysis, 
+      conversationState, 
+      deliberationId, 
+      availableKnowledge
+    );
     
     sendData({ 
       agentType: selectedAgent,
@@ -341,7 +224,7 @@ async function processStreamingOrchestration(
       done: false
     });
 
-    // Generate streaming response
+    // Generate streaming response using orchestrator
     const response = await generateStreamingResponse(
       message.content,
       selectedAgent,
@@ -350,7 +233,8 @@ async function processStreamingOrchestration(
       similarNodes,
       deliberationId,
       openAIApiKey,
-      sendData
+      sendData,
+      orchestrator
     );
 
     // Cache the final response
@@ -475,59 +359,38 @@ async function generateFastResponse(
   return fullResponse;
 }
 
-// Enhanced message analysis with error handling
-async function analyzeMessage(content: string, openAIApiKey: string): Promise<{
-  intent: string;
-  complexity: number;
-  topicRelevance: number;
-  requiresExpertise: boolean;
-}> {
+// Enhanced knowledge availability check
+async function checkAvailableKnowledge(supabase: any, deliberationId?: string): Promise<Record<string, boolean>> {
+  const knowledge = {
+    bill_agent: false,
+    peer_agent: false,
+    flow_agent: false
+  };
+
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'Analyze this message and return JSON with: intent, complexity (0-1), topicRelevance (0-1), requiresExpertise (boolean). Focus on policy, legal, participant, or clarification intents.'
-          },
-          {
-            role: 'user',
-            content: content
-          }
-        ],
-        max_tokens: 150,
-        temperature: 0.3
-      }),
-    });
+    // Check if bill agent has knowledge base
+    const { data: billAgents } = await supabase
+      .from('agent_configurations')
+      .select('id')
+      .eq('agent_type', 'bill_agent')
+      .or(`deliberation_id.eq.${deliberationId},deliberation_id.is.null`)
+      .eq('is_active', true)
+      .limit(1);
 
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+    if (billAgents && billAgents.length > 0) {
+      const { data: knowledge_count } = await supabase
+        .from('agent_knowledge')
+        .select('id', { count: 'exact' })
+        .eq('agent_id', billAgents[0].id)
+        .limit(1);
+
+      knowledge.bill_agent = knowledge_count && knowledge_count.length > 0;
     }
-
-    const data = await response.json();
-    const analysisContent = data.choices?.[0]?.message?.content;
-    
-    if (!analysisContent) {
-      throw new Error('No analysis content received');
-    }
-
-    return JSON.parse(analysisContent);
   } catch (error) {
-    console.error('❌ Message analysis failed:', error);
-    // Return safe defaults
-    return { 
-      intent: 'general', 
-      complexity: 0.5, 
-      topicRelevance: 0.5, 
-      requiresExpertise: false 
-    };
+    console.warn('Knowledge availability check failed:', error);
   }
+
+  return knowledge;
 }
 
 // Get conversation state
@@ -556,67 +419,7 @@ async function findSimilarNodes(supabase: any, content: string): Promise<any[]> 
   return nodes || [];
 }
 
-// Enhanced agent selection with sophisticated weighting algorithm
-function selectOptimalAgent(analysis: any, conversationState: any, similarNodes: any[]): string {
-  const scores = {
-    bill_agent: 0,
-    peer_agent: 0,
-    flow_agent: 0
-  };
-
-  // Base scoring factors
-  const factors = {
-    complexity: analysis.complexity || 0.5,
-    requiresExpertise: analysis.requiresExpertise || false,
-    intent: analysis.intent || 'general',
-    topicRelevance: analysis.topicRelevance || 0.5,
-    messageCount: conversationState.messageCount || 0,
-    recentMessageTypes: getRecentMessageTypes(conversationState.recentMessages || []),
-    similarNodesCount: similarNodes.length
-  };
-
-  // Bill Agent scoring
-  scores.bill_agent += factors.complexity * 40; // High weight for complexity
-  scores.bill_agent += factors.requiresExpertise ? 30 : 0;
-  scores.bill_agent += factors.topicRelevance * 25;
-  scores.bill_agent += factors.intent.includes('policy') ? 20 : 0;
-  scores.bill_agent += factors.intent.includes('legal') ? 20 : 0;
-  scores.bill_agent += factors.intent.includes('legislation') ? 25 : 0;
-
-  // Peer Agent scoring
-  scores.peer_agent += factors.messageCount > 5 ? 20 : 0; // Needs conversation history
-  scores.peer_agent += factors.similarNodesCount * 15; // Similar discussions boost relevance
-  scores.peer_agent += factors.intent.includes('participant') ? 25 : 0;
-  scores.peer_agent += factors.intent.includes('perspective') ? 20 : 0;
-  scores.peer_agent += getRecentBillAgentCount(factors.recentMessageTypes) > 2 ? 15 : 0; // Balance after bill agent responses
-
-  // Flow Agent scoring  
-  scores.flow_agent += factors.messageCount < 3 ? 25 : 0; // Good for early conversation
-  scores.flow_agent += factors.intent.includes('question') ? 20 : 0;
-  scores.flow_agent += factors.intent.includes('clarify') ? 25 : 0;
-  scores.flow_agent += factors.complexity < 0.3 ? 15 : 0; // Simple queries
-  scores.flow_agent += getRecentFlowAgentCount(factors.recentMessageTypes) === 0 ? 10 : 0; // Avoid repetition
-
-  // Diversity bonus - avoid same agent repeatedly
-  const lastAgentType = getLastAgentType(factors.recentMessageTypes);
-  if (lastAgentType) {
-    scores[lastAgentType as keyof typeof scores] -= 10;
-  }
-
-  // Select agent with highest score
-  const selectedAgent = Object.entries(scores).reduce((max, [agent, score]) => 
-    score > max.score ? { agent, score } : max, 
-    { agent: 'flow_agent', score: -1 }
-  ).agent;
-
-  console.log(`🔬 Agent scoring results:`, {
-    scores,
-    factors,
-    selected: selectedAgent
-  });
-
-  return selectedAgent;
-}
+// Legacy function - replaced by orchestrator method
 
 // Helper functions for agent selection
 function getRecentMessageTypes(messages: any[]): string[] {
@@ -635,22 +438,26 @@ function getLastAgentType(messageTypes: string[]): string | null {
   return messageTypes.find(type => type !== 'user') || null;
 }
 
-// Generate streaming response with full context
+// Generate streaming response using orchestrator
 async function generateStreamingResponse(
   content: string,
   agentType: string,
-  analysis: any,
-  conversationState: any,
+  analysis: AnalysisResult,
+  conversationState: ConversationContext,
   similarNodes: any[],
   deliberationId: string,
   openAIApiKey: string,
-  sendData: (data: any) => void
+  sendData: (data: any) => void,
+  orchestrator: AgentOrchestrator
 ): Promise<string> {
-  // Determine model based on complexity
-  const model = analysis.complexity > 0.8 ? 'gpt-5-2025-08-07' : 'gpt-4o-mini';
-  const isGPT5 = model === 'gpt-5-2025-08-07';
+  // Get agent configuration through orchestrator
+  const agentConfig = await orchestrator.getAgentConfig(agentType, deliberationId);
   
-  console.log(`🧠 Using ${model} for ${agentType} response`);
+  // Select optimal model using orchestrator
+  const model = orchestrator.selectOptimalModel(analysis, agentConfig);
+  const isGPT5 = model.includes('gpt-5');
+  
+  console.log(`🧠 Using ${model} for ${agentType} response (config: ${agentConfig ? 'custom' : 'default'})`);
 
   // For bill agent, retrieve relevant knowledge first
   let knowledgeContext = '';
@@ -659,7 +466,13 @@ async function generateStreamingResponse(
     knowledgeContext = await retrieveBillAgentKnowledge(content, deliberationId);
   }
 
-  const systemPrompt = await buildSystemPrompt(agentType, analysis, conversationState, similarNodes, knowledgeContext, deliberationId);
+  // Generate system prompt using orchestrator
+  const enhancementContext = {
+    complexity: analysis.complexity,
+    similarNodes,
+    knowledgeContext
+  };
+  const systemPrompt = orchestrator.generateSystemPrompt(agentConfig, agentType, enhancementContext);
 
   const requestBody: any = {
     model,
@@ -670,10 +483,10 @@ async function generateStreamingResponse(
     stream: true
   };
 
-  // Set appropriate parameters based on model
+  // Set appropriate parameters based on model (GPT-5 models use max_completion_tokens)
   if (isGPT5) {
     requestBody.max_completion_tokens = 1500;
-    // No temperature for GPT-5
+    // GPT-5 models don't support temperature parameter
   } else {
     requestBody.max_tokens = 1000;
     requestBody.temperature = 0.7;
@@ -720,47 +533,7 @@ async function generateStreamingResponse(
   return fullResponse;
 }
 
-// Build appropriate system prompt using cached agent configuration
-async function buildSystemPrompt(agentType: string, analysis: any, conversationState: any, similarNodes: any[], knowledgeContext: string = '', deliberationId?: string): Promise<string> {
-  // Get agent configuration with caching
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
-  
-  const agentConfig = await getAgentConfig(supabase, agentType, deliberationId);
-  
-  let systemPrompt: string;
-  
-  if (agentConfig) {
-    // Generate system prompt from agent configuration
-    if (agentConfig.prompt_overrides?.system_prompt) {
-      systemPrompt = agentConfig.prompt_overrides.system_prompt;
-    } else {
-      // Auto-generate from agent configuration
-      systemPrompt = generateSystemPromptFromAgent(agentConfig);
-    }
-  } else {
-    // Use standardized fallback
-    console.warn(`No ${agentType} agent configuration found, using standardized fallback`);
-    systemPrompt = getFallbackSystemPrompt(agentType);
-  }
-
-  // Add context based on analysis
-  if (analysis.complexity > 0.7) {
-    systemPrompt += "\n\nThis is a complex query requiring detailed analysis and nuanced understanding.";
-  }
-
-  if (similarNodes.length > 0) {
-    systemPrompt += `\n\nThere are ${similarNodes.length} related discussion points that may be relevant to reference.`;
-  }
-
-  // Add knowledge context for bill agent
-  if (knowledgeContext && knowledgeContext.length > 0) {
-    systemPrompt += `\n\nRELEVANT KNOWLEDGE CONTEXT:\n${knowledgeContext}\n\nUse this knowledge to inform your response when relevant, but always provide balanced and comprehensive information.`;
-  }
-
-  return systemPrompt;
-}
+// Legacy function - replaced by orchestrator
 
 // Retrieve knowledge for bill agent responses
 async function retrieveBillAgentKnowledge(query: string, deliberationId: string): Promise<string> {

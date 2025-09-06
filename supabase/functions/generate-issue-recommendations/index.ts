@@ -89,7 +89,7 @@ Only include issues with relevance score >= 0.6. If no issues meet this threshol
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-nano-2025-08-07', // Updated to latest fast model for analysis
         messages: [
           {
             role: 'system',

@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
+import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -160,40 +161,24 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const orchestrator = new AgentOrchestrator(supabase);
 
-    // Get deliberation details and Flo agent configuration (with caching)
+    // Get deliberation details and Flo agent configuration using orchestrator
     const [{ data: deliberation, error: deliberationError }, agentConfig] = await Promise.all([
       supabase
         .from('deliberations')
         .select('title, description, notion')
         .eq('id', deliberationId)
         .single(),
-      getAgentConfig(supabase, 'flow_agent', deliberationId)
+      orchestrator.getAgentConfig('flow_agent', deliberationId)
     ]);
 
     if (deliberationError) {
       throw new Error(`Error fetching deliberation: ${deliberationError.message}`);
     }
 
-    // Generate system prompt from agent configuration
-    let floSystemPrompt = '';
-    if (agentConfig) {
-      // Use custom system prompt if available
-      floSystemPrompt = agentConfig.prompt_overrides?.system_prompt || 
-        `You are ${agentConfig.name || 'Flo'}, ${agentConfig.description || 'a helpful facilitation assistant'}`;
-      
-      if (agentConfig.goals?.length) {
-        floSystemPrompt += `\n\nYour goals are:\n${agentConfig.goals.map((g: string) => `- ${g}`).join('\n')}`;
-      }
-      
-      if (agentConfig.response_style) {
-        floSystemPrompt += `\n\nResponse style: ${agentConfig.response_style}`;
-      }
-    } else {
-      // Standardized fallback system prompt
-      console.warn('No Flo agent configuration found, using standardized fallback prompt');
-      floSystemPrompt = getFallbackSystemPrompt('flow_agent');
-    }
+    // Generate system prompt using orchestrator
+    const floSystemPrompt = orchestrator.generateSystemPrompt(agentConfig, 'flow_agent');
 
     // Get recent conversation context (last 5 messages)
     const { data: recentMessages, error: messagesError } = await supabase
@@ -293,7 +278,7 @@ Respond with JSON in this format:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini-2025-08-07', // Updated to latest efficient model
         messages: [
           {
             role: 'system',
@@ -306,8 +291,7 @@ Respond with JSON in this format:
             content: aiPrompt
           }
         ],
-        max_tokens: 300,
-        temperature: 0.7
+        max_completion_tokens: 300 // Updated parameter for GPT-5 models
       }),
     });
 

@@ -31,7 +31,7 @@ serve(async (req) => {
     let body: any = {};
     try { body = await req.json(); } catch {}
 
-    const model = body?.model || "gpt-4o-realtime-preview-2024-10-01";
+    const model = body?.model || "gpt-4o-realtime-preview-2024-10-01"; // Keep realtime model as is - no GPT-5 realtime yet
     const voice = body?.voice || "alloy";
 
     const instructions =
