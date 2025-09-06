@@ -586,15 +586,36 @@ export const IbisSubmissionModal = ({
                       <p className="text-xs text-muted-foreground mb-2">
                         These connections will be established when you click "Share":
                       </p>
-                      <div className="space-y-1">
-                        {selectedRelationships.map((rel, index) => (
-                          <div key={`${rel.id}-${rel.type}`} className="flex items-center gap-2 text-xs">
-                            <span className="font-medium text-primary">#{index + 1}</span>
-                            <span className="text-muted-foreground">→</span>
-                            <span className="font-medium">{rel.type.replace(/_/g, ' ')}</span>
-                            <span className="text-muted-foreground">connection</span>
-                          </div>
-                        ))}
+                      <div className="space-y-2">
+                        {selectedRelationships.map((rel, index) => {
+                          const connectedNode = existingNodes.find(node => node.id === rel.id);
+                          return (
+                            <div key={`${rel.id}-${rel.type}`} className="flex items-start gap-3 p-2 bg-background/50 rounded border">
+                              <span className="font-medium text-primary text-xs mt-0.5">#{index + 1}</span>
+                              <div className="flex-1 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  {connectedNode && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {connectedNode.node_type}
+                                    </Badge>
+                                  )}
+                                  <span className="text-sm font-medium">
+                                    {connectedNode?.title || 'Unknown item'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>Relationship:</span>
+                                  <span className="font-medium text-foreground">
+                                    {rel.type ? rel.type.replace(/_/g, ' ') : 'No specific type'}
+                                  </span>
+                                  {rel.confidence === 1.0 && (
+                                    <Badge variant="secondary" className="text-xs">Manual</Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
