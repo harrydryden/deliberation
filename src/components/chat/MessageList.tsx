@@ -11,6 +11,7 @@ import type { ChatMessage } from "@/types/index";
 import SimilarIbisNodes from "@/components/chat/SimilarIbisNodes";
 import { MessageRating } from "@/components/chat/MessageRating";
 import { performanceMonitor } from "@/utils/performanceUtils";
+import { usePerformanceOptimization, useComponentMetrics } from "@/hooks/usePerformanceOptimization";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -238,7 +239,7 @@ export const MessageList = memo(({ messages, isLoading, isTyping, onAddToIbis, o
       map.set(config.agent_type, config);
     });
     return map;
-  }, [agentConfigs], 'agentConfigsMap');
+  }, [agentConfigs]);
 
   const renderItem = createOptimizedCallback((index: number, message: ChatMessage) => {
     const endTimer = performanceMonitor.startTimer('MessageItem.render');
@@ -257,7 +258,7 @@ export const MessageList = memo(({ messages, isLoading, isTyping, onAddToIbis, o
     
     endTimer();
     return result;
-  }, [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId], 'renderItem');
+  }, [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId]);
 
   useEffect(() => {
     if (!atBottom && messages.length > prevCountRef.current) {

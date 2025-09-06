@@ -8,6 +8,8 @@ import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
+import { useSessionTracking } from "@/hooks/useSessionTracking";
+import { usePerformanceOptimization } from "@/hooks/usePerformanceOptimization";
 import { ExpandableText } from "@/components/common/ExpandableText";
 const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({
   default: m.IbisMapVisualization
@@ -58,6 +60,11 @@ const DeliberationChat = () => {
   const deliberationService = useDeliberationService();
   const agentService = useAgentService();
   const messageService = useMessageService();
+  const { sessionMetrics, updateActivity } = useSessionTracking();
+  const { createOptimizedCallback } = usePerformanceOptimization({
+    componentName: 'DeliberationChat',
+    enableLogging: true
+  });
   const [deliberation, setDeliberation] = useState<Deliberation | null>(null);
   const [agentConfigs, setAgentConfigs] = useState<Array<{agent_type: string; name: string; description?: string;}>>([]);
   const [loading, setLoading] = useState(true);
