@@ -286,9 +286,32 @@ const OptimizedDeliberationChat = () => {
   if (isAdmin) {
     return (
       <Layout>
-        <div className="p-6">
-          <h1 className="text-2xl font-bold mb-4">Admin View</h1>
-          <p>Admin interface for deliberation: {state.deliberation.title}</p>
+        <div className="container mx-auto px-4 py-6 max-w-4xl">
+          {/* Admin Header */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-primary">Admin View: {state.deliberation.title}</h1>
+                <p className="text-muted-foreground">Read-only access to all messages in chronological order</p>
+              </div>
+              <Badge className={`${getStatusColor(state.deliberation.status)} text-white`}>
+                {state.deliberation.status}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="space-y-4">
+            <OptimizedMessageList 
+              messages={messages} 
+              isLoading={chatLoading} 
+              isTyping={isTyping} 
+              onAddToIbis={() => {}} // Read-only for admin
+              onRetry={() => {}} // Read-only for admin
+              deliberationId={deliberationId} 
+              agentConfigs={state.agentConfigs}
+            />
+          </div>
         </div>
       </Layout>
     );

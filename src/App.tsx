@@ -51,7 +51,6 @@ const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Admin = lazy(() => import("./pages/Admin"));
-const AdminDeliberationView = lazy(() => import("./components/admin/AdminDeliberationView").then(module => ({ default: module.AdminDeliberationView })));
 const Deliberations = lazy(() => import("./pages/Deliberations"));
 const DeliberationChat = lazy(() => import("./pages/DeliberationChat"));
 const UserMetrics = lazy(() => import("./pages/UserMetrics"));
@@ -71,7 +70,6 @@ const App = () => (
                   <Route path="/auth" element={<Auth />} />
                   
                   <Route path="/admin" element={<AuthGuard><AdminGuard><Admin /></AdminGuard></AuthGuard>} />
-                  <Route path="/admin/deliberations/:deliberationId" element={<AuthGuard><AdminGuard><AdminDeliberationView /></AdminGuard></AuthGuard>} />
                   <Route path="/deliberations" element={<AuthGuard><Deliberations /></AuthGuard>} />
                   <Route path="/deliberations/:deliberationId" element={<AuthGuard><DeliberationChat /></AuthGuard>} />
                   <Route path="/metrics" element={<AuthGuard><UserMetrics /></AuthGuard>} />
