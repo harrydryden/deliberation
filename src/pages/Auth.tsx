@@ -15,8 +15,8 @@ const Auth = () => {
   const [deliberations, setDeliberations] = useState<any[]>([]);
   
   // Form state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [accessCode1, setAccessCode1] = useState('');
+  const [accessCode2, setAccessCode2] = useState('');
   const [isSigningIn, setIsSigningIn] = useState(false);
 
   useEffect(() => {
@@ -57,9 +57,30 @@ const Auth = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate access codes
+    if (!accessCode1 || !accessCode2) {
+      toast.error('Please enter both access codes');
+      return;
+    }
+    
+    if (accessCode1.length !== 5 || !/^[A-Z]{5}$/.test(accessCode1)) {
+      toast.error('Access Code 1 must be 5 uppercase letters');
+      return;
+    }
+    
+    if (accessCode2.length !== 6 || !/^\d{6}$/.test(accessCode2)) {
+      toast.error('Access Code 2 must be 6 digits');
+      return;
+    }
+    
     setIsSigningIn(true);
     
     try {
+      // Construct email from access code 1
+      const email = `${accessCode1}@deliberation.local`;
+      const password = accessCode2;
+      
       const { error } = await signIn(email, password);
       
       if (error) {
@@ -95,30 +116,36 @@ const Auth = () => {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl text-center">Sign In</CardTitle>
           <CardDescription className="text-center">
-            Enter your email and password to continue
+            Enter your access codes to continue
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignIn} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="accessCode1">Access Code 1 (5 letters)</Label>
               <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
+                id="accessCode1"
+                type="text"
+                value={accessCode1}
+                onChange={(e) => setAccessCode1(e.target.value.toUpperCase())}
+                placeholder="ABCDE"
+                maxLength={5}
+                pattern="[A-Z]{5}"
+                className="font-mono tracking-wider"
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="accessCode2">Access Code 2 (6 digits)</Label>
               <Input
-                id="password"
+                id="accessCode2"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
+                value={accessCode2}
+                onChange={(e) => setAccessCode2(e.target.value)}
+                placeholder="123456"
+                maxLength={6}
+                pattern="[0-9]{6}"
+                className="font-mono tracking-wider"
                 required
               />
             </div>
