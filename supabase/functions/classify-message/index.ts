@@ -123,7 +123,8 @@ Notion: "${deliberationNotion}"`
       },
       body: JSON.stringify({
         model: 'gpt-4o', // Use valid OpenAI model
-        max_completion_tokens: 1000,
+        max_tokens: 1000, // Legacy models use max_tokens
+        temperature: 0.7,
         messages: [{
           role: 'user',
           content: prompt
