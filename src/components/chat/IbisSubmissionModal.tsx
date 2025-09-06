@@ -497,8 +497,8 @@ export const IbisSubmissionModal = ({
           }))} placeholder="Detailed description (optional)" rows={3} />
           </div>
 
-          {/* Connections Section - Always show when there are existing nodes */}
-          {existingNodes.length > 0 && formData.description.trim() && (
+          {/* Connections Section - Show when there are existing nodes */}
+          {existingNodes.length > 0 && (
             <div className="border-t pt-4 mt-4 space-y-4">
               <div>
                 <h4 className="text-sm font-medium mb-2">Connect to Existing Items</h4>
@@ -534,22 +534,28 @@ export const IbisSubmissionModal = ({
 
               {/* Issue Recommendations - Always show when not in linking mode */}
               {!isLinkingMode && (
-                <IssueRecommendations
-                  deliberationId={deliberationId}
-                  userContent={formData.description || messageContent}
-                  onIssueSelected={handleIssueSelected}
-                />
+                <div>
+                  <h5 className="text-xs font-medium text-muted-foreground mb-2">Link to Existing Issues</h5>
+                  <IssueRecommendations
+                    deliberationId={deliberationId}
+                    userContent={formData.description || messageContent || formData.title}
+                    onIssueSelected={handleIssueSelected}
+                  />
+                </div>
               )}
 
               {/* Enhanced Relationship Selector - Show when creating new nodes */}
-              {!isLinkingMode && formData.title.trim() && (
-                <EnhancedRelationshipSelector
-                  deliberationId={deliberationId}
-                  content={formData.description || messageContent}
-                  title={formData.title}
-                  nodeType={(formData.nodeType || 'issue') as 'issue' | 'position' | 'argument'}
-                  onRelationshipsChange={handleRelationshipsChange}
-                />
+              {!isLinkingMode && (
+                <div>
+                  <h5 className="text-xs font-medium text-muted-foreground mb-2">Smart Connections</h5>
+                  <EnhancedRelationshipSelector
+                    deliberationId={deliberationId}
+                    content={formData.description || messageContent}
+                    title={formData.title || "New contribution"}
+                    nodeType={(formData.nodeType || 'issue') as 'issue' | 'position' | 'argument'}
+                    onRelationshipsChange={handleRelationshipsChange}
+                  />
+                </div>
               )}
             </div>
           )}
