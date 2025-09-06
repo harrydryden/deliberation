@@ -80,21 +80,13 @@ export const AdminDeliberationView = () => {
         }
 
         // Get messages - admin should be able to see all messages
-        console.log('AdminDeliberationView: About to fetch messages for deliberation:', deliberationId);
         const messagesResult = await supabase
           .from('messages')
           .select('*')
           .eq('deliberation_id', deliberationId)
           .order('created_at', { ascending: true });
           
-        console.log('AdminDeliberationView: Messages query result:', {
-          error: messagesResult.error,
-          data: messagesResult.data,
-          count: messagesResult.data?.length || 0
-        });
-          
         if (messagesResult.error) {
-          console.error('AdminDeliberationView: Messages query error', messagesResult.error);
           logger.error('Messages query error', messagesResult.error as Error);
           throw messagesResult.error;
         }
@@ -122,16 +114,6 @@ export const AdminDeliberationView = () => {
           agent_context: msg.agent_context
         }));
         setMessages(chatMessages);
-
-        // Auto-expand all user messages with agent responses for admin view
-        const userMessagesWithResponses = new Set<string>();
-        const tempGroups = groupMessages(chatMessages);
-        tempGroups.forEach(group => {
-          if (group.agentResponses.length > 0) {
-            userMessagesWithResponses.add(group.userMessage.id);
-          }
-        });
-        setExpandedMessages(userMessagesWithResponses);
       } catch (err) {
         logger.error('Failed to load data', err as Error);
         setError('Failed to load deliberation');
