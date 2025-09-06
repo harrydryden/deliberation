@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { Lightbulb, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { IssueRecommendationService, IssueRecommendation } from '@/services/domain/implementations/issue-recommendation.service';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
@@ -26,6 +28,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set());
+  const [issueRelationshipTypes, setIssueRelationshipTypes] = useState<Map<string, string>>(new Map());
 
   const recommendationService = new IssueRecommendationService();
 
@@ -68,17 +71,30 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
   // Handle issue selection
   const handleIssueSelect = (issueId: string) => {
     const newSelected = new Set(selectedIssues);
+    const newRelTypes = new Map(issueRelationshipTypes);
+    
     if (newSelected.has(issueId)) {
       newSelected.delete(issueId);
+      newRelTypes.delete(issueId);
     } else {
       newSelected.add(issueId);
+      newRelTypes.set(issueId, 'addresses'); // Default relationship type
     }
+    
     setSelectedIssues(newSelected);
+    setIssueRelationshipTypes(newRelTypes);
 
     // Notify parent component
     if (onIssueSelected) {
       onIssueSelected(issueId);
     }
+  };
+
+  // Handle relationship type change
+  const handleRelationshipTypeChange = (issueId: string, relationshipType: string) => {
+    const newRelTypes = new Map(issueRelationshipTypes);
+    newRelTypes.set(issueId, relationshipType);
+    setIssueRelationshipTypes(newRelTypes);
   };
 
   // Handle issue creation from recommendation
@@ -180,15 +196,30 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
                       )}
                     </Button>
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCreateFromRecommendation(recommendation)}
-                      className="h-8 px-3 text-xs"
-                    >
-                      Create New
-                    </Button>
+                    {selectedIssues.has(recommendation.issueId) && (
+                      <div className="mt-2">
+                        <Label className="text-xs">Relationship Type</Label>
+                        <Select
+                          value={issueRelationshipTypes.get(recommendation.issueId) || 'addresses'}
+                          onValueChange={(value) => handleRelationshipTypeChange(recommendation.issueId, value)}
+                        >
+                          <SelectTrigger className="h-7 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border border-border shadow-lg z-50">
+                            <SelectItem value="supports">Supports</SelectItem>
+                            <SelectItem value="opposes">Opposes</SelectItem>
+                            <SelectItem value="addresses">Addresses</SelectItem>
+                            <SelectItem value="relates_to">Relates To</SelectItem>
+                            <SelectItem value="builds_on">Builds On</SelectItem>
+                            <SelectItem value="questions">Questions</SelectItem>
+                            <SelectItem value="counters">Counters</SelectItem>
+                            <SelectItem value="strengthens">Strengthens</SelectItem>
+                            <SelectItem value="refines">Refines</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

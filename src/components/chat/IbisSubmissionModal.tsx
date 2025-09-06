@@ -530,18 +530,6 @@ export const IbisSubmissionModal = ({
                   <p className="text-xs text-muted-foreground mt-1">
                     Your submission will be linked to the selected issue instead of creating a new node.
                   </p>
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => {
-                      setIsLinkingMode(false);
-                      setSelectedIssueId(null);
-                    }}
-                    className="mt-2 h-6 px-2 text-xs"
-                  >
-                    Create new node instead
-                  </Button>
                 </div>
               )}
 
