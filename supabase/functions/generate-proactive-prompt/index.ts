@@ -154,7 +154,7 @@ Respond with JSON in this format:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07', // Updated to latest efficient model
+        model: 'gpt-4o', // Efficient model for prompts
         messages: [
           {
             role: 'system',
@@ -167,7 +167,8 @@ Respond with JSON in this format:
             content: aiPrompt
           }
         ],
-        max_completion_tokens: 300 // Updated parameter for GPT-5 models
+        max_tokens: 300, // Legacy models use max_tokens
+        temperature: 0.7
       }),
     });
 

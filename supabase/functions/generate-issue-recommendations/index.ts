@@ -89,7 +89,7 @@ Only include issues with relevance score >= 0.6. If no issues meet this threshol
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-nano-2025-08-07', // Updated to latest fast model for analysis
+        model: 'gpt-4o-mini', // Fast model for analysis
         messages: [
           {
             role: 'system',
@@ -100,7 +100,8 @@ Only include issues with relevance score >= 0.6. If no issues meet this threshol
             content: aiPrompt
           }
         ],
-        max_completion_tokens: 1000 // Updated for GPT-5 models
+        max_tokens: 1000, // Legacy models use max_tokens
+        temperature: 0.7
       }),
     });
 

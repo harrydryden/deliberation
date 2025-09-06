@@ -57,13 +57,13 @@ export class AgentOrchestrator {
       return agentConfig.preferred_model;
     }
 
-    // Complexity-based selection using latest available models
+    // Complexity-based selection using valid available models
     if (analysis.complexity > 0.8 || analysis.requiresExpertise) {
-      return 'gpt-5-2025-08-07'; // Flagship model for complex queries
+      return 'gpt-4.1-2025-04-14'; // Flagship model for complex queries
     } else if (analysis.complexity > 0.5) {
-      return 'gpt-5-mini-2025-08-07'; // Balanced performance
+      return 'gpt-4o'; // Balanced performance
     } else {
-      return 'gpt-5-nano-2025-08-07'; // Fast for simple queries
+      return 'gpt-4o-mini'; // Fast for simple queries
     }
   }
 
@@ -270,7 +270,7 @@ export class AgentOrchestrator {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5-nano-2025-08-07', // Fast model for analysis
+          model: 'gpt-4o-mini', // Fast model for analysis
           messages: [
             {
               role: 'system',
