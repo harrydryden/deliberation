@@ -110,11 +110,11 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
   // Notify parent when relationships change
   useEffect(() => {
-    console.log('🟠 UPDATING PARENT WITH RELATIONSHIPS');
-    console.log('🟠 Current selectedIssues:', Array.from(selectedIssues));
-    console.log('🟠 Current issueRelationshipTypes:', Array.from(issueRelationshipTypes.entries()));
-    
-    if (onRelationshipsChange) {
+    if (onRelationshipsChange && (selectedIssues.size > 0 || issueRelationshipTypes.size > 0)) {
+      console.log('🟠 UPDATING PARENT WITH RELATIONSHIPS');
+      console.log('🟠 Current selectedIssues:', Array.from(selectedIssues));
+      console.log('🟠 Current issueRelationshipTypes:', Array.from(issueRelationshipTypes.entries()));
+      
       const relationships = Array.from(selectedIssues).map(issueId => ({
         id: issueId,
         type: issueRelationshipTypes.get(issueId) || 'addresses',
@@ -123,7 +123,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
       console.log('🟠 SENDING RELATIONSHIPS TO PARENT:', relationships);
       onRelationshipsChange(relationships);
     }
-  }, [selectedIssues, issueRelationshipTypes, onRelationshipsChange]);
+  }, [selectedIssues, issueRelationshipTypes]); // Removed onRelationshipsChange dependency
 
   // Handle issue creation from recommendation
   const handleCreateFromRecommendation = async (recommendation: IssueRecommendation) => {
