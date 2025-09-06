@@ -1,7 +1,7 @@
 import { useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
-import { useOptimizedAuthContext } from "@/components/auth/OptimizedAuthProvider";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 
 interface DeliberationService {
   getDeliberations(): Promise<any[]>;
@@ -12,7 +12,7 @@ interface DeliberationService {
 }
 
 export const useOptimizedDeliberationService = (): DeliberationService => {
-  const { user } = useOptimizedAuthContext();
+  const { user } = useSupabaseAuth();
   
   // Memoize all service methods to prevent recreation
   const service = useMemo(() => ({

@@ -72,8 +72,6 @@ const OptimizedMessageItem = memo(({
   agentConfigsMap: Map<string, AgentConfig>;
   deliberationId?: string;
 }) => {
-  console.log('OptimizedMessageItem rendering:', { messageId: message.id, messageType: message.message_type, content: message.content?.substring(0, 20) });
-  
   const isUser = message.message_type === 'user';
   
   // Optimized agent config lookup with proper typing
@@ -166,13 +164,6 @@ export const OptimizedMessageList = memo(({
   deliberationId, 
   agentConfigs 
 }: MessageListProps) => {
-  console.log('OptimizedMessageList render:', {
-    messagesLength: messages?.length || 0,
-    isLoading,
-    isTyping,
-    messages: messages?.map(m => ({ id: m.id, type: m.message_type, content: m.content?.substring(0, 30) }))
-  });
-
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [unreadIndex, setUnreadIndex] = useState<number | null>(null);
@@ -261,14 +252,6 @@ export const OptimizedMessageList = memo(({
     );
   }
 
-  console.log('OptimizedMessageList: About to render', {
-    messagesLength: messages.length,
-    isLoading,
-    isTyping,
-    shouldShowEmptyState: messages.length === 0 && !isTyping,
-    shouldShowVirtuoso: messages.length > 0 || isTyping
-  });
-
   return (
     <div className="relative h-full overflow-hidden p-4">
       {messages.length === 0 && !isTyping ? (
@@ -276,9 +259,6 @@ export const OptimizedMessageList = memo(({
           <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <h3 className="text-lg font-medium mb-2">Welcome to Democratic Deliberation</h3>
           <p>Start a conversation with our AI agents to explore ideas and engage in thoughtful dialogue.</p>
-          <div className="text-xs mt-4 p-2 bg-muted rounded">
-            Debug: messages.length = {messages.length}, isTyping = {isTyping.toString()}
-          </div>
         </div>
       ) : (
         <>

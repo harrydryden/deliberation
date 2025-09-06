@@ -32,10 +32,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         // Check admin status when user signs in
         if (session?.user) {
-          // Simple admin check - treat specific email as admin
-          const isAdminUser = session.user.email === 'ADMIN@deliberation.local' || 
-                             session.user.email === 'SUPER@deliberation.local';
-          setIsAdmin(isAdminUser);
+          // Check admin status from database
+          setTimeout(async () => {
+            try {
+              const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('user_role')
+                .eq('id', session.user.id)
+                .single();
+              
+              const hasAdminRole = profile?.user_role === 'admin' || false;
+              setIsAdmin(hasAdminRole);
+            } catch (error) {
+              console.error('Error checking admin status:', error);
+              logger.error('Error checking admin status:', error);
+              setIsAdmin(false);
+            }
+          }, 0);
         } else {
           setIsAdmin(false);
         }
@@ -51,11 +64,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       // Check admin status for existing session
       if (session?.user) {
-        const isAdminUser = session.user.email === 'ADMIN@deliberation.local' || 
-                           session.user.email === 'SUPER@deliberation.local';
-        setIsAdmin(isAdminUser);
+        setTimeout(async () => {
+          try {
+            const { data: profile, error } = await supabase
+              .from('profiles')
+              .select('user_role')
+              .eq('id', session.user.id)
+              .single();
+            
+            const hasAdminRole = profile?.user_role === 'admin' || false;
+            setIsAdmin(hasAdminRole);
+          } catch (error) {
+            console.error('Error checking admin status:', error);
+            logger.error('Error checking admin status:', error);
+            setIsAdmin(false);
+          }
+          setIsLoading(false);
+        }, 0);
+      } else {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();

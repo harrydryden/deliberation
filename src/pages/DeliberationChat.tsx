@@ -12,7 +12,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { OptimizedMessageList } from "@/components/chat/OptimizedMessageList";
-import { useOptimizedAuthContext } from "@/components/auth/OptimizedAuthProvider";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useOptimizedDeliberationService } from "@/hooks/useOptimizedDeliberationService";
 import { useStableServices } from "@/hooks/useStableServices";
 import { useChat } from "@/hooks/useChat";
@@ -41,7 +41,7 @@ interface Deliberation {
 
 const OptimizedDeliberationChat = () => {
   const { deliberationId } = useParams<{ deliberationId: string }>();
-  const { user, isLoading, isAdmin } = useOptimizedAuthContext();
+  const { user, isLoading, isAdmin } = useSupabaseAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const deliberationService = useOptimizedDeliberationService();
