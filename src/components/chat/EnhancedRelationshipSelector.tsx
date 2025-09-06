@@ -74,6 +74,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   }, [title, content, nodeType, evaluated]);
 
   const evaluateRelationships = async () => {
+    console.log('🟡 EVALUATE RELATIONSHIPS CLICKED');
     if (!title.trim() || loading) return;
     
     setLoading(true);
@@ -145,6 +146,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   };
 
   const addManualConnection = () => {
+    console.log('🟢 ADD MANUAL CONNECTION CLICKED');
     if (selectedRelationships.size + manualConnections.length >= MAX_CONNECTIONS) {
       toast({
         title: "Maximum Connections Reached",
@@ -158,12 +160,14 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   };
 
   const updateManualConnection = (index: number, field: 'nodeId' | 'relationshipType', value: string) => {
+    console.log('🟠 MANUAL CONNECTION UPDATE:', { index, field, value });
     setManualConnections(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
       
       // Update parent when both fields are filled
       if (updated[index].nodeId && updated[index].relationshipType) {
+        console.log('🟠 UPDATING PARENT WITH RELATIONSHIPS');
         const allConnections = [
           ...suggestions
             .filter(s => selectedRelationships.has(`${s.nodeId}-${s.relationshipType}`))

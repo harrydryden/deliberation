@@ -170,6 +170,13 @@ export const IbisSubmissionModal = ({
     // Don't automatically switch to linking mode - let user choose relationships
   };
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log('🔴 FORM SUBMISSION TRIGGERED:', {
+      target: e.target,
+      currentTarget: e.currentTarget,
+      type: e.type,
+      timeStamp: e.timeStamp,
+      stack: new Error().stack
+    });
     e.preventDefault();
     if (!formData.title.trim() || !formData.nodeType) {
       toast({
@@ -437,6 +444,7 @@ export const IbisSubmissionModal = ({
         <form onSubmit={handleSubmit} className="space-y-4" onKeyDown={(e) => {
           // Prevent Enter key from submitting the form accidentally
           if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+            console.log('🔵 PREVENTED ENTER KEY SUBMISSION:', e.target);
             e.preventDefault();
           }
         }}>
