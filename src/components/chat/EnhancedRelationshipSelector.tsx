@@ -353,9 +353,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                                 <SelectContent className="bg-background border border-border shadow-lg z-50">
                                   <SelectItem value="supports">Supports</SelectItem>
                                   <SelectItem value="opposes">Opposes</SelectItem>
-                                  <SelectItem value="addresses">Addresses</SelectItem>
                                   <SelectItem value="relates_to">Relates To</SelectItem>
-                                  <SelectItem value="builds_on">Builds On</SelectItem>
                                   <SelectItem value="responds_to">Responds To</SelectItem>
                                 </SelectContent>
                              </Select>
@@ -458,9 +456,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                        <SelectContent className="bg-background border border-border shadow-lg z-50">
                          <SelectItem value="supports">Supports</SelectItem>
                          <SelectItem value="opposes">Opposes</SelectItem>
-                         <SelectItem value="addresses">Addresses</SelectItem>
                          <SelectItem value="relates_to">Relates To</SelectItem>
-                         <SelectItem value="builds_on">Builds On</SelectItem>
                          <SelectItem value="responds_to">Responds To</SelectItem>
                        </SelectContent>
                     </Select>

@@ -28,8 +28,6 @@ const RELATIONSHIP_TYPES = [
   { value: 'supports', label: 'Supports' },
   { value: 'opposes', label: 'Opposes' },
   { value: 'relates_to', label: 'Relates to' },
-  { value: 'addresses', label: 'Addresses' },
-  { value: 'builds_on', label: 'Builds on' },
   { value: 'responds_to', label: 'Responds to' }
 ];
 
