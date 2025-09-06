@@ -3,6 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
+import { useSessionTracking } from '@/hooks/useSessionTracking';
+import { useRealtimeActivityTracking } from '@/hooks/useRealtimeActivityTracking';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown, Type, AudioLines, Clock } from 'lucide-react';
 import { RealtimeRTC } from '@/utils/realtimeRtc';
@@ -34,7 +37,14 @@ interface VoiceInterfaceProps {
 }
 
 const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferredBillAgentId, className, variant = 'default', sendMessage: sendChatMessage, setMessageText }) => {
+  const { user } = useSupabaseAuth();
   const { toast } = useToast();
+  const { currentSession, updateActivity } = useSessionTracking();
+  const { recordVoiceInteraction } = useRealtimeActivityTracking({
+    userId: user?.id,
+    deliberationId,
+    enabled: !!currentSession
+  });
   const [connected, setConnected] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [mode, setMode] = useState<'idle' | 'bill' | 'ibis' | 'stt'>('idle');
@@ -217,7 +227,8 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
 
   const handleEvent = (event: VoiceEvent) => {
     // Update session activity for any event
-    sessionManagerRef.current?.updateActivity();
+    updateActivity();
+    recordVoiceInteraction('message', undefined);
     
     // Handle session expired and other critical errors
     if (event?.type === 'error') {
@@ -371,6 +382,9 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     try {
       await ensureIdle();
       await ensureBillAgentId();
+      
+      // Record voice interaction start
+      recordVoiceInteraction('start');
       
       // Initialize session manager
       sessionManagerRef.current = createSessionManager();
@@ -577,6 +591,10 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     try {
       logger.debug('stop called', { mode });
       const wasConnected = connected;
+      
+      // Record voice interaction end with duration  
+      const sessionStartTime = sessionManagerRef.current?.getSessionStatus().sessionAge || 0;
+      recordVoiceInteraction('end', sessionStartTime);
       
       // Stop session manager
       if (sessionManagerRef.current) {

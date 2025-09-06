@@ -26,7 +26,7 @@ import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
 import { useIsMobile } from "@/hooks/use-mobile";
 const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface"));
 import { logger } from "@/utils/logger";
-import { useProactivePrompts } from "@/hooks/useProactivePrompts";
+import { useEnhancedProactivePrompts } from "@/hooks/useEnhancedProactivePrompts";
 import { ProactivePrompt } from "@/components/chat/ProactivePrompt";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -104,23 +104,23 @@ const DeliberationChat = () => {
     retryMessage
   } = useChat(deliberationId);
 
-  // Proactive prompts hook
+  // Enhanced proactive prompts hook with session tracking integration
   const {
     currentPrompt,
-    recordActivity,
     handlePromptResponse,
     handlePromptDismiss,
     handlePromptOptOut,
+    facilitatorSession,
     isEnabled: proactivePromptsEnabled
-  } = useProactivePrompts({
+  } = useEnhancedProactivePrompts({
     userId: user?.id || '',
     deliberationId: deliberationId || '',
     enabled: isParticipant && deliberation?.status === 'active'
   });
   const sendMessage = async (content: string) => {
     await originalSendMessage(content, chatMode);
-    // Record activity for proactive prompts
-    recordActivity();
+    // Update session activity for tracking and proactive prompts
+    updateActivity();
     // Update engagement score when message is sent
     setUserScores(prev => ({
       ...prev,
