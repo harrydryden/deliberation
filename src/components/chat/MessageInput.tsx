@@ -14,13 +14,14 @@ export interface MessageInputRef {
 }
 
 export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(({ onSendMessage, disabled }, ref) => {
-  const [message, setMessage] = useState("");
+  const [message, setMessageState] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useImperativeHandle(ref, () => ({
     setMessage: (text: string) => {
-      setMessage(text);
+      console.log('MessageInput setMessage called with:', text);
+      setMessageState(text);
       // Focus and resize after setting text
       requestAnimationFrame(() => {
         if (textareaRef.current) {
@@ -30,7 +31,7 @@ export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(
         }
       });
     },
-    clearMessage: () => setMessage("")
+    clearMessage: () => setMessageState("")
   }), []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -39,7 +40,7 @@ export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(
       setIsSubmitting(true);
       try {
         await onSendMessage(message);
-        setMessage("");
+        setMessageState("");
         // Use requestAnimationFrame to ensure smooth transition
         requestAnimationFrame(() => {
           textareaRef.current?.focus();
@@ -60,7 +61,7 @@ export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(
   }, [message, disabled, isSubmitting, handleSubmit]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value);
+    setMessageState(e.target.value);
   }, []);
 
   // Auto-resize textarea

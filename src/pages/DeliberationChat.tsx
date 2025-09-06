@@ -103,7 +103,13 @@ const OptimizedDeliberationChat = () => {
 
   // setMessageText function for voice interface
   const setMessageText = useCallback((text: string) => {
-    messageInputRef.current?.setMessage(text);
+    console.log('DeliberationChat setMessageText called with:', text);
+    console.log('messageInputRef.current:', messageInputRef.current);
+    if (messageInputRef.current) {
+      messageInputRef.current.setMessage(text);
+    } else {
+      console.error('messageInputRef.current is null');
+    }
   }, []);
 
   // Load deliberation data
