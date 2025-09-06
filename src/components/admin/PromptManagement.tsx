@@ -229,7 +229,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5" />
-          Prompt Template Management
+          System Prompts
         </CardTitle>
         <div className="flex gap-2">
           <Dialog open={creating} onOpenChange={setCreating}>
