@@ -225,33 +225,44 @@ async function processStreamingOrchestration(
     });
 
     // Generate streaming response using orchestrator
-    const response = await generateStreamingResponse(
-      message.content,
-      selectedAgent,
-      analysis,
-      conversationState,
-      similarNodes,
-      deliberationId,
-      openAIApiKey,
-      sendData,
-      orchestrator
-    );
+    try {
+      const response = await generateStreamingResponse(
+        message.content,
+        selectedAgent,
+        analysis,
+        conversationState,
+        similarNodes,
+        deliberationId,
+        openAIApiKey,
+        sendData,
+        orchestrator
+      );
 
-    // Cache the final response
-    cacheResponse(message.content, response, selectedAgent, deliberationId);
+      console.log(`✅ Generated response length: ${response.length}`);
 
-    // Store final response using service client
-    await serviceSupabase.from('messages').insert({
-      content: response,
-      message_type: selectedAgent,
-      user_id: message.user_id,
-      deliberation_id: deliberationId,
-      agent_context: { 
-        agent_type: selectedAgent,
-        processing_method: 'full_orchestration',
-        analysis 
-      }
-    });
+      // Cache the final response
+      cacheResponse(message.content, response, selectedAgent, deliberationId);
+
+      // Store final response using service client
+      await serviceSupabase.from('messages').insert({
+        content: response,
+        message_type: selectedAgent,
+        user_id: message.user_id,
+        deliberation_id: deliberationId,
+        agent_context: { 
+          agent_type: selectedAgent,
+          processing_method: 'full_orchestration',
+          analysis 
+        }
+      });
+
+    } catch (responseError) {
+      console.error('❌ Error generating response:', responseError);
+      sendData({ 
+        content: 'I apologise, but I encountered an issue generating a response. Please try again.',
+        done: false 
+      });
+    }
 
     sendData({ done: true });
 
@@ -482,6 +493,8 @@ async function generateStreamingResponse(
     max_completion_tokens: 1500
   };
 
+  console.log(`🔧 Request body:`, JSON.stringify(requestBody, null, 2));
+
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -490,6 +503,14 @@ async function generateStreamingResponse(
     },
     body: JSON.stringify(requestBody),
   });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`❌ OpenAI API error: ${response.status} - ${errorText}`);
+    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+  }
+
+  console.log(`✅ OpenAI API call successful for ${agentType}`);
 
   const reader = response.body?.getReader();
   const decoder = new TextDecoder();
@@ -508,18 +529,20 @@ async function generateStreamingResponse(
         
         try {
           const data = JSON.parse(line.slice(6));
+          console.log(`📦 Received chunk:`, JSON.stringify(data, null, 2));
           const content = data.choices?.[0]?.delta?.content || '';
           if (content) {
             fullResponse += content;
             sendData({ content, done: false });
           }
         } catch (e) {
-          // Ignore parse errors
+          console.warn('⚠️ Parse error:', e);
         }
       }
     }
   }
 
+  console.log(`📝 Full response length: ${fullResponse.length}`);
   return fullResponse;
 }
 
@@ -576,6 +599,13 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
 
       if (!error && data?.response) {
         console.log('📚 LangChain knowledge retrieved successfully');
+        return data.response;
+      } else {
+        console.log('📚 LangChain query failed, falling back to direct knowledge query');
+      }
+    } catch (langchainError) {
+      console.warn('📚 LangChain function not available, using fallback:', langchainError);
+    }
         return data.response;
       }
     } catch (langchainError) {
