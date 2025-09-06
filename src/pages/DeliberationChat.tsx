@@ -24,6 +24,8 @@ import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
 import { useIsMobile } from "@/hooks/use-mobile";
 const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface"));
 import { logger } from "@/utils/logger";
+import { useProactivePrompts } from "@/hooks/useProactivePrompts";
+import { ProactivePrompt } from "@/components/chat/ProactivePrompt";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Deliberation {
@@ -94,8 +96,24 @@ const DeliberationChat = () => {
     loadChatHistory,
     retryMessage
   } = useChat(deliberationId);
+
+  // Proactive prompts hook
+  const {
+    currentPrompt,
+    recordActivity,
+    handlePromptResponse,
+    handlePromptDismiss,
+    handlePromptOptOut,
+    isEnabled: proactivePromptsEnabled
+  } = useProactivePrompts({
+    userId: user?.id || '',
+    deliberationId: deliberationId || '',
+    enabled: isParticipant && deliberation?.status === 'active'
+  });
   const sendMessage = async (content: string) => {
     await originalSendMessage(content, chatMode);
+    // Record activity for proactive prompts
+    recordActivity();
     // Update engagement score when message is sent
     setUserScores(prev => ({
       ...prev,
@@ -485,6 +503,18 @@ const DeliberationChat = () => {
         
         {/* IBIS Submission Modal */}
         {deliberation && <IbisSubmissionModal isOpen={ibisModal.isOpen} onClose={handleIbisModalClose} messageId={ibisModal.messageId} messageContent={ibisModal.messageContent} deliberationId={deliberation.id} onSuccess={handleIbisSuccess} />}
+
+        {/* Proactive Prompt Modal */}
+        {currentPrompt && (
+          <ProactivePrompt
+            isOpen={true}
+            question={currentPrompt.question}
+            context={currentPrompt.context}
+            onRespond={handlePromptResponse}
+            onDismiss={handlePromptDismiss}
+            onOptOut={handlePromptOptOut}
+          />
+        )}
 
       </div>
     </Layout>;

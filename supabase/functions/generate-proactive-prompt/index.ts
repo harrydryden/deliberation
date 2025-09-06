@@ -1,0 +1,196 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { userId, deliberationId, sessionContext } = await req.json();
+    
+    if (!userId || !deliberationId) {
+      throw new Error('Missing required fields: userId or deliberationId');
+    }
+
+    console.log('🤖 Generating proactive prompt', { userId, deliberationId });
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+
+    if (!openAIApiKey) {
+      throw new Error('OPENAI_API_KEY not configured');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get deliberation details
+    const { data: deliberation, error: deliberationError } = await supabase
+      .from('deliberations')
+      .select('title, description, notion')
+      .eq('id', deliberationId)
+      .single();
+
+    if (deliberationError) {
+      throw new Error(`Error fetching deliberation: ${deliberationError.message}`);
+    }
+
+    // Get recent conversation context (last 5 messages)
+    const { data: recentMessages, error: messagesError } = await supabase
+      .from('messages')
+      .select('content, message_type, created_at')
+      .eq('deliberation_id', deliberationId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (messagesError) {
+      console.warn('Error fetching recent messages:', messagesError);
+    }
+
+    // Get user's participation level
+    const { data: userMessages, error: userMessagesError } = await supabase
+      .from('messages')
+      .select('id, message_type')
+      .eq('deliberation_id', deliberationId)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (userMessagesError) {
+      console.warn('Error fetching user messages:', userMessagesError);
+    }
+
+    // Analyze conversation context for prompt generation
+    const conversationSummary = recentMessages?.map(msg => 
+      `${msg.message_type}: ${msg.content.slice(0, 100)}...`
+    ).join('\n') || 'No recent messages';
+
+    const userEngagement = {
+      totalMessages: userMessages?.length || 0,
+      lastMessageType: userMessages?.[0]?.message_type || 'none',
+      isNewToDiscussion: (userMessages?.length || 0) < 3
+    };
+
+    // Create AI prompt for generating proactive prompt
+    const aiPrompt = `You are Flo, a helpful facilitation assistant in a deliberative discussion about "${deliberation.title}".
+
+CONTEXT:
+- Deliberation topic: ${deliberation.title}
+- Description: ${deliberation.description || 'No description available'}
+- Notion statement: ${deliberation.notion || 'No notion statement'}
+- User engagement: ${userEngagement.totalMessages} messages, last type: ${userEngagement.lastMessageType}
+- Recent conversation:
+${conversationSummary}
+
+TASK: Generate a thoughtful, engaging proactive prompt to re-engage this user who has been inactive for 5 minutes. The prompt should:
+
+1. Be contextually relevant to the ongoing discussion
+2. Encourage meaningful participation 
+3. Be welcoming and not pushy
+4. Offer specific ways to contribute
+5. Be concise (1-2 sentences)
+
+Consider these contexts:
+- If new participant: Welcome and guide them
+- If experienced participant: Build on their previous contributions  
+- If discussion is quiet: Encourage broader participation
+- If discussion is active: Help them catch up or add perspective
+
+Respond with JSON in this format:
+{
+  "question": "Your engaging proactive prompt here",
+  "context": "engagement|onboarding|catch_up|perspective"
+}`;
+
+    // Call OpenAI API
+    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are Flo, an expert facilitator skilled at engaging participants in meaningful deliberation. Always respond with valid JSON.'
+          },
+          {
+            role: 'user',
+            content: aiPrompt
+          }
+        ],
+        max_tokens: 300,
+        temperature: 0.7
+      }),
+    });
+
+    if (!openAIResponse.ok) {
+      const errorText = await openAIResponse.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${openAIResponse.status}`);
+    }
+
+    const openAIData = await openAIResponse.json();
+    const aiResponseContent = openAIData.choices?.[0]?.message?.content;
+
+    if (!aiResponseContent) {
+      throw new Error('No response from OpenAI');
+    }
+
+    console.log('🤖 OpenAI raw response:', aiResponseContent);
+
+    // Parse AI response
+    let promptData;
+    try {
+      // Extract JSON from response (handle potential markdown formatting)
+      const jsonMatch = aiResponseContent.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : aiResponseContent;
+      promptData = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', parseError);
+      // Fallback prompt
+      promptData = {
+        question: "I'd love to hear your thoughts on this discussion. What aspects of this topic interest you most?",
+        context: "engagement"
+      };
+    }
+
+    // Validate prompt data
+    if (!promptData.question || typeof promptData.question !== 'string') {
+      promptData.question = "What are your thoughts on the current discussion? I'd love to hear your perspective.";
+    }
+
+    if (!promptData.context || !['engagement', 'onboarding', 'catch_up', 'perspective'].includes(promptData.context)) {
+      promptData.context = "engagement";
+    }
+
+    console.log('✅ Generated proactive prompt:', promptData);
+
+    return new Response(JSON.stringify({ 
+      prompt: promptData,
+      deliberationTitle: deliberation.title,
+      userEngagement
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('❌ Proactive prompt generation error:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      prompt: null 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});

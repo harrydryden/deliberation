@@ -19,6 +19,7 @@ export interface IssueRecommendationRequest {
 
 export class IssueRecommendationService {
   private promptService: PromptService;
+  private currentDeliberationId: string = '';
 
   constructor() {
     this.promptService = new PromptService();
@@ -30,6 +31,9 @@ export class IssueRecommendationService {
   async getIssueRecommendations(request: IssueRecommendationRequest): Promise<IssueRecommendation[]> {
     try {
       const { userId, deliberationId, content, maxRecommendations = 2 } = request;
+      
+      // Store deliberation ID for use in AI service
+      this.currentDeliberationId = deliberationId;
 
       // Get existing issues for the deliberation
       const existingIssues = await this.getExistingIssues(deliberationId);
@@ -39,43 +43,30 @@ export class IssueRecommendationService {
         return [];
       }
 
-      // Get the issue recommendation prompt template
-      const promptTemplate = await this.promptService.getIssueRecommendationPrompt();
-      if (!promptTemplate) {
-        logger.warn('[IssueRecommendationService] Issue recommendation prompt template not found');
+      // Call AI service for recommendations using OpenAI
+      const aiRecommendations = await this.getAIRecommendations('', content, existingIssues);
+
+      // If AI recommendations failed, use fallback
+      if (!aiRecommendations || aiRecommendations.length === 0) {
+        logger.warn('[IssueRecommendationService] AI recommendations failed, using fallback');
         return this.getFallbackRecommendations(existingIssues, maxRecommendations);
       }
 
-      // Prepare variables for the prompt
-      const variables = {
-        user_submission: content,
-        available_issues: this.formatIssuesForPrompt(existingIssues)
-      };
-
-      // Validate variables
-      const validationErrors = this.promptService.validatePromptVariables(promptTemplate, variables);
-      if (validationErrors.length > 0) {
-        logger.error('[IssueRecommendationService] Prompt validation errors', { errors: validationErrors });
-        return this.getFallbackRecommendations(existingIssues, maxRecommendations);
-      }
-
-      // Render the prompt
-      const renderedPrompt = this.promptService.renderPrompt(promptTemplate, variables);
-
-      // Call AI service for recommendations (this would be implemented with OpenAI or similar)
-      const aiRecommendations = await this.getAIRecommendations(renderedPrompt, content, existingIssues);
-
-      // Process and validate AI recommendations
-      const recommendations = this.processAIRecommendations(aiRecommendations, existingIssues, maxRecommendations);
+      // AI service now returns properly formatted recommendations, just validate and return
+      const validRecommendations = aiRecommendations.filter(rec => 
+        rec.issueId && 
+        rec.title && 
+        rec.relevanceScore >= 0.6
+      ).slice(0, maxRecommendations);
 
       // Log recommendations for debugging
       logger.info('[IssueRecommendationService] Generated recommendations', { 
         userId, 
         deliberationId, 
-        count: recommendations.length 
+        count: validRecommendations.length 
       });
 
-      return recommendations;
+      return validRecommendations;
     } catch (error) {
       logger.error('[IssueRecommendationService] Error getting issue recommendations', { error, request });
       
@@ -120,106 +111,33 @@ export class IssueRecommendationService {
   }
 
   /**
-   * Get AI recommendations (placeholder for OpenAI integration)
+   * Get AI recommendations using OpenAI via Supabase Edge Function
    */
   private async getAIRecommendations(
     prompt: string, 
     content: string, 
     existingIssues: Array<{ id: string; title: string; description?: string }>
-  ): Promise<string> {
-    // This would call OpenAI or similar AI service
-    // For now, return a mock response
-    logger.info('[IssueRecommendationService] Would call AI service with prompt', { promptLength: prompt.length });
-    
-    // Simulate AI response based on content similarity
-    return this.simulateAIResponse(content, existingIssues);
-  }
-
-  /**
-   * Simulate AI response for development/testing
-   */
-  private simulateAIResponse(
-    content: string, 
-    issues: Array<{ id: string; title: string; description?: string }>
-  ): string {
-    if (issues.length === 0) return 'No relevant issues found.';
-
-    // Simple keyword matching simulation
-    const contentLower = content.toLowerCase();
-    const scoredIssues = issues.map(issue => {
-      const issueText = `${issue.title} ${issue.description || ''}`.toLowerCase();
-      let score = 0;
-      
-      // Simple word overlap scoring
-      const contentWords = contentLower.split(/\s+/);
-      const issueWords = issueText.split(/\s+/);
-      
-      for (const word of contentWords) {
-        if (word.length > 3 && issueWords.includes(word)) {
-          score += 0.1;
-        }
-      }
-      
-      return { ...issue, score: Math.min(score, 1.0) };
-    });
-
-    // Sort by score and take top 2
-    const topIssues = scoredIssues
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 2)
-      .filter(issue => issue.score > 0.1);
-
-    if (topIssues.length === 0) {
-      return 'No relevant issues found.';
-    }
-
-    return topIssues.map((issue, index) => 
-      `- Recommended Issue ${index + 1}: ${issue.title} - ${issue.score.toFixed(2)} - Content similarity match`
-    ).join('\n');
-  }
-
-  /**
-   * Process AI recommendations into structured format
-   */
-  private processAIRecommendations(
-    aiResponse: string, 
-    existingIssues: Array<{ id: string; title: string; description?: string }>,
-    maxRecommendations: number
-  ): IssueRecommendation[] {
+  ): Promise<IssueRecommendation[]> {
     try {
-      const recommendations: IssueRecommendation[] = [];
-      const lines = aiResponse.split('\n').filter(line => line.trim());
-
-      for (const line of lines) {
-        if (recommendations.length >= maxRecommendations) break;
-
-        // Parse AI response format: "Recommended Issue X: [Title] - [Score] - [Explanation]"
-        const match = line.match(/Recommended Issue \d+: (.+?) - ([\d.]+) - (.+)/);
-        if (match) {
-          const [, title, scoreStr, explanation] = match;
-          const relevanceScore = parseFloat(scoreStr);
-
-          // Find matching issue in existing issues
-          const matchingIssue = existingIssues.find(issue => 
-            issue.title.toLowerCase().includes(title.toLowerCase()) ||
-            title.toLowerCase().includes(issue.title.toLowerCase())
-          );
-
-          if (matchingIssue && !isNaN(relevanceScore) && relevanceScore >= 0.6) {
-            recommendations.push({
-              issueId: matchingIssue.id,
-              title: matchingIssue.title,
-              description: matchingIssue.description,
-              relevanceScore,
-              explanation
-            });
-          }
+      // Call our Supabase Edge Function for issue recommendations
+      const { data, error } = await supabase.functions.invoke('generate-issue-recommendations', {
+        body: {
+          userId: '', // Will be set by edge function from auth
+          deliberationId: this.currentDeliberationId,
+          content: content,
+          maxRecommendations: 2
         }
+      });
+
+      if (error) {
+        logger.error('[IssueRecommendationService] Edge function error', { error });
+        throw new Error(`Edge function error: ${error.message}`);
       }
 
-      return recommendations;
+      return data?.recommendations || [];
     } catch (error) {
-      logger.error('[IssueRecommendationService] Error processing AI recommendations', { error, aiResponse });
+      logger.error('[IssueRecommendationService] AI recommendations failed', { error });
+      // Return empty array on error, fallback will be handled by caller
       return [];
     }
   }
@@ -235,7 +153,7 @@ export class IssueRecommendationService {
       issueId: issue.id,
       title: issue.title,
       description: issue.description,
-      relevanceScore: 0.8 - (index * 0.1), // Decreasing relevance for fallback
+      relevanceScore: 0.7 - (index * 0.1), // Decreasing relevance for fallback
       explanation: 'Fallback recommendation based on recency'
     }));
   }

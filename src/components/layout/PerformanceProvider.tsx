@@ -18,28 +18,37 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({ childr
       window.addEventListener('load', () => {
         const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
         if (navigation) {
+          // Fix negative timing values by ensuring proper timing calculations
           const metrics = {
-            domContentLoaded: navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart,
-            loadComplete: navigation.loadEventEnd - navigation.loadEventStart,
-            totalPageLoad: navigation.loadEventEnd - navigation.fetchStart,
-            domInteractive: navigation.domInteractive - navigation.fetchStart
+            domContentLoaded: Math.max(0, navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart),
+            loadComplete: Math.max(0, navigation.loadEventEnd - navigation.loadEventStart),
+            totalPageLoad: Math.max(0, navigation.loadEventEnd - navigation.fetchStart),
+            domInteractive: Math.max(0, navigation.domInteractive - navigation.fetchStart)
           };
           
-          logger.performance.mark('Page load metrics', metrics);
+          // Only record metrics that are valid (non-zero and reasonable)
+          const validMetrics = Object.entries(metrics).filter(([_, value]) => 
+            value > 0 && value < 30000 // Less than 30 seconds is reasonable
+          ).reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
           
-          // Record each metric
-          Object.entries(metrics).forEach(([name, value]) => {
-            performanceMonitor.recordMetric(`page.${name}`, value);
-          });
+          if (Object.keys(validMetrics).length > 0) {
+            logger.performance.mark('Page load metrics', validMetrics);
+            
+            // Record each valid metric
+            Object.entries(validMetrics).forEach(([name, value]) => {
+              performanceMonitor.recordMetric(`page.${name}`, value as number);
+            });
+          }
         }
       });
 
-      // Monitor long tasks (> 50ms)
+      // Monitor long tasks (> 50ms) with improved filtering
       if ('PerformanceObserver' in window) {
         try {
           const observer = new PerformanceObserver((list) => {
             for (const entry of list.getEntries()) {
-              if (entry.duration > 50) {
+              // Filter out very short or very long tasks that might be measurement errors
+              if (entry.duration > 50 && entry.duration < 10000) {
                 logger.warn('Long task detected', {
                   duration: `${entry.duration.toFixed(2)}ms`,
                   startTime: entry.startTime
@@ -57,13 +66,14 @@ export const PerformanceProvider: React.FC<PerformanceProviderProps> = ({ childr
         }
       }
 
-      // Monitor layout shifts
+      // Monitor layout shifts with improved validation
       if ('PerformanceObserver' in window) {
         try {
           const observer = new PerformanceObserver((list) => {
             for (const entry of list.getEntries()) {
               const cls = entry as any;
-              if (cls.value > 0.1) { // CLS threshold
+              // Only report significant layout shifts
+              if (cls.value > 0.1 && cls.value < 1.0) {
                 logger.warn('Layout shift detected', {
                   value: cls.value,
                   sources: cls.sources?.length || 0
