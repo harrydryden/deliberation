@@ -284,6 +284,14 @@ const OptimizedDeliberationChat = () => {
   if (!user || !state.deliberation) return null;
 
   if (isAdmin) {
+    console.log('Admin view rendering:', { 
+      isAdmin, 
+      messagesLength: messages.length, 
+      chatLoading, 
+      deliberationTitle: state.deliberation?.title,
+      userId: user?.id
+    });
+    
     return (
       <Layout>
         <div className="container mx-auto px-4 py-6 max-w-4xl">
@@ -293,6 +301,9 @@ const OptimizedDeliberationChat = () => {
               <div>
                 <h1 className="text-2xl font-bold text-primary">Admin View: {state.deliberation.title}</h1>
                 <p className="text-muted-foreground">Read-only access to all messages in chronological order</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Debug: {messages.length} messages loaded, chatLoading: {chatLoading.toString()}
+                </p>
               </div>
               <Badge className={`${getStatusColor(state.deliberation.status)} text-white`}>
                 {state.deliberation.status}
@@ -302,15 +313,25 @@ const OptimizedDeliberationChat = () => {
 
           {/* Messages */}
           <div className="space-y-4">
-            <OptimizedMessageList 
-              messages={messages} 
-              isLoading={chatLoading} 
-              isTyping={isTyping} 
-              onAddToIbis={() => {}} // Read-only for admin
-              onRetry={() => {}} // Read-only for admin
-              deliberationId={deliberationId} 
-              agentConfigs={state.agentConfigs}
-            />
+            {chatLoading ? (
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="text-center p-8 text-muted-foreground">
+                No messages found in this deliberation.
+              </div>
+            ) : (
+              <OptimizedMessageList 
+                messages={messages} 
+                isLoading={chatLoading} 
+                isTyping={isTyping} 
+                onAddToIbis={() => {}} // Read-only for admin
+                onRetry={() => {}} // Read-only for admin
+                deliberationId={deliberationId} 
+                agentConfigs={state.agentConfigs}
+              />
+            )}
           </div>
         </div>
       </Layout>
