@@ -172,7 +172,6 @@ export interface Agent {
   deliberation_id?: string;
   created_by?: string;
   created_at: string;
-  updated_at: string;
   preset_questions?: any[];
   facilitator_config?: any;
   prompt_overrides?: Record<string, any>;

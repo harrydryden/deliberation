@@ -210,7 +210,7 @@ export const useAdminData = () => {
       const apiAgentData = {
         ...agentData,
         // Remove camelCase fields that don't exist in the API
-      } as Omit<Agent, 'id' | 'created_at' | 'updated_at'>;
+      } as Omit<Agent, 'id' | 'created_at'>;
       
       const newAgent = await services.agentService.createAgent(apiAgentData);
       
@@ -261,7 +261,7 @@ export const useAdminData = () => {
   const createLocalAgent = async (agentData: LocalAgentCreate): Promise<Agent> => {
     try {
       // Convert LocalAgentCreate to the format expected by the service
-      const fullAgentData: Omit<Agent, 'id' | 'created_at' | 'updated_at'> = {
+      const fullAgentData: Omit<Agent, 'id' | 'created_at'> = {
         name: agentData.name,
         agent_type: agentData.agent_type,
         deliberation_id: agentData.deliberationId,

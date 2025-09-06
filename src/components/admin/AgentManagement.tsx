@@ -58,7 +58,7 @@ export const AgentManagement: React.FC = () => {
   const createForm = useForm({
     initialData: getDefaultFormData(),
     onSubmit: async (data) => {
-      const createdAgent = await agentService.createAgent(data as Omit<Agent, 'id' | 'created_at' | 'updated_at'>);
+      const createdAgent = await agentService.createAgent(data as Omit<Agent, 'id' | 'created_at'>);
       setAgents([...agents, createdAgent]);
       setIsCreateDialogOpen(false);
       createForm.resetForm();

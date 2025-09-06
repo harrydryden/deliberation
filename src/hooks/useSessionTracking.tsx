@@ -72,7 +72,7 @@ export const useSessionTracking = (): UseSessionTrackingReturn => {
         // Update local session data
         setCurrentSession(prev => prev ? {
           ...prev,
-          last_active: new Date().toISOString()
+          recently_active: true
         } : null);
       }
     });

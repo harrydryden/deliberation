@@ -17,6 +17,7 @@ import { BulkUserCreation } from './BulkUserCreation';
 import { PromptManagement } from './PromptManagement';
 import { AgentRatingDashboard } from './AgentRatingDashboard';
 import { AnonymityDashboard } from './AnonymityDashboard';
+import { SessionsManagement } from './SessionsManagement';
 
 import { useAdminData } from '@/hooks/useAdminData';
 import { useMemoryLeakDetection } from '@/utils/performanceUtils';
@@ -80,6 +81,7 @@ export const AdminDashboard = () => {
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="deliberations">Deliberations</TabsTrigger>
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
+          <TabsTrigger value="sessions">Sessions</TabsTrigger>
           <TabsTrigger value="ratings">Agent Ratings</TabsTrigger>
           </TabsList>
         </div>
@@ -144,6 +146,10 @@ export const AdminDashboard = () => {
 
         <TabsContent value="privacy" className="space-y-4">
           <AnonymityDashboard />
+        </TabsContent>
+
+        <TabsContent value="sessions" className="space-y-4">
+          <SessionsManagement />
         </TabsContent>
 
         <TabsContent value="ratings" className="space-y-4">

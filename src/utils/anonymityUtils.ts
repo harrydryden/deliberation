@@ -53,6 +53,20 @@ export const anonymizeTimestamp = (timestamp: string | Date): string => {
   return date.toISOString();
 };
 
+// Format relative time for anonymized display
+export const formatAnonymizedTime = (timestamp: string | Date): string => {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+  
+  if (diffHours < 1) return "recently";
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return `${Math.floor(diffDays / 7)}w ago`;
+};
+
 // Configuration for anonymity settings
 export const ANONYMITY_CONFIG = {
   // How long to keep detailed session data before anonymizing

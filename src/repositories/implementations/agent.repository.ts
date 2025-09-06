@@ -82,7 +82,6 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
       deliberation_id: data.deliberation_id,
       created_by: data.created_by,
       created_at: data.created_at,
-      updated_at: data.updated_at,
       preset_questions: data.preset_questions,
       facilitator_config: data.facilitator_config,
       prompt_overrides: data.prompt_overrides,
@@ -186,7 +185,6 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
           deliberation_id,
           created_by,
           created_at,
-          updated_at,
           preset_questions,
           facilitator_config,
           prompt_overrides
@@ -223,7 +221,6 @@ export class AgentRepository extends SupabaseBaseRepository implements IAgentRep
           deliberation_id,
           created_by,
           created_at,
-          updated_at,
           preset_questions,
           facilitator_config,
           prompt_overrides

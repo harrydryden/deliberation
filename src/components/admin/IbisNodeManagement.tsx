@@ -106,7 +106,7 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
           node_type: editForm.node_type,
           position_x: editForm.position_x,
           position_y: editForm.position_y,
-          updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString()
         })
         .eq('id', editingNode.id);
 

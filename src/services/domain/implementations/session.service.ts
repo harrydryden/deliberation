@@ -6,9 +6,9 @@ export interface UserSession {
   user_id: string;
   session_token_hash: string;
   created_at: string;
-  last_active: string;
   expires_at: string;
   is_active: boolean;
+  recently_active: boolean;
 }
 
 export interface SessionMetrics {
@@ -51,7 +51,7 @@ export class SessionService {
       const { error } = await supabase
         .from('user_sessions')
         .update({ 
-          last_active: new Date().toISOString() 
+          recently_active: true
         })
         .eq('id', sessionId)
         .eq('is_active', true);
@@ -74,7 +74,7 @@ export class SessionService {
         .from('user_sessions')
         .update({ 
           is_active: false,
-          last_active: new Date().toISOString()
+          recently_active: false
         })
         .eq('id', sessionId);
 
@@ -131,7 +131,7 @@ export class SessionService {
       if (completedSessions.length > 0) {
         const totalDuration = completedSessions.reduce((total, session) => {
           const start = new Date(session.created_at).getTime();
-          const end = new Date(session.last_active).getTime();
+          const end = new Date(session.expires_at).getTime(); // Use expires_at as end time approximation
           return total + (end - start);
         }, 0);
         

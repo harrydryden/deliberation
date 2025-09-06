@@ -170,7 +170,7 @@ const { user, isAdmin } = useSupabaseAuth();
             .update({
               position_x: change.position.x,
               position_y: change.position.y,
-              updated_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
             })
             .eq('id', change.id);
         } catch (error) {

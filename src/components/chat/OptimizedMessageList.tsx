@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Bot, User, Users, Workflow, FileText, Plus, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatToUKTime } from "@/utils/timeUtils";
+import { formatMessageTime } from '@/utils/timeDisplay';
 const LazyMarkdownMessage = lazy(() => import("@/components/common/MarkdownMessage").then(m => ({ default: m.MarkdownMessage })));
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import type { ChatMessage } from "@/types/index";
@@ -129,7 +129,7 @@ const OptimizedMessageItem = memo(({
               </span>
             )}
             <span className="text-xs text-muted-foreground">
-              {formatToUKTime(message.created_at)}
+              {formatMessageTime(message.created_at)}
             </span>
           </div>
 
