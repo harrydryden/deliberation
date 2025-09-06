@@ -223,17 +223,24 @@ export const MessageList = memo(({ messages, isLoading, isTyping, onAddToIbis, o
   const [unreadIndex, setUnreadIndex] = useState<number | null>(null);
   const prevCountRef = useRef(0);
   const didAutoScrollRef = useRef(false);
+  
+  // Performance optimization hooks
+  const { createOptimizedCallback, createOptimizedMemo } = usePerformanceOptimization({
+    componentName: 'MessageList',
+    enableLogging: true
+  });
+  const { getMetrics } = useComponentMetrics('MessageList');
 
   // Memoize agent configs map for efficient lookup
-  const agentConfigsMap = useMemo(() => {
+  const agentConfigsMap = createOptimizedMemo(() => {
     const map = new Map();
     agentConfigs?.forEach(config => {
       map.set(config.agent_type, config);
     });
     return map;
-  }, [agentConfigs]);
+  }, [agentConfigs], 'agentConfigsMap');
 
-  const renderItem = useCallback((index: number, message: ChatMessage) => {
+  const renderItem = createOptimizedCallback((index: number, message: ChatMessage) => {
     const endTimer = performanceMonitor.startTimer('MessageItem.render');
     
     const result = (
@@ -250,7 +257,7 @@ export const MessageList = memo(({ messages, isLoading, isTyping, onAddToIbis, o
     
     endTimer();
     return result;
-  }, [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId]);
+  }, [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId], 'renderItem');
 
   useEffect(() => {
     if (!atBottom && messages.length > prevCountRef.current) {

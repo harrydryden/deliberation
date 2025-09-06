@@ -23,6 +23,7 @@ import { logger } from '@/utils/logger';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import { usePerformanceOptimization, useComponentMetrics } from '@/hooks/usePerformanceOptimization';
 
 export const AdminDashboard = () => {
   const adminData = useAdminData();
@@ -31,9 +32,16 @@ export const AdminDashboard = () => {
   const { toast } = useToast();
   
   useMemoryLeakDetection('AdminDashboard');
+  
+  // Performance optimization
+  const { createOptimizedCallback, createBatchedUpdater } = usePerformanceOptimization({
+    componentName: 'AdminDashboard',
+    enableLogging: true
+  });
+  const { getMetrics } = useComponentMetrics('AdminDashboard');
 
   useEffect(() => {
-    const initializeData = async () => {
+    const initializeData = createOptimizedCallback(async () => {
       await handleAsyncError(async () => {
         await Promise.all([
           adminData.fetchStats(),
@@ -43,10 +51,10 @@ export const AdminDashboard = () => {
         ]);
         logger.component.mount('AdminDashboard', { message: 'Admin dashboard initialized successfully' });
       }, 'admin dashboard initialization');
-    };
+    }, [handleAsyncError, adminData], 'initializeData');
     
     initializeData();
-  }, [handleAsyncError]);
+  }, [createOptimizedCallback, handleAsyncError, adminData]);
 
 
   return (

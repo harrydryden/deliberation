@@ -84,7 +84,7 @@ const DeliberationChat = () => {
   const [userScores, setUserScores] = useState({
     engagement: 0, // Count of user messages sent total
     shares: 0, // Count of IBIS submissions total
-    sessions: 1, // Count of login sessions (placeholder)
+    sessions: sessionMetrics?.totalSessions || 1, // Real session tracking data
     helpfulness: 0, // Count of net positive IBIS contribution ratings
     stanceScore: undefined as number | undefined // User's stance towards deliberation topic (-1.0 to 1.0)
   });
@@ -190,7 +190,7 @@ const DeliberationChat = () => {
       setUserScores({
         engagement: deliberationMessages.length,
         shares: ibisSubmissions.length,
-        sessions: 1, // Placeholder - could track from user sessions
+        sessions: sessionMetrics?.totalSessions || 1, // Real session data from tracking
         helpfulness: helpfulnessScore,
         stanceScore: stanceData?.stance_score || 0
       });
