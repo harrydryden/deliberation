@@ -838,7 +838,6 @@ export type Database = {
           created_at: string | null
           id: string
           is_archived: boolean | null
-          role: string | null
           user_role: Database["public"]["Enums"]["app_role"] | null
         }
         Insert: {
@@ -848,7 +847,6 @@ export type Database = {
           created_at?: string | null
           id: string
           is_archived?: boolean | null
-          role?: string | null
           user_role?: Database["public"]["Enums"]["app_role"] | null
         }
         Update: {
@@ -858,7 +856,6 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_archived?: boolean | null
-          role?: string | null
           user_role?: Database["public"]["Enums"]["app_role"] | null
         }
         Relationships: []
