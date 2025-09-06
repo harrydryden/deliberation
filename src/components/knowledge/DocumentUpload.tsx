@@ -192,15 +192,20 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
           throw new Error('No meaningful text content found in the document');
         }
         
-        // For text files, we'll simulate the processing result
-        // This should be replaced with a proper text processing edge function
-        processResult = {
-          success: true,
-          text: fileContent,
-          pages: 1,
-          strategy: 'text-direct',
-          chunksProcessed: Math.ceil(fileContent.length / 1000)
-        };
+        // Process text files with proper text processor edge function
+        setProcessingStatus('Processing text content with advanced analysis...');
+        
+        const response = await supabase.functions.invoke('text-processor', {
+          body: {
+            text: fileContent,
+            fileName: file.name,
+            deliberationId: `default-${user.id}`,
+            userId: user.id
+          }
+        });
+        
+        processResult = response.data;
+        processError = response.error;
         processError = null;
       }
 

@@ -205,6 +205,29 @@ export const IbisSubmissionModal = ({
         if (relError) throw relError;
       } else {
         // Create new node as before
+        // Calculate intelligent position based on node type and existing nodes
+        const calculateNodePosition = (nodeType: string, parentNodeId?: string) => {
+          const basePositions = {
+            issue: { x: 200, y: 150 },
+            position: { x: 400, y: 300 },
+            argument: { x: 600, y: 450 }
+          };
+          
+          const base = basePositions[nodeType as keyof typeof basePositions] || { x: 400, y: 300 };
+          
+          // Add some variation while keeping nodes organized
+          const variation = 100;
+          const offsetX = Math.random() * variation - variation / 2;
+          const offsetY = Math.random() * variation - variation / 2;
+          
+          return {
+            x: Math.max(50, Math.min(800, base.x + offsetX)),
+            y: Math.max(50, Math.min(600, base.y + offsetY))
+          };
+        };
+        
+        const position = calculateNodePosition(formData.nodeType, formData.parentNodeId);
+
         const { data: inserted, error: nodeError } = await supabase
           .from('ibis_nodes')
           .insert({
@@ -215,8 +238,8 @@ export const IbisSubmissionModal = ({
             deliberation_id: deliberationId,
             message_id: messageId,
             created_by: user.id,
-            position_x: Math.random() * 800 + 100,
-            position_y: Math.random() * 600 + 100
+            position_x: position.x,
+            position_y: position.y
           })
           .select('id, node_type')
           .maybeSingle();
