@@ -832,6 +832,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          access_code_1: string | null
+          access_code_2: string | null
           archive_reason: string | null
           archived_at: string | null
           archived_by: string | null
@@ -841,6 +843,8 @@ export type Database = {
           user_role: Database["public"]["Enums"]["app_role"] | null
         }
         Insert: {
+          access_code_1?: string | null
+          access_code_2?: string | null
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
@@ -850,6 +854,8 @@ export type Database = {
           user_role?: Database["public"]["Enums"]["app_role"] | null
         }
         Update: {
+          access_code_1?: string | null
+          access_code_2?: string | null
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
@@ -1276,6 +1282,14 @@ export type Database = {
       debug_storage_context: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      generate_access_code_1: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_access_code_2: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       get_admin_system_stats: {
         Args: Record<PropertyKey, never>

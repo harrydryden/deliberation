@@ -57,9 +57,22 @@ export function UserManagement({ users, loading, onLoad, onUpdateRole, onArchive
   const columns = [
     {
       key: 'email',
-      header: 'Access Code',
+      header: 'User Details',
       render: (user: User) => (
-        <span className="font-mono text-sm">{user.email}</span>
+        <div>
+          <div className="font-medium">{user.profile?.displayName || 'Unknown User'}</div>
+          <div className="text-sm text-muted-foreground font-mono">{user.email}</div>
+        </div>
+      )
+    },
+    {
+      key: 'accessCodes',
+      header: 'Access Codes',
+      render: (user: User) => (
+        <div className="font-mono text-sm">
+          <div>{user.accessCode1 || 'Not set'}</div>
+          <div className="text-muted-foreground">{user.accessCode2 || 'Not set'}</div>
+        </div>
       )
     },
     {

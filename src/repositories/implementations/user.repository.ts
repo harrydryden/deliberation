@@ -71,7 +71,9 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
       isArchived: data.is_archived,
       archivedAt: data.archived_at,
       archivedBy: data.archived_by,
-      archiveReason: data.archive_reason
+      archiveReason: data.archive_reason,
+      accessCode1: data.access_code_1,
+      accessCode2: data.access_code_2
     };
   }
 
@@ -110,6 +112,8 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
           bio: profile.bio || '',
           expertiseAreas: profile.expertise_areas || [],
         },
+        accessCode1: profile.access_code_1,
+        accessCode2: profile.access_code_2
       } as User;
     } catch (error) {
       logger.error('User repository findByEmail failed', error, { email });
@@ -215,6 +219,8 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
           archivedAt: profile.archived_at,
           archivedBy: profile.archived_by,
           archiveReason: profile.archive_reason,
+          accessCode1: profile.access_code_1,
+          accessCode2: profile.access_code_2
         };
       });
 

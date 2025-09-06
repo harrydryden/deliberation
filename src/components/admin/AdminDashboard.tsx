@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 
 import { UserAccessManagement } from './UserAccessManagement';
+import { AccessCodeCreation } from './AccessCodeCreation';
 import { AgentManagement } from './AgentManagement';
 import { LocalAgentManagement } from './LocalAgentManagement';
 import { DeliberationOverview } from './DeliberationOverview';
@@ -82,6 +83,7 @@ export const AdminDashboard = () => {
         </div>
 
         <TabsContent value="users" className="space-y-4">
+          <AccessCodeCreation />
           <UserAccessManagement
             users={adminData.users}
             loading={adminData.loadingUsers}
