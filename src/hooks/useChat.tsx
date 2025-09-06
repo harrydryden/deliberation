@@ -43,42 +43,39 @@ export const useChat = (deliberationId?: string) => {
     realtimeService
   }), [messageService, realtimeService]);
 
-  const { toast } = useToast();
+  // Stable toast reference to prevent recreating callbacks
+  const stableToast = useMemo(() => {
+    const { toast } = require('@/hooks/use-toast');
+    return toast;
+  }, []);
 
-  // Load chat history when user is authenticated or deliberationId changes
-  useEffect(() => {
-    if (!authLoading && user) {
-      loadChatHistory();
-      setupRealTimeUpdates();
+  // Stable callback references to prevent infinite loops
+  const stableLoadChatHistory = useCallback(async () => {
+    if (!user) {
+      logger.info('loadChatHistory: No user found, skipping');
+      return;
     }
 
-    return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
-    };
-  }, [user, authLoading, deliberationId]);
+    setChatState(prev => ({ ...prev, isLoading: true }));
+    
+    await handleAsyncError(async () => {
+      const data = await cacheService.memoizeAsync(
+        'chat-history',
+        [deliberationId, user.id],
+        () => services.messageService.getMessages(deliberationId),
+        { ttl: 60000 }
+      );
+      
+      setChatState(prev => ({ 
+        ...prev, 
+        messages: convertApiMessagesToChatMessages(data || []),
+        isLoading: false
+      }));
+      logger.api.response('GET', '/messages', 200, { deliberationId, messageCount: data?.length || 0 });
+    }, 'loading chat history');
+  }, [user, deliberationId, handleAsyncError, setChatState, services.messageService]);
 
-  // Remove redundant reload - realtime updates should handle missed messages
-
-  // Listen for agent failure events (e.g., OpenAI quota exceeded)
-  useEffect(() => {
-    const handler = () => {
-      setChatState(prev => ({ ...prev, isTyping: false }));
-      toast({ title: 'Contact Platform Admin', description: 'AI responses are temporarily unavailable.', variant: 'destructive' });
-    };
-    if (typeof window !== 'undefined') {
-      window.addEventListener('agent-error', handler);
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('agent-error', handler);
-      }
-    };
-  }, [toast]);
-
-  const setupRealTimeUpdates = () => {
+  const stableSetupRealTimeUpdates = useCallback(() => {
     if (!user) return;
 
     try {
@@ -99,7 +96,6 @@ export const useChat = (deliberationId?: string) => {
           submitted_to_ibis: message.submitted_to_ibis || false
         };
 
-        // Only add messages that belong to this deliberation (or all if no deliberationId)
         setChatState(prev => {
           // Avoid duplicates
           if (prev.messages.some(msg => msg.id === chatMessage.id)) {
@@ -119,44 +115,41 @@ export const useChat = (deliberationId?: string) => {
     } catch (error) {
       handleError(error, 'real-time setup');
     }
-  };
+  }, [user, realtimeService, deliberationId, setChatState, handleError]);
 
-  const loadChatHistory = useCallback(async () => {
-    if (!user) {
-      logger.info('loadChatHistory: No user found, skipping');
-      return;
+  // Load chat history when user is authenticated or deliberationId changes
+  useEffect(() => {
+    if (!authLoading && user) {
+      stableLoadChatHistory();
+      stableSetupRealTimeUpdates();
     }
 
-    console.log('loadChatHistory: Starting load for', { userId: user.id, deliberationId });
-    setChatState(prev => ({ ...prev, isLoading: true }));
-    
-    await handleAsyncError(async () => {
-      // const timer = performanceMonitor.startTimer('loadChatHistory');
-      
-      // Use cached message loading with deduplication
-      const data = await cacheService.memoizeAsync(
-        'chat-history',
-        [deliberationId, user.id],
-        () => services.messageService.getMessages(deliberationId),
-        { ttl: 60000 } // Cache for 1 minute
-      );
-      
-      console.log('loadChatHistory: Received data', { 
-        messageCount: data?.length || 0, 
-        deliberationId,
-        userId: user.id,
-        cached: true
-      });
-      
-      setChatState(prev => ({ 
-        ...prev, 
-        messages: convertApiMessagesToChatMessages(data || []),
-        isLoading: false
-      }));
-        // timer();
-      logger.api.response('GET', '/messages', 200, { deliberationId, messageCount: data?.length || 0 });
-    }, 'loading chat history');
-  }, [user, deliberationId, handleAsyncError, setChatState, services.messageService]);
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+    };
+  }, [user, authLoading, deliberationId, stableLoadChatHistory, stableSetupRealTimeUpdates]);
+
+  // Remove redundant reload - realtime updates should handle missed messages
+
+  // Listen for agent failure events (e.g., OpenAI quota exceeded)
+  useEffect(() => {
+    const handler = () => {
+      setChatState(prev => ({ ...prev, isTyping: false }));
+      stableToast({ title: 'Contact Platform Admin', description: 'AI responses are temporarily unavailable.', variant: 'destructive' });
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('agent-error', handler);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('agent-error', handler);
+      }
+    };
+  }, [stableToast, setChatState]);
+
 
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!user || !content.trim()) return;
@@ -203,11 +196,8 @@ export const useChat = (deliberationId?: string) => {
           deliberationId,
           // onUpdate callback - update streaming message in real-time
           (streamContent: string, agentType: string) => {
-            console.log('🔄 onUpdate called:', { streamContent: streamContent.substring(0, 50), agentType, hasContent: !!streamContent.trim() });
-            
             // Only create streaming UI messages when we have actual content to show
             if (!streamContent.trim()) {
-              console.log('⚠️ Skipping onUpdate due to empty content');
               return;
             }
             
@@ -221,12 +211,9 @@ export const useChat = (deliberationId?: string) => {
               agent_context: { agentType }
             };
 
-            console.log('📝 Creating/updating streaming message:', streamingMessage.id);
-
             setChatState(prev => {
               const existingStreamingIndex = prev.messages.findIndex(m => m.id === `streaming-${saved.id}`);
               if (existingStreamingIndex >= 0) {
-                console.log('🔄 Updating existing streaming message at index:', existingStreamingIndex);
                 // Update existing streaming message
                 return {
                   ...prev,
@@ -235,7 +222,6 @@ export const useChat = (deliberationId?: string) => {
                   )
                 };
               } else {
-                console.log('➕ Adding new streaming message');
                 // Only add streaming message when we have actual content
                 return {
                   ...prev,
@@ -246,14 +232,11 @@ export const useChat = (deliberationId?: string) => {
           },
           // onComplete callback - replace with final message
           async (finalContent: string, agentType: string) => {
-            console.log('✅ onComplete called:', { finalContent: finalContent.substring(0, 50), agentType });
-            
-              // Don't create messages with empty content
-              if (!finalContent.trim()) {
-                console.log('⚠️ Skipping onComplete due to empty finalContent');
-                setChatState(prev => ({ ...prev, isTyping: false }));
-                return;
-              }
+            // Don't create messages with empty content
+            if (!finalContent.trim()) {
+              setChatState(prev => ({ ...prev, isTyping: false }));
+              return;
+            }
             
             try {
               // Replace streaming placeholder with final agent message locally to avoid full reload
@@ -266,10 +249,9 @@ export const useChat = (deliberationId?: string) => {
                 status: 'sent',
                 agent_context: { agentType }
               };
-              console.log('🏁 Creating final message:', finalMessage.id);
+
               setChatState(prev => {
                 const withoutStreaming = prev.messages.filter(m => m.id !== `streaming-${saved.id}`);
-                console.log('🧹 Filtered out streaming messages, remaining:', withoutStreaming.length);
                 return {
                   ...prev,
                   messages: [...withoutStreaming, finalMessage],
@@ -290,7 +272,7 @@ export const useChat = (deliberationId?: string) => {
               messages: prev.messages.filter(m => m.id !== `streaming-${saved.id}` && !m.id.startsWith('streaming-')),
               isTyping: false
             }));
-            toast({
+            stableToast({
               title: "Response Error",
               description: "Failed to get agent response. Please try again.",
               variant: "destructive"
@@ -310,7 +292,7 @@ export const useChat = (deliberationId?: string) => {
       }));
       throw error;
     }
-  }, [user, deliberationId, setChatState, services.messageService, startStreaming, loadChatHistory, toast]);
+  }, [user, deliberationId, setChatState, services.messageService, startStreaming, stableToast]);
 
   const retryMessage = useCallback(async (id: string) => {
     const target = chatState.messages.find(m => m.id === id);
@@ -343,7 +325,7 @@ export const useChat = (deliberationId?: string) => {
     isLoading: chatState.isLoading,
     isTyping: chatState.isTyping || streamingState.isStreaming,
     sendMessage,
-    loadChatHistory,
+    loadChatHistory: stableLoadChatHistory,
     retryMessage,
     streamingState,
     stopStreaming

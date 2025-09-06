@@ -248,28 +248,33 @@ export const OptimizedMessageList = memo(({
     memoryThreshold: 100 // Higher threshold
   });
 
-  // Optimized agent configs map with proper typing
+  // Optimized agent configs map with proper typing and stability check
   const agentConfigsMap = useMemo(() => {
     const map = new Map<string, AgentConfig>();
     agentConfigs?.forEach(config => {
       map.set(config.agent_type, config);
     });
     return map;
-  }, [agentConfigs]);
+  }, [agentConfigs?.length, agentConfigs?.map(c => c.agent_type).join(',')]);  // More stable dependencies
 
-  const renderItem = useCallback((index: number, message: ChatMessage) => {
-    return (
-      <OptimizedMessageItem
-        message={message}
-        index={index}
-        unreadIndex={unreadIndex}
-        onAddToIbis={onAddToIbis}
-        onRetry={onRetry}
-        agentConfigsMap={agentConfigsMap}
-        deliberationId={deliberationId}
-      />
-    );
-  }, [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId]);
+  // Optimize renderItem with stable dependencies
+  const renderItem = createOptimizedCallback(
+    (index: number, message: ChatMessage) => {
+      return (
+        <OptimizedMessageItem
+          message={message}
+          index={index}
+          unreadIndex={unreadIndex}
+          onAddToIbis={onAddToIbis}
+          onRetry={onRetry}
+          agentConfigsMap={agentConfigsMap}
+          deliberationId={deliberationId}
+        />
+      );
+    },
+    [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId],
+    'renderItem'
+  );
 
   // Auto-scroll optimization
   const scrollToBottom = useCallback(() => {
