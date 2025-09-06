@@ -110,9 +110,8 @@ serve(async (req) => {
         'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14', // More reliable model
-        max_tokens: 1000, // Use max_tokens for GPT-4.1
-        temperature: 0.1, // Very low temperature for consistent, focused output
+        model: 'gpt-4.1-2025-04-14',
+        max_completion_tokens: 1000,
         messages: [
           {
             role: 'system',

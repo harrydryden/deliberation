@@ -50,21 +50,15 @@ export class AgentOrchestrator {
     this.supabase = supabase;
   }
 
-  // UNIFIED MODEL SELECTION (no models newer than Aug 10, 2025)
+  // Standardized model selection - always use flagship model
   selectOptimalModel(analysis: AnalysisResult, agentConfig?: AgentConfig): string {
     // Check agent-specific model preference first
     if (agentConfig?.preferred_model) {
       return agentConfig.preferred_model;
     }
-
-    // Complexity-based selection using valid available models
-    if (analysis.complexity > 0.8 || analysis.requiresExpertise) {
-      return 'gpt-4.1-2025-04-14'; // Flagship model for complex queries
-    } else if (analysis.complexity > 0.5) {
-      return 'gpt-4o'; // Balanced performance
-    } else {
-      return 'gpt-4o-mini'; // Fast for simple queries
-    }
+    
+    // Always use flagship model for consistency
+    return 'gpt-4.1-2025-04-14';
   }
 
   // UNIFIED AGENT CONFIGURATION FETCHING
@@ -270,7 +264,7 @@ export class AgentOrchestrator {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini', // Fast model for analysis
+          model: 'gpt-4.1-2025-04-14',
           messages: [
             {
               role: 'system',

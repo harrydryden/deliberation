@@ -310,7 +310,7 @@ async function generateFastResponse(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-2025-04-14',
       messages: [
         {
           role: 'system',
@@ -321,8 +321,7 @@ async function generateFastResponse(
           content: content
         }
       ],
-      max_tokens: 500,
-      temperature: 0.7,
+      max_completion_tokens: 500,
       stream: true
     }),
   });
@@ -453,9 +452,8 @@ async function generateStreamingResponse(
   // Get agent configuration through orchestrator
   const agentConfig = await orchestrator.getAgentConfig(agentType, deliberationId);
   
-  // Select optimal model using orchestrator
-  const model = orchestrator.selectOptimalModel(analysis, agentConfig);
-  const isGPT5 = model.includes('gpt-5');
+  // Select standardized model
+  const model = 'gpt-4.1-2025-04-14';
   
   console.log(`🧠 Using ${model} for ${agentType} response (config: ${agentConfig ? 'custom' : 'default'})`);
 
@@ -480,17 +478,9 @@ async function generateStreamingResponse(
       { role: 'system', content: systemPrompt },
       { role: 'user', content: content }
     ],
-    stream: true
+    stream: true,
+    max_completion_tokens: 1500
   };
-
-  // Set appropriate parameters based on model (GPT-5 models use max_completion_tokens)
-  if (isGPT5) {
-    requestBody.max_completion_tokens = 1500;
-    // GPT-5 models don't support temperature parameter
-  } else {
-    requestBody.max_tokens = 1000;
-    requestBody.temperature = 0.7;
-  }
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',

@@ -194,8 +194,7 @@ Respond in JSON format:
         },
         { role: "user", content: relationshipPrompt }
       ],
-      max_tokens: 1500,
-      temperature: 0.3
+      max_completion_tokens: 1500
     });
 
     let aiRelationships: any[] = [];

@@ -89,7 +89,7 @@ Only include issues with relevance score >= 0.6. If no issues meet this threshol
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // Fast model for analysis
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           {
             role: 'system',
@@ -100,8 +100,7 @@ Only include issues with relevance score >= 0.6. If no issues meet this threshol
             content: aiPrompt
           }
         ],
-        max_tokens: 1000, // Legacy models use max_tokens
-        temperature: 0.7
+        max_completion_tokens: 1000
       }),
     });
 

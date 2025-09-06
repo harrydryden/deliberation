@@ -122,9 +122,8 @@ Notion: "${deliberationNotion}"`
         'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o', // Use valid OpenAI model
-        max_tokens: 1000, // Legacy models use max_tokens
-        temperature: 0.7,
+        model: 'gpt-4.1-2025-04-14',
+        max_completion_tokens: 1000,
         messages: [{
           role: 'user',
           content: prompt
