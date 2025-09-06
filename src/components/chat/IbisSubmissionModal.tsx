@@ -44,12 +44,21 @@ export const IbisSubmissionModal = ({
     nodeType: '' as NodeType | '',
     parentNodeId: ''
   });
-  // Enhanced relationship management
-  const [selectedRelationships, setSelectedRelationships] = useState<Array<{
+  // Enhanced relationship management - separate tracking for different sources
+  const [issueRecommendationRelationships, setIssueRecommendationRelationships] = useState<Array<{
     id: string;
     type: string;
     confidence: number;
   }>>([]);
+  
+  const [manualRelationships, setManualRelationships] = useState<Array<{
+    id: string;
+    type: string;
+    confidence: number;
+  }>>([]);
+  
+  // Combined relationships for submission
+  const selectedRelationships = [...issueRecommendationRelationships, ...manualRelationships];
   
   const [aiSuggestions, setAiSuggestions] = useState<{
     title: string;
@@ -162,10 +171,13 @@ export const IbisSubmissionModal = ({
   };
 
   const handleIssueRecommendationsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
-    console.log('🔗 RELATIONSHIPS CHANGED:', relationships);
-    console.log('🔗 SETTING SELECTED RELATIONSHIPS IN MODAL STATE');
-    setSelectedRelationships(relationships);
-    console.log('🔗 AFTER SETTING - selectedRelationships length:', relationships.length);
+    console.log('🔗 ISSUE RECOMMENDATIONS CHANGED:', relationships);
+    setIssueRecommendationRelationships(relationships);
+  };
+
+  const handleManualConnectionsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
+    console.log('🔗 MANUAL CONNECTIONS CHANGED:', relationships);
+    setManualRelationships(relationships);
   };
 
   const handleIssueSelected = (issueId: string) => {
@@ -339,7 +351,8 @@ export const IbisSubmissionModal = ({
         parentNodeId: ''
       });
       setAiSuggestions(null);
-      setSelectedRelationships([]);
+      setIssueRecommendationRelationships([]);
+      setManualRelationships([]);
       setSelectedIssueId(null);
       setIsLinkingMode(false);
     } catch (error: any) {
@@ -572,7 +585,7 @@ export const IbisSubmissionModal = ({
                   <div className="mt-4 p-4 border border-dashed border-muted/30 rounded-lg">
                     <ManualNodeSelector
                       existingNodes={existingNodes}
-                      onConnectionsChange={handleIssueRecommendationsChange}
+                      onConnectionsChange={handleManualConnectionsChange}
                     />
                   </div>
 
@@ -587,35 +600,71 @@ export const IbisSubmissionModal = ({
                         These connections will be established when you click "Share":
                       </p>
                       <div className="space-y-2">
-                        {selectedRelationships.map((rel, index) => {
-                          const connectedNode = existingNodes.find(node => node.id === rel.id);
-                          return (
-                            <div key={`${rel.id}-${rel.type}`} className="flex items-start gap-3 p-2 bg-background/50 rounded border">
-                              <span className="font-medium text-primary text-xs mt-0.5">#{index + 1}</span>
-                              <div className="flex-1 space-y-1">
-                                <div className="flex items-center gap-2">
-                                  {connectedNode && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {connectedNode.node_type}
-                                    </Badge>
-                                  )}
-                                  <span className="text-sm font-medium">
-                                    {connectedNode?.title || 'Unknown item'}
-                                  </span>
+                        {issueRecommendationRelationships.length > 0 && (
+                          <div className="space-y-2">
+                            <h6 className="text-xs font-semibold text-primary">AI Recommendations:</h6>
+                            {issueRecommendationRelationships.map((rel, index) => {
+                              const connectedNode = existingNodes.find(node => node.id === rel.id);
+                              return (
+                                <div key={`ai-${rel.id}-${rel.type}`} className="flex items-start gap-3 p-2 bg-background/50 rounded border">
+                                  <span className="font-medium text-primary text-xs mt-0.5">#{index + 1}</span>
+                                  <div className="flex-1 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      {connectedNode && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {connectedNode.node_type}
+                                        </Badge>
+                                      )}
+                                      <span className="text-sm font-medium">
+                                        {connectedNode?.title || 'Unknown item'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      <span>Relationship:</span>
+                                      <span className="font-medium text-foreground">
+                                        {rel.type ? rel.type.replace(/_/g, ' ') : 'No specific type'}
+                                      </span>
+                                      <Badge variant="secondary" className="text-xs">AI</Badge>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  <span>Relationship:</span>
-                                  <span className="font-medium text-foreground">
-                                    {rel.type ? rel.type.replace(/_/g, ' ') : 'No specific type'}
-                                  </span>
-                                  {rel.confidence === 1.0 && (
-                                    <Badge variant="secondary" className="text-xs">Manual</Badge>
-                                  )}
+                              );
+                            })}
+                          </div>
+                        )}
+                        
+                        {manualRelationships.length > 0 && (
+                          <div className="space-y-2">
+                            <h6 className="text-xs font-semibold text-green-600">Manual Connections:</h6>
+                            {manualRelationships.map((rel, index) => {
+                              const connectedNode = existingNodes.find(node => node.id === rel.id);
+                              return (
+                                <div key={`manual-${rel.id}-${rel.type}`} className="flex items-start gap-3 p-2 bg-background/50 rounded border">
+                                  <span className="font-medium text-green-600 text-xs mt-0.5">#{index + 1}</span>
+                                  <div className="flex-1 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      {connectedNode && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {connectedNode.node_type}
+                                        </Badge>
+                                      )}
+                                      <span className="text-sm font-medium">
+                                        {connectedNode?.title || 'Unknown item'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                      <span>Relationship:</span>
+                                      <span className="font-medium text-foreground">
+                                        {rel.type ? rel.type.replace(/_/g, ' ') : 'No specific type'}
+                                      </span>
+                                      <Badge variant="secondary" className="text-xs">Manual</Badge>
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
