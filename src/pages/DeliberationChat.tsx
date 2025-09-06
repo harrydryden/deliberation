@@ -89,6 +89,16 @@ const OptimizedDeliberationChat = () => {
     retryMessage
   } = useChat(deliberationId);
 
+  console.log('DeliberationChat: useChat results', {
+    isAdmin,
+    messagesLength: messages?.length || 0,
+    chatLoading,
+    isTyping,
+    deliberationId,
+    userId: user?.id,
+    messages: messages?.map(m => ({ id: m.id, type: m.message_type, content: m.content?.substring(0, 30) }))
+  });
+
   // Optimized sendMessage
   const sendMessage = useCallback(async (content: string) => {
     await originalSendMessage(content, chatModeRef.current);
@@ -309,17 +319,23 @@ const OptimizedDeliberationChat = () => {
             ) : messages.length === 0 ? (
               <div className="text-center p-8 text-muted-foreground">
                 No messages found in this deliberation.
+                <div className="text-xs mt-2">Debug: messages.length = {messages.length}, chatLoading = {chatLoading.toString()}</div>
               </div>
             ) : (
-              <OptimizedMessageList 
-                messages={messages} 
-                isLoading={chatLoading} 
-                isTyping={isTyping} 
-                onAddToIbis={() => {}} // Read-only for admin
-                onRetry={() => {}} // Read-only for admin
-                deliberationId={deliberationId} 
-                agentConfigs={state.agentConfigs}
-              />
+              <>
+                <div className="text-xs text-muted-foreground mb-2">
+                  Debug: Rendering {messages.length} messages
+                </div>
+                <OptimizedMessageList 
+                  messages={messages} 
+                  isLoading={chatLoading} 
+                  isTyping={isTyping} 
+                  onAddToIbis={() => {}} // Read-only for admin
+                  onRetry={() => {}} // Read-only for admin
+                  deliberationId={deliberationId} 
+                  agentConfigs={state.agentConfigs}
+                />
+              </>
             )}
           </div>
         </div>

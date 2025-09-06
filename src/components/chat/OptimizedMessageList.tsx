@@ -235,6 +235,13 @@ export const OptimizedMessageList = memo(({
   deliberationId, 
   agentConfigs 
 }: MessageListProps) => {
+  console.log('OptimizedMessageList render:', {
+    messagesLength: messages?.length || 0,
+    isLoading,
+    isTyping,
+    messages: messages?.map(m => ({ id: m.id, type: m.message_type, content: m.content?.substring(0, 30) }))
+  });
+
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const [atBottom, setAtBottom] = useState(true);
   const [unreadIndex, setUnreadIndex] = useState<number | null>(null);
