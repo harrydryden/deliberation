@@ -532,22 +532,51 @@ export const IbisSubmissionModal = ({
                 </div>
               )}
 
-              {/* Issue Recommendations - Always show when not in linking mode */}
+              {/* Issue Recommendations and Manual Selection */}
               {!isLinkingMode && (
                 <div>
                   <h5 className="text-xs font-medium text-muted-foreground mb-2">Link to Existing Issues</h5>
+                  
+                  {/* AI Recommendations */}
                   <IssueRecommendations
                     deliberationId={deliberationId}
                     userContent={formData.description || messageContent || formData.title}
                     onIssueSelected={handleIssueSelected}
                   />
+                  
+                  {/* Manual Selection Dropdown */}
+                  <div className="mt-3">
+                    <Label htmlFor="manualNodeSelection" className="text-xs">Or select manually:</Label>
+                    <Select onValueChange={(value) => value !== 'none' && handleIssueSelected(value)}>
+                      <SelectTrigger className="mt-1 bg-background border-border z-50">
+                        <SelectValue placeholder="Choose an existing item to link to" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border-border shadow-lg z-50 max-h-60">
+                        <SelectItem value="none">
+                          <span className="text-muted-foreground">No connection</span>
+                        </SelectItem>
+                        {existingNodes.map((node) => (
+                          <SelectItem key={node.id} value={node.id}>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">
+                                {node.node_type}
+                              </Badge>
+                              <span className="truncate">{node.title}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               )}
 
-              {/* Enhanced Relationship Selector - Show when creating new nodes */}
+              {/* Enhanced Relationship Selector and Manual Connections */}
               {!isLinkingMode && (
                 <div>
                   <h5 className="text-xs font-medium text-muted-foreground mb-2">Smart Connections</h5>
+                  
+                  {/* AI-powered relationship analysis */}
                   <EnhancedRelationshipSelector
                     deliberationId={deliberationId}
                     content={formData.description || messageContent}
@@ -555,6 +584,25 @@ export const IbisSubmissionModal = ({
                     nodeType={(formData.nodeType || 'issue') as 'issue' | 'position' | 'argument'}
                     onRelationshipsChange={handleRelationshipsChange}
                   />
+                  
+                  {/* Manual relationship creation */}
+                  <div className="mt-3 p-3 border border-border rounded-lg bg-muted/20">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      You can also manually create relationships after submission using the IBIS map editor.
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {existingNodes.slice(0, 3).map((node) => (
+                        <Badge key={node.id} variant="outline" className="text-xs">
+                          {node.node_type}: {node.title.slice(0, 20)}...
+                        </Badge>
+                      ))}
+                      {existingNodes.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{existingNodes.length - 3} more
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
