@@ -3,10 +3,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Brain, Zap, ArrowRight, CheckCircle2, XCircle, Lightbulb } from 'lucide-react';
+import { Brain, Zap, ArrowRight, CheckCircle2, XCircle, Lightbulb, Plus, Trash2 } from 'lucide-react';
 
 interface RelationshipSuggestion {
   nodeId: string;
@@ -37,10 +38,29 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   const [selectedRelationships, setSelectedRelationships] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [evaluated, setEvaluated] = useState(false);
+  const [existingNodes, setExistingNodes] = useState<Array<{id: string, title: string, node_type: string}>>([]);
+  const [manualConnections, setManualConnections] = useState<Array<{nodeId: string, relationshipType: string}>>([]);
   const { toast } = useToast();
 
   // Maximum number of connections allowed
   const MAX_CONNECTIONS = 3;
+
+  // Load existing nodes for manual connection
+  useEffect(() => {
+    const loadExistingNodes = async () => {
+      const { data, error } = await supabase
+        .from('ibis_nodes')
+        .select('id, title, node_type')
+        .eq('deliberation_id', deliberationId)
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setExistingNodes(data);
+      }
+    };
+    
+    loadExistingNodes();
+  }, [deliberationId]);
 
   // Real-time evaluation trigger
   useEffect(() => {
@@ -124,6 +144,60 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
     onRelationshipsChange(relationships);
   };
 
+  const addManualConnection = () => {
+    if (selectedRelationships.size + manualConnections.length >= MAX_CONNECTIONS) {
+      toast({
+        title: "Maximum Connections Reached",
+        description: `You can only have up to ${MAX_CONNECTIONS} connections total.`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setManualConnections(prev => [...prev, { nodeId: '', relationshipType: '' }]);
+  };
+
+  const updateManualConnection = (index: number, field: 'nodeId' | 'relationshipType', value: string) => {
+    setManualConnections(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      
+      // Update parent when both fields are filled
+      if (updated[index].nodeId && updated[index].relationshipType) {
+        const allConnections = [
+          ...suggestions
+            .filter(s => selectedRelationships.has(`${s.nodeId}-${s.relationshipType}`))
+            .map(s => ({ id: s.nodeId, type: s.relationshipType, confidence: s.confidence })),
+          ...updated
+            .filter(conn => conn.nodeId && conn.relationshipType)
+            .map(conn => ({ id: conn.nodeId, type: conn.relationshipType, confidence: 0.8 }))
+        ];
+        onRelationshipsChange(allConnections);
+      }
+      
+      return updated;
+    });
+  };
+
+  const removeManualConnection = (index: number) => {
+    setManualConnections(prev => {
+      const updated = prev.filter((_, i) => i !== index);
+      
+      // Update parent
+      const allConnections = [
+        ...suggestions
+          .filter(s => selectedRelationships.has(`${s.nodeId}-${s.relationshipType}`))
+          .map(s => ({ id: s.nodeId, type: s.relationshipType, confidence: s.confidence })),
+        ...updated
+          .filter(conn => conn.nodeId && conn.relationshipType)
+          .map(conn => ({ id: conn.nodeId, type: conn.relationshipType, confidence: 0.8 }))
+      ];
+      onRelationshipsChange(allConnections);
+      
+      return updated;
+    });
+  };
+
   const getRelationshipColor = (type: string) => {
     const supportiveTypes = ['supports', 'strengthens', 'builds_on', 'addresses'];
     const oppositionalTypes = ['opposes', 'counters', 'contradicts', 'challenges'];
@@ -154,11 +228,102 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   };
 
   if (!suggestions.length && !loading && evaluated) {
+    // Show manual connection interface when no AI suggestions
     return (
-      <div className="space-y-3">
-        <div className="text-sm text-muted-foreground">
-          No AI relationship suggestions found. You can still create manual connections after submission.
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Label className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Manual Connections
+          </Label>
+          <Badge variant="secondary" className="text-xs">
+            {manualConnections.filter(c => c.nodeId && c.relationshipType).length}/{MAX_CONNECTIONS}
+          </Badge>
         </div>
+        
+        {manualConnections.length === 0 && (
+          <div className="text-sm text-muted-foreground">
+            No AI suggestions available. Add manual connections below.
+          </div>
+        )}
+        
+        {/* Manual connection forms */}
+        <div className="space-y-3">
+          {manualConnections.map((connection, index) => (
+            <Card key={index} className="p-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Connection #{index + 1}</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeManualConnection(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Connect to</Label>
+                    <Select
+                      value={connection.nodeId}
+                      onValueChange={(value) => updateManualConnection(index, 'nodeId', value)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Select node" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border border-border shadow-lg z-50">
+                        {existingNodes.map(node => (
+                          <SelectItem key={node.id} value={node.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{getNodeTypeIcon(node.node_type)}</span>
+                              <span className="truncate">{node.title}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label className="text-xs">Relationship</Label>
+                    <Select
+                      value={connection.relationshipType}
+                      onValueChange={(value) => updateManualConnection(index, 'relationshipType', value)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border border-border shadow-lg z-50">
+                        <SelectItem value="supports">Supports</SelectItem>
+                        <SelectItem value="opposes">Opposes</SelectItem>
+                        <SelectItem value="addresses">Addresses</SelectItem>
+                        <SelectItem value="relates_to">Relates To</SelectItem>
+                        <SelectItem value="builds_on">Builds On</SelectItem>
+                        <SelectItem value="questions">Questions</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+        
+        {manualConnections.length < MAX_CONNECTIONS && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addManualConnection}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Connection
+          </Button>
+        )}
       </div>
     );
   }
@@ -180,6 +345,20 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
           <Zap className="h-3 w-3" />
           Analyze Content
         </Button>
+        
+        {/* Allow manual connections even before AI analysis */}
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={addManualConnection}
+            className="flex items-center gap-2 text-muted-foreground"
+          >
+            <Plus className="h-4 w-4" />
+            Add Manual Connection
+          </Button>
+        </div>
       </div>
     );
   }
@@ -192,12 +371,12 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
           Smart Connections ({suggestions.length} found)
         </Label>
         <div className="flex items-center gap-2">
-          {selectedRelationships.size > 0 && (
+          {selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length > 0 && (
             <Badge variant="secondary" className="text-xs">
-              {selectedRelationships.size}/{MAX_CONNECTIONS} selected
+              {selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length}/{MAX_CONNECTIONS} selected
             </Badge>
           )}
-          {selectedRelationships.size >= MAX_CONNECTIONS && (
+          {selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length >= MAX_CONNECTIONS && (
             <Badge variant="outline" className="text-xs text-amber-600">
               Max reached
             </Badge>
@@ -216,7 +395,8 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
         {suggestions.slice(0, 8).map((suggestion, index) => {
           const key = `${suggestion.nodeId}-${suggestion.relationshipType}`;
           const isSelected = selectedRelationships.has(key);
-          const canSelect = selectedRelationships.size < MAX_CONNECTIONS || isSelected;
+          const totalConnections = selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length;
+          const canSelect = totalConnections < MAX_CONNECTIONS || isSelected;
           
           return (
             <Card
@@ -288,9 +468,92 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
         </div>
       )}
 
-      {selectedRelationships.size > 0 && (
+      {/* Manual connections section when AI suggestions exist */}
+      {suggestions.length > 0 && manualConnections.filter(c => c.nodeId && c.relationshipType).length < MAX_CONNECTIONS - selectedRelationships.size && (
+        <div className="mt-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={addManualConnection}
+            className="flex items-center gap-2 text-muted-foreground"
+          >
+            <Plus className="h-4 w-4" />
+            Add Manual Connection
+          </Button>
+        </div>
+      )}
+
+      {manualConnections.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-sm">Manual Connections</Label>
+          {manualConnections.map((connection, index) => (
+            <Card key={index} className="p-3 bg-muted/20">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Connection #{index + 1}</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeManualConnection(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Connect to</Label>
+                    <Select
+                      value={connection.nodeId}
+                      onValueChange={(value) => updateManualConnection(index, 'nodeId', value)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Select node" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border border-border shadow-lg z-50">
+                        {existingNodes.map(node => (
+                          <SelectItem key={node.id} value={node.id}>
+                            <div className="flex items-center gap-2">
+                              <span>{getNodeTypeIcon(node.node_type)}</span>
+                              <span className="truncate">{node.title}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label className="text-xs">Relationship</Label>
+                    <Select
+                      value={connection.relationshipType}
+                      onValueChange={(value) => updateManualConnection(index, 'relationshipType', value)}
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border border-border shadow-lg z-50">
+                        <SelectItem value="supports">Supports</SelectItem>
+                        <SelectItem value="opposes">Opposes</SelectItem>
+                        <SelectItem value="addresses">Addresses</SelectItem>
+                        <SelectItem value="relates_to">Relates To</SelectItem>
+                        <SelectItem value="builds_on">Builds On</SelectItem>
+                        <SelectItem value="questions">Questions</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length > 0 && (
         <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-          <h6 className="text-sm font-medium mb-2">Selected Connections ({selectedRelationships.size}/{MAX_CONNECTIONS})</h6>
+          <h6 className="text-sm font-medium mb-2">Selected Connections ({selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length}/{MAX_CONNECTIONS})</h6>
           <div className="space-y-1 text-xs text-muted-foreground">
             {suggestions
               .filter(s => selectedRelationships.has(`${s.nodeId}-${s.relationshipType}`))
@@ -300,8 +563,23 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                   <span className="font-medium">{s.nodeTitle.slice(0, 30)}...</span>
                   <ArrowRight className="h-3 w-3 text-primary" />
                   <span className="text-primary">{formatRelationshipType(s.relationshipType)}</span>
+                  <Badge variant="outline" className="text-xs">AI</Badge>
                 </div>
               ))}
+            {manualConnections
+              .filter(conn => conn.nodeId && conn.relationshipType)
+              .map((conn, index) => {
+                const node = existingNodes.find(n => n.id === conn.nodeId);
+                return (
+                  <div key={`manual-${index}`} className="flex items-center gap-2">
+                    <span>{node ? getNodeTypeIcon(node.node_type) : '📄'}</span>
+                    <span className="font-medium">{node ? node.title.slice(0, 30) + '...' : 'Unknown'}</span>
+                    <ArrowRight className="h-3 w-3 text-primary" />
+                    <span className="text-primary">{formatRelationshipType(conn.relationshipType)}</span>
+                    <Badge variant="outline" className="text-xs">Manual</Badge>
+                  </div>
+                );
+              })}
           </div>
         </div>
       )}
