@@ -236,12 +236,6 @@ export const OptimizedMessageList = memo(({
     }
   }, [messages.length]);
 
-  console.log('OptimizedMessageList render:', { 
-    isLoading, 
-    messagesLength: messages?.length || 0, 
-    messages: messages?.map(m => ({ id: m.id, type: m.message_type, content: m.content?.substring(0, 30) })) 
-  });
-
   if (isLoading) {
     return (
       <div className="flex-1 p-4 space-y-4">
@@ -264,7 +258,7 @@ export const OptimizedMessageList = memo(({
         <div className="text-center text-muted-foreground py-12">
           <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <h3 className="text-lg font-medium mb-2">Welcome to Democratic Deliberation</h3>
-          <p>Start a conversation with our AI agents to explore ideas and engage in thoughtful dialogue.</p>
+          <p>Join the conversation...</p>
         </div>
       ) : (
         <>
