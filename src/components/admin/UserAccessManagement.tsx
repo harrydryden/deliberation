@@ -103,7 +103,7 @@ export const UserAccessManagement = ({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>User Details</TableHead>
+                    <TableHead>User ID</TableHead>
                     <TableHead>Access Code 1</TableHead>
                     <TableHead>Access Code 2</TableHead>
                     <TableHead>Role</TableHead>
@@ -115,10 +115,9 @@ export const UserAccessManagement = ({
                   {users.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{user.profile?.displayName || `User ${user.accessCode1 || user.id.slice(0, 8)}`}</div>
-                          <div className="text-sm text-muted-foreground">ID: {user.id.slice(0, 8)}...</div>
-                        </div>
+                        <code className="font-mono text-xs bg-muted px-2 py-1 rounded block max-w-[120px] truncate">
+                          {user.id}
+                        </code>
                       </TableCell>
                       <TableCell>
                         <div className="font-mono text-sm font-medium">
