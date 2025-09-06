@@ -22,7 +22,6 @@ export const useServices = () => {
 // Individual service hooks for convenience  
 export const useMessageService = () => useServices().messageService;
 export const useAgentService = () => useServices().agentService;
-export const useDeliberationService = () => useServices().deliberationService;
 export const useUserService = () => useServices().userService;
 export const useAdminService = () => useServices().adminService;
 export const useRealtimeService = () => useServices().realtimeService;

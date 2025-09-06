@@ -8,7 +8,7 @@ import { FormField } from '@/components/forms/FormField';
 import { NotionExamples } from '@/components/forms/NotionExamples';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { serviceContainer } from '@/services/domain/container';
+import { useDeliberationService } from '@/hooks/useDeliberationService';
 import { logger } from '@/utils/logger';
 
 interface DeliberationCreationProps {
@@ -29,7 +29,7 @@ type DeliberationForm = {
 export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCreationProps) => {
   const [createOpen, setCreateOpen] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
-  const deliberationService = serviceContainer.deliberationService;
+  const deliberationService = useDeliberationService();
   
   const form = useForm<DeliberationForm>({
     initialData: {

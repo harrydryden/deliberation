@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Users, Clock, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatToUKDate } from "@/utils/timeUtils";
-import { serviceContainer } from "@/services/domain/container";
+import { useDeliberationService } from "@/hooks/useDeliberationService";
 import { logger } from "@/utils/logger";
 import { Deliberation } from "@/types/index";
 interface DeliberationWithStats extends Deliberation {
@@ -24,10 +24,8 @@ const Deliberations = () => {
     isAdmin
   } = useSupabaseAuth();
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
-  const deliberationService = serviceContainer.deliberationService;
+  const { toast } = useToast();
+  const deliberationService = useDeliberationService();
   const [deliberations, setDeliberations] = useState<DeliberationWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDescription, setSelectedDescription] = useState<{

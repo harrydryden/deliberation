@@ -1,4 +1,5 @@
 import { useServices } from '@/hooks/useServices';
+import { useDeliberationService } from '@/hooks/useDeliberationService';
 import { useCrudOperations } from './useCrudOperations';
 import { User, Agent, Deliberation } from '@/types/index';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,6 +7,7 @@ import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
 export const useStandardizedAdminData = () => {
   const services = useServices();
+  const deliberationService = useDeliberationService();
 
   // Users CRUD
   const users = useCrudOperations<User>({
@@ -69,9 +71,9 @@ export const useStandardizedAdminData = () => {
 
   // Deliberations CRUD
   const deliberations = useCrudOperations<Deliberation, any, Partial<Deliberation>>({
-    getAll: () => services.deliberationService.getDeliberations(),
+    getAll: () => deliberationService.getDeliberations(),
     create: async (deliberationData) => {
-      return await services.deliberationService.createDeliberation(deliberationData);
+      return await deliberationService.createDeliberation(deliberationData);
     },
     update: async () => {
       throw new Error('Deliberation updates not implemented');

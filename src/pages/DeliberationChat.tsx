@@ -1,6 +1,7 @@
 import { useEffect, useState, lazy, Suspense, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useDeliberationService } from "@/hooks/useDeliberationService";
 import { useServices } from "@/hooks/useServices";
 import { Layout } from "@/components/layout/Layout";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
@@ -58,56 +59,8 @@ const DeliberationChat = () => {
   } = useToast();
   
   // Use the service container directly to avoid creating new instances on every render
-  const { deliberationService: baseDeliberationService, agentService, messageService } = useServices();
-  
-  // Create a memoized wrapper for the deliberation service methods we need
-  const deliberationService = useMemo(() => ({
-    async getDeliberation(deliberationId: string) {
-      const { data, error } = await supabase
-        .from('deliberations')
-        .select(`
-          *,
-          participants(
-            user_id,
-            role,
-            joined_at
-          )
-        `)
-        .eq('id', deliberationId)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (!data) throw new Error('Deliberation not found');
-      
-      data.participant_count = data.participants?.length || 0;
-      return data;
-    },
-    
-    async joinDeliberation(deliberationId: string) {
-      if (!user) throw new Error('User not authenticated');
-      
-      const { data: existing } = await supabase
-        .from('participants')
-        .select('id')
-        .eq('deliberation_id', deliberationId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (existing) return; // Already a participant
-
-      const { error } = await supabase
-        .from('participants')
-        .insert({
-          deliberation_id: deliberationId,
-          user_id: user.id,
-          role: 'participant'
-        });
-
-      if (error && !(error.code === '23505' && error.message.includes('participants_deliberation_id_user_id_key'))) {
-        throw error;
-      }
-    }
-  }), [user]);
+  const { agentService, messageService } = useServices();
+  const deliberationService = useDeliberationService();
   
   const { sessionMetrics, updateActivity } = useSessionTracking();
   const { createOptimizedCallback } = usePerformanceOptimization({

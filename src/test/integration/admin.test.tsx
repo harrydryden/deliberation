@@ -26,7 +26,7 @@ describe('Admin Service Integration', () => {
     const mockUserService = { getUsers: vi.fn() };
     const mockAgentService = { getGlobalAgents: vi.fn() };
     const mockDeliberationService = { getDeliberations: vi.fn() };
-    adminService = new AdminService(mockAdminRepository as any, mockUserService as any, mockAgentService as any, mockDeliberationService as any);
+    adminService = new AdminService(mockAdminRepository as any, mockUserService as any, mockAgentService as any);
   });
 
   it('gets system statistics', async () => {

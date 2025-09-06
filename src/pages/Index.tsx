@@ -5,14 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare, Users, Vote, Brain, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { serviceContainer } from "@/services/domain/container";
+import { useDeliberationService } from "@/hooks/useDeliberationService";
 import { logError } from '@/utils/consoleLogger';
 const Index = () => {
   const {
     user
   } = useSupabaseAuth();
   const navigate = useNavigate();
-  const deliberationService = serviceContainer.deliberationService;
+  const deliberationService = useDeliberationService();
   const [deliberations, setDeliberations] = useState<any[]>([]);
   useEffect(() => {
     if (!user) {

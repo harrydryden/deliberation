@@ -1,4 +1,4 @@
-import { IAdminService, IUserService, IAgentService, IDeliberationService } from '../interfaces';
+import { IAdminService, IUserService, IAgentService } from '../interfaces';
 import { IAdminRepository } from '@/repositories/interfaces';
 import { User, Agent, Deliberation } from '@/types/index';
 import { logger } from '@/utils/logger';
@@ -7,8 +7,7 @@ export class AdminService implements IAdminService {
   constructor(
     private adminRepository: IAdminRepository,
     private userService: IUserService,
-    private agentService: IAgentService,
-    private deliberationService: IDeliberationService
+    private agentService: IAgentService
   ) {}
 
   async getSystemStats(): Promise<{
@@ -73,12 +72,8 @@ export class AdminService implements IAdminService {
   }
 
   async getAllDeliberations(): Promise<Deliberation[]> {
-    try {
-      return await this.deliberationService.getDeliberations();
-    } catch (error) {
-      logger.error('Admin service getAllDeliberations failed', { error });
-      throw error;
-    }
+    // Use useDeliberationService hook directly in components instead
+    throw new Error('Use useDeliberationService hook directly instead of calling getAllDeliberations');
   }
 
   // Access code management removed - Supabase Auth handles user creation

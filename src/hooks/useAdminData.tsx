@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useServices } from '@/hooks/useServices';
+import { useDeliberationService } from '@/hooks/useDeliberationService';
 import { User, Agent, Deliberation, LocalAgentCreate, AccessCode, SystemStats } from '@/types/index';
 import { toast } from 'sonner';
 import { useErrorHandler } from './useErrorHandler';
@@ -9,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export const useAdminData = () => {
   const services = useServices();
+  const deliberationService = useDeliberationService();
   const { user, isAdmin } = useSupabaseAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,14 +143,14 @@ export const useAdminData = () => {
   const fetchDeliberations = useCallback(async () => {
     setLoadingDeliberations(true);
     try {
-      const data = await services.deliberationService.getDeliberations();
+      const data = await deliberationService.getDeliberations();
       setDeliberations(data);
     } catch (error) {
       handleError(error, 'fetch deliberations');
     } finally {
       setLoadingDeliberations(false);
     }
-  }, [services.deliberationService]);
+  }, [deliberationService]);
 
   const fetchStats = useCallback(async () => {
     // Only fetch stats if the user is an admin
