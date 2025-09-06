@@ -256,7 +256,15 @@ export const IbisSubmissionModal = ({
       }
 
       // Create enhanced relationships from AI analysis (only for new nodes)
+      console.log('🔗 RELATIONSHIP DEBUG:', {
+        isLinkingMode,
+        selectedRelationshipsCount: selectedRelationships.length,
+        selectedRelationships,
+        willCreateRelationships: !isLinkingMode && selectedRelationships.length > 0
+      });
+      
       if (!isLinkingMode && selectedRelationships.length > 0) {
+        console.log('🔗 CREATING RELATIONSHIPS:', selectedRelationships);
         const relationshipInserts = selectedRelationships.map(rel => ({
           source_node_id: nodeId,
           target_node_id: rel.id,
@@ -265,11 +273,22 @@ export const IbisSubmissionModal = ({
           deliberation_id: deliberationId
         }));
         
+        console.log('🔗 RELATIONSHIP INSERTS:', relationshipInserts);
+        
         const { error: relErr } = await supabase
           .from('ibis_relationships')
           .insert(relationshipInserts);
         
-        if (relErr) throw relErr;
+        if (relErr) {
+          console.error('🔗 RELATIONSHIP INSERT ERROR:', relErr);
+          throw relErr;
+        } else {
+          console.log('🔗 RELATIONSHIPS CREATED SUCCESSFULLY');
+        }
+      } else {
+        console.log('🔗 SKIPPING RELATIONSHIPS:', {
+          reason: isLinkingMode ? 'linking mode' : 'no relationships selected'
+        });
       }
 
       // Store stance score if available from AI classification
