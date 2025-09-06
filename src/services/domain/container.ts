@@ -5,7 +5,7 @@ import { DeliberationRepository } from '@/repositories/implementations/deliberat
 import { MessageRepository } from '@/repositories/implementations/message.repository';
 import { UserService } from './implementations/user.service';
 import { AdminService } from './implementations/admin.service';
-import { AgentService } from './implementations/agent.service';
+import { UnifiedAgentService } from './implementations/unified-agent.service';
 import { DeliberationService } from './implementations/deliberation.service';
 import { MessageService } from './implementations/message.service';
 import { RealtimeService } from './implementations/realtime.service';
@@ -21,7 +21,7 @@ const messageRepository = new MessageRepository();
 
 // Create service instances
 const userService = new UserService(userRepository);
-const agentService = new AgentService(agentRepository);
+const agentService = new UnifiedAgentService(agentRepository);
 const deliberationService = new DeliberationService(deliberationRepository);
 const messageService = new MessageService(messageRepository);
 const realtimeService = new RealtimeService();

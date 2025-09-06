@@ -100,8 +100,7 @@ Only include issues with relevance score >= 0.6. If no issues meet this threshol
             content: aiPrompt
           }
         ],
-        max_tokens: 1000,
-        temperature: 0.3
+        max_completion_tokens: 1000 // Updated for GPT-5 models
       }),
     });
 

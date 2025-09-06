@@ -27,6 +27,7 @@ export type Database = {
           is_active: boolean
           is_default: boolean
           name: string
+          preferred_model: string | null
           preset_questions: Json | null
           prompt_overrides: Json | null
           response_style: string | null
@@ -44,6 +45,7 @@ export type Database = {
           is_active?: boolean
           is_default?: boolean
           name: string
+          preferred_model?: string | null
           preset_questions?: Json | null
           prompt_overrides?: Json | null
           response_style?: string | null
@@ -61,6 +63,7 @@ export type Database = {
           is_active?: boolean
           is_default?: boolean
           name?: string
+          preferred_model?: string | null
           preset_questions?: Json | null
           prompt_overrides?: Json | null
           response_style?: string | null
@@ -1256,6 +1259,10 @@ export type Database = {
         Returns: boolean
       }
       cleanup_expired_access_codes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      cleanup_orphaned_sessions: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
