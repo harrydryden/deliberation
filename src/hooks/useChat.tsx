@@ -44,10 +44,8 @@ export const useChat = (deliberationId?: string) => {
   }), [messageService, realtimeService]);
 
   // Stable toast reference to prevent recreating callbacks
-  const stableToast = useMemo(() => {
-    const { toast } = require('@/hooks/use-toast');
-    return toast;
-  }, []);
+  const { toast } = useToast();
+  const stableToast = useMemo(() => toast, [toast]);
 
   // Stable callback references to prevent infinite loops
   const stableLoadChatHistory = useCallback(async () => {
