@@ -57,16 +57,16 @@ serve(async (req) => {
 
     // Check if user has admin role
     console.log('🔍 Checking admin role for user:', user.id);
-    const { data: userRoles, error: roleError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
+    const { data: userProfile, error: roleError } = await supabase
+      .from('profiles')
+      .select('user_role')
+      .eq('id', user.id)
+      .single();
 
-    console.log('📋 User roles query result:', { userRoles, roleError });
+    console.log('📋 User profile query result:', { userProfile, roleError });
 
-    if (roleError || !userRoles || userRoles.length === 0) {
-      console.error('❌ Admin access check failed:', { roleError, userRoles, userId: user.id });
+    if (roleError || !userProfile || userProfile.user_role !== 'admin') {
+      console.error('❌ Admin access check failed:', { roleError, userProfile, userId: user.id });
       return new Response(
         JSON.stringify({ error: 'Admin access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -106,14 +106,10 @@ serve(async (req) => {
       })
     }
 
-    // Get user roles
-    const userIds = profiles.map(p => p.id)
-    const { data: allUserRoles } = await supabase
-      .from('user_roles')
-      .select('user_id, role')
-      .in('user_id', userIds)
+    // User roles are now stored directly in profiles table
 
     // Get participants with deliberations
+    const userIds = profiles.map(p => p.id);
     const { data: participants } = await supabase
       .from('participants')
       .select(`
@@ -126,8 +122,7 @@ serve(async (req) => {
       `)
       .in('user_id', userIds.map(id => id.toString()))
 
-    // Create maps for efficient lookups
-    const rolesMap = new Map(allUserRoles?.map(r => [r.user_id, r.role]) || [])
+    // Create map for efficient lookups
     const deliberationsMap = new Map()
     
     // Initialize deliberations map
@@ -149,7 +144,7 @@ serve(async (req) => {
 
     // Map profiles to user data with access codes
     const users = profiles.map(profile => {
-      const role = rolesMap.get(profile.id) || 'user'
+      const role = profile.user_role || 'user'
       const deliberations = deliberationsMap.get(profile.id) || []
       const authUser = authUsersMap.get(profile.id)
 

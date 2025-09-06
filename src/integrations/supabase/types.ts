@@ -841,6 +841,7 @@ export type Database = {
           id: string
           is_archived: boolean | null
           role: string | null
+          user_role: Database["public"]["Enums"]["app_role"] | null
         }
         Insert: {
           access_code_1?: string | null
@@ -852,6 +853,7 @@ export type Database = {
           id: string
           is_archived?: boolean | null
           role?: string | null
+          user_role?: Database["public"]["Enums"]["app_role"] | null
         }
         Update: {
           access_code_1?: string | null
@@ -863,6 +865,7 @@ export type Database = {
           id?: string
           is_archived?: boolean | null
           role?: string | null
+          user_role?: Database["public"]["Enums"]["app_role"] | null
         }
         Relationships: []
       }
@@ -1036,27 +1039,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      user_roles: {
-        Row: {
-          created_at: string | null
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
       }
       user_sessions: {
         Row: {

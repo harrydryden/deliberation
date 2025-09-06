@@ -121,29 +121,18 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
 
   async updateRole(userId: string, role: string): Promise<void> {
     try {
-      // Update both the profiles table and user_roles table
+      // Update the profiles table with the new role
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ updated_at: new Date().toISOString() })
+        .update({ 
+          user_role: role as any,
+          updated_at: new Date().toISOString() 
+        })
         .eq('id', userId);
 
       if (profileError) {
         logger.error('User repository updateRole profile error', profileError, { userId, role });
         throw profileError;
-      }
-
-      // Update or insert user role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert({ 
-          user_id: userId, 
-          role: role as any,
-          created_at: new Date().toISOString()
-        });
-
-      if (roleError) {
-        logger.error('User repository updateRole role error', roleError, { userId, role });
-        throw roleError;
       }
 
       logger.info('User role updated successfully', { userId, role });
@@ -169,14 +158,10 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         return [];
       }
 
-      // Get user roles
-      const userIds = profiles.map(p => p.id);
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('user_id, role')
-        .in('user_id', userIds);
+      // User roles are now in profiles table directly
 
       // Get participants with deliberations
+      const userIds = profiles.map(p => p.id);
       const { data: participants } = await supabase
         .from('participants')
         .select(`
@@ -189,8 +174,7 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         `)
         .in('user_id', userIds.map(id => id.toString()));
 
-      // Create maps for efficient lookups
-      const rolesMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
+      // Create map for efficient lookups
       const deliberationsMap = new Map();
       
       // Initialize deliberations map
@@ -210,9 +194,9 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         }
       });
 
-      // Map users - access codes now come directly from the database!
+      // Map users - access codes and roles now come directly from the database!
       const users: User[] = profiles.map(profile => {
-        const role = rolesMap.get(profile.id) || 'user';
+        const role = profile.user_role || 'user';
         const deliberations = deliberationsMap.get(profile.id) || [];
         
         return {

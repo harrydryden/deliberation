@@ -32,12 +32,13 @@ export const useOptimizedAuth = () => {
           is_archived: false
         });
       
-      const { data: roles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_role')
+        .eq('id', userId)
+        .single();
       
-      return roles?.some(r => r.role === 'admin') || false;
+      return profile?.user_role === 'admin' || false;
     } catch (error) {
       logger.error('Error checking admin status:', error);
       return false;

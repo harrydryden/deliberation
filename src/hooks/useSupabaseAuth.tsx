@@ -51,12 +51,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 // Profile upsert error might be expected for existing users
               }
               
-              const { data: roles, error } = await supabase
-                .from('user_roles')
-                .select('role')
-                .eq('user_id', session.user.id);
+              const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('user_role')
+                .eq('id', session.user.id)
+                .single();
               
-              let hasAdminRole = roles?.some(r => r.role === 'admin') || false;
+              let hasAdminRole = profile?.user_role === 'admin' || false;
               setIsAdmin(hasAdminRole);
             } catch (error) {
               console.error('Error checking admin status:', error);
@@ -98,12 +99,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               // Profile upsert error might be expected for existing users
             }
             
-            const { data: roles, error } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id);
+            const { data: profile, error } = await supabase
+              .from('profiles')
+              .select('user_role')
+              .eq('id', session.user.id)
+              .single();
             
-            let hasAdminRole = roles?.some(r => r.role === 'admin') || false;
+            let hasAdminRole = profile?.user_role === 'admin' || false;
             setIsAdmin(hasAdminRole);
           } catch (error) {
             console.error('Error checking admin status:', error);
@@ -154,14 +156,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         console.log('Admin user created successfully', adminData);
         
-        // Add admin role to user_roles table
+        // Set admin role in profiles table
         if (adminData.user) {
           await supabase
-            .from('user_roles')
-            .insert({
-              user_id: adminData.user.id,
-              role: 'admin'
-            });
+            .from('profiles')
+            .update({ user_role: 'admin' })
+            .eq('id', adminData.user.id);
         }
       }
 
@@ -182,14 +182,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         console.log('Super user created successfully', superData);
         
-        // Add admin role to user_roles table
+        // Set admin role in profiles table
         if (superData.user) {
           await supabase
-            .from('user_roles')
-            .insert({
-              user_id: superData.user.id,
-              role: 'admin'
-            });
+            .from('profiles')
+            .update({ user_role: 'admin' })
+            .eq('id', superData.user.id);
         }
       }
 

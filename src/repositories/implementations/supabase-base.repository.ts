@@ -29,10 +29,10 @@ export abstract class SupabaseBaseRepository {
 
     try {
       const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
+        .from('profiles')
+        .select('user_role')
+        .eq('id', userId)
+        .eq('user_role', 'admin')
         .single();
       
       return !!data;
