@@ -8,7 +8,7 @@ import { FormField } from '@/components/forms/FormField';
 import { NotionExamples } from '@/components/forms/NotionExamples';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useDeliberationService } from '@/hooks/useDeliberationService';
+import { serviceContainer } from '@/services/domain/container';
 import { logger } from '@/utils/logger';
 
 interface DeliberationCreationProps {
@@ -22,12 +22,14 @@ type DeliberationForm = {
   is_public: boolean;
   max_participants: number;
   generate_ibis_roots: boolean;
+  status: 'draft' | 'active' | 'completed';
+  facilitator_id?: string;
 };
 
 export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCreationProps) => {
   const [createOpen, setCreateOpen] = useState(false);
   const [showExamples, setShowExamples] = useState(false);
-  const deliberationService = useDeliberationService();
+  const deliberationService = serviceContainer.deliberationService;
   
   const form = useForm<DeliberationForm>({
     initialData: {
@@ -36,7 +38,9 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
       notion: '',
       is_public: true,
       max_participants: 50,
-      generate_ibis_roots: true
+      generate_ibis_roots: true,
+      status: 'draft' as const,
+      facilitator_id: undefined
     },
     validate: (data) => {
       const errors: Record<string, string> = {};
@@ -70,7 +74,15 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
     },
     onSubmit: async (data) => {
       // Create deliberation
-      const deliberation = await deliberationService.createDeliberation(data);
+      const { generate_ibis_roots, ...deliberationData } = data;
+      const createData: any = {
+        ...deliberationData,
+        status: data.status || 'draft',
+        facilitator_id: data.facilitator_id || null,
+        start_time: null,
+        end_time: null
+      };
+      const deliberation = await deliberationService.createDeliberation(createData);
       
       // Generate IBIS roots if enabled
       if (data.generate_ibis_roots && deliberation?.id) {

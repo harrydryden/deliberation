@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { SupabaseAuthForm } from "@/components/auth/SupabaseAuthForm";
-import { useDeliberationService } from "@/hooks/useDeliberationService";
+import { serviceContainer } from "@/services/domain/container";
 
 const Auth = () => {
 
   const { user, isLoading, isAdmin } = useSupabaseAuth();
   const navigate = useNavigate();
-  const deliberationService = useDeliberationService();
+  const deliberationService = serviceContainer.deliberationService;
   const [deliberations, setDeliberations] = useState<any[]>([]);
 
   useEffect(() => {

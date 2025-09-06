@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Agent, FacilitatorConfig } from '@/types/index';
-import { useAgentService } from '@/hooks/useServices';
+import { serviceContainer } from '@/services/domain/container';
 import { logger } from '@/utils/logger';
 import { useForm } from '@/hooks/useForm';
 import { FormField } from '@/components/forms/FormField';
@@ -53,7 +53,7 @@ export const AgentManagement: React.FC = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const { toast } = useToast();
-  const agentService = useAgentService();
+  const agentService = serviceContainer.agentService;
 
   const createForm = useForm({
     initialData: getDefaultFormData(),

@@ -75,4 +75,27 @@ export class DeliberationService implements IDeliberationService {
       throw error;
     }
   }
+
+  async joinDeliberation(deliberationId: string): Promise<void> {
+    // Implementation would depend on how participation is tracked
+    // For now, this is a placeholder
+    logger.info('joinDeliberation called', { deliberationId });
+    throw new Error('joinDeliberation not yet implemented');
+  }
+
+  async leaveDeliberation(deliberationId: string): Promise<void> {
+    // Implementation would depend on how participation is tracked
+    // For now, this is a placeholder
+    logger.info('leaveDeliberation called', { deliberationId });
+    throw new Error('leaveDeliberation not yet implemented');
+  }
+
+  async getDeliberation(deliberationId: string): Promise<Deliberation | null> {
+    try {
+      return await this.deliberationRepository.findById(deliberationId);
+    } catch (error) {
+      logger.error('Deliberation service getDeliberation failed', { error, deliberationId });
+      throw error;
+    }
+  }
 }

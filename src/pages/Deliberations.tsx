@@ -9,21 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Users, Clock, MessageSquare } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatToUKDate } from "@/utils/timeUtils";
-import { useDeliberationService } from "@/hooks/useDeliberationService";
+import { serviceContainer } from "@/services/domain/container";
 import { logger } from "@/utils/logger";
-interface Deliberation {
-  id: string;
-  title: string;
-  description?: string;
-  status: 'draft' | 'active' | 'completed';
-  facilitator_id?: string;
-  is_public: boolean;
-  max_participants: number;
-  start_time?: string;
-  end_time?: string;
-  created_at: string;
+import { Deliberation } from "@/types/index";
+interface DeliberationWithStats extends Deliberation {
   participant_count?: number;
   is_user_participant?: boolean;
+  created_at: string; // Keep both for compatibility
 }
 const Deliberations = () => {
   const {
@@ -35,8 +27,8 @@ const Deliberations = () => {
   const {
     toast
   } = useToast();
-  const deliberationService = useDeliberationService();
-  const [deliberations, setDeliberations] = useState<Deliberation[]>([]);
+  const deliberationService = serviceContainer.deliberationService;
+  const [deliberations, setDeliberations] = useState<DeliberationWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDescription, setSelectedDescription] = useState<{
     title: string;
@@ -61,7 +53,7 @@ const Deliberations = () => {
         count: data?.length || 0,
         data
       });
-      setDeliberations(data);
+      setDeliberations(data as DeliberationWithStats[]);
     } catch (error) {
       logger.error('Failed to load deliberations', error as any);
       toast({
@@ -171,7 +163,7 @@ const Deliberations = () => {
                     </div>
                     <div className="flex items-center space-x-1">
                       <Clock className="h-4 w-4" />
-                      <span>{formatToUKDate(deliberation.created_at)}</span>
+                      <span>{formatToUKDate(new Date(deliberation.created_at))}</span>
                     </div>
                   </div>
                   

@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { IbisNodeManagement } from './IbisNodeManagement';
 import { AdminIbisMapEditor } from './AdminIbisMapEditor';
 import { NotionEditor } from './NotionEditor';
-import { useAdminService } from '@/hooks/useServices';
+import { serviceContainer } from '@/services/domain/container';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
 
@@ -34,7 +34,7 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
   const [clearing, setClearing] = useState<{ [key: string]: 'messages' | 'ibis' | null }>({});
   const [deliberations, setDeliberations] = useState(initialDeliberations);
   const navigate = useNavigate();
-  const adminService = useAdminService();
+  const adminService = serviceContainer.adminService;
   const { toast } = useToast();
 
   useEffect(() => {

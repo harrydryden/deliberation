@@ -26,6 +26,9 @@ export interface IDeliberationService {
   createDeliberation(deliberation: Omit<Deliberation, 'id' | 'created_at' | 'updated_at'>): Promise<Deliberation>;
   updateDeliberation(id: string, deliberation: Partial<Deliberation>): Promise<Deliberation>;
   deleteDeliberation(id: string): Promise<void>;
+  joinDeliberation(deliberationId: string): Promise<void>;
+  leaveDeliberation(deliberationId: string): Promise<void>;
+  getDeliberation(deliberationId: string): Promise<Deliberation | null>;
 }
 
 export interface IUserService {
