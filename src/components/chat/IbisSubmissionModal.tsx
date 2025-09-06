@@ -571,10 +571,12 @@ export const IbisSubmissionModal = ({
                 </div>
               )}
 
-              {/* Enhanced Relationship Selector and Manual Connections */}
+              {/* Enhanced Relationship Selector with 3-connection limit */}
               {!isLinkingMode && (
                 <div>
-                  <h5 className="text-xs font-medium text-muted-foreground mb-2">Smart Connections</h5>
+                  <h5 className="text-xs font-medium text-muted-foreground mb-2">
+                    Smart Connections (Select up to 3)
+                  </h5>
                   
                   {/* AI-powered relationship analysis */}
                   <EnhancedRelationshipSelector
@@ -585,22 +587,18 @@ export const IbisSubmissionModal = ({
                     onRelationshipsChange={handleRelationshipsChange}
                   />
                   
-                  {/* Manual relationship creation */}
+                  {/* Info about manual connections */}
                   <div className="mt-3 p-3 border border-border rounded-lg bg-muted/20">
-                    <p className="text-xs text-muted-foreground mb-2">
-                      You can also manually create relationships after submission using the IBIS map editor.
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {existingNodes.slice(0, 3).map((node) => (
-                        <Badge key={node.id} variant="outline" className="text-xs">
-                          {node.node_type}: {node.title.slice(0, 20)}...
-                        </Badge>
-                      ))}
-                      {existingNodes.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{existingNodes.length - 3} more
-                        </Badge>
-                      )}
+                    <div className="flex items-start gap-2">
+                      <Lightbulb className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-medium mb-1">
+                          About Connections
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          AI analyzes your content to suggest meaningful relationships. You can select up to 3 connections that will be created automatically, or add more connections later in the IBIS map editor.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>

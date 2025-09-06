@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Brain, Zap, ArrowRight, CheckCircle2, XCircle } from 'lucide-react';
+import { Brain, Zap, ArrowRight, CheckCircle2, XCircle, Lightbulb } from 'lucide-react';
 
 interface RelationshipSuggestion {
   nodeId: string;
@@ -38,6 +38,9 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   const [loading, setLoading] = useState(false);
   const [evaluated, setEvaluated] = useState(false);
   const { toast } = useToast();
+
+  // Maximum number of connections allowed
+  const MAX_CONNECTIONS = 3;
 
   // Real-time evaluation trigger
   useEffect(() => {
@@ -74,7 +77,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
         if (data.relationships?.length > 0) {
           toast({
             title: "Smart Connections Found",
-            description: `Found ${data.relationships.length} potential relationship${data.relationships.length > 1 ? 's' : ''}`,
+            description: `Found ${data.relationships.length} potential relationship${data.relationships.length > 1 ? 's' : ''}. Select up to ${MAX_CONNECTIONS}.`,
           });
         }
       }
@@ -96,8 +99,15 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
     
     if (newSelected.has(key)) {
       newSelected.delete(key);
-    } else {
+    } else if (newSelected.size < MAX_CONNECTIONS) {
       newSelected.add(key);
+    } else {
+      toast({
+        title: "Maximum Connections Reached",
+        description: `You can only select up to ${MAX_CONNECTIONS} connections. Remove one to add another.`,
+        variant: "destructive"
+      });
+      return;
     }
     
     setSelectedRelationships(newSelected);
@@ -146,117 +156,153 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   if (!suggestions.length && !loading && evaluated) {
     return (
       <div className="space-y-3">
-        <Label className="flex items-center gap-2">
-          <Brain className="h-4 w-4" />
-          Smart Connections
-        </Label>
-        <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg border-l-4 border-l-muted">
-          No meaningful relationships detected with existing contributions. Your contribution appears to be introducing new perspectives.
+        <div className="text-sm text-muted-foreground">
+          No AI relationship suggestions found. You can still create manual connections after submission.
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
+  if (!suggestions.length && !loading && !evaluated) {
+    return (
+      <div className="space-y-3">
         <Label className="flex items-center gap-2">
           <Brain className="h-4 w-4" />
           Smart Connections
-          {suggestions.length > 0 && (
-            <Badge variant="secondary" className="ml-2">
-              {suggestions.length} found
+        </Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={evaluateRelationships}
+          className="flex items-center gap-2"
+        >
+          <Zap className="h-3 w-3" />
+          Analyze Content
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Label className="flex items-center gap-2">
+          <Brain className="h-4 w-4" />
+          Smart Connections ({suggestions.length} found)
+        </Label>
+        <div className="flex items-center gap-2">
+          {selectedRelationships.size > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {selectedRelationships.size}/{MAX_CONNECTIONS} selected
             </Badge>
           )}
-        </Label>
-        
-        {!evaluated && !loading && title.trim() && (
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={evaluateRelationships}
-            className="flex items-center gap-1"
-          >
-            <Zap className="h-3 w-3" />
-            Analyze
-          </Button>
-        )}
+          {selectedRelationships.size >= MAX_CONNECTIONS && (
+            <Badge variant="outline" className="text-xs text-amber-600">
+              Max reached
+            </Badge>
+          )}
+        </div>
       </div>
 
       {loading && (
-        <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+        <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
           <LoadingSpinner className="h-4 w-4" />
-          <span className="text-sm text-muted-foreground">
-            Analyzing relationships with existing contributions...
-          </span>
+          <span className="text-sm text-muted-foreground">Analysing relationships...</span>
         </div>
       )}
 
-      {suggestions.length > 0 && (
-        <div className="space-y-2 max-h-80 overflow-y-auto border rounded-lg p-2 bg-muted/20">
-          {suggestions.map((suggestion, index) => {
-            const key = `${suggestion.nodeId}-${suggestion.relationshipType}`;
-            const isSelected = selectedRelationships.has(key);
-            
-            return (
-              <Card 
-                key={key} 
-                className={`cursor-pointer transition-all hover:shadow-sm ${
-                  isSelected ? 'ring-2 ring-primary shadow-sm' : ''
-                }`}
-                onClick={() => toggleRelationship(suggestion)}
-              >
-                <CardContent className="p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">{getNodeTypeIcon(suggestion.nodeType)}</span>
-                        <Badge variant="outline" className="capitalize text-xs">
-                          {suggestion.nodeType}
-                        </Badge>
-                        <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                        <Badge className={`text-xs border ${getRelationshipColor(suggestion.relationshipType)}`}>
-                          {formatRelationshipType(suggestion.relationshipType)}
-                        </Badge>
-                      </div>
-                      
-                      <div>
-                        <h5 className="font-medium text-sm line-clamp-1">
-                          {suggestion.nodeTitle}
-                        </h5>
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                          {suggestion.reasoning}
-                        </p>
-                      </div>
-                      
-                      <div className="flex items-center gap-4 text-xs">
-                        <span className={`font-medium ${getConfidenceColor(suggestion.confidence)}`}>
-                          {Math.round(suggestion.confidence * 100)}% confidence
-                        </span>
-                        <span className="text-muted-foreground">
-                          {Math.round(suggestion.semanticSimilarity * 100)}% similarity
-                        </span>
-                      </div>
+      <div className="space-y-2 max-h-60 overflow-y-auto">
+        {suggestions.slice(0, 8).map((suggestion, index) => {
+          const key = `${suggestion.nodeId}-${suggestion.relationshipType}`;
+          const isSelected = selectedRelationships.has(key);
+          const canSelect = selectedRelationships.size < MAX_CONNECTIONS || isSelected;
+          
+          return (
+            <Card
+              key={key}
+              className={`cursor-pointer transition-all hover:shadow-sm ${
+                isSelected 
+                  ? 'ring-2 ring-primary bg-primary/5' 
+                  : canSelect 
+                    ? 'hover:border-primary/50'
+                    : 'opacity-60 cursor-not-allowed hover:border-border'
+              }`}
+              onClick={() => canSelect && toggleRelationship(suggestion)}
+            >
+              <CardContent className="p-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-1">
+                    {isSelected ? (
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                    ) : canSelect ? (
+                      <div className="h-4 w-4 rounded-full border-2 border-border hover:border-primary transition-colors" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">{getNodeTypeIcon(suggestion.nodeType)}</span>
+                      <span className="font-medium text-sm truncate">
+                        {suggestion.nodeTitle}
+                      </span>
                     </div>
                     
-                    <div className="flex-shrink-0">
-                      {isSelected ? (
-                        <CheckCircle2 className="h-5 w-5 text-primary" />
-                      ) : (
-                        <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
-                      )}
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs ${getRelationshipColor(suggestion.relationshipType)}`}
+                      >
+                        <ArrowRight className="h-3 w-3 mr-1" />
+                        {formatRelationshipType(suggestion.relationshipType)}
+                      </Badge>
+                      <Badge variant="outline" className={`text-xs ${getConfidenceColor(suggestion.confidence)}`}>
+                        {Math.round(suggestion.confidence * 100)}% confidence
+                      </Badge>
                     </div>
+                    
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {suggestion.reasoning}
+                    </p>
+                    
+                    {suggestion.semanticSimilarity && (
+                      <div className="mt-1">
+                        <Badge variant="secondary" className="text-xs">
+                          {Math.round(suggestion.semanticSimilarity * 100)}% similarity
+                        </Badge>
+                      </div>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {suggestions.length === 0 && evaluated && !loading && (
+        <div className="text-center py-4 text-sm text-muted-foreground">
+          No meaningful relationships detected with existing content.
         </div>
       )}
-      
+
       {selectedRelationships.size > 0 && (
-        <div className="text-xs text-muted-foreground p-2 bg-muted/30 rounded">
-          {selectedRelationships.size} connection{selectedRelationships.size > 1 ? 's' : ''} selected
+        <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+          <h6 className="text-sm font-medium mb-2">Selected Connections ({selectedRelationships.size}/{MAX_CONNECTIONS})</h6>
+          <div className="space-y-1 text-xs text-muted-foreground">
+            {suggestions
+              .filter(s => selectedRelationships.has(`${s.nodeId}-${s.relationshipType}`))
+              .map(s => (
+                <div key={`${s.nodeId}-${s.relationshipType}`} className="flex items-center gap-2">
+                  <span>{getNodeTypeIcon(s.nodeType)}</span>
+                  <span className="font-medium">{s.nodeTitle.slice(0, 30)}...</span>
+                  <ArrowRight className="h-3 w-3 text-primary" />
+                  <span className="text-primary">{formatRelationshipType(s.relationshipType)}</span>
+                </div>
+              ))}
+          </div>
         </div>
       )}
     </div>
