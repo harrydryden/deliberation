@@ -164,6 +164,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
                   <div className="flex flex-col gap-2">
                     <Button
+                      type="button"
                       variant={selectedIssues.has(recommendation.issueId) ? "default" : "outline"}
                       size="sm"
                       onClick={() => handleIssueSelect(recommendation.issueId)}
@@ -180,6 +181,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
                     </Button>
 
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => handleCreateFromRecommendation(recommendation)}
