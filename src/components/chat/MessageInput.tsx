@@ -18,21 +18,48 @@ export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useImperativeHandle(ref, () => ({
-    setMessage: (text: string) => {
-      console.log('MessageInput setMessage called with:', text);
-      setMessageState(text);
-      // Focus and resize after setting text
-      requestAnimationFrame(() => {
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-          textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-        }
-      });
-    },
-    clearMessage: () => setMessageState("")
-  }), []);
+  useImperativeHandle(ref, () => {
+    console.log('=== MessageInput useImperativeHandle called ===');
+    const methods = {
+      setMessage: (text: string) => {
+        console.log('=== MessageInput setMessage method called ===');
+        console.log('Setting message to:', text);
+        console.log('Current message state before:', message);
+        
+        // Force immediate state update
+        setMessageState(text);
+        
+        // Also force a direct DOM update as fallback
+        setTimeout(() => {
+          if (textareaRef.current && textareaRef.current.value !== text) {
+            console.log('Forcing direct DOM update');
+            textareaRef.current.value = text;
+            textareaRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }, 0);
+        
+        console.log('setMessageState called with:', text);
+        // Focus and resize after setting text
+        requestAnimationFrame(() => {
+          console.log('requestAnimationFrame callback executing');
+          if (textareaRef.current) {
+            console.log('Focusing textarea and resizing');
+            textareaRef.current.focus();
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+          } else {
+            console.log('textareaRef.current is null');
+          }
+        });
+      },
+      clearMessage: () => {
+        console.log('MessageInput clearMessage called');
+        setMessageState("");
+      }
+    };
+    console.log('Returning methods:', Object.keys(methods));
+    return methods;
+  }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,9 +93,11 @@ export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(
 
   // Auto-resize textarea
   useEffect(() => {
+    console.log('MessageInput useEffect running, message length:', message.length);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      console.log('Textarea resized to height:', textareaRef.current.style.height);
     }
   }, [message]);
 
@@ -77,6 +106,7 @@ export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(
       <form onSubmit={handleSubmit} className="flex gap-2 items-end">
         <div className="flex-1">
           <Textarea
+            key={`textarea-${message.length}`}
             ref={textareaRef}
             value={message}
             onChange={handleChange}
