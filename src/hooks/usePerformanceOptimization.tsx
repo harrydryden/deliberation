@@ -15,6 +15,7 @@ export const usePerformanceOptimization = (config: PerformanceConfig = {}) => {
   const { enableLogging = false, componentName = 'Unknown', memoryThreshold = 50 } = config;
   const renderCountRef = useRef(0);
   const lastRenderTimeRef = useRef(Date.now());
+  const lastMemoryCheckRef = useRef(0);
 
   useEffect(() => {
     renderCountRef.current += 1;
@@ -22,15 +23,16 @@ export const usePerformanceOptimization = (config: PerformanceConfig = {}) => {
     const timeSinceLastRender = now - lastRenderTimeRef.current;
     lastRenderTimeRef.current = now;
 
-    if (enableLogging) {
+    // Only log and check memory every 10 renders to reduce overhead
+    if (enableLogging && renderCountRef.current % 10 === 0) {
       logger.debug(`${componentName} render #${renderCountRef.current}`, {
         timeSinceLastRender,
         memoryUsage: (performance as any)?.memory?.usedJSHeapSize || 0
       });
     }
 
-    // Memory leak detection
-    if ((performance as any)?.memory?.usedJSHeapSize) {
+    // Memory leak detection - only check every 50 renders to reduce overhead
+    if ((performance as any)?.memory?.usedJSHeapSize && renderCountRef.current % 50 === 0) {
       const memoryMB = (performance as any).memory.usedJSHeapSize / 1024 / 1024;
       if (memoryMB > memoryThreshold) {
         logger.warn(`High memory usage detected in ${componentName}`, {

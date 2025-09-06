@@ -3,7 +3,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useServices } from "@/hooks/useServices";
 import { Layout } from "@/components/layout/Layout";
-import { MessageList } from "@/components/chat/MessageList";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
@@ -113,7 +112,8 @@ const DeliberationChat = () => {
   const { sessionMetrics, updateActivity } = useSessionTracking();
   const { createOptimizedCallback } = usePerformanceOptimization({
     componentName: 'DeliberationChat',
-    enableLogging: true
+    enableLogging: false, // Disable logging to reduce overhead
+    memoryThreshold: 100 // Higher threshold
   });
   // Combine related state to reduce re-renders
   const [uiState, setUiState] = useState({
@@ -171,7 +171,7 @@ const DeliberationChat = () => {
     deliberationId: deliberationId || '',
     enabled: deliberationState.isParticipant && deliberationState.deliberation?.status === 'active'
   });
-  const sendMessage = createOptimizedCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string) => {
     await originalSendMessage(content, uiState.chatMode);
     // Update session activity for tracking and proactive prompts
     updateActivity();
@@ -181,7 +181,7 @@ const DeliberationChat = () => {
       engagement: prev.engagement + 1
     }));
   }, [originalSendMessage, uiState.chatMode, updateActivity]);
-  const handleAddToIbis = createOptimizedCallback((messageId: string, messageContent: string) => {
+  const handleAddToIbis = useCallback((messageId: string, messageContent: string) => {
     setIbisModal({
       isOpen: true,
       messageId,
@@ -189,7 +189,7 @@ const DeliberationChat = () => {
     });
   }, []);
   
-  const handleIbisModalClose = createOptimizedCallback(() => {
+  const handleIbisModalClose = useCallback(() => {
     setIbisModal({
       isOpen: false,
       messageId: '',
@@ -206,7 +206,7 @@ const DeliberationChat = () => {
     setUiState(prev => ({ ...prev, viewMode: 'chat' }));
   }, [isMobile]);
   
-  // Remove sessionMetrics from loadUserScores dependency to prevent circular updates
+  // Stable loadUserScores without sessionMetrics dependency to prevent re-render cycles
   const loadUserScores = useCallback(async () => {
     if (!user?.id || !deliberationId) return;
     
@@ -238,13 +238,13 @@ const DeliberationChat = () => {
         helpfulnessScore = Math.max(0, helpfulRatings - unhelpfulRatings);
       }
 
-      setUserScores({
+      setUserScores(prev => ({
         engagement: deliberationMessages.length,
         shares: ibisSubmissions.length,
-        sessions: sessionMetrics?.totalSessions || 1,
+        sessions: prev.sessions, // Keep current session count to avoid sessionMetrics dependency
         helpfulness: helpfulnessScore,
         stanceScore: stanceData?.stance_score || 0
-      });
+      }));
       
       logger.info('User scores loaded successfully', {
         engagement: deliberationMessages.length,
@@ -253,15 +253,15 @@ const DeliberationChat = () => {
       });
     } catch (error) {
       logger.error('Failed to load user scores', error as Error);
-      setUserScores({
+      setUserScores(prev => ({
         engagement: 0,
         shares: 0,
-        sessions: 1,
+        sessions: prev.sessions,
         helpfulness: 0,
         stanceScore: 0
-      });
+      }));
     }  
-  }, [user?.id, deliberationId, messageService, sessionMetrics]);
+  }, [user?.id, deliberationId, messageService]);
 
   const loadAgentConfigs = useCallback(async () => {
     if (!deliberationId) {
@@ -325,11 +325,27 @@ const DeliberationChat = () => {
     }
     if (user && deliberationId) {
       loadDeliberation();
-      loadUserScores();
       loadAgentConfigs();
     }
-  }, [user, isLoading, deliberationId, navigate, loadDeliberation, loadUserScores, loadAgentConfigs]);
-  const handleJoinDeliberation = createOptimizedCallback(async () => {
+  }, [user, isLoading, deliberationId, navigate, loadDeliberation, loadAgentConfigs]);
+
+  // Update session count when sessionMetrics changes
+  useEffect(() => {
+    if (sessionMetrics?.totalSessions) {
+      setUserScores(prev => ({
+        ...prev,
+        sessions: sessionMetrics.totalSessions
+      }));
+    }
+  }, [sessionMetrics?.totalSessions]);
+
+  // Separate effect for loading user scores to avoid circular dependencies
+  useEffect(() => {
+    if (user?.id && deliberationId && deliberationState.deliberation) {
+      loadUserScores();
+    }
+  }, [user?.id, deliberationId, deliberationState.deliberation?.id, loadUserScores]);
+  const handleJoinDeliberation = useCallback(async () => {
     if (!deliberationId || !user) return;
     setUiState(prev => ({ ...prev, joiningDeliberation: true }));
     try {

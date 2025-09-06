@@ -11,7 +11,6 @@ import type { ChatMessage } from "@/types/index";
 import { AgentConfig } from "@/types/common";
 import SimilarIbisNodes from "@/components/chat/SimilarIbisNodes";
 import { MessageRating } from "@/components/chat/MessageRating";
-import { performanceMonitor } from "@/utils/performanceUtils";
 import { usePerformanceOptimization } from "@/hooks/usePerformanceOptimization";
 
 interface MessageListProps {
@@ -245,12 +244,12 @@ export const OptimizedMessageList = memo(({
   // Performance optimization hooks
   const { createOptimizedCallback, createOptimizedMemo } = usePerformanceOptimization({
     componentName: 'OptimizedMessageList',
-    enableLogging: true,
-    memoryThreshold: 50 // Lower threshold
+    enableLogging: false, // Disable logging to reduce overhead
+    memoryThreshold: 100 // Higher threshold
   });
 
   // Optimized agent configs map with proper typing
-  const agentConfigsMap = createOptimizedMemo(() => {
+  const agentConfigsMap = useMemo(() => {
     const map = new Map<string, AgentConfig>();
     agentConfigs?.forEach(config => {
       map.set(config.agent_type, config);
@@ -258,10 +257,8 @@ export const OptimizedMessageList = memo(({
     return map;
   }, [agentConfigs]);
 
-  const renderItem = createOptimizedCallback((index: number, message: ChatMessage) => {
-    const endTimer = performanceMonitor.startTimer('MessageItem.render');
-    
-    const result = (
+  const renderItem = useCallback((index: number, message: ChatMessage) => {
+    return (
       <OptimizedMessageItem
         message={message}
         index={index}
@@ -272,9 +269,6 @@ export const OptimizedMessageList = memo(({
         deliberationId={deliberationId}
       />
     );
-    
-    endTimer();
-    return result;
   }, [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId]);
 
   // Auto-scroll optimization
