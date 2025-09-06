@@ -5,17 +5,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Users } from 'lucide-react';
 
 export function AccessCodeCreation() {
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [accessCode1, setAccessCode1] = useState('');
-  const [accessCode2, setAccessCode2] = useState('');
+  const [userCount, setUserCount] = useState(1);
+  const [createdUsers, setCreatedUsers] = useState<Array<{code1: string, code2: string, email: string}>>([]);
   const { toast } = useToast();
 
-  const generateRandomCodes = () => {
+  const generateRandomAccessCodes = () => {
     // Generate 5-letter uppercase code
     const code1 = Array.from({ length: 5 }, () => 
       String.fromCharCode(65 + Math.floor(Math.random() * 26))
@@ -24,49 +22,68 @@ export function AccessCodeCreation() {
     // Generate 6-digit numeric code
     const code2 = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
     
-    setAccessCode1(code1);
-    setAccessCode2(code2);
+    return { code1, code2 };
   };
 
-  const createUserWithAccessCodes = async () => {
-    if (!email || !password || !accessCode1 || !accessCode2) {
+  const createBulkUsers = async () => {
+    if (userCount < 1 || userCount > 50) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in all fields",
+        title: "Invalid Count",
+        description: "Please enter a number between 1 and 50",
         variant: "destructive"
       });
       return;
     }
 
     setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            access_code_1: accessCode1,
-            access_code_2: accessCode2
-          }
-        }
-      });
+    const newUsers: Array<{code1: string, code2: string, email: string}> = [];
+    let successCount = 0;
+    let errorCount = 0;
 
-      if (error) throw error;
+    try {
+      for (let i = 0; i < userCount; i++) {
+        const { code1, code2 } = generateRandomAccessCodes();
+        const email = `${code1}@deliberation.local`;
+        const password = code2; // Use access code 2 as password
+
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/`,
+              data: {
+                access_code_1: code1,
+                access_code_2: code2,
+                role: 'user'
+              }
+            }
+          });
+
+          if (error) {
+            console.error(`Error creating user ${i + 1}:`, error);
+            errorCount++;
+          } else {
+            newUsers.push({ code1, code2, email });
+            successCount++;
+          }
+        } catch (error) {
+          console.error(`Exception creating user ${i + 1}:`, error);
+          errorCount++;
+        }
+      }
+
+      setCreatedUsers(prev => [...prev, ...newUsers]);
 
       toast({
-        title: "User Created",
-        description: `User created with access codes ${accessCode1} and ${accessCode2}`,
+        title: "Bulk User Creation Complete",
+        description: `Successfully created ${successCount} users${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+        variant: successCount > 0 ? "default" : "destructive"
       });
 
-      // Reset form
-      setEmail('');
-      setPassword('');
-      setAccessCode1('');
-      setAccessCode2('');
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: "Bulk Creation Error",
         description: error.message,
         variant: "destructive"
       });
@@ -76,79 +93,72 @@ export function AccessCodeCreation() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Create User with Access Codes</CardTitle>
-        <CardDescription>
-          Create a new user account with custom access codes that will serve as email/password prefixes
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Bulk User Creation
+          </CardTitle>
+          <CardDescription>
+            Create multiple users with randomly generated access codes. Each user gets a 5-letter access code as email prefix and 6-digit password.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="userCount">Number of users to create (1-50)</Label>
             <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@example.com"
+              id="userCount"
+              type="number"
+              min={1}
+              max={50}
+              value={userCount}
+              onChange={(e) => setUserCount(parseInt(e.target.value) || 1)}
+              placeholder="5"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-            />
-          </div>
-        </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="accessCode1">Access Code 1 (5 letters)</Label>
-            <Input
-              id="accessCode1"
-              value={accessCode1}
-              onChange={(e) => setAccessCode1(e.target.value.toUpperCase())}
-              placeholder="ABCDE"
-              maxLength={5}
-              pattern="[A-Z]{5}"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="accessCode2">Access Code 2 (6 digits)</Label>
-            <Input
-              id="accessCode2"
-              value={accessCode2}
-              onChange={(e) => setAccessCode2(e.target.value)}
-              placeholder="123456"
-              maxLength={6}
-              pattern="[0-9]{6}"
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-2">
           <Button 
-            onClick={generateRandomCodes}
-            variant="outline"
-            type="button"
-          >
-            Generate Random Codes
-          </Button>
-          <Button 
-            onClick={createUserWithAccessCodes}
+            onClick={createBulkUsers}
             disabled={isLoading}
+            className="w-full"
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Create User
+            Create {userCount} User{userCount !== 1 ? 's' : ''}
           </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {createdUsers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recently Created Users</CardTitle>
+            <CardDescription>
+              Access codes and login details for newly created users
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {createdUsers.slice(-20).map((user, index) => (
+                <div key={index} className="flex justify-between items-center p-2 bg-muted rounded">
+                  <div className="font-mono text-sm">
+                    <div className="font-medium">{user.email}</div>
+                    <div className="text-muted-foreground">Password: {user.code2}</div>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Codes: {user.code1} / {user.code2}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {createdUsers.length > 20 && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Showing last 20 users. Total created: {createdUsers.length}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
