@@ -497,52 +497,60 @@ export const IbisSubmissionModal = ({
           }))} placeholder="Detailed description (optional)" rows={3} />
           </div>
 
-          {/* Issue Recommendations - Show when there are existing nodes and user content */}
-          {existingNodes.length > 0 && formData.description.trim() && !isLinkingMode && (
-            <div className="border-t pt-4 mt-4">
-              <IssueRecommendations
-                deliberationId={deliberationId}
-                userContent={formData.description || messageContent}
-                onIssueSelected={handleIssueSelected}
-              />
-            </div>
-          )}
-
-          {/* Show linking mode indicator */}
-          {isLinkingMode && selectedIssueId && (
-            <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">Linking to existing issue</span>
+          {/* Connections Section - Always show when there are existing nodes */}
+          {existingNodes.length > 0 && formData.description.trim() && (
+            <div className="border-t pt-4 mt-4 space-y-4">
+              <div>
+                <h4 className="text-sm font-medium mb-2">Connect to Existing Items</h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Link your contribution to existing issues, positions, or arguments in the deliberation map.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Your submission will be linked to the selected issue instead of creating a new node.
-              </p>
-              <Button 
-                type="button" 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => {
-                  setIsLinkingMode(false);
-                  setSelectedIssueId(null);
-                }}
-                className="mt-2 h-6 px-2 text-xs"
-              >
-                Create new node instead
-              </Button>
-            </div>
-          )}
 
-          {/* Enhanced Relationship Selector - Show only when creating new nodes */}
-          {existingNodes.length > 0 && !isLinkingMode && (
-            <div className="border-t pt-4 mt-4">
-              <EnhancedRelationshipSelector
-                deliberationId={deliberationId}
-                content={formData.description || messageContent}
-                title={formData.title}
-                nodeType={(formData.nodeType || 'issue') as 'issue' | 'position' | 'argument'}
-                onRelationshipsChange={handleRelationshipsChange}
-              />
+              {/* Show linking mode indicator */}
+              {isLinkingMode && selectedIssueId && (
+                <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Linking to existing issue</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Your submission will be linked to the selected issue instead of creating a new node.
+                  </p>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => {
+                      setIsLinkingMode(false);
+                      setSelectedIssueId(null);
+                    }}
+                    className="mt-2 h-6 px-2 text-xs"
+                  >
+                    Create new node instead
+                  </Button>
+                </div>
+              )}
+
+              {/* Issue Recommendations - Always show when not in linking mode */}
+              {!isLinkingMode && (
+                <IssueRecommendations
+                  deliberationId={deliberationId}
+                  userContent={formData.description || messageContent}
+                  onIssueSelected={handleIssueSelected}
+                />
+              )}
+
+              {/* Enhanced Relationship Selector - Show when creating new nodes */}
+              {!isLinkingMode && formData.title.trim() && (
+                <EnhancedRelationshipSelector
+                  deliberationId={deliberationId}
+                  content={formData.description || messageContent}
+                  title={formData.title}
+                  nodeType={(formData.nodeType || 'issue') as 'issue' | 'position' | 'argument'}
+                  onRelationshipsChange={handleRelationshipsChange}
+                />
+              )}
             </div>
           )}
 
