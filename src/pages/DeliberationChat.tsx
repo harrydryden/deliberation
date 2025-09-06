@@ -2,7 +2,7 @@ import { useEffect, useState, lazy, Suspense, useCallback, useRef } from "react"
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
-import { MessageInput } from "@/components/chat/MessageInput";
+import { MessageInput, MessageInputRef } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,9 @@ const OptimizedDeliberationChat = () => {
   const deliberationService = useOptimizedDeliberationService();
   const { messageService, agentService } = useStableServices();
   const isMobile = useIsMobile();
+  
+  // Ref for MessageInput to access setMessage function
+  const messageInputRef = useRef<MessageInputRef>(null);
 
   // Consolidated state
   const [state, setState] = useState({
@@ -97,6 +100,11 @@ const OptimizedDeliberationChat = () => {
       }
     }));
   }, [originalSendMessage]);
+
+  // setMessageText function for voice interface
+  const setMessageText = useCallback((text: string) => {
+    messageInputRef.current?.setMessage(text);
+  }, []);
 
   // Load deliberation data
   const loadDeliberation = useCallback(async () => {
@@ -254,7 +262,7 @@ const OptimizedDeliberationChat = () => {
           agentConfigs={state.agentConfigs} 
         />
       </div>
-      <MessageInput onSendMessage={sendMessage} disabled={chatLoading} />
+      <MessageInput ref={messageInputRef} onSendMessage={sendMessage} disabled={chatLoading} />
     </div>
   );
 
@@ -357,7 +365,8 @@ const OptimizedDeliberationChat = () => {
                       <VoiceInterfaceLazy 
                         deliberationId={state.deliberation.id} 
                         variant="panel" 
-                        sendMessage={sendMessage} 
+                        sendMessage={sendMessage}
+                        setMessageText={setMessageText}
                       />
                     </Suspense>
                   </div>
@@ -436,7 +445,8 @@ const OptimizedDeliberationChat = () => {
                     <VoiceInterfaceLazy 
                       deliberationId={state.deliberation.id}
                       variant="panel" 
-                      sendMessage={sendMessage} 
+                      sendMessage={sendMessage}
+                      setMessageText={setMessageText}
                     />
                   </Suspense>
                 </div>

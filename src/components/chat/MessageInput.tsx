@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { useState, useRef, useEffect, useCallback, memo, useImperativeHandle, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
@@ -8,10 +8,30 @@ interface MessageInputProps {
   disabled?: boolean;
 }
 
-export const MessageInput = memo(({ onSendMessage, disabled }: MessageInputProps) => {
+export interface MessageInputRef {
+  setMessage: (text: string) => void;
+  clearMessage: () => void;
+}
+
+export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(({ onSendMessage, disabled }, ref) => {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    setMessage: (text: string) => {
+      setMessage(text);
+      // Focus and resize after setting text
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+      });
+    },
+    clearMessage: () => setMessage("")
+  }), []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,7 +98,7 @@ export const MessageInput = memo(({ onSendMessage, disabled }: MessageInputProps
             <Send className="h-4 w-4" />
           )}
         </Button>
-      </form>
-    </div>
-  );
-});
+    </form>
+  </div>
+);
+}));
