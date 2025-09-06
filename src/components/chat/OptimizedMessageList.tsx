@@ -72,6 +72,8 @@ const OptimizedMessageItem = memo(({
   agentConfigsMap: Map<string, AgentConfig>;
   deliberationId?: string;
 }) => {
+  console.log('OptimizedMessageItem rendering:', { messageId: message.id, messageType: message.message_type, content: message.content?.substring(0, 20) });
+  
   const isUser = message.message_type === 'user';
   
   // Optimized agent config lookup with proper typing
@@ -267,16 +269,22 @@ export const OptimizedMessageList = memo(({
   // Optimize renderItem with stable dependencies
   const renderItem = createOptimizedCallback(
     (index: number, message: ChatMessage) => {
+      console.log('renderItem called:', { index, messageId: message.id, messageType: message.message_type });
       return (
-        <OptimizedMessageItem
-          message={message}
-          index={index}
-          unreadIndex={unreadIndex}
-          onAddToIbis={onAddToIbis}
-          onRetry={onRetry}
-          agentConfigsMap={agentConfigsMap}
-          deliberationId={deliberationId}
-        />
+        <div style={{ border: '1px solid blue', margin: '2px', padding: '4px' }}>
+          <div style={{ fontSize: '10px', color: 'red' }}>
+            Debug: Item {index} - {message.id} - {message.message_type}
+          </div>
+          <OptimizedMessageItem
+            message={message}
+            index={index}
+            unreadIndex={unreadIndex}
+            onAddToIbis={onAddToIbis}
+            onRetry={onRetry}
+            agentConfigsMap={agentConfigsMap}
+            deliberationId={deliberationId}
+          />
+        </div>
       );
     },
     [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId],
