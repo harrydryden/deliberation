@@ -45,6 +45,9 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   // Maximum number of connections allowed
   const MAX_CONNECTIONS = 3;
 
+  // Calculate total connections more reliably
+  const totalConnections = selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length;
+
   // Load existing nodes for manual connection
   useEffect(() => {
     const loadExistingNodes = async () => {
@@ -241,7 +244,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
         </Label>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
-            {selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length}/{MAX_CONNECTIONS}
+            {totalConnections}/{MAX_CONNECTIONS}
           </Badge>
           {!evaluated && !loading && (
             <Button
@@ -270,11 +273,10 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
         <div className="space-y-3">
           <Label className="text-sm font-medium">AI Suggestions</Label>
           <div className="space-y-2 max-h-60 overflow-y-auto">
-            {suggestions.slice(0, 8).map((suggestion, index) => {
-              const key = `${suggestion.nodeId}-${suggestion.relationshipType}`;
-              const isSelected = selectedRelationships.has(key);
-              const totalConnections = selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length;
-              const canSelect = totalConnections < MAX_CONNECTIONS || isSelected;
+             {suggestions.slice(0, 8).map((suggestion, index) => {
+               const key = `${suggestion.nodeId}-${suggestion.relationshipType}`;
+               const isSelected = selectedRelationships.has(key);
+               const canSelect = totalConnections < MAX_CONNECTIONS || isSelected;
               
               return (
                 <Card
@@ -346,7 +348,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label className="text-sm font-medium">Manual Connections</Label>
-          {manualConnections.filter(c => c.nodeId && c.relationshipType).length < MAX_CONNECTIONS - selectedRelationships.size && (
+          {totalConnections < MAX_CONNECTIONS && (
             <Button
               type="button"
               variant="outline"
@@ -429,13 +431,13 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
         ))}
       </div>
 
-      {/* Summary of selected connections */}
-      {(selectedRelationships.size > 0 || manualConnections.filter(c => c.nodeId && c.relationshipType).length > 0) && (
-        <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-          <h6 className="text-sm font-medium mb-2 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-primary" />
-            Selected Connections ({selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length}/{MAX_CONNECTIONS})
-          </h6>
+       {/* Summary of selected connections */}
+       {totalConnections > 0 && (
+         <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+           <h6 className="text-sm font-medium mb-2 flex items-center gap-2">
+             <CheckCircle2 className="h-4 w-4 text-primary" />
+             Selected Connections ({totalConnections}/{MAX_CONNECTIONS})
+           </h6>
           <div className="space-y-1 text-xs text-muted-foreground">
             {suggestions
               .filter(s => selectedRelationships.has(`${s.nodeId}-${s.relationshipType}`))
