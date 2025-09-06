@@ -23,6 +23,15 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
     sampleInterval = 10000 // 10 seconds
   } = options;
 
+  // Disable memory monitoring in production
+  if (process.env.NODE_ENV === 'production') {
+    return {
+      getMemoryStats: () => ({}),
+      checkMemoryUsage: () => null,
+      forceGarbageCollection: () => false
+    };
+  }
+
   const initialMemoryRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout>();
   const mountTimeRef = useRef<number>(Date.now());
@@ -103,8 +112,13 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
     return false;
   }, [componentName]);
 
-  // Start monitoring
+  // Start monitoring (only in development)
   useEffect(() => {
+    // Skip monitoring in production
+    if (process.env.NODE_ENV === 'production') {
+      return;
+    }
+
     const stats = getMemoryStats();
     if (stats.usedJSHeapSize) {
       initialMemoryRef.current = stats.usedJSHeapSize;
@@ -115,7 +129,7 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
       checkMemoryUsage();
     }, sampleInterval);
 
-    // Monitor component lifecycle
+    // Monitor component lifecycle (only in development)
     logger.component.mount(componentName);
 
     return () => {
@@ -147,11 +161,15 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
   };
 };
 
-// Hook for monitoring global memory usage
+// Hook for monitoring global memory usage - disabled in production
 export const useGlobalMemoryMonitor = () => {
   const intervalRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
+    // Only monitor in development
+    if (process.env.NODE_ENV !== 'development') {
+      return;
+    }
     // Monitor global memory every 30 seconds
     intervalRef.current = setInterval(() => {
       if (typeof window !== 'undefined' && 'performance' in window) {

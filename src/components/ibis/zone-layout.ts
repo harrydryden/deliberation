@@ -1,5 +1,6 @@
 // Zone-based concentric layout system for IBIS nodes
 import { IbisNodeLike, IbisRelationshipLike, calculateSemanticSimilarity } from './ibis-layout';
+import { logger } from '@/utils/logger';
 
 export interface ZoneConfig {
   innerRadius: number;
@@ -112,7 +113,9 @@ export const applyConcentricLayout = (
   });
   
   const zones = calculateZoneBoundaries(canvas, nodeTypeCounts);
-  console.log('🎯 Zone boundaries calculated:', zones);
+  if (process.env.NODE_ENV === 'development') {  
+    logger.debug('Zone boundaries calculated:', zones);
+  }
   const positions = new Map<string, { x: number; y: number; vx: number; vy: number }>();
   
   // Initial positioning within zones

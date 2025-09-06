@@ -10,10 +10,12 @@ export enum LogLevel {
 class Logger {
   private level: LogLevel;
   private isDevelopment: boolean;
+  private isProduction: boolean;
 
   constructor() {
     this.isDevelopment = process.env.NODE_ENV === 'development';
-    this.level = this.isDevelopment ? LogLevel.DEBUG : LogLevel.WARN;
+    this.isProduction = process.env.NODE_ENV === 'production';
+    this.level = this.isDevelopment ? LogLevel.DEBUG : LogLevel.ERROR;
   }
 
   private shouldLog(level: LogLevel): boolean {
@@ -27,6 +29,7 @@ class Logger {
   }
 
   debug(message: string | any, context?: any): void {
+    if (this.isProduction) return; // Never log debug in production
     if (this.shouldLog(LogLevel.DEBUG)) {
       if (typeof message === 'object') {
         console.log(this.formatMessage('DEBUG', 'Debug info', message));
@@ -37,6 +40,7 @@ class Logger {
   }
 
   info(message: string | any, context?: any): void {
+    if (this.isProduction) return; // Never log info in production
     if (this.shouldLog(LogLevel.INFO)) {
       if (typeof message === 'object') {
         console.info(this.formatMessage('INFO', 'Info', message));
@@ -97,19 +101,23 @@ class Logger {
     error: (name: string, error: any, context?: any) => this.error(`💥 ${name} error`, error, context),
   };
 
-  // Performance logging
+  // Performance logging - disabled in production
   performance = {
     start: (operation: string) => {
-      if (this.isDevelopment) {
+      if (this.isDevelopment && !this.isProduction) {
         console.time(`⚡ ${operation}`);
       }
     },
     end: (operation: string) => {
-      if (this.isDevelopment) {
+      if (this.isDevelopment && !this.isProduction) {
         console.timeEnd(`⚡ ${operation}`);
       }
     },
-    mark: (operation: string, context?: any) => this.debug(`📊 ${operation}`, context),
+    mark: (operation: string, context?: any) => {
+      if (!this.isProduction) {
+        this.debug(`📊 ${operation}`, context);
+      }
+    },
   };
 }
 

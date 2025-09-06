@@ -66,7 +66,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       if (error) throw error;
       setKnowledgeItems(data || []);
     } catch (error) {
-      console.error('Error loading knowledge:', error);
+      logger.error('Error loading knowledge:', error);
       toast({
         title: "Error",
         description: "Failed to load agent knowledge",
@@ -105,7 +105,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         .upload(fileName, file);
 
       if (uploadError) {
-        console.error('Storage upload error:', uploadError);
+        logger.error('Storage upload error:', uploadError);
         throw new Error(`Upload failed: ${uploadError.message}`);
       }
 
@@ -118,7 +118,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         .createSignedUrl(uploadData.path, 600); // 10 minute expiry
 
       if (signErr || !signed?.signedUrl) {
-        console.error('Failed to create signed URL:', signErr);
+        logger.error('Failed to create signed URL:', signErr);
         throw new Error('Failed to create signed URL for processing');
       }
 

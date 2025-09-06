@@ -14,6 +14,7 @@ import { IBISService } from '@/services/domain/implementations/ibis.service';
 import { useIbisSubmission } from '@/hooks/useIbisSubmission';
 import { useIbisClassification } from '@/hooks/useIbisClassification';
 import { NODE_TYPE_OPTIONS } from '@/constants/ibisTypes';
+import { logger } from '@/utils/logger';
 
 interface IbisSubmissionModalProps {
   isOpen: boolean;
@@ -125,7 +126,7 @@ export const IbisSubmissionModal = ({
       const nodes = await ibisService.getExistingNodes(deliberationId);
       setExistingNodes(nodes);
     } catch (error) {
-      console.error('Error loading existing nodes:', error);
+      logger.error('Error loading existing nodes:', error);
     }
   };
 
@@ -173,7 +174,7 @@ export const IbisSubmissionModal = ({
         await loadExistingNodes(); // Reload nodes to show new ones
       }
     } catch (error) {
-      console.error('Error generating root issues:', error);
+      logger.error('Error generating root issues:', error);
     } finally {
       setIsGeneratingRoots(false);
     }

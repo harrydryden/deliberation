@@ -35,7 +35,9 @@ export const useResponseStreaming = () => {
     onComplete: (finalContent: string, agentType: string) => void,
     onError: (error: string) => void
   ) => {
-    console.log('🚀 Starting streaming for message:', messageId, 'deliberation:', deliberationId);
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('Starting streaming for message', { messageId, deliberationId });
+      }
     
     // Cancel any existing stream
     if (streamControllerRef.current) {
@@ -58,7 +60,9 @@ export const useResponseStreaming = () => {
         throw new Error('No authentication session found');
       }
 
-      console.log('🔑 Session found, calling agent-orchestration-stream function');
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('Session found, calling agent-orchestration-stream function');
+      }
 
       // Use Supabase functions.invoke for proper authentication
       const { data, error } = await supabase.functions.invoke('agent-orchestration-stream', {
@@ -69,7 +73,9 @@ export const useResponseStreaming = () => {
         }
       });
 
-      console.log('📡 Function invoke response:', { data, error });
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('Function invoke response', { hasData: !!data, hasError: !!error });
+      }
 
       if (error) {
         console.error('❌ Supabase function error:', error);

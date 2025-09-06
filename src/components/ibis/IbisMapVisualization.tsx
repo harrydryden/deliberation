@@ -310,11 +310,13 @@ const { user, isAdmin } = useSupabaseAuth();
     relationships: IbisRelationship[] = [],
     canvas: { width: number; height: number } = { width: 1600, height: 1000 }
   ) => {
-    console.log('🎯 Starting concentric layout calculation...', {
-      nodesCount: nodes.length,
-      relationshipsCount: relationships.length,
-      canvas
-    });
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('🎯 Starting concentric layout calculation...', {
+        nodesCount: nodes.length,
+        relationshipsCount: relationships.length,
+        canvas
+      });
+    }
 
     // Use the new concentric layout system
     const { positions: layoutPositions, zones: layoutZones } = applyConcentricLayout(
@@ -336,14 +338,16 @@ const { user, isAdmin } = useSupabaseAuth();
       canvas
     );
     
-    console.log('🎯 Concentric layout completed:', {
-      positionsCount: layoutPositions.size,
-      zonesCalculated: !!layoutZones,
-      issueZone: layoutZones?.issue,
-      positionZone: layoutZones?.position,
-      argumentZone: layoutZones?.argument,
-      samplePositions: Array.from(layoutPositions.entries()).slice(0, 3)
-    });
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('🎯 Concentric layout completed:', {
+        positionsCount: layoutPositions.size,
+        zonesCalculated: !!layoutZones,
+        issueZone: layoutZones?.issue,
+        positionZone: layoutZones?.position,
+        argumentZone: layoutZones?.argument,
+        samplePositions: Array.from(layoutPositions.entries()).slice(0, 3)
+      });
+    }
     
     // Convert layout positions to simple positions map
     const positions = new Map<string, { x: number; y: number }>();
@@ -354,10 +358,12 @@ const { user, isAdmin } = useSupabaseAuth();
     // Store zones for rendering - set immediately for this layout
     setZones(layoutZones);
     
-    console.log('🎯 Zones set and positions converted:', {
-      positionsMapSize: positions.size,
-      zonesStored: !!layoutZones
-    });
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('🎯 Zones set and positions converted:', {
+        positionsMapSize: positions.size,
+        zonesStored: !!layoutZones
+      });
+    }
 
     // Return simplified result for compatibility
     return positions;
@@ -533,17 +539,21 @@ const { user, isAdmin } = useSupabaseAuth();
 
   // Precompute positions for the full dataset to keep layout stable across filters
   useEffect(() => {
-    console.log('🎯 Layout effect triggered:', {
-      ibisNodesLength: ibisNodes.length,
-      ibisRelationshipsLength: ibisRelationships.length
-    });
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('🎯 Layout effect triggered:', {
+        ibisNodesLength: ibisNodes.length,
+        ibisRelationshipsLength: ibisRelationships.length
+      });
+    }
     
     if (ibisNodes.length > 0) {
       const pos = computeConcentricLayout(ibisNodes, ibisRelationships);
-      console.log('🎯 Layout computed, setting positions:', {
-        positionsSize: pos.size,
-        sampleEntry: pos.entries().next().value
-      });
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('🎯 Layout computed, setting positions:', {
+          positionsSize: pos.size,
+          sampleEntry: pos.entries().next().value
+        });
+      }
       setComputedPositions(pos);
     } else {
       setComputedPositions(new Map());
@@ -651,11 +661,13 @@ const { user, isAdmin } = useSupabaseAuth();
     const canvasHeight = 1000;
     const center = { x: canvasWidth / 2, y: canvasHeight / 2 };
     
-    console.log('🎯 Rendering zones:', {
-      zones,
-      reactFlowBounds,
-      center
-    });
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('🎯 Rendering zones:', {
+        zones,
+        reactFlowBounds,
+        center
+      });
+    }
     
     return (
       <>
