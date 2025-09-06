@@ -1,4 +1,4 @@
-// Performance optimization utilities
+// Performance optimization utilities - v2
 import { useCallback, useMemo, useRef, useEffect } from 'react';
 import { logger } from './logger';
 
