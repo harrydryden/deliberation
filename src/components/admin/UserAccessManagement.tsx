@@ -82,8 +82,9 @@ export const UserAccessManagement = ({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>User ID</TableHead>
-                    <TableHead>Email</TableHead>
+                    <TableHead>User Details</TableHead>
+                    <TableHead>Access Code 1</TableHead>
+                    <TableHead>Access Code 2</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Deliberations</TableHead>
                     <TableHead>Actions</TableHead>
@@ -93,11 +94,21 @@ export const UserAccessManagement = ({
                   {users.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
-                        <code className="font-mono text-xs bg-muted px-2 py-1 rounded">
-                          {user.id.slice(0, 8)}...
-                        </code>
+                        <div>
+                          <div className="font-medium">{user.profile?.displayName || `User ${user.accessCode1 || user.id.slice(0, 8)}`}</div>
+                          <div className="text-sm text-muted-foreground">ID: {user.id.slice(0, 8)}...</div>
+                        </div>
                       </TableCell>
-                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <div className="font-mono text-sm font-medium">
+                          {user.accessCode1 || 'Not set'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-mono text-sm">
+                          {user.accessCode2 || 'Not set'}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
                           {user.role === 'admin' ? 'Admin' : 'User'}
