@@ -573,7 +573,7 @@ export const IbisSubmissionModal = ({
 
               {/* Enhanced Relationship Selector with 3-connection limit */}
               {!isLinkingMode && (
-                <div>
+                <div className="space-y-4">
                   <h5 className="text-xs font-medium text-muted-foreground mb-2">
                     Smart Connections (Select up to 3)
                   </h5>
@@ -586,6 +586,29 @@ export const IbisSubmissionModal = ({
                     nodeType={(formData.nodeType || 'issue') as 'issue' | 'position' | 'argument'}
                     onRelationshipsChange={handleRelationshipsChange}
                   />
+                  
+                  {/* Summary of selected connections to be created on submit */}
+                  {selectedRelationships.length > 0 && (
+                    <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                      <h6 className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-primary" />
+                        Ready to Create {selectedRelationships.length} Connection{selectedRelationships.length > 1 ? 's' : ''}
+                      </h6>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        These connections will be established when you click "Share":
+                      </p>
+                      <div className="space-y-1">
+                        {selectedRelationships.map((rel, index) => (
+                          <div key={`${rel.id}-${rel.type}`} className="flex items-center gap-2 text-xs">
+                            <span className="font-medium text-primary">#{index + 1}</span>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="font-medium">{rel.type.replace(/_/g, ' ')}</span>
+                            <span className="text-muted-foreground">connection</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
