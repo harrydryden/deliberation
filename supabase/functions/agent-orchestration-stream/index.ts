@@ -8,6 +8,134 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Agent configuration cache (5-minute TTL)
+interface AgentCacheEntry {
+  agent: any;
+  timestamp: number;
+}
+
+const agentConfigCache = new Map<string, AgentCacheEntry>();
+const AGENT_CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
+const MAX_AGENT_CACHE_SIZE = 100;
+
+// Standardized agent config fetching with caching
+async function getAgentConfig(supabase: any, agentType: string, deliberationId?: string): Promise<any> {
+  const cacheKey = `${agentType}:${deliberationId || 'global'}`;
+  
+  // Check cache first
+  const cached = agentConfigCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < AGENT_CACHE_DURATION) {
+    console.log(`🚀 Agent config cache hit: ${agentType}`);
+    return cached.agent;
+  }
+  
+  console.log(`🔄 Fetching agent config: ${agentType} for deliberation: ${deliberationId}`);
+  
+  try {
+    // Step 1: Try local agent for this deliberation (if deliberationId provided)
+    if (deliberationId) {
+      const { data: localAgent, error: localError } = await supabase
+        .from('agent_configurations')
+        .select('*')
+        .eq('deliberation_id', deliberationId)
+        .eq('agent_type', agentType)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (localError) {
+        console.warn(`Error fetching local ${agentType} agent:`, localError);
+      }
+      
+      if (localAgent) {
+        console.log(`✅ Found local ${agentType} agent`);
+        cacheAgentConfig(cacheKey, localAgent);
+        return localAgent;
+      }
+    }
+    
+    // Step 2: Fallback to global agent
+    console.log(`No local ${agentType} agent found, trying global agent`);
+    const { data: globalAgent, error: globalError } = await supabase
+      .from('agent_configurations')
+      .select('*')
+      .eq('agent_type', agentType)
+      .eq('is_default', true)
+      .is('deliberation_id', null)
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    if (globalError) {
+      console.warn(`Error fetching global ${agentType} agent:`, globalError);
+    }
+    
+    if (globalAgent) {
+      console.log(`✅ Found global ${agentType} agent`);
+      cacheAgentConfig(cacheKey, globalAgent);
+      return globalAgent;
+    }
+    
+    // Step 3: Return null for hardcoded fallback
+    console.log(`No ${agentType} agent configuration found, will use hardcoded fallback`);
+    cacheAgentConfig(cacheKey, null);
+    return null;
+    
+  } catch (error) {
+    console.error(`Failed to fetch ${agentType} agent configuration:`, error);
+    return null;
+  }
+}
+
+function cacheAgentConfig(key: string, agent: any): void {
+  // Clean up cache if it's getting too large
+  if (agentConfigCache.size >= MAX_AGENT_CACHE_SIZE) {
+    cleanupAgentCache();
+  }
+  
+  agentConfigCache.set(key, {
+    agent,
+    timestamp: Date.now()
+  });
+}
+
+function cleanupAgentCache(): void {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+  
+  // Remove expired entries
+  for (const [key, entry] of agentConfigCache.entries()) {
+    if ((now - entry.timestamp) > AGENT_CACHE_DURATION) {
+      keysToDelete.push(key);
+    }
+  }
+  
+  // If still too many, remove oldest entries
+  if (agentConfigCache.size - keysToDelete.length > MAX_AGENT_CACHE_SIZE) {
+    const sortedEntries = Array.from(agentConfigCache.entries())
+      .filter(([key]) => !keysToDelete.includes(key))
+      .sort(([,a], [,b]) => a.timestamp - b.timestamp);
+    
+    const toRemove = sortedEntries.slice(0, 20); // Remove oldest 20
+    keysToDelete.push(...toRemove.map(([key]) => key));
+  }
+  
+  keysToDelete.forEach(key => agentConfigCache.delete(key));
+  console.log(`🧹 Agent cache cleanup: removed ${keysToDelete.length} entries`);
+}
+
+// Standardized fallback prompts
+function getFallbackSystemPrompt(agentType: string): string {
+  switch (agentType) {
+    case 'flow_agent':
+      return `You are Flo, a helpful facilitation assistant in deliberative discussions. You guide conversation flow, encourage participation, and help users explore different perspectives on important topics.`;
+    case 'bill_agent':
+      return `You are Bill, a specialized AI assistant for policy analysis and legislative frameworks. You provide factual, balanced information about policy matters and help clarify complex legislative issues.`;
+    case 'peer_agent':
+      return `You are Pia, representing the collective voice and diverse perspectives in this discussion. You synthesize different viewpoints and help participants understand how their views relate to others.`;
+    default:
+      return `You are a helpful AI assistant facilitating meaningful discussion and engagement.`;
+  }
+}
+
 // Streaming response handler for real-time agent responses
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -531,7 +659,7 @@ async function generateStreamingResponse(
     knowledgeContext = await retrieveBillAgentKnowledge(content, deliberationId);
   }
 
-  const systemPrompt = await buildSystemPrompt(agentType, analysis, conversationState, similarNodes, knowledgeContext);
+  const systemPrompt = await buildSystemPrompt(agentType, analysis, conversationState, similarNodes, knowledgeContext, deliberationId);
 
   const requestBody: any = {
     model,
@@ -592,38 +720,29 @@ async function generateStreamingResponse(
   return fullResponse;
 }
 
-// Build appropriate system prompt using agent configuration
-async function buildSystemPrompt(agentType: string, analysis: any, conversationState: any, similarNodes: any[], knowledgeContext: string = ''): Promise<string> {
-  // Get agent configuration with system prompt
+// Build appropriate system prompt using cached agent configuration
+async function buildSystemPrompt(agentType: string, analysis: any, conversationState: any, similarNodes: any[], knowledgeContext: string = '', deliberationId?: string): Promise<string> {
+  // Get agent configuration with caching
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
   
-  // Get agent configuration
-  let systemPrompt = getDefaultSystemPrompt(agentType);
+  const agentConfig = await getAgentConfig(supabase, agentType, deliberationId);
   
-  try {
-    const { data: agentConfigs } = await supabase
-      .from('agent_configurations')
-      .select('*')
-      .eq('agent_type', agentType)
-      .eq('is_active', true)
-      .order('deliberation_id', { nullsFirst: false })
-      .limit(1);
-    
-    if (agentConfigs && agentConfigs.length > 0) {
-      const agent = agentConfigs[0];
-      
-      // Generate system prompt from agent configuration
-      if (agent.prompt_overrides?.system_prompt) {
-        systemPrompt = agent.prompt_overrides.system_prompt;
-      } else {
-        // Auto-generate from agent configuration
-        systemPrompt = generateSystemPromptFromAgent(agent);
-      }
+  let systemPrompt: string;
+  
+  if (agentConfig) {
+    // Generate system prompt from agent configuration
+    if (agentConfig.prompt_overrides?.system_prompt) {
+      systemPrompt = agentConfig.prompt_overrides.system_prompt;
+    } else {
+      // Auto-generate from agent configuration
+      systemPrompt = generateSystemPromptFromAgent(agentConfig);
     }
-  } catch (error) {
-    console.error('Failed to get agent configuration, using default:', error);
+  } else {
+    // Use standardized fallback
+    console.warn(`No ${agentType} agent configuration found, using standardized fallback`);
+    systemPrompt = getFallbackSystemPrompt(agentType);
   }
 
   // Add context based on analysis
