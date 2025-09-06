@@ -118,13 +118,23 @@ export class IssueRecommendationService {
     existingIssues: Array<{ id: string; title: string; description?: string }>
   ): Promise<IssueRecommendation[]> {
     try {
+      // Get current user from Supabase auth
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+      
+      if (!userId) {
+        logger.error('[IssueRecommendationService] No authenticated user found');
+        return [];
+      }
+
       // Call our Supabase Edge Function for issue recommendations
       const { data, error } = await supabase.functions.invoke('generate-issue-recommendations', {
         body: {
-          userId: '', // Will be set by edge function from auth
+          userId: userId,
           deliberationId: this.currentDeliberationId,
           content: content,
-          maxRecommendations: 2
+          maxRecommendations: 2,
+          existingIssues: existingIssues
         }
       });
 
