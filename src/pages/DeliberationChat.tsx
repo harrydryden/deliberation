@@ -319,7 +319,7 @@ const OptimizedDeliberationChat = () => {
                       <p className="text-sm text-muted-foreground cursor-pointer" 
                          onClick={() => setState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
                          title="Click to view full description">
-                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description.length > 50 ? `${state.deliberation.description.slice(0, 50)}...` : state.deliberation.description}
+                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description.length > 100 ? `${state.deliberation.description.slice(0, 100)}...` : state.deliberation.description}
                       </p>
                     </div>
                   )}
@@ -329,7 +329,7 @@ const OptimizedDeliberationChat = () => {
                       <p className="text-sm text-muted-foreground cursor-pointer" 
                          onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
                          title="Click to view full notion statement">
-                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion.length > 50 ? `${state.deliberation.notion.slice(0, 50)}...` : state.deliberation.notion}
+                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion.length > 100 ? `${state.deliberation.notion.slice(0, 100)}...` : state.deliberation.notion}
                       </p>
                     </div>
                   )}
@@ -395,7 +395,7 @@ const OptimizedDeliberationChat = () => {
                       <p className="text-xs text-muted-foreground cursor-pointer" 
                          onClick={() => setState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
                          title="Click to view full description">
-                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description.length > 50 ? `${state.deliberation.description.slice(0, 50)}...` : state.deliberation.description}
+                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description.length > 100 ? `${state.deliberation.description.slice(0, 100)}...` : state.deliberation.description}
                       </p>
                     )}
                     
@@ -403,7 +403,7 @@ const OptimizedDeliberationChat = () => {
                       <p className="text-xs text-muted-foreground cursor-pointer" 
                          onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
                          title="Click to view full notion statement">
-                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion.length > 50 ? `${state.deliberation.notion.slice(0, 50)}...` : state.deliberation.notion}
+                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion.length > 100 ? `${state.deliberation.notion.slice(0, 100)}...` : state.deliberation.notion}
                       </p>
                     )}
                   </div>
