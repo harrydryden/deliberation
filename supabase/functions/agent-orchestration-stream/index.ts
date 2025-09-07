@@ -134,17 +134,17 @@ async function processStreamingOrchestration(
       
       console.log(`✅ No existing responses found for message ${messageId} - proceeding with processing`);
     
-    // User client for reading messages (respects RLS)
-    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          authorization: authHeader,
+      // User client for reading messages (respects RLS)
+      const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            authorization: authHeader,
+          },
         },
-      },
-    });
+      });
 
-    // Initialize orchestrator with service client
-    const orchestrator = new AgentOrchestrator(serviceSupabase);
+      // Initialize orchestrator with service client
+      const orchestrator = new AgentOrchestrator(serviceSupabase);
 
     // Get message details using user client (respects RLS)
     const { data: message, error: messageError } = await userSupabase
