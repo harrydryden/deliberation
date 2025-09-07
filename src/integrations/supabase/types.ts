@@ -944,6 +944,10 @@ export type Database = {
           target_node_id: string
         }[]
       }
+      admin_get_system_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       admin_update_agent_configuration: {
         Args: { p_agent_id: string; p_updates: Json }
         Returns: {
@@ -972,10 +976,6 @@ export type Database = {
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
-      }
-      get_admin_system_stats: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
       }
       get_authenticated_user: {
         Args: Record<PropertyKey, never>
@@ -1117,16 +1117,6 @@ export type Database = {
       l2_normalize: {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: string
-      }
-      log_admin_action: {
-        Args: {
-          p_action: string
-          p_new_values?: Json
-          p_old_values?: Json
-          p_record_id?: string
-          p_table_name?: string
-        }
-        Returns: undefined
       }
       match_agent_knowledge: {
         Args: {
