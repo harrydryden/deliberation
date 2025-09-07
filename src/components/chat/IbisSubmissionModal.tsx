@@ -8,8 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Lightbulb, CheckCircle } from "lucide-react";
-import { ManualNodeSelector } from './ManualNodeSelector';
-import { IssueRecommendations } from '@/components/ibis/IssueRecommendations';
+import { EnhancedRelationshipSelector } from './EnhancedRelationshipSelector';
 import { IBISService } from '@/services/domain/implementations/ibis.service';
 import { useIbisSubmission } from '@/hooks/useIbisSubmission';
 import { useIbisClassification } from '@/hooks/useIbisClassification';
@@ -45,21 +44,15 @@ export const IbisSubmissionModal = ({
     parentNodeId: ''
   });
 
-  // Enhanced relationship management - separate tracking for different sources
-  const [issueRecommendationRelationships, setIssueRecommendationRelationships] = useState<Array<{
-    id: string;
-    type: string;
-    confidence: number;
-  }>>([]);
-  
-  const [manualRelationships, setManualRelationships] = useState<Array<{
+  // Enhanced relationship management - unified smart + manual connections
+  const [smartConnections, setSmartConnections] = useState<Array<{
     id: string;
     type: string;
     confidence: number;
   }>>([]);
 
   // Combined relationships for submission
-  const selectedRelationships = [...issueRecommendationRelationships, ...manualRelationships];
+  const selectedRelationships = smartConnections;
 
   const [existingNodes, setExistingNodes] = useState<Array<{
     id: string;
@@ -115,8 +108,7 @@ export const IbisSubmissionModal = ({
       nodeType: '',
       parentNodeId: ''
     });
-    setIssueRecommendationRelationships([]);
-    setManualRelationships([]);
+    setSmartConnections([]);
     setSelectedIssueId(null);
     setIsLinkingMode(false);
   };
@@ -138,8 +130,7 @@ export const IbisSubmissionModal = ({
       description: formData.description,
       nodeType: formData.nodeType,
       parentNodeId: formData.parentNodeId,
-      issueRecommendationRelationships,
-      manualRelationships,
+      smartConnections,
       selectedIssueId,
       isLinkingMode
     };
@@ -154,12 +145,8 @@ export const IbisSubmissionModal = ({
     }));
   };
 
-  const handleIssueRecommendationsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
-    setIssueRecommendationRelationships(relationships);
-  };
-
-  const handleManualConnectionsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
-    setManualRelationships(relationships);
+  const handleSmartConnectionsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
+    setSmartConnections(relationships);
   };
 
   const handleIssueSelected = (issueId: string) => {
@@ -342,21 +329,14 @@ export const IbisSubmissionModal = ({
             />
           </div>
 
-          {/* Issue Recommendations */}
+          {/* Enhanced Relationship Selector - Smart + Manual Connections */}
           {existingNodes.length > 0 && (
-            <IssueRecommendations
+            <EnhancedRelationshipSelector
               deliberationId={deliberationId}
-              userContent={messageContent}
-              onIssueSelected={handleIssueSelected}
-              onRelationshipsChange={handleIssueRecommendationsChange}
-            />
-          )}
-
-          {/* Manual Node Selector */}
-          {existingNodes.length > 0 && (
-            <ManualNodeSelector
-              existingNodes={existingNodes}
-              onConnectionsChange={handleManualConnectionsChange}
+              content={messageContent}
+              title={formData.title}
+              nodeType={formData.nodeType as 'issue' | 'position' | 'argument'}
+              onRelationshipsChange={handleSmartConnectionsChange}
             />
           )}
 

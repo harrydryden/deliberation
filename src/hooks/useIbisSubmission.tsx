@@ -10,12 +10,7 @@ export interface IbisSubmissionData {
   description: string;
   nodeType: string;
   parentNodeId?: string;
-  issueRecommendationRelationships: Array<{
-    id: string;
-    type: string;
-    confidence: number;
-  }>;
-  manualRelationships: Array<{
+  smartConnections: Array<{
     id: string;
     type: string;
     confidence: number;
@@ -64,10 +59,7 @@ export const useIbisSubmission = (
       logger.info('[useIbisSubmission] Starting IBIS submission', { submissionData });
 
       let nodeId: string;
-      const allRelationships = [
-        ...submissionData.issueRecommendationRelationships,
-        ...submissionData.manualRelationships
-      ];
+      const allRelationships = submissionData.smartConnections;
 
       if (submissionData.isLinkingMode && submissionData.selectedIssueId) {
         // Link to existing issue
