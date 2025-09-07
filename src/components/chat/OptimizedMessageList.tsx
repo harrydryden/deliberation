@@ -103,19 +103,69 @@ const OptimizedMessageItem = memo(({
 
   const handleShare = useCallback(async () => {
     try {
-      await navigator.share({
-        title: 'Deliberation Message',
-        text: message.content,
-        url: window.location.href
-      });
-    } catch (err) {
-      // Fallback to clipboard if Web Share API not available
+      // Check if Web Share API is supported and available
+      if (navigator.share && navigator.canShare) {
+        const shareData = {
+          title: 'Deliberation Message',
+          text: message.content,
+          url: window.location.href
+        };
+        
+        if (navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+          return;
+        }
+      }
+      
+      // Fallback to clipboard
       await navigator.clipboard.writeText(message.content);
+      
+      // Show success feedback (you might want to add toast here)
+      console.log('Message copied to clipboard');
+    } catch (err) {
+      console.error('Share failed:', err);
+      // Last resort: try to copy without permissions
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = message.content;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+        console.log('Message copied using fallback method');
+      } catch (fallbackErr) {
+        console.error('All share methods failed:', fallbackErr);
+      }
     }
   }, [message.content]);
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(message.content);
+    try {
+      await navigator.clipboard.writeText(message.content);
+      console.log('Message copied to clipboard');
+    } catch (err) {
+      console.error('Copy failed:', err);
+      // Fallback method
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = message.content;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+        console.log('Message copied using fallback method');
+      } catch (fallbackErr) {
+        console.error('All copy methods failed:', fallbackErr);
+      }
+    }
   }, [message.content]);
 
   return (
@@ -148,11 +198,13 @@ const OptimizedMessageItem = memo(({
           </Card>
           
           <div className="mt-2 flex gap-2">
+            {/* Debug: Always show at least one button to verify rendering */}
             <Button
               variant="ghost"
               size="sm"
               onClick={handleShare}
-              className="text-xs"
+              className="text-xs border border-border bg-background hover:bg-accent"
+              title="Share this message"
             >
               <Share2 className="h-3 w-3 mr-1" />
               Share
@@ -162,7 +214,8 @@ const OptimizedMessageItem = memo(({
               variant="ghost"
               size="sm"
               onClick={handleCopy}
-              className="text-xs"
+              className="text-xs border border-border bg-background hover:bg-accent"
+              title="Copy message to clipboard"
             >
               <Copy className="h-3 w-3 mr-1" />
               Copy
@@ -174,6 +227,7 @@ const OptimizedMessageItem = memo(({
                 size="sm"
                 onClick={handleAddToIbis}
                 className="text-xs"
+                title="Add this message to IBIS map"
               >
                 <Plus className="h-3 w-3 mr-1" />
                 Add to IBIS
