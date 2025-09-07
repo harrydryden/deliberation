@@ -112,11 +112,20 @@ serve(async (req) => {
 
     let processedCount = 0;
     let failedCount = 0;
+    const processingResults = [];
 
-    // Process messages sequentially to maintain chronological order
-    for (let messageIndex = 0; messageIndex < messages.length; messageIndex++) {
-      const message = messages[messageIndex];
-      console.log(`Processing message ${messageIndex + 1}/${messages.length}: ${message.id}`);
+    // Process messages in smaller chunks to prevent timeouts
+    const chunkSize = 20; // Process 20 messages at a time
+    
+    for (let chunkIndex = 0; chunkIndex < messages.length; chunkIndex += chunkSize) {
+      const chunk = messages.slice(chunkIndex, Math.min(chunkIndex + chunkSize, messages.length));
+      console.log(`Processing chunk ${Math.floor(chunkIndex / chunkSize) + 1}/${Math.ceil(messages.length / chunkSize)} (${chunk.length} messages)`);
+      
+      // Process each message in the chunk
+      for (let messageIndex = 0; messageIndex < chunk.length; messageIndex++) {
+        const globalMessageIndex = chunkIndex + messageIndex;
+        const message = chunk[messageIndex];
+        console.log(`Processing message ${globalMessageIndex + 1}/${messages.length}: ${message.id}`);
 
       try {
         // First check if a response already exists
@@ -170,12 +179,14 @@ serve(async (req) => {
           continue;
         }
 
-        // Verify response was created with balanced delays that won't cause timeouts
+        // Use exponential backoff for robust verification
         let responseVerified = false;
-        const maxVerificationAttempts = 4;
+        const maxVerificationAttempts = 6;
         
         for (let attempt = 1; attempt <= maxVerificationAttempts; attempt++) {
-          await new Promise(resolve => setTimeout(resolve, attempt * 1500)); // 1.5s, 3s, 4.5s, 6s
+          // Exponential backoff: 500ms, 1s, 2s, 4s, 8s, 16s (max 31.5s total)
+          const delay = Math.min(500 * Math.pow(2, attempt - 1), 16000);
+          await new Promise(resolve => setTimeout(resolve, delay));
           
           const { data: responseCheck } = await supabase
             .from('messages')
@@ -186,7 +197,7 @@ serve(async (req) => {
             .limit(1);
           
           if (responseCheck && responseCheck.length > 0) {
-            console.log(`✅ Agent response verified for message ${message.id}`);
+            console.log(`✅ Agent response verified for message ${message.id} (attempt ${attempt})`);
             processedCount++;
             responseVerified = true;
             
@@ -197,9 +208,11 @@ serve(async (req) => {
                 bulk_import_status: 'agent_response_generated'
               })
               .eq('id', message.id);
+            
+            processingResults.push({ messageId: message.id, status: 'success', attempts: attempt });
             break;
           } else if (attempt < maxVerificationAttempts) {
-            console.log(`🔍 Waiting for response to appear for message ${message.id}...`);
+            console.log(`🔍 Attempt ${attempt}/${maxVerificationAttempts}: Waiting for response for message ${message.id}...`);
           }
         }
         
@@ -209,69 +222,88 @@ serve(async (req) => {
           await supabase
             .from('messages')
             .update({
-              bulk_import_status: 'failed'
+              bulk_import_status: 'verification_failed'
             })
             .eq('id', message.id);
+          
+          processingResults.push({ messageId: message.id, status: 'verification_failed', attempts: maxVerificationAttempts });
         }
 
-      } catch (error) {
-        console.error(`Error processing message ${message.id}:`, error);
-        failedCount++;
-        await supabase
-          .from('messages')
-          .update({
-            bulk_import_status: 'failed'
-          })
-          .eq('id', message.id);
+        } catch (error) {
+          console.error(`Error processing message ${message.id}:`, error);
+          failedCount++;
+          await supabase
+            .from('messages')
+            .update({
+              bulk_import_status: 'processing_error'
+            })
+            .eq('id', message.id);
+          
+          processingResults.push({ messageId: message.id, status: 'processing_error', error: error.message });
+        }
+
+        // Minimal delay between messages within chunk
+        if (messageIndex < chunk.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
-
-      // Shorter rate limiting between messages to avoid function timeouts
-      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second instead of 2
-
-      // Update batch progress more frequently
-      if ((messageIndex + 1) % 5 === 0 || messageIndex === messages.length - 1) {
-        await supabase
-          .from('bulk_import_batches')
-          .update({
-            processed_messages: processedCount,
-            failed_messages: failedCount,
-            processing_log: [
-              ...(batch.processing_log || []),
-              {
-                timestamp: new Date().toISOString(),
-                action: 'progress_update',
-                details: { 
-                  processed: processedCount, 
-                  failed: failedCount, 
-                  current_message: messageIndex + 1,
-                  success_rate: processedCount + failedCount > 0 ? (processedCount / (processedCount + failedCount) * 100).toFixed(1) + '%' : '0%'
-                }
-              }
-            ]
-          })
-          .eq('id', batchId);
-
-        console.log(`📊 Progress: ${processedCount + failedCount}/${messages.length} messages processed (${processedCount} successful, ${failedCount} failed)`);
+      
+      // Longer pause between chunks to prevent overwhelming the system
+      if (chunkIndex + chunkSize < messages.length) {
+        console.log(`Chunk ${Math.floor(chunkIndex / chunkSize) + 1} completed. Pausing before next chunk...`);
+        await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second pause between chunks
       }
     }
 
-    // Final verification pass for any remaining failures
-    if (failedCount > 0) {
-      console.log(`🔍 Running final verification for ${failedCount} failed messages...`);
+    // Update final batch progress
+    await supabase
+      .from('bulk_import_batches')
+      .update({
+        processed_messages: processedCount,
+        failed_messages: failedCount,
+        processing_log: [
+          ...(batch.processing_log || []),
+          {
+            timestamp: new Date().toISOString(),
+            action: 'processing_completed',
+            details: { 
+              processed: processedCount, 
+              failed: failedCount,
+              success_rate: processedCount + failedCount > 0 ? (processedCount / (processedCount + failedCount) * 100).toFixed(1) + '%' : '0%',
+              results_summary: processingResults.reduce((acc, result) => {
+                acc[result.status] = (acc[result.status] || 0) + 1;
+                return acc;
+              }, {})
+            }
+          }
+        ]
+      })
+      .eq('id', batchId);
+
+    console.log(`📊 Final Progress: ${processedCount + failedCount}/${messages.length} messages processed (${processedCount} successful, ${failedCount} failed)`);
+    
+    // Enhanced recovery for any remaining failures
+    const criticalFailures = processingResults.filter(r => r.status === 'processing_error' || r.status === 'verification_failed');
+
+    // Enhanced recovery system for high reliability
+    if (criticalFailures.length > 0) {
+      console.log(`🔍 Running enhanced recovery for ${criticalFailures.length} critical failures...`);
       
       const { data: failedMessages } = await supabase
         .from('messages')
-        .select('id, parent_message_id')
+        .select('id, content, user_id, deliberation_id, created_at')
         .eq('deliberation_id', batch.deliberation_id)
-        .eq('bulk_import_status', 'failed')
+        .in('bulk_import_status', ['verification_failed', 'processing_error'])
         .order('created_at', { ascending: true });
 
       if (failedMessages && failedMessages.length > 0) {
         let recoveredCount = 0;
         
         for (const failedMsg of failedMessages) {
-          // Check if response actually exists but wasn't found initially
-          const { data: lateResponse } = await supabase
+          console.log(`🔄 Attempting recovery for message ${failedMsg.id}...`);
+          
+          // First check if response exists
+          const { data: existingResponse } = await supabase
             .from('messages')
             .select('id')
             .eq('deliberation_id', batch.deliberation_id)
@@ -279,22 +311,64 @@ serve(async (req) => {
             .neq('message_type', 'user')
             .limit(1);
             
-          if (lateResponse && lateResponse.length > 0) {
-            console.log(`✅ Found late response for previously failed message ${failedMsg.id}`);
+          if (existingResponse && existingResponse.length > 0) {
+            console.log(`✅ Found existing response for message ${failedMsg.id}`);
             await supabase
               .from('messages')
               .update({ bulk_import_status: 'agent_response_generated' })
               .eq('id', failedMsg.id);
-            
             recoveredCount++;
             processedCount++;
             failedCount--;
+          } else {
+            // Retry agent orchestration with enhanced error handling
+            try {
+              console.log(`🔄 Retrying agent orchestration for message ${failedMsg.id}...`);
+              const { data: retryResponse, error: retryError } = await supabase.functions.invoke(
+                'agent-orchestration-stream',
+                {
+                  headers: { authorization: authHeader },
+                  body: {
+                    messageId: failedMsg.id,
+                    deliberationId: failedMsg.deliberation_id,
+                    mode: 'recovery_retry'
+                  }
+                }
+              );
+
+              if (!retryError) {
+                // Use more aggressive verification for retries
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+                
+                const { data: retryCheck } = await supabase
+                  .from('messages')
+                  .select('id')
+                  .eq('deliberation_id', batch.deliberation_id)
+                  .eq('parent_message_id', failedMsg.id)
+                  .neq('message_type', 'user')
+                  .limit(1);
+                
+                if (retryCheck && retryCheck.length > 0) {
+                  console.log(`✅ Retry successful for message ${failedMsg.id}`);
+                  await supabase
+                    .from('messages')
+                    .update({ bulk_import_status: 'agent_response_generated' })
+                    .eq('id', failedMsg.id);
+                  recoveredCount++;
+                  processedCount++;
+                  failedCount--;
+                }
+              }
+            } catch (retryError) {
+              console.error(`❌ Retry failed for message ${failedMsg.id}:`, retryError);
+            }
           }
+          
+          // Small delay between recovery attempts
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
-        if (recoveredCount > 0) {
-          console.log(`🎉 Recovered ${recoveredCount} messages in final verification pass`);
-        }
+        console.log(`🎉 Recovery completed: ${recoveredCount} messages recovered`);
       }
     }
 
@@ -322,13 +396,24 @@ serve(async (req) => {
 
     console.log(`Agent response processing completed. Processed: ${processedCount}, Failed: ${failedCount}`);
 
+    const successRate = ((processedCount / messages.length) * 100).toFixed(1);
+    const meetsTarget = parseFloat(successRate) >= 99.0;
+    
+    console.log(`🎯 Final Results: ${successRate}% success rate (target: 99%+) - ${meetsTarget ? 'TARGET MET' : 'BELOW TARGET'}`);
+
     return new Response(JSON.stringify({
       success: true,
       batch_id: batchId,
       total_messages: messages.length,
       processed_messages: processedCount,
       failed_messages: failedCount,
-      message: `Successfully processed ${processedCount} of ${messages.length} messages`
+      success_rate: `${successRate}%`,
+      target_met: meetsTarget,
+      processing_summary: processingResults.reduce((acc, result) => {
+        acc[result.status] = (acc[result.status] || 0) + 1;
+        return acc;
+      }, {}),
+      message: `Processed ${processedCount}/${messages.length} messages (${successRate}% success rate)`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
