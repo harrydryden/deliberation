@@ -1090,10 +1090,6 @@ export type Database = {
         Args: { "": unknown }
         Returns: unknown
       }
-      is_admin_user: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
       is_participant_in_deliberation: {
         Args: { deliberation_id: string; user_id: string }
         Returns: boolean
@@ -1149,10 +1145,6 @@ export type Database = {
       sparsevec_typmod_in: {
         Args: { "": unknown[] }
         Returns: number
-      }
-      user_participates_in_deliberation_by_code: {
-        Args: { deliberation_uuid: string }
-        Returns: boolean
       }
       vector_avg: {
         Args: { "": number[] }
