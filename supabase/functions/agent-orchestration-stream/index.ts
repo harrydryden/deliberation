@@ -24,9 +24,14 @@ serve(async (req) => {
       });
     }
 
-    const { messageId, deliberationId, mode } = await req.json();
+    const { messageId, deliberationId, mode = 'stream' } = await req.json();
     
     console.log('🚀 Starting streaming agent orchestration', { messageId, deliberationId, mode });
+    
+    // Special handling for bulk processing mode
+    if (mode === 'bulk_processing') {
+      console.log(`🔄 Bulk processing mode enabled for message ${messageId}`);
+    }
 
     // Create streaming response
     const { readable, writable } = new TransformStream();
@@ -137,8 +142,8 @@ async function processStreamingOrchestration(
       // Cache the response
       cacheResponse(message.content, response, fastPath.agent, deliberationId);
 
-      // Store response using service client
-      const { data: fastInsertData, error: fastInsertError } = await serviceSupabase.from('messages').insert({
+      // Store response using service client with enhanced verification for bulk processing
+      const insertData = {
         content: response,
         message_type: fastPath.agent,
         user_id: message.user_id,
@@ -148,13 +153,36 @@ async function processStreamingOrchestration(
         agent_context: { 
           agent_type: fastPath.agent,
           processing_method: 'high_confidence_fast_path',
-          confidence: fastPath.confidence 
+          confidence: fastPath.confidence,
+          processing_mode: mode
         }
-      });
+      };
+
+      const { data: fastInsertData, error: fastInsertError } = await serviceSupabase.from('messages').insert(insertData);
 
       if (fastInsertError) {
         console.error('❌ Fast path database insert error:', fastInsertError);
         throw new Error(`Failed to save fast path response: ${fastInsertError.message}`);
+      }
+
+      // Enhanced verification for bulk processing
+      if (mode === 'bulk_processing') {
+        console.log('✅ Fast path response stored, verifying for bulk processing...');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        const { data: verifyData } = await serviceSupabase
+          .from('messages')
+          .select('id')
+          .eq('parent_message_id', messageId)
+          .eq('deliberation_id', deliberationId)
+          .neq('message_type', 'user')
+          .single();
+          
+        if (!verifyData) {
+          throw new Error('Fast path response verification failed');
+        }
+        
+        console.log(`✅ Fast path response verified: ${verifyData.id}`);
       }
 
       sendData({ done: true });
@@ -259,7 +287,8 @@ async function processStreamingOrchestration(
 
       // Store final response using service client
       console.log('💾 Storing response in database...');
-      const { data: insertData, error: insertError } = await serviceSupabase.from('messages').insert({
+      
+      const insertData = {
         content: response,
         message_type: selectedAgent,
         user_id: message.user_id,
@@ -269,9 +298,16 @@ async function processStreamingOrchestration(
         agent_context: { 
           agent_type: selectedAgent,
           processing_method: 'full_orchestration',
-          analysis 
+          analysis: analysis,
+          processing_mode: mode
         }
-      });
+      };
+
+      const { data: insertResult, error: insertError } = await serviceSupabase
+        .from('messages')
+        .insert(insertData)
+        .select('id')
+        .single();
 
       if (insertError) {
         console.error('❌ Database insert error:', insertError);
@@ -279,18 +315,40 @@ async function processStreamingOrchestration(
         throw new Error(`Failed to save response: ${insertError.message}`);
       } else {
         console.log('✅ Response stored successfully in database');
-        // Verify the response was actually saved
-        const { data: verifyData } = await serviceSupabase
-          .from('messages')
-          .select('id, content')
-          .eq('id', insertData[0].id)
-          .single();
         
-        if (!verifyData || !verifyData.content) {
-          console.error('❌ Response verification failed - no content found');
-          throw new Error('Response verification failed');
+        // Enhanced verification for bulk processing
+        if (mode === 'bulk_processing') {
+          console.log('🔍 Running enhanced verification for bulk processing...');
+          
+          // Wait for database write to complete
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          const { data: verifyData } = await serviceSupabase
+            .from('messages')
+            .select('id, content')
+            .eq('id', insertResult.id)
+            .single();
+          
+          if (!verifyData || !verifyData.content) {
+            console.error('❌ Bulk processing verification failed - no content found');
+            throw new Error('Bulk processing verification failed');
+          } else {
+            console.log(`✅ Bulk processing response verified: ${verifyData.id}`);
+          }
         } else {
-          console.log('✅ Response verified in database');
+          // Standard verification for regular processing
+          const { data: verifyData } = await serviceSupabase
+            .from('messages')
+            .select('id, content')
+            .eq('id', insertResult.id)
+            .single();
+          
+          if (!verifyData || !verifyData.content) {
+            console.error('❌ Response verification failed - no content found');
+            throw new Error('Response verification failed');
+          } else {
+            console.log('✅ Response verified in database');
+          }
         }
       }
 
