@@ -350,14 +350,12 @@ async function generateStreamingResponse(
     const useStreaming = mode !== 'bulk_processing';
     console.log(`🌊 Streaming mode: ${useStreaming}`);
     
-    const requestBody: any = {
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: content }
-      ],
-      ...ModelConfigManager.generateAPIParams(model, [], { maxTokens: 3000, stream: useStreaming })
-    };
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: content }
+    ];
+    
+    const requestBody: any = ModelConfigManager.generateAPIParams(model, messages, { maxTokens: 3000, stream: useStreaming });
 
     console.log('🔧 Request body preview:', JSON.stringify({
       model: requestBody.model,
