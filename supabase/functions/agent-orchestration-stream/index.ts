@@ -859,6 +859,203 @@ async function generateStreamingResponse(
 
   console.log(`📝 Full response length: ${fullResponse.length}`);
   return fullResponse;
+  
+  } catch (systemPromptError) {
+    console.error('❌ Error generating system prompt - FULL ERROR DETAILS:', {
+      error: systemPromptError,
+      message: systemPromptError.message,
+      stack: systemPromptError.stack,
+      name: systemPromptError.name
+    });
+    
+    sendData({ 
+      content: `Error generating system prompt: ${systemPromptError.message}`,
+      done: false 
+    });
+    throw systemPromptError;
+  }
 }
 
-// End of file
+// Enhanced response cache with cleanup
+interface CacheEntry {
+  response: string;
+  agentType: string;
+  timestamp: number;
+  hits: number;
+}
+
+const responseCache = new Map<string, CacheEntry>();
+const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
+const MAX_CACHE_SIZE = 1000; // Prevent memory leaks
+
+function checkResponseCache(content: string, deliberationId?: string): CacheEntry | null {
+  const key = `${deliberationId || 'global'}:${content.toLowerCase().trim()}`;
+  const cached = responseCache.get(key);
+  
+  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+    cached.hits++;
+    return cached;
+  }
+  
+  // Remove expired entry if found
+  if (cached) {
+    responseCache.delete(key);
+  }
+  
+  return null;
+}
+
+function cacheResponse(content: string, response: string, agentType: string, deliberationId?: string): void {
+  // Clean up cache if it's getting too large
+  if (responseCache.size >= MAX_CACHE_SIZE) {
+    cleanupCache();
+  }
+  
+  const key = `${deliberationId || 'global'}:${content.toLowerCase().trim()}`;
+  responseCache.set(key, {
+    response,
+    agentType,
+    timestamp: Date.now(),
+    hits: 0
+  });
+}
+
+function cleanupCache(): void {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+  
+  // Remove expired entries
+  for (const [key, entry] of responseCache.entries()) {
+    if ((now - entry.timestamp) > CACHE_DURATION) {
+      keysToDelete.push(key);
+    }
+  }
+  
+  // If still too many, remove least recently used
+  if (responseCache.size - keysToDelete.length > MAX_CACHE_SIZE) {
+    const sortedEntries = Array.from(responseCache.entries())
+      .filter(([key]) => !keysToDelete.includes(key))
+      .sort(([,a], [,b]) => a.timestamp - b.timestamp);
+    
+    const toRemove = sortedEntries.slice(0, 200); // Remove oldest 200
+    keysToDelete.push(...toRemove.map(([key]) => key));
+  }
+  
+  keysToDelete.forEach(key => responseCache.delete(key));
+  console.log(`🧹 Cleaned up cache: removed ${keysToDelete.length} entries`);
+}
+
+// Retrieve knowledge for bill agent responses
+async function retrieveBillAgentKnowledge(query: string, deliberationId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get bill agent for this deliberation
+    const { data: billAgents } = await supabase
+      .from('agent_configurations')
+      .select('id')
+      .eq('agent_type', 'bill_agent')
+      .eq('deliberation_id', deliberationId)
+      .eq('is_active', true)
+      .limit(1);
+
+    if (!billAgents || billAgents.length === 0) {
+      console.log('📚 No bill agent found for deliberation, checking global agents...');
+      
+      // Fallback to global bill agent
+      const { data: globalAgents } = await supabase
+        .from('agent_configurations')
+        .select('id')
+        .eq('agent_type', 'bill_agent')
+        .is('deliberation_id', null)
+        .eq('is_active', true)
+        .limit(1);
+        
+      if (!globalAgents || globalAgents.length === 0) {
+        console.log('📚 No bill agent found at all');
+        return '';
+      }
+      
+      billAgents.push(globalAgents[0]);
+    }
+
+    const agentId = billAgents[0].id;
+    console.log(`📚 Querying knowledge for agent: ${agentId}`);
+
+    // Try LangChain query first (more advanced) with retry logic
+    let langchainSuccess = false;
+    const maxRetries = 2;
+    
+    for (let attempt = 1; attempt <= maxRetries && !langchainSuccess; attempt++) {
+      try {
+        console.log(`📚 LangChain attempt ${attempt}/${maxRetries}`);
+        
+        const langchainPromise = supabase.functions.invoke('langchain-query-knowledge', {
+          body: { 
+            query, 
+            agentId, 
+            maxResults: 5 
+          }
+        });
+        
+        // Add timeout to LangChain call
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('LangChain timeout')), 45000);
+        });
+        
+        const { data, error } = await Promise.race([langchainPromise, timeoutPromise]);
+
+        if (!error && data?.response) {
+          console.log('✅ LangChain knowledge retrieved successfully');
+          langchainSuccess = true;
+          return data.response;
+        } else {
+          console.log(`❌ LangChain attempt ${attempt} failed:`, error?.message || 'No response');
+          if (attempt === maxRetries) {
+            console.log('📚 All LangChain attempts failed, falling back to direct query');
+          }
+        }
+      } catch (langchainError) {
+        console.warn(`❌ LangChain attempt ${attempt} error:`, langchainError.message);
+        if (langchainError.message.includes('timeout')) {
+          console.log('🕒 LangChain timeout detected');
+        }
+        if (attempt === maxRetries) {
+          console.warn('📚 All LangChain attempts failed, using fallback');
+        }
+      }
+      
+      // Wait before retry (except on last attempt)
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    }
+
+    // Fallback: Use direct Supabase query for knowledge retrieval
+    console.log('📚 LangChain query failed, using direct knowledge query as fallback');
+    
+    try {
+      // If no specific knowledge, get general agent knowledge
+      const { data: generalKnowledge } = await supabase
+        .from('agent_knowledge')
+        .select('content, metadata')
+        .eq('agent_id', agentId)
+        .limit(3);
+        
+      if (generalKnowledge && generalKnowledge.length > 0) {
+        const contextChunks = generalKnowledge.map((item: any) => item.content).join('\n\n');
+        console.log(`📚 Retrieved ${generalKnowledge.length} general knowledge chunks`);
+        return contextChunks;
+      }
+    } catch (fallbackError) {
+      console.error('📚 Fallback knowledge query error:', fallbackError);
+    }
+
+    return '';
+  } catch (error) {
+    console.error('📚 Knowledge retrieval error:', error);
+    return '';
+  }
+}
