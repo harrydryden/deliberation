@@ -3,7 +3,7 @@ import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
-import { MessageInput, MessageInputRef } from "@/components/chat/MessageInput";
+import { EnhancedMessageInput } from "@/components/chat/EnhancedMessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,8 +50,8 @@ const OptimizedDeliberationChat = () => {
   const { messageService, agentService } = useStableServices();
   const isMobile = useIsMobile();
   
-  // Ref for MessageInput to access setMessage function
-  const messageInputRef = useRef<MessageInputRef>(null);
+  // State for enhanced message input
+  const [messageText, setMessageText] = useState("");
 
   // Consolidated state
   const [state, setState] = useState({
@@ -92,8 +92,8 @@ const OptimizedDeliberationChat = () => {
   } = useChat(deliberationId);
 
 
-  // Optimized sendMessage
-  const sendMessage = useCallback(async (content: string) => {
+  // Enhanced sendMessage with type detection
+  const sendMessage = useCallback(async (content: string, type: 'QUESTION' | 'STATEMENT' | 'OTHER') => {
     await originalSendMessage(content, chatModeRef.current);
     setState(prev => ({
       ...prev,
@@ -104,11 +104,14 @@ const OptimizedDeliberationChat = () => {
     }));
   }, [originalSendMessage]);
 
+  // Voice interface compatible sendMessage (single parameter)
+  const sendMessageForVoice = useCallback(async (content: string) => {
+    await sendMessage(content, 'OTHER'); // Default to OTHER for voice messages
+  }, [sendMessage]);
+
   // setMessageText function for voice interface
-  const setMessageText = useCallback((text: string) => {
-    if (messageInputRef.current) {
-      messageInputRef.current.setMessage(text);
-    }
+  const setMessageTextFromVoice = useCallback((text: string) => {
+    setMessageText(text);
   }, []);
 
   // Load deliberation data
@@ -267,7 +270,7 @@ const OptimizedDeliberationChat = () => {
           agentConfigs={state.agentConfigs} 
         />
       </div>
-      <MessageInput ref={messageInputRef} onSendMessage={sendMessage} disabled={chatLoading} />
+      <EnhancedMessageInput onSendMessage={sendMessage} disabled={chatLoading} />
     </div>
   ), [messages, chatLoading, isTyping, handleAddToIbis, retryMessage, deliberationId, state.agentConfigs, sendMessage]);
 
@@ -364,8 +367,8 @@ const OptimizedDeliberationChat = () => {
                       <VoiceInterfaceLazy 
                         deliberationId={state.deliberation.id} 
                         variant="panel" 
-                        sendMessage={sendMessage}
-                        setMessageText={setMessageText}
+                        sendMessage={sendMessageForVoice}
+                        setMessageText={setMessageTextFromVoice}
                       />
                     </Suspense>
                   </div>
@@ -444,7 +447,7 @@ const OptimizedDeliberationChat = () => {
                     <VoiceInterfaceLazy 
                       deliberationId={state.deliberation.id}
                       variant="panel" 
-                      sendMessage={sendMessage}
+                      sendMessage={sendMessageForVoice}
                       setMessageText={setMessageText}
                     />
                   </Suspense>
