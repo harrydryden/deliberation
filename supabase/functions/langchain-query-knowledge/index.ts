@@ -1,12 +1,12 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
-import { OpenAIEmbeddings } from 'https://esm.sh/@langchain/openai@0.6.0?no-check';
-import { ChatOpenAI } from 'https://esm.sh/@langchain/openai@0.6.0?no-check';
-import { SupabaseVectorStore } from 'https://esm.sh/@langchain/community@0.3.0/vectorstores/supabase?no-check';
-import { createRetrievalChain } from 'https://esm.sh/langchain@0.3.0/chains/retrieval?no-check';
-import { createStuffDocumentsChain } from 'https://esm.sh/langchain@0.3.0/chains/combine_documents?no-check';
-import { PromptTemplate } from 'https://esm.sh/@langchain/core@0.3.0/prompts?no-check';
+import { OpenAIEmbeddings } from 'https://esm.sh/@langchain/openai@0.6.3';
+import { ChatOpenAI } from 'https://esm.sh/@langchain/openai@0.6.3';
+import { SupabaseVectorStore } from 'https://esm.sh/@langchain/community@0.3.49/vectorstores/supabase';
+import { createRetrievalChain } from 'https://esm.sh/langchain@0.3.30/chains/retrieval';
+import { createStuffDocumentsChain } from 'https://esm.sh/langchain@0.3.30/chains/combine_documents';
+import { PromptTemplate } from 'https://esm.sh/@langchain/core@0.3.30/prompts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,8 +17,6 @@ serve(async (req) => {
   console.log('=== LANGCHAIN QUERY EDGE FUNCTION CALLED ===');
   console.log('Method:', req.method);
 
-  const startTime = Date.now();
-  
   try {
     // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
@@ -27,11 +25,6 @@ serve(async (req) => {
     }
 
     console.log('Processing POST request...');
-
-    // Add timeout wrapper for the entire function
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Function timeout after 50 seconds')), 50000);
-    });
 
     // Parse request body
     const body = await req.json();
@@ -101,28 +94,16 @@ serve(async (req) => {
 
     console.log('Initializing LangChain components...');
 
-    // Initialize LangChain components with retry logic
-    let embeddings, llm;
-    
-    try {
-      embeddings = new OpenAIEmbeddings({
-        openAIApiKey: openAIApiKey,
-        modelName: 'text-embedding-3-small',
-        timeout: 30000, // 30 second timeout
-      });
+    // Initialize LangChain components
+    const embeddings = new OpenAIEmbeddings({
+      openAIApiKey: openAIApiKey,
+      modelName: 'text-embedding-3-small',
+    });
 
-      llm = new ChatOpenAI({
-        openAIApiKey: openAIApiKey,
-        modelName: 'gpt-5-2025-08-07',
-        maxRetries: 2,
-        timeout: 30000,
-      });
-      
-      console.log('✅ LangChain components initialized successfully');
-    } catch (initError) {
-      console.error('❌ Failed to initialize LangChain components:', initError);
-      throw new Error(`LangChain initialization failed: ${initError.message}`);
-    }
+    const llm = new ChatOpenAI({
+      openAIApiKey: openAIApiKey,
+      modelName: 'gpt-5-2025-08-07', // Best model for knowledge queries
+    });
 
     // Create vector store instance for retrieval
     const vectorStore = new SupabaseVectorStore(embeddings, {
@@ -183,12 +164,10 @@ Generate a detailed analytical response:
 
     console.log('Executing query...');
 
-    // Execute the query with timeout
-    const queryPromise = chain.invoke({
+    // Execute the query
+    const result = await chain.invoke({
       input: query,
     });
-    
-    const result = await Promise.race([queryPromise, timeoutPromise]);
 
     console.log(`Query completed. Found ${result.context?.length || 0} source documents`);
 
@@ -212,8 +191,7 @@ Generate a detailed analytical response:
       chunk_index: doc.metadata?.chunkIndex || index,
     })) || [];
 
-    const processingTime = Date.now() - startTime;
-    console.log(`✅ LangChain RAG query completed successfully in ${processingTime}ms`);
+    console.log('LangChain RAG query completed successfully');
 
     return new Response(
       JSON.stringify({
@@ -223,30 +201,20 @@ Generate a detailed analytical response:
         relevantKnowledge,
         sources: uniqueSources,
         langchainProcessed: true,
-        processingTimeMs: processingTime,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   } catch (error) {
-    const processingTime = Date.now() - startTime;
     console.error('=== ERROR IN LANGCHAIN QUERY EDGE FUNCTION ===');
     console.error('Error message:', error.message);
     console.error('Error stack:', error.stack);
-    console.error(`Processing time before error: ${processingTime}ms`);
-    
-    // Determine error type for better debugging
-    const errorType = error.message.includes('timeout') ? 'TIMEOUT' : 
-                     error.message.includes('initialization') ? 'INITIALIZATION' : 
-                     error.message.includes('configuration') ? 'CONFIGURATION' : 'PROCESSING';
 
     return new Response(
       JSON.stringify({
         success: false,
         error: `LangChain query error: ${error.message}`,
-        errorType,
-        processingTimeMs: processingTime,
       }),
       {
         status: 500,
