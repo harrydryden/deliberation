@@ -569,6 +569,7 @@ async function processStreamingOrchestration(
   sendData: (data: any) => void
 ) {
   console.log(`🚀 Starting processStreamingOrchestration`, { messageId, deliberationId, mode });
+  console.log(`🔐 Auth header present:`, !!authHeader);
   
   try {
     // Initialize Supabase clients
@@ -655,6 +656,7 @@ async function processStreamingOrchestration(
 
     if (messageError || !message) {
       console.error(`❌ Error fetching message:`, messageError);
+      console.error(`❌ Full message error details:`, JSON.stringify(messageError, null, 2));
       sendData({ error: `Message not found or access denied: ${messageError?.message}`, done: true });
       return;
     }
@@ -885,9 +887,11 @@ async function processStreamingOrchestration(
       });
       
       sendData({ 
+        error: `Response generation failed: ${responseError.message}`,
         content: `Error: ${responseError.message}. Please check the logs for details.`,
-        done: false 
+        done: true 
       });
+      return; // Exit early on error
     }
 
     sendData({ done: true });
