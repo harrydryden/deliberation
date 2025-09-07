@@ -111,49 +111,58 @@ const OptimizedMessageItem = memo(({
 
   return (
     <div className="pb-4">
-      <div className="flex gap-3">
-        <Avatar className="h-8 w-8">
-          <AvatarFallback className={isUser ? 'bg-primary' : agentInfo?.color || 'bg-muted-foreground'}>
-            {isUser ? (
-              <User className="h-4 w-4 text-white" />
-            ) : (
-              <AgentIcon className="h-4 w-4 text-white" />
-            )}
-          </AvatarFallback>
-        </Avatar>
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium">
-              {isUser ? 'You' : (agentInfo?.name || 'Assistant')}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {formatMessageTime(message.created_at)}
-            </span>
-          </div>
+      <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+        <div className={`flex gap-3 max-w-[80%] ${isUser ? 'flex-row-reverse' : ''}`}>
+          <Avatar className="h-8 w-8 flex-shrink-0">
+            <AvatarFallback className={isUser ? 'bg-primary' : agentInfo?.color || 'bg-muted-foreground'}>
+              {isUser ? (
+                <User className="h-4 w-4 text-white" />
+              ) : (
+                <AgentIcon className="h-4 w-4 text-white" />
+              )}
+            </AvatarFallback>
+          </Avatar>
           
-          <Card className="p-3 bg-card relative">
-            <Suspense fallback={<Skeleton className="h-4 w-full" />}>
-              <LazyMarkdownMessage content={message.content} />
-            </Suspense>
+          <div className="flex-1 min-w-0">
+            <div className={`flex items-center gap-2 mb-1 ${isUser ? 'justify-end' : ''}`}>
+              <span className="text-sm font-medium">
+                {isUser ? 'You' : (agentInfo?.name || 'Assistant')}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {formatMessageTime(message.created_at)}
+              </span>
+            </div>
             
-            {/* Integrated Share button for user messages */}
-            {isUser && (
-              <div className="absolute bottom-2 right-2">
-                <Button
-                  variant={message.submitted_to_ibis ? "secondary" : "outline"}
-                  size="sm"
-                  onClick={message.submitted_to_ibis ? undefined : handleShare}
-                  disabled={message.submitted_to_ibis}
-                  className="text-xs h-6"
-                  title={message.submitted_to_ibis ? "Already shared to IBIS" : "Share to IBIS - add descriptions and links"}
-                >
-                  <Share2 className="h-3 w-3 mr-1" />
-                  {message.submitted_to_ibis ? "Submitted" : "Share"}
-                </Button>
-              </div>
-            )}
-          </Card>
+            <Card className={`p-3 relative ${
+              isUser 
+                ? 'bg-primary text-primary-foreground' 
+                : 'bg-muted'
+            }`}>
+              <Suspense fallback={<Skeleton className="h-4 w-full" />}>
+                <LazyMarkdownMessage 
+                  content={message.content}
+                  className={isUser ? 'prose-invert' : ''}
+                />
+              </Suspense>
+              
+              {/* Integrated Share button for user messages */}
+              {isUser && (
+                <div className="absolute bottom-2 right-2">
+                  <Button
+                    variant={message.submitted_to_ibis ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={message.submitted_to_ibis ? undefined : handleShare}
+                    disabled={message.submitted_to_ibis}
+                    className="text-xs h-6 text-primary-foreground/80 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                    title={message.submitted_to_ibis ? "Already shared to IBIS" : "Share to IBIS - add descriptions and links"}
+                  >
+                    <Share2 className="h-3 w-3 mr-1" />
+                    {message.submitted_to_ibis ? "Submitted" : "Share"}
+                  </Button>
+                </div>
+              )}
+            </Card>
+          </div>
         </div>
       </div>
     </div>
