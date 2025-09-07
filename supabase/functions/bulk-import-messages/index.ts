@@ -62,14 +62,6 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Initialize admin client for user validation
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-
     // Get the authorization header to verify admin access
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
@@ -235,101 +227,62 @@ serve(async (req) => {
     // Sort messages by created_at to maintain chronological order
     csvRows.sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
 
-    // Import messages sequentially in chronological order (like the working manual flow)
+    // Import messages in chunks
     let importedCount = 0;
     let failedCount = 0;
+    const chunkSize = 100;
 
-    for (let i = 0; i < csvRows.length; i++) {
-      const row = csvRows[i];
-      console.log(`Importing message ${i + 1}/${csvRows.length}: ${row.content.substring(0, 50)}...`);
+    for (let i = 0; i < csvRows.length; i += chunkSize) {
+      const chunk = csvRows.slice(i, i + chunkSize);
       
-      try {
-        // Insert user message using admin client (like we used to, but with admin client for RLS)
-        const { data: insertedMessage, error: insertError } = await supabaseAdmin
-          .from('messages')
-          .insert({
-            content: row.content,
-            user_id: row.user_id,
-            deliberation_id: deliberationId,
-            message_type: 'user' as const,
-            bulk_import_status: 'awaiting_agent_response' as const, // Back to the working status
-            created_at: row.created_at
-          })
-          .select('id')
-          .single();
+      const messagesToInsert = chunk.map(row => ({
+        content: row.content,
+        user_id: row.user_id,
+        deliberation_id: deliberationId,
+        message_type: 'user' as const,
+        bulk_import_status: 'awaiting_agent_response' as const,
+        created_at: row.created_at
+      }));
 
-        if (insertError || !insertedMessage) {
-          console.error(`❌ Error inserting message ${i + 1}:`, insertError);
-          failedCount++;
-          continue;
-        }
+      const { data: insertedMessages, error: insertError } = await supabase
+        .from('messages')
+        .insert(messagesToInsert)
+        .select('id');
 
-        importedCount++;
-        console.log(`✅ Successfully imported message ${insertedMessage.id}`);
-
-      } catch (error) {
-        console.error(`Error importing message ${i + 1}:`, error);
-        failedCount++;
+      if (insertError) {
+        console.error(`Error inserting chunk ${i / chunkSize + 1}:`, insertError);
+        failedCount += chunk.length;
+      } else {
+        importedCount += insertedMessages?.length || 0;
       }
+
+      // Update batch progress
+      await supabase
+        .from('bulk_import_batches')
+        .update({
+          imported_messages: importedCount,
+          failed_messages: failedCount
+        })
+        .eq('id', batch.id);
     }
 
-    console.log(`Import phase completed. Imported: ${importedCount}, Failed: ${failedCount}`);
-
-    // Update batch status after import phase
-    await supabaseAdmin
-      .from('bulk_import_batches')
-      .update({
-        imported_messages: importedCount,
-        failed_messages: failedCount,
-        import_status: importedCount > 0 ? 'imported' : 'failed'
-      })
-      .eq('id', batch.id);
-
-    // If we successfully imported messages, automatically trigger agent response generation
-    if (importedCount > 0) {
-      console.log(`🤖 Automatically triggering agent response generation for ${importedCount} messages...`);
-      
-      try {
-        // Call the existing working process-bulk-agent-responses function
-        const { error: agentProcessError } = await supabase.functions.invoke(
-          'process-bulk-agent-responses',
-          {
-            headers: { authorization: req.headers.get('authorization') },
-            body: { batchId: batch.id }
-          }
-        );
-
-        if (agentProcessError) {
-          console.error('❌ Failed to start agent response generation:', agentProcessError);
-        } else {
-          console.log('✅ Successfully started agent response generation');
-        }
-      } catch (error) {
-        console.error('Error starting agent response generation:', error);
-      }
-    }
-
-    // Update final batch status - agent responses are handled in background
-    const finalStatus = failedCount === 0 ? 'completed' : (importedCount > 0 ? 'completed' : 'failed');
-    await supabaseAdmin
+    // Update final batch status
+    const finalStatus = failedCount === 0 ? 'imported' : (importedCount > 0 ? 'imported' : 'failed');
+    await supabase
       .from('bulk_import_batches')
       .update({
         import_status: finalStatus,
         processing_log: [
           {
             timestamp: new Date().toISOString(),
-            action: 'import_completed_with_agent_responses',
-            details: { 
-              imported: importedCount, 
-              failed: failedCount,
-              note: 'Agent responses are being generated in background'
-            }
+            action: 'import_completed',
+            details: { imported: importedCount, failed: failedCount }
           }
         ]
       })
       .eq('id', batch.id);
 
-    console.log(`Import completed with agent response generation in progress. Imported: ${importedCount}, Failed: ${failedCount}`);
+    console.log(`Import completed. Imported: ${importedCount}, Failed: ${failedCount}`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -337,7 +290,7 @@ serve(async (req) => {
       total_messages: csvRows.length,
       imported_messages: importedCount,
       failed_messages: failedCount,
-      message: `Successfully imported ${importedCount} of ${csvRows.length} messages with agent responses generating automatically`
+      message: `Successfully imported ${importedCount} of ${csvRows.length} messages`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

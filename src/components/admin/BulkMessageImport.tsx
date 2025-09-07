@@ -37,6 +37,8 @@ export const BulkMessageImport: React.FC = () => {
   const [deliberations, setDeliberations] = useState<Deliberation[]>([]);
   const [importBatches, setImportBatches] = useState<ImportBatch[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const [importProgress, setImportProgress] = useState<{ imported: number; total: number }>({ imported: 0, total: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { adminService } = useStableServices();
 
@@ -141,6 +143,26 @@ export const BulkMessageImport: React.FC = () => {
       toast.error(`Import failed: ${error.message}`);
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const handleProcessAgentResponses = async (batchId: string) => {
+    setIsProcessing(batchId);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-bulk-agent-responses', {
+        body: { batchId }
+      });
+
+      if (error) throw error;
+
+      toast.success(`Processing started for ${data.total_messages} messages`);
+      loadImportBatches();
+      
+    } catch (error) {
+      console.error('Processing error:', error);
+      toast.error(`Failed to start processing: ${error.message}`);
+    } finally {
+      setIsProcessing(null);
     }
   };
 
@@ -262,7 +284,6 @@ export const BulkMessageImport: React.FC = () => {
           </CardTitle>
           <CardDescription>
             Upload a CSV file with message content and user IDs to import messages in bulk. 
-            Agent responses will be generated automatically for each imported message.
             Required columns: content, user_id. Optional: created_at
           </CardDescription>
         </CardHeader>
@@ -385,6 +406,27 @@ export const BulkMessageImport: React.FC = () => {
                       value={(batch.processed_messages / batch.imported_messages) * 100} 
                       className="h-2"
                     />
+                  )}
+
+                  {(batch.import_status === 'imported' || batch.import_status === 'completed') && 
+                   (batch.processing_status === 'not_started' || (batch.processed_messages < batch.imported_messages)) && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleProcessAgentResponses(batch.id)}
+                      disabled={isProcessing === batch.id}
+                    >
+                      {isProcessing === batch.id ? (
+                        <>
+                          <Play className="mr-2 h-4 w-4 animate-spin" />
+                          Starting...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="mr-2 h-4 w-4" />
+                          {batch.processed_messages > 0 ? 'Re-generate Agent Responses' : 'Generate Agent Responses'}
+                        </>
+                      )}
+                    </Button>
                   )}
                 </div>
               ))}
