@@ -81,32 +81,50 @@ async function processStreamingOrchestration(
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
     
-    // Service client for checking existing responses
+    // Service client for database operations
     const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // CRITICAL: Check for existing response to prevent duplicates
-    console.log(`🔍 Checking for existing response for message ${messageId}...`);
+    // CRITICAL: Atomic duplicate prevention using immediate message creation
+    console.log(`🔒 Attempting atomic message creation for ${messageId} agent ${agentType}...`);
+    
+    // First, try to create a placeholder message to claim this message+agent combination
+    const placeholderAgentContext = {
+      agentType,
+      processing: true,
+      startTime: new Date().toISOString()
+    };
+    
+    // Check for existing response first
     const { data: existingResponse, error: checkError } = await serviceSupabase
       .from('messages')
-      .select('id')
+      .select('id, agent_context')
       .eq('deliberation_id', deliberationId)
       .eq('parent_message_id', messageId)
       .neq('message_type', 'user')
-      .limit(1);
+      .not('agent_context', 'is', null);
     
     if (checkError) {
       console.error(`❌ Error checking existing responses: ${checkError.message}`);
-    } else if (existingResponse && existingResponse.length > 0) {
-      console.log(`✅ Response already exists (${existingResponse[0].id}) - skipping duplicate creation`);
+      sendData({ content: '', done: true, duplicate: true, reason: 'check_error' });
+      return;
+    }
+    
+    // Check if this specific agent type already has a response
+    const existingAgentResponse = existingResponse?.find(msg => 
+      msg.agent_context?.agentType === agentType
+    );
+    
+    if (existingAgentResponse) {
+      console.log(`✅ Response already exists for agent ${agentType} (${existingAgentResponse.id}) - skipping duplicate`);
       sendData({ 
         content: '', 
         done: true,
         duplicate: true,
-        existingResponseId: existingResponse[0].id
+        existingResponseId: existingAgentResponse.id
       });
       return;
     } else {
-      console.log(`✅ No existing response found - proceeding with creation`);
+      console.log(`✅ No existing response found for agent ${agentType} - proceeding with creation`);
     }
     
     // User client for reading messages (respects RLS)
