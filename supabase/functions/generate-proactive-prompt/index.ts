@@ -101,18 +101,34 @@ serve(async (req) => {
       adaptivePrompting: true
     } : { adaptivePrompting: false };
 
-    // Create enhanced AI prompt with session context using agent configuration
-    const aiPrompt = `${floSystemPrompt}
+    // Get proactive prompt template from database
+    const { data: templateData, error: templateError } = await supabase
+      .rpc('get_prompt_template', { 
+        template_name: 'generate_proactive_prompts'
+      });
 
-CURRENT DELIBERATION CONTEXT:
-- Topic: ${deliberation.title}
-- Description: ${deliberation.description || 'No description available'}
-- Notion statement: ${deliberation.notion || 'No notion statement'}
-- User engagement: ${userEngagement.totalMessages} messages, last type: ${userEngagement.lastMessageType}
-- Recent conversation:
-${conversationSummary}
+    if (templateError || !templateData || templateData.length === 0) {
+      throw new Error(`Failed to get prompt template: ${templateError?.message || 'Template not found'}`);
+    }
 
-${sessionContext ? `
+    const template = templateData[0];
+    
+    // Prepare guidance based on session analysis
+    const userExperienceGuidance = sessionAnalysis.userExperience === 'new' 
+      ? 'Welcoming and providing gentle guidance for new participants' 
+      : sessionAnalysis.userExperience === 'experienced' 
+        ? 'Building on their experience and encouraging deeper insights' 
+        : '';
+    
+    const sessionPhaseGuidance = sessionAnalysis.sessionPhase === 'extended' 
+      ? 'Acknowledging their continued engagement and suggesting valuable contributions' 
+      : '';
+    
+    const engagementLevelGuidance = sessionAnalysis.engagementLevel === 'low' 
+      ? 'Using a different approach since previous prompts haven\'t led to engagement' 
+      : '';
+
+    const sessionContextText = sessionContext ? `
 ENHANCED SESSION CONTEXT:
 - User experience level: ${sessionAnalysis.userExperience} (${sessionContext.totalSessions} total sessions)
 - Current session duration: ${Math.round(sessionContext.currentSessionAge / 60000)} minutes
@@ -120,32 +136,21 @@ ENHANCED SESSION CONTEXT:
 - Session phase: ${sessionAnalysis.sessionPhase}
 - Prompts sent this session: ${sessionContext.promptsSentThisSession}
 - Is long-running session: ${sessionContext.isLongSession ? 'yes' : 'no'}
-` : ''}
+` : '';
 
-PROACTIVE FACILITATION TASK: 
-Generate a thoughtful, engaging proactive prompt to re-engage this user who has been inactive. The prompt should align with your facilitation style and goals while being:
-
-1. Contextually relevant to the ongoing discussion
-2. ${sessionAnalysis.userExperience === 'new' ? 'Welcoming and providing gentle guidance for new participants' : ''}
-3. ${sessionAnalysis.userExperience === 'experienced' ? 'Building on their experience and encouraging deeper insights' : ''}
-4. ${sessionAnalysis.sessionPhase === 'extended' ? 'Acknowledging their continued engagement and suggesting valuable contributions' : ''}
-5. ${sessionAnalysis.engagementLevel === 'low' ? 'Using a different approach since previous prompts haven\'t led to engagement' : ''}
-6. Encouraging but not pushy
-7. Offering specific, actionable ways to contribute
-8. Concise (1-2 sentences)
-
-Consider these contexts:
-- If new participant: Welcome and guide them with specific first steps
-- If experienced participant: Build on their previous contributions and session history
-- If discussion is quiet: Encourage broader participation with specific conversation starters
-- If discussion is active: Help them catch up or add fresh perspective
-- If extended session: Acknowledge their dedication and suggest high-value contributions
-
-Respond with JSON in this format:
-{
-  "question": "Your engaging proactive prompt here",
-  "context": "engagement|onboarding|catch_up|perspective|extended_session"
-}`;
+    // Replace template variables with actual values
+    const aiPrompt = template.template_text
+      .replace(/\{\{flow_system_prompt\}\}/g, floSystemPrompt)
+      .replace(/\{\{deliberation_title\}\}/g, deliberation.title)
+      .replace(/\{\{deliberation_description\}\}/g, deliberation.description || 'No description available')
+      .replace(/\{\{deliberation_notion\}\}/g, deliberation.notion || 'No notion statement')
+      .replace(/\{\{user_engagement\}\}/g, userEngagement.totalMessages.toString())
+      .replace(/\{\{last_message_type\}\}/g, userEngagement.lastMessageType)
+      .replace(/\{\{conversation_summary\}\}/g, conversationSummary)
+      .replace(/\{\{session_context\}\}/g, sessionContextText)
+      .replace(/\{\{user_experience_guidance\}\}/g, userExperienceGuidance)
+      .replace(/\{\{session_phase_guidance\}\}/g, sessionPhaseGuidance)
+      .replace(/\{\{engagement_level_guidance\}\}/g, engagementLevelGuidance);
 
     // Call OpenAI API
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {

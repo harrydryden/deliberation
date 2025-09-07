@@ -151,40 +151,39 @@ serve(async (req) => {
       });
     }
 
-    // Use AI to determine relationship types and confidence
-    const relationshipPrompt = `
-Context: This is a democratic deliberation about "${deliberation?.title || 'Unknown Topic'}".
-${deliberation?.notion ? `Key Question: ${deliberation.notion}` : ''}
+    // Get relationship evaluation prompt from template system
+    const { data: templateData, error: templateError } = await supabase
+      .rpc('get_prompt_template', { 
+        template_name: 'evaluate_ibis_relationships'
+      });
 
-New Contribution:
-Type: ${nodeType}
-Title: ${title}
-Content: ${content}
+    if (templateError || !templateData || templateData.length === 0) {
+      throw new Error(`Failed to get prompt template: ${templateError?.message || 'Template not found'}`);
+    }
 
-Evaluate relationships with these existing contributions:
-${semanticMatches.map((node, i) => `
+    const template = templateData[0];
+    
+    // Prepare template variables
+    const existingContributions = semanticMatches.map((node, i) => `
 ${i + 1}. [${node.node_type.toUpperCase()}] ${node.title}
    ${node.description || 'No description'}
-`).join('\n')}
+`).join('\n');
 
-For each existing contribution that has a meaningful relationship, provide:
-1. Relationship type: ${RELATIONSHIP_TYPES[`${nodeType}_to_issue` as keyof typeof RELATIONSHIP_TYPES]?.join(', ')} or ${RELATIONSHIP_TYPES[`${nodeType}_to_position` as keyof typeof RELATIONSHIP_TYPES]?.join(', ')} or ${RELATIONSHIP_TYPES[`${nodeType}_to_argument` as keyof typeof RELATIONSHIP_TYPES]?.join(', ')}
-2. Confidence score (0.0-1.0)
-3. Brief reasoning (1 sentence)
+    const validRelationshipTypes = [
+      ...RELATIONSHIP_TYPES[`${nodeType}_to_issue` as keyof typeof RELATIONSHIP_TYPES] || [],
+      ...RELATIONSHIP_TYPES[`${nodeType}_to_position` as keyof typeof RELATIONSHIP_TYPES] || [],
+      ...RELATIONSHIP_TYPES[`${nodeType}_to_argument` as keyof typeof RELATIONSHIP_TYPES] || []
+    ].join(', ');
 
-Only suggest relationships with confidence > 0.6. Focus on logical and argumentative relationships, not just topical similarity.
-
-Respond in JSON format:
-{
-  "relationships": [
-    {
-      "nodeIndex": number,
-      "relationshipType": "string", 
-      "confidence": number,
-      "reasoning": "string"
-    }
-  ]
-}`;
+    // Replace template variables with actual values
+    const relationshipPrompt = template.template_text
+      .replace(/\{\{deliberation_title\}\}/g, deliberation?.title || 'Unknown Topic')
+      .replace(/\{\{deliberation_notion\}\}/g, deliberation?.notion ? `Key Question: ${deliberation.notion}` : '')
+      .replace(/\{\{node_type\}\}/g, nodeType)
+      .replace(/\{\{title\}\}/g, title)
+      .replace(/\{\{content\}\}/g, content)
+      .replace(/\{\{existing_contributions\}\}/g, existingContributions)
+      .replace(/\{\{valid_relationship_types\}\}/g, validRelationshipTypes);
 
     const selectedModel = ModelConfigManager.selectOptimalModel({
       complexity: 0.8,
