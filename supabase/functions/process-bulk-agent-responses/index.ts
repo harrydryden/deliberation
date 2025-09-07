@@ -170,12 +170,12 @@ serve(async (req) => {
           continue;
         }
 
-        // Verify response was created with longer, more reliable delays
+        // Verify response was created with balanced delays that won't cause timeouts
         let responseVerified = false;
-        const maxVerificationAttempts = 5;
+        const maxVerificationAttempts = 4;
         
         for (let attempt = 1; attempt <= maxVerificationAttempts; attempt++) {
-          await new Promise(resolve => setTimeout(resolve, attempt * 3000)); // 3s, 6s, 9s, 12s, 15s
+          await new Promise(resolve => setTimeout(resolve, attempt * 1500)); // 1.5s, 3s, 4.5s, 6s
           
           const { data: responseCheck } = await supabase
             .from('messages')
@@ -225,8 +225,8 @@ serve(async (req) => {
           .eq('id', message.id);
       }
 
-      // Rate limiting between messages
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Shorter rate limiting between messages to avoid function timeouts
+      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second instead of 2
 
       // Update batch progress more frequently
       if ((messageIndex + 1) % 5 === 0 || messageIndex === messages.length - 1) {
