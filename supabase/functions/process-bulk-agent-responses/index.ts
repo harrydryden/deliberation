@@ -110,41 +110,31 @@ class MessageProcessor {
 
         console.log(`✅ Orchestration completed for message ${messageId}`);
 
-        // Simplified verification - just 3 quick checks
-        let verificationSuccess = false;
-        let responseId = null;
-        
-        for (let checkAttempt = 1; checkAttempt <= 3; checkAttempt++) {
-          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second wait
-          
-          console.log(`🔍 Quick verification ${checkAttempt}/3 for message ${messageId}`);
-          
-          const verificationResult = await this.hasExistingResponse(messageId, deliberationId);
-          
-          if (verificationResult.exists) {
-            console.log(`🎉 Agent response verified for message ${messageId}`);
-            verificationSuccess = true;
-            responseId = verificationResult.responseId;
-            break;
-          }
-        }
+        // Wait longer for response to be fully committed to database
+        console.log(`⏳ Waiting 3 seconds for response to be committed...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
-        if (verificationSuccess) {
+        // Single verification with longer wait
+        console.log(`🔍 Verifying agent response for message ${messageId}`);
+        const verificationResult = await this.hasExistingResponse(messageId, deliberationId);
+        
+        if (verificationResult.exists) {
+          console.log(`✅ Agent response verified: ${verificationResult.responseId}`);
           return {
             messageId,
             status: 'success',
             attempts: attempt,
-            responseId: responseId!
+            responseId: verificationResult.responseId!
           };
         } else {
           console.error(`❌ No response found after orchestration for message ${messageId}, attempt ${attempt}`);
           
           if (attempt < MAX_ATTEMPTS) {
             console.log(`🔄 Will retry orchestration for message ${messageId}`);
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            await new Promise(resolve => setTimeout(resolve, 2000));
             continue;
           } else {
-            throw new Error('Orchestration completed but no response was created after all verification attempts');
+            throw new Error('Orchestration completed but no response was created after verification');
           }
         }
 
@@ -311,8 +301,8 @@ serve(async (req) => {
 
         console.log(`📝 Message ${result.messageId}: ${result.status} (${result.attempts} attempts)`);
         
-        // Small delay between messages to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Very small delay between messages for speed
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       // Update progress after each batch
