@@ -320,7 +320,6 @@ serve(async (req) => {
         }
       }
     }
-    }
 
     // Update final batch status
     const finalProcessingStatus = failedCount === 0 ? 'completed' : (processedCount > 0 ? 'completed' : 'failed');
