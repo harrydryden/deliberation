@@ -57,30 +57,23 @@ serve(async (req) => {
       `- ${issue.title}${issue.description ? `: ${issue.description}` : ''} (ID: ${issue.id})`
     ).join('\n');
 
-    // Create AI prompt for issue recommendations
-    const aiPrompt = `You are analysing user content to recommend existing issues from a deliberation discussion. Your task is to find the most relevant existing issues that the user's content relates to.
+    // Get prompt template from database
+    const { data: templateData, error: templateError } = await supabase
+      .rpc('get_prompt_template', { 
+        template_name: 'Issue Recommendation System'
+      });
 
-USER CONTENT:
-"${content}"
+    if (templateError || !templateData || templateData.length === 0) {
+      throw new Error(`Failed to get prompt template: ${templateError?.message || 'Template not found'}`);
+    }
 
-EXISTING ISSUES:
-${issuesContext}
-
-Please analyse the user's content and identify the ${maxRecommendations} most relevant existing issues. For each recommendation, provide:
-1. The exact issue ID (from the list above)
-2. A relevance score between 0.6-1.0 (only recommend if score >= 0.6)  
-3. A clear explanation of why this issue is relevant to the user's content
-
-Respond with a JSON array in this exact format:
-[
-  {
-    "issueId": "exact-uuid-from-list", 
-    "relevanceScore": 0.85,
-    "explanation": "This issue directly relates to the user's concern about..."
-  }
-]
-
-Only include issues with relevance score >= 0.6. If no issues meet this threshold, return an empty array [].`;
+    const template = templateData[0];
+    
+    // Replace template variables with actual values
+    const aiPrompt = template.template_text
+      .replace(/\{\{user_content\}\}/g, content)
+      .replace(/\{\{existing_issues\}\}/g, issuesContext)
+      .replace(/\{\{max_recommendations\}\}/g, maxRecommendations.toString());
 
     // Call OpenAI API
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
