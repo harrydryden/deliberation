@@ -257,7 +257,7 @@ export const OptimizedMessageList = memo(({
       {messages.length === 0 && !isTyping ? (
         <div className="text-center text-muted-foreground py-12">
           <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <h3 className="text-lg font-medium mb-2">Welcome to Deliberation</h3>
+          <h3 className="text-lg font-medium mb-2">Welcome to Democratic Deliberation</h3>
           <p>Join the conversation...</p>
         </div>
       ) : (
