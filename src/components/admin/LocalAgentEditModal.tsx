@@ -163,6 +163,50 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
             onGoalsChange={(goals) => form.updateField('goals', goals)}
           />
 
+          {/* System Prompt Override */}
+          <div className="space-y-4 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-base font-semibold">System Prompt Override</Label>
+                <p className="text-sm text-muted-foreground">
+                  Override the default system prompt for this specific agent
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                Template: {agent.agent_type} default
+              </Badge>
+            </div>
+
+            <div className="space-y-2">
+              <FormField
+                type="textarea"
+                label="Custom System Prompt"
+                value={form.formData.prompt_overrides.system_prompt || ''}
+                onChange={(value) => form.updateField('prompt_overrides', {
+                  ...form.formData.prompt_overrides,
+                  system_prompt: value
+                })}
+                placeholder="Leave empty to use template default, or enter custom system prompt..."
+                rows={8}
+              />
+              {form.formData.prompt_overrides.system_prompt && (
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => form.updateField('prompt_overrides', {
+                      ...form.formData.prompt_overrides,
+                      system_prompt: ''
+                    })}
+                  >
+                    Clear Override
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Classification Prompt Override */}
           <div className="space-y-4 border-t pt-4">
             <div className="flex items-center justify-between">
