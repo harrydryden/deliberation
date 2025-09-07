@@ -87,6 +87,16 @@ function cacheResponse(content: string, response: string, agentType: string, del
   const cacheKey = createCacheKey('agent_response', deliberationId || 'global', content.toLowerCase().trim());
   responseCache.set(cacheKey, response);
 }
+
+// Generate fast response using templates and simple AI with improved error handling
+async function generateFastResponse(
+  content: string,
+  fastPath: any,
+  supabase: any,
+  sendData: (data: any) => void
+): Promise<string> {
+  const openAIApiKey = getOpenAIKey();
+  
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -106,6 +116,11 @@ function cacheResponse(content: string, response: string, agentType: string, del
       stream: true
     }),
   });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+  }
 
   const reader = response.body?.getReader();
   const decoder = new TextDecoder();
@@ -130,7 +145,7 @@ function cacheResponse(content: string, response: string, agentType: string, del
             sendData({ content, done: false });
           }
         } catch (e) {
-          // Ignore parse errors
+          // Ignore parse errors for streaming
         }
       }
     }
