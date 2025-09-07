@@ -210,7 +210,9 @@ async function processStreamingOrchestration(
         [],
         deliberationId,
         openAIApiKey,
-        sendData
+        sendData,
+        orchestrator,
+        mode
       );
 
       // Store response using service client
@@ -235,19 +237,38 @@ async function processStreamingOrchestration(
     // Enhanced orchestration using unified service
     console.log('🔄 Using enhanced orchestration');
     
-    // Parallel analysis and context gathering
-    const analysisPromise = orchestrator.analyzeMessage(message.content, openAIApiKey);
-    const conversationPromise = getConversationState(userSupabase, deliberationId, message.user_id);
-    const similarNodesPromise = findSimilarNodes(userSupabase, message.content);
-    const knowledgePromise = checkAvailableKnowledge(serviceSupabase, deliberationId);
+    // For bulk processing, skip complex analysis to avoid timeouts
+    let analysis, conversationState, similarNodes, availableKnowledge;
+    
+    if (mode === 'bulk_processing') {
+      console.log('📦 Bulk mode: Using simplified analysis');
+      // Use default analysis for bulk processing
+      analysis = {
+        intent: 'general',
+        complexity: 0.5,
+        topicRelevance: 0.5,
+        requiresExpertise: false
+      };
+      // Get simplified context
+      conversationState = await getConversationState(userSupabase, deliberationId, message.user_id);
+      similarNodes = [];
+      availableKnowledge = await checkAvailableKnowledge(serviceSupabase, deliberationId);
+    } else {
+      // Full analysis for normal processing
+      console.log('🔄 Full analysis mode');
+      const analysisPromise = orchestrator.analyzeMessage(message.content, openAIApiKey);
+      const conversationPromise = getConversationState(userSupabase, deliberationId, message.user_id);
+      const similarNodesPromise = findSimilarNodes(userSupabase, message.content);
+      const knowledgePromise = checkAvailableKnowledge(serviceSupabase, deliberationId);
 
-    // Wait for all parallel operations
-    const [analysis, conversationState, similarNodes, availableKnowledge] = await Promise.all([
-      analysisPromise,
-      conversationPromise,
-      similarNodesPromise,
-      knowledgePromise
-    ]);
+      // Wait for all parallel operations
+      [analysis, conversationState, similarNodes, availableKnowledge] = await Promise.all([
+        analysisPromise,
+        conversationPromise,
+        similarNodesPromise,
+        knowledgePromise
+      ]);
+    }
 
     console.log('📊 Analysis complete, selecting optimal agent...');
 
@@ -276,7 +297,8 @@ async function processStreamingOrchestration(
         deliberationId,
         openAIApiKey,
         sendData,
-        orchestrator
+        orchestrator,
+        mode
       );
 
       console.log(`✅ Generated response length: ${response.length}`);
@@ -555,7 +577,8 @@ async function generateStreamingResponse(
   deliberationId: string,
   openAIApiKey: string,
   sendData: (data: any) => void,
-  orchestrator: AgentOrchestrator
+  orchestrator: AgentOrchestrator,
+  mode: string = 'stream'
 ): Promise<string> {
   // Get agent configuration through orchestrator
   const agentConfig = await orchestrator.getAgentConfig(agentType, deliberationId);
@@ -590,14 +613,16 @@ async function generateStreamingResponse(
     throw new Error('System prompt is empty or undefined');
   }
 
+  const useStreaming = mode !== 'bulk_processing';
+  
   const requestBody: any = {
     model,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: content }
     ],
-    stream: true,
-    max_completion_tokens: 3000  // Increased from 1500 to allow fuller responses
+    stream: useStreaming,
+    max_completion_tokens: 3000
   };
 
   console.log('🔧 Request body preview:', JSON.stringify({
@@ -610,7 +635,7 @@ async function generateStreamingResponse(
     max_completion_tokens: requestBody.max_completion_tokens
   }, null, 2));
 
-  console.log('🚀 About to make OpenAI API call...');
+  console.log(`🚀 About to make OpenAI API call (${useStreaming ? 'streaming' : 'non-streaming'})...`);
   console.log('📏 User content length:', content?.length || 0);
   console.log('📝 User content preview:', content?.substring(0, 200) + '...');
 
@@ -661,6 +686,18 @@ async function generateStreamingResponse(
   console.log(`✅ OpenAI API call successful for ${agentType}`);
   console.log('📡 Response status:', response.status);
   console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
+  // Handle non-streaming response for bulk processing
+  if (!useStreaming) {
+    console.log('📦 Processing non-streaming response for bulk mode');
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    console.log(`✅ Non-streaming response received: ${content.length} characters`);
+    
+    // Send the content as if it were streamed
+    sendData({ content, done: false });
+    return content;
+  }
 
   const reader = response.body?.getReader();
   const decoder = new TextDecoder();

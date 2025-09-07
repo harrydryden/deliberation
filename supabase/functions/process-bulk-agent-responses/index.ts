@@ -82,15 +82,15 @@ class MessageProcessor {
           };
         }
 
-        // Use simplified bulk orchestration - no streaming, no complex analysis
+        // Use original orchestration with bulk processing mode
         const orchestrationResult = await this.supabase.functions.invoke(
-          'bulk-agent-orchestration',
+          'agent-orchestration-stream',
           {
             headers: { authorization: this.authHeader },
             body: {
               messageId: messageId,
               deliberationId: deliberationId,
-              attempt: attempt
+              mode: 'bulk_processing'
             }
           }
         );
