@@ -244,7 +244,7 @@ serve(async (req) => {
                   processed: processedCount, 
                   failed: failedCount, 
                   current_message: messageIndex + 1,
-                  success_rate: successRate
+                  success_rate: processedCount + failedCount > 0 ? (processedCount / (processedCount + failedCount) * 100).toFixed(1) + '%' : '0%'
                 }
               }
             ]
