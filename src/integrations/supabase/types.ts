@@ -945,9 +945,7 @@ export type Database = {
         }[]
       }
       admin_update_agent_configuration: {
-        Args:
-          | { p_access_code: string; p_agent_id: string; p_updates: Json }
-          | { p_agent_id: string; p_updates: Json }
+        Args: { p_agent_id: string; p_updates: Json }
         Returns: {
           id: string
           updated_at: string
@@ -974,10 +972,6 @@ export type Database = {
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
-      }
-      can_user_change_role: {
-        Args: { new_role: string; target_user_id: string }
-        Returns: boolean
       }
       cleanup_expired_processing_locks: {
         Args: Record<PropertyKey, never>
@@ -1009,12 +1003,8 @@ export type Database = {
           deliberation_id: string
         }[]
       }
-      get_current_user_role: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
       get_deliberation_stance_summary: {
-        Args: { deliberation_txt: string } | { deliberation_uuid: string }
+        Args: { deliberation_uuid: string }
         Returns: {
           average_confidence: number
           average_stance: number
@@ -1064,18 +1054,6 @@ export type Database = {
           version: number
         }[]
       }
-      get_user_deliberation_ids: {
-        Args: { user_uuid: string }
-        Returns: {
-          deliberation_id: string
-        }[]
-      }
-      get_user_deliberation_ids_safe: {
-        Args: { user_uuid: string }
-        Returns: {
-          deliberation_id: string
-        }[]
-      }
       get_user_deliberations: {
         Args: { user_uuid: string }
         Returns: {
@@ -1083,9 +1061,7 @@ export type Database = {
         }[]
       }
       get_user_stance_trend: {
-        Args:
-          | { deliberation_txt: string; user_uuid: string }
-          | { deliberation_uuid: string; user_uuid: string }
+        Args: { deliberation_uuid: string; user_uuid: string }
         Returns: {
           confidence_score: number
           date: string
@@ -1108,13 +1084,6 @@ export type Database = {
         Args: { "": unknown[] }
         Returns: number
       }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
       hnsw_bit_support: {
         Args: { "": unknown }
         Returns: unknown
@@ -1131,32 +1100,12 @@ export type Database = {
         Args: { "": unknown }
         Returns: unknown
       }
-      is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
       is_admin_user: {
-        Args: Record<PropertyKey, never> | { user_id: string }
-        Returns: boolean
-      }
-      is_admin_user_simple: {
-        Args: { access_code: string }
-        Returns: boolean
-      }
-      is_authenticated_admin: {
         Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_facilitator_of_deliberation: {
-        Args: { deliberation_id: string; user_id: string }
         Returns: boolean
       }
       is_participant_in_deliberation: {
         Args: { deliberation_id: string; user_id: string }
-        Returns: boolean
-      }
-      is_user_participant_in_deliberation: {
-        Args: { deliberation_uuid: string; user_uuid: string }
         Returns: boolean
       }
       ivfflat_bit_support: {
@@ -1225,16 +1174,8 @@ export type Database = {
         Args: { "": unknown[] }
         Returns: number
       }
-      user_participates_in_deliberation: {
-        Args: { deliberation_uuid: string; user_uuid: string }
-        Returns: boolean
-      }
       user_participates_in_deliberation_by_code: {
         Args: { deliberation_uuid: string }
-        Returns: boolean
-      }
-      user_participates_in_deliberation_safe: {
-        Args: { deliberation_uuid: string; user_uuid: string }
         Returns: boolean
       }
       vector_avg: {
