@@ -1,56 +1,44 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight
+} from '../shared/edge-function-utils.ts';
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
     console.log('📋 Admin get users function called');
-    // Create Supabase client with service role key for admin operations
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return new Response(
-        JSON.stringify({ error: 'Missing Supabase configuration' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
 
     // Verify the requesting user is an admin
     console.log('🔐 Checking authorization header...');
-    const authHeader = req.headers.get('Authorization')
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       console.error('❌ No authorization header found');
-      return new Response(
-        JSON.stringify({ error: 'No authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return createErrorResponse('No authorization header', 401);
     }
 
     // Extract token from Bearer format
     console.log('🎫 Extracting token from authorization header...');
-    const token = authHeader.replace('Bearer ', '')
+    const token = authHeader.replace('Bearer ', '');
     
     // Verify the token and get user
     console.log('👤 Verifying user token...');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
       console.error('❌ Invalid user token:', userError);
-      return new Response(
-        JSON.stringify({ error: 'Invalid user token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return createErrorResponse('Invalid user token', 401);
     }
 
     console.log('✅ User verified:', user.id);
@@ -67,10 +55,7 @@ serve(async (req) => {
 
     if (roleError || !userProfile || userProfile.user_role !== 'admin') {
       console.error('❌ Admin access check failed:', { roleError, userProfile, userId: user.id });
-      return new Response(
-        JSON.stringify({ error: 'Admin access required' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return createErrorResponse('Admin access required', 403);
     }
 
     console.log('✅ Admin access verified for user:', user.id);
