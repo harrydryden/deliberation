@@ -11,7 +11,7 @@ interface SystemPromptPreviewProps {
 export const SystemPromptPreview = ({ agent }: SystemPromptPreviewProps) => {
   const { agentService } = useServices();
   
-  const systemPrompt = agentService.generateSystemPrompt(agent);
+  const systemPrompt = agentService.generatePromptPreview(agent);
   const hasOverride = Boolean(agent.prompt_overrides?.system_prompt);
 
   return (
