@@ -644,9 +644,6 @@ async function processStreamingOrchestration(
     }
       
     console.log(`✅ No existing responses found for message ${messageId} - proceeding with processing`);
-        },
-      },
-    });
 
     // Initialize orchestrator with service client
     console.log(`🤖 Initializing AgentOrchestrator`);
