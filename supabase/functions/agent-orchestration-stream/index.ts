@@ -363,6 +363,7 @@ async function processStreamingOrchestration(
 
     // Generate streaming response using orchestrator
     try {
+      console.log(`🎯 Starting generateStreamingResponse for ${selectedAgent}...`);
       const response = await generateStreamingResponse(
         message.content,
         selectedAgent,
@@ -450,9 +451,25 @@ async function processStreamingOrchestration(
       }
 
     } catch (responseError) {
-      console.error('❌ Error generating response:', responseError);
+      console.error('❌ Error generating response - FULL ERROR DETAILS:', {
+        error: responseError,
+        message: responseError.message,
+        stack: responseError.stack,
+        name: responseError.name
+      });
+      
+      // Log additional context
+      console.error('❌ Error context:', {
+        selectedAgent,
+        messageContent: message.content?.substring(0, 100) + '...',
+        deliberationId,
+        mode,
+        hasOpenAIKey: !!openAIApiKey,
+        analysisPreview: JSON.stringify(analysis).substring(0, 200) + '...'
+      });
+      
       sendData({ 
-        content: 'I apologise, but I encountered an issue generating a response. Please try again.',
+        content: `Error: ${responseError.message}. Please check the logs for details.`,
         done: false 
       });
     }
