@@ -84,34 +84,55 @@ async function processStreamingOrchestration(
     // Service client for database operations
     const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // CRITICAL: Check for existing responses BEFORE proceeding
-    console.log(`🔍 Checking for existing responses for message ${messageId}...`);
-    const { data: existingResponses, error: checkError } = await serviceSupabase
-      .from('messages')
-      .select('id, agent_context')
-      .eq('deliberation_id', deliberationId)
-      .eq('parent_message_id', messageId)
-      .neq('message_type', 'user');
+    // CRITICAL: Use PostgreSQL advisory lock to prevent concurrent processing
+    const lockId = parseInt(messageId.substring(0, 8), 16); // Convert message ID to integer for lock
+    console.log(`🔒 Attempting to acquire advisory lock for message ${messageId} (lockId: ${lockId})...`);
     
-    if (checkError) {
-      console.error(`❌ Error checking existing responses: ${checkError.message}`);
-      sendData({ content: '', done: true, duplicate: true, reason: 'check_error' });
+    const { data: lockResult, error: lockError } = await serviceSupabase.rpc('pg_try_advisory_lock', { key: lockId });
+    
+    if (lockError) {
+      console.error(`❌ Error acquiring lock: ${lockError.message}`);
+      sendData({ content: '', done: true, duplicate: true, reason: 'lock_error' });
       return;
     }
     
-    if (existingResponses && existingResponses.length > 0) {
-      console.log(`✅ Response(s) already exist for message ${messageId} - skipping processing`);
-      console.log(`   Existing responses: ${existingResponses.map(r => r.id).join(', ')}`);
-      sendData({ 
-        content: '', 
-        done: true,
-        duplicate: true,
-        existingResponseIds: existingResponses.map(r => r.id)
-      });
+    if (!lockResult) {
+      console.log(`🔒 Lock already held for message ${messageId} - another process is handling this message`);
+      sendData({ content: '', done: true, duplicate: true, reason: 'lock_held' });
       return;
-    } else {
+    }
+    
+    console.log(`✅ Advisory lock acquired for message ${messageId}`);
+    
+    try {
+      // Double-check for existing responses after acquiring lock
+      console.log(`🔍 Double-checking for existing responses after lock acquisition...`);
+      const { data: existingResponses, error: checkError } = await serviceSupabase
+        .from('messages')
+        .select('id, agent_context')
+        .eq('deliberation_id', deliberationId)
+        .eq('parent_message_id', messageId)
+        .neq('message_type', 'user');
+      
+      if (checkError) {
+        console.error(`❌ Error checking existing responses: ${checkError.message}`);
+        sendData({ content: '', done: true, duplicate: true, reason: 'check_error' });
+        return;
+      }
+      
+      if (existingResponses && existingResponses.length > 0) {
+        console.log(`✅ Response(s) already exist for message ${messageId} - skipping processing`);
+        console.log(`   Existing responses: ${existingResponses.map(r => r.id).join(', ')}`);
+        sendData({ 
+          content: '', 
+          done: true,
+          duplicate: true,
+          existingResponseIds: existingResponses.map(r => r.id)
+        });
+        return;
+      }
+      
       console.log(`✅ No existing responses found for message ${messageId} - proceeding with processing`);
-    }
     
     // User client for reading messages (respects RLS)
     const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -417,6 +438,15 @@ async function processStreamingOrchestration(
   } catch (error) {
     console.error('❌ Streaming processing error:', error);
     sendData({ error: error.message, done: true });
+  } finally {
+    // Release the advisory lock
+    console.log(`🔓 Releasing advisory lock for message ${messageId} (lockId: ${lockId})...`);
+    try {
+      await serviceSupabase.rpc('pg_advisory_unlock', { key: lockId });
+      console.log(`✅ Advisory lock released for message ${messageId}`);
+    } catch (unlockError) {
+      console.error(`❌ Error releasing lock: ${unlockError.message}`);
+    }
   }
 }
 
