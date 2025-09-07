@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { Lightbulb, CheckCircle } from "lucide-react";
 import { EnhancedRelationshipSelector } from './EnhancedRelationshipSelector';
+import { IssueRecommendations } from '@/components/ibis/IssueRecommendations';
+import SimilarIbisNodes from './SimilarIbisNodes';
 import { IBISService } from '@/services/domain/implementations/ibis.service';
 import { useIbisSubmission } from '@/hooks/useIbisSubmission';
 import { useIbisClassification } from '@/hooks/useIbisClassification';
@@ -51,8 +53,14 @@ export const IbisSubmissionModal = ({
     confidence: number;
   }>>([]);
 
+  // Issue recommendations and similar nodes state
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [isLinkingMode, setIsLinkingMode] = useState(false);
+  const [issueRecommendations, setIssueRecommendations] = useState<Array<{id: string, type: string, confidence: number}>>([]);
+  const [similarNodes, setSimilarNodes] = useState<any[]>([]);
+
   // Combined relationships for submission
-  const selectedRelationships = smartConnections;
+  const selectedRelationships = [...smartConnections, ...issueRecommendations];
 
   const [existingNodes, setExistingNodes] = useState<Array<{
     id: string;
@@ -60,10 +68,6 @@ export const IbisSubmissionModal = ({
     node_type: string;
   }>>([]);
   const [isGeneratingRoots, setIsGeneratingRoots] = useState(false);
-
-  // Issue recommendations state
-  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
-  const [isLinkingMode, setIsLinkingMode] = useState(false);
   
   // Use custom hooks for better separation of concerns
   const { submitToIbis, isSubmitting } = useIbisSubmission(
@@ -130,7 +134,7 @@ export const IbisSubmissionModal = ({
       description: formData.description,
       nodeType: formData.nodeType,
       parentNodeId: formData.parentNodeId,
-      smartConnections,
+      smartConnections: [...smartConnections, ...issueRecommendations],
       selectedIssueId,
       isLinkingMode
     };
@@ -147,6 +151,10 @@ export const IbisSubmissionModal = ({
 
   const handleSmartConnectionsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
     setSmartConnections(relationships);
+  };
+
+  const handleIssueRecommendationsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
+    setIssueRecommendations(relationships);
   };
 
   const handleIssueSelected = (issueId: string) => {
@@ -332,6 +340,15 @@ export const IbisSubmissionModal = ({
             />
           </div>
 
+          {/* Issue Recommendations - AI-powered with relationship types */}
+          <IssueRecommendations
+            deliberationId={deliberationId}
+            userContent={messageContent}
+            onIssueSelected={handleIssueSelected}
+            onRelationshipsChange={handleIssueRecommendationsChange}
+            className="mb-4"
+          />
+
           {/* Enhanced Relationship Selector - Smart + Manual Connections */}
           {existingNodes.length > 0 ? (
             <div className="space-y-2">
@@ -351,6 +368,15 @@ export const IbisSubmissionModal = ({
             <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
               No existing nodes found. Enhanced relationship selector will activate once nodes exist.
             </div>
+          )}
+
+          {/* Similar IBIS Nodes - Show related contributions */}
+          {similarNodes.length > 0 && (
+            <SimilarIbisNodes
+              nodes={similarNodes}
+              messageId={messageId}
+              deliberationId={deliberationId}
+            />
           )}
 
           {/* Relationship Summary */}
