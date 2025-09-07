@@ -1,7 +1,112 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
-import { AgentOrchestrator, type AnalysisResult, type ConversationContext } from '../shared/agent-orchestrator.ts';
+
+// Inline orchestrator types and logic to avoid import issues
+interface AgentConfig {
+  id: string;
+  name: string;
+  description?: string;
+  agent_type: string;
+  goals?: string[];
+  response_style?: string;
+  is_active: boolean;
+  is_default: boolean;
+  deliberation_id?: string;
+  prompt_overrides?: {
+    system_prompt?: string;
+  };
+  facilitator_config?: Record<string, any>;
+  preferred_model?: string;
+}
+
+interface AnalysisResult {
+  intent: string;
+  complexity: number;
+  topicRelevance: number;
+  requiresExpertise: boolean;
+  confidence?: number;
+}
+
+interface ConversationContext {
+  messageCount: number;
+  recentMessages: any[];
+  lastAgentType?: string;
+  userEngagement?: any;
+}
+
+// Simplified inline orchestrator class
+class AgentOrchestrator {
+  private supabase: any;
+  
+  constructor(supabase: any) {
+    this.supabase = supabase;
+  }
+
+  // Simple message analysis
+  async analyzeMessage(content: string, apiKey: string): Promise<AnalysisResult> {
+    const lowerContent = content.toLowerCase();
+    
+    return {
+      intent: lowerContent.includes('what') ? 'question' : 'statement',
+      complexity: content.length > 100 ? 0.8 : 0.3,
+      topicRelevance: lowerContent.includes('policy') || lowerContent.includes('law') ? 0.9 : 0.5,
+      requiresExpertise: lowerContent.includes('legal') || lowerContent.includes('regulation') || lowerContent.includes('bill'),
+      confidence: 0.8
+    };
+  }
+
+  // Simple agent selection logic
+  async selectOptimalAgent(
+    analysis: AnalysisResult, 
+    conversationState: ConversationContext, 
+    deliberationId: string,
+    availableKnowledge: Record<string, boolean>
+  ): Promise<string> {
+    // Simple heuristic-based selection
+    if (analysis.requiresExpertise || analysis.complexity > 0.7) {
+      return 'bill_agent';
+    } else if (conversationState.messageCount > 5) {
+      return 'peer_agent';  
+    } else {
+      return 'flow_agent';
+    }
+  }
+
+  // Get agent configuration
+  async getAgentConfig(agentType: string, deliberationId?: string): Promise<AgentConfig | null> {
+    try {
+      const { data: configs } = await this.supabase
+        .from('agent_configurations')
+        .select('*')
+        .eq('agent_type', agentType)
+        .eq('is_active', true)
+        .or(`deliberation_id.eq.${deliberationId || 'null'},deliberation_id.is.null`)
+        .order('deliberation_id', { ascending: false, nullsLast: true })
+        .limit(1);
+
+      return configs?.[0] || null;
+    } catch (error) {
+      console.error(`Failed to get agent config for ${agentType}:`, error);
+      return null;
+    }
+  }
+
+  // Generate system prompt
+  generateSystemPrompt(agentConfig: AgentConfig | null, agentType: string, enhancementContext?: any): string {
+    const defaultPrompts = {
+      bill_agent: `You are the Bill Agent, a knowledgeable policy expert focused on providing factual, balanced information about legislation and policy matters. Analyse policy implications and legislative details while maintaining political neutrality. Use British English spelling and grammar.`,
+      peer_agent: `You are the Peer Agent, representing diverse perspectives in democratic deliberation. Synthesise different viewpoints and help participants understand the broader landscape of opinions. Use British English spelling and grammar.`,
+      flow_agent: `You are the Flow Agent, guiding democratic deliberation forward constructively. Ask thoughtful questions, help clarify ideas, and encourage productive dialogue. Use British English spelling and grammar.`
+    };
+
+    if (agentConfig?.prompt_overrides?.system_prompt) {
+      return agentConfig.prompt_overrides.system_prompt;
+    }
+
+    return defaultPrompts[agentType as keyof typeof defaultPrompts] || defaultPrompts.flow_agent;
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
