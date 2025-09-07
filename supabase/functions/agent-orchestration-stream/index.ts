@@ -43,34 +43,149 @@ class AgentOrchestrator {
     this.supabase = supabase;
   }
 
-  // Simple message analysis
-  async analyzeMessage(content: string, apiKey: string): Promise<AnalysisResult> {
-    const lowerContent = content.toLowerCase();
-    
-    return {
-      intent: lowerContent.includes('what') ? 'question' : 'statement',
-      complexity: content.length > 100 ? 0.8 : 0.3,
-      topicRelevance: lowerContent.includes('policy') || lowerContent.includes('law') ? 0.9 : 0.5,
-      requiresExpertise: lowerContent.includes('legal') || lowerContent.includes('regulation') || lowerContent.includes('bill'),
-      confidence: 0.8
-    };
+  // AI-powered message analysis using OpenAI
+  async analyzeMessage(content: string, openAIApiKey: string): Promise<AnalysisResult> {
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-5-2025-08-07',
+          messages: [
+            {
+              role: 'system',
+              content: 'Analyse this message and return JSON with: intent, complexity (0-1), topicRelevance (0-1), requiresExpertise (boolean). Focus on policy, legal, participant, or clarification intents. Use British English spelling and grammar.'
+            },
+            {
+              role: 'user',
+              content: content
+            }
+          ],
+          max_completion_tokens: 150
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const analysisContent = data.choices?.[0]?.message?.content;
+      
+      if (!analysisContent) {
+        throw new Error('No analysis content received');
+      }
+
+      return JSON.parse(analysisContent);
+    } catch (error) {
+      console.error('❌ Message analysis failed:', error);
+      // Return safe defaults based on content analysis
+      const lowerContent = content.toLowerCase();
+      return { 
+        intent: lowerContent.includes('what') || lowerContent.includes('how') ? 'question' : 
+               lowerContent.includes('policy') || lowerContent.includes('law') ? 'policy' : 'general',
+        complexity: content.length > 200 ? 0.8 : content.length > 100 ? 0.6 : 0.3,
+        topicRelevance: lowerContent.includes('policy') || lowerContent.includes('law') || 
+                       lowerContent.includes('regulation') || lowerContent.includes('bill') ? 0.9 : 0.5,
+        requiresExpertise: lowerContent.includes('legal') || lowerContent.includes('regulation') || 
+                          lowerContent.includes('bill') || lowerContent.includes('legislation')
+      };
+    }
   }
 
-  // Simple agent selection logic
+  // Enhanced agent selection with proper scoring algorithm
   async selectOptimalAgent(
     analysis: AnalysisResult, 
-    conversationState: ConversationContext, 
+    conversationContext: ConversationContext,
     deliberationId: string,
-    availableKnowledge: Record<string, boolean>
+    availableKnowledge: Record<string, boolean> = {}
   ): Promise<string> {
-    // Simple heuristic-based selection
-    if (analysis.requiresExpertise || analysis.complexity > 0.7) {
-      return 'bill_agent';
-    } else if (conversationState.messageCount > 5) {
-      return 'peer_agent';  
-    } else {
-      return 'flow_agent';
+    // Get available agent configurations
+    const agentTypes = ['bill_agent', 'peer_agent', 'flow_agent'];
+    const agentConfigs = new Map<string, AgentConfig | null>();
+    
+    // Fetch all agent configs in parallel
+    const configPromises = agentTypes.map(async (type) => {
+      const config = await this.getAgentConfig(type, deliberationId);
+      agentConfigs.set(type, config);
+      return { type, config };
+    });
+    
+    await Promise.all(configPromises);
+    
+    const scores = {
+      bill_agent: 0,
+      peer_agent: 0,
+      flow_agent: 0
+    };
+
+    // Enhanced scoring with agent configuration awareness
+    const factors = {
+      complexity: analysis.complexity || 0.5,
+      requiresExpertise: analysis.requiresExpertise || false,
+      intent: analysis.intent || 'general',
+      topicRelevance: analysis.topicRelevance || 0.5,
+      messageCount: conversationContext.messageCount || 0,
+      recentMessageTypes: this.getRecentMessageTypes(conversationContext.recentMessages || []),
+      hasKnowledge: availableKnowledge
+    };
+
+    // Bill Agent scoring - enhanced with knowledge availability
+    const billConfig = agentConfigs.get('bill_agent');
+    if (billConfig?.is_active !== false) {
+      scores.bill_agent += factors.complexity * 40;
+      scores.bill_agent += factors.requiresExpertise ? 30 : 0;
+      scores.bill_agent += factors.topicRelevance * 25;
+      scores.bill_agent += factors.intent.includes('policy') ? 20 : 0;
+      scores.bill_agent += factors.intent.includes('legal') ? 20 : 0;
+      scores.bill_agent += factors.intent.includes('legislation') ? 25 : 0;
+      scores.bill_agent += factors.hasKnowledge.bill_agent ? 15 : 0;
     }
+
+    // Peer Agent scoring
+    const peerConfig = agentConfigs.get('peer_agent');
+    if (peerConfig?.is_active !== false) {
+      scores.peer_agent += factors.messageCount > 5 ? 20 : 0;
+      scores.peer_agent += factors.intent.includes('participant') ? 25 : 0;
+      scores.peer_agent += factors.intent.includes('perspective') ? 20 : 0;
+      scores.peer_agent += this.getRecentBillAgentCount(factors.recentMessageTypes) > 2 ? 15 : 0;
+    }
+
+    // Flow Agent scoring  
+    const flowConfig = agentConfigs.get('flow_agent');
+    if (flowConfig?.is_active !== false) {
+      scores.flow_agent += factors.messageCount < 3 ? 25 : 0;
+      scores.flow_agent += factors.intent.includes('question') ? 20 : 0;
+      scores.flow_agent += factors.intent.includes('clarify') ? 25 : 0;
+      scores.flow_agent += factors.complexity < 0.3 ? 15 : 0;
+      scores.flow_agent += this.getRecentFlowAgentCount(factors.recentMessageTypes) === 0 ? 10 : 0;
+    }
+
+    // Anti-repetition logic
+    const lastAgentType = this.getLastAgentType(factors.recentMessageTypes);
+    if (lastAgentType && scores[lastAgentType as keyof typeof scores] !== undefined) {
+      scores[lastAgentType as keyof typeof scores] -= 10;
+    }
+
+    // Select agent with highest score, defaulting to flow_agent
+    const selectedAgent = Object.entries(scores).reduce((max, [agent, score]) => 
+      score > max.score ? { agent, score } : max, 
+      { agent: 'flow_agent', score: -1 }
+    ).agent;
+
+    console.log(`🔬 Enhanced agent scoring results:`, {
+      scores,
+      factors,
+      selected: selectedAgent,
+      availableConfigs: Object.fromEntries(
+        Array.from(agentConfigs.entries()).map(([type, config]) => [type, !!config])
+      )
+    });
+
+    return selectedAgent;
   }
 
   // Get agent configuration
@@ -92,19 +207,111 @@ class AgentOrchestrator {
     }
   }
 
-  // Generate system prompt
+  // Generate system prompt with context enhancement
   generateSystemPrompt(agentConfig: AgentConfig | null, agentType: string, enhancementContext?: any): string {
-    const defaultPrompts = {
-      bill_agent: `You are the Bill Agent, a knowledgeable policy expert focused on providing factual, balanced information about legislation and policy matters. Analyse policy implications and legislative details while maintaining political neutrality. Use British English spelling and grammar.`,
-      peer_agent: `You are the Peer Agent, representing diverse perspectives in democratic deliberation. Synthesise different viewpoints and help participants understand the broader landscape of opinions. Use British English spelling and grammar.`,
-      flow_agent: `You are the Flow Agent, guiding democratic deliberation forward constructively. Ask thoughtful questions, help clarify ideas, and encourage productive dialogue. Use British English spelling and grammar.`
+    if (agentConfig?.prompt_overrides?.system_prompt) {
+      return this.enhancePromptWithContext(agentConfig.prompt_overrides.system_prompt, enhancementContext);
+    }
+    
+    if (agentConfig) {
+      // Auto-generate from agent configuration
+      let prompt = `You are ${agentConfig.name}`;
+      
+      if (agentConfig.description) {
+        prompt += `, ${agentConfig.description}`;
+      }
+      
+      if (agentConfig.goals?.length) {
+        prompt += `\n\nYour goals are:\n${agentConfig.goals.map(g => `- ${g}`).join('\n')}`;
+      }
+      
+      if (agentConfig.response_style) {
+        prompt += `\n\nResponse style: ${agentConfig.response_style}`;
+      }
+      
+      return this.enhancePromptWithContext(prompt, enhancementContext);
+    }
+    
+    // Fallback to standardized default prompts
+    return this.enhancePromptWithContext(this.getDefaultSystemPrompt(agentType), enhancementContext);
+  }
+
+  // Helper methods for agent selection
+  private getRecentMessageTypes(messages: any[]): string[] {
+    return messages.slice(0, 5).map(m => m.message_type || 'unknown');
+  }
+
+  private getRecentBillAgentCount(messageTypes: string[]): number {
+    return messageTypes.filter(type => type === 'bill_agent').length;
+  }
+
+  private getRecentFlowAgentCount(messageTypes: string[]): number {
+    return messageTypes.filter(type => type === 'flow_agent').length;
+  }
+
+  private getLastAgentType(messageTypes: string[]): string | null {
+    return messageTypes.find(type => type !== 'user') || null;
+  }
+
+  private getDefaultSystemPrompt(agentType: string): string {
+    const systemPrompts = {
+      bill_agent: `You are the Bill Agent, a specialised AI facilitator for democratic deliberation. Your expertise lies in policy analysis, legislative frameworks, and the nuanced understanding of how laws and regulations impact society.
+
+Your role is to provide factual, balanced information about policy matters, help clarify complex legislative issues, and guide participants toward evidence-based discussions about governance and policy implementation.
+
+Key responsibilities:
+- Analyse policy implications and legislative details
+- Provide factual information about existing laws and regulations  
+- Help participants understand the complexity of policy decisions
+- Maintain political neutrality while being informative
+- Guide discussions toward constructive policy dialogue`,
+
+      peer_agent: `You are the Peer Agent called "Pia". You are a go-between for users/participants, as users cannot talk directly to one another. You capture the arguments and statements of any given participant once they have finished making their point and convert them into the IBIS format (Issues, Positions, Arguments) for structured deliberation.
+
+Your role is to reflect back what participants have shared, identify patterns in the discussion, and help individuals understand how their views relate to others in the community.
+
+Key responsibilities:
+- Capture and convert participant statements into IBIS format
+- Synthesise and reflect participant perspectives  
+- Identify areas of consensus and divergence
+- Share relevant insights from similar discussions
+- Help participants see diverse viewpoints
+- Foster empathy and understanding between different positions`,
+
+      flow_agent: `You are the Flow Agent, the facilitator and guide for this democratic deliberation. Your expertise is in conversation facilitation, engagement techniques, and helping participants navigate complex discussions productively.
+
+Your role is to maintain healthy discussion flow, suggest productive directions for conversation, and help participants engage more deeply with the topics at hand.
+
+Key responsibilities:
+- Facilitate productive conversation flow
+- Suggest discussion directions and frameworks
+- Help participants engage more deeply
+- Introduce relevant questions and perspectives  
+- Guide toward constructive outcomes`
     };
 
-    if (agentConfig?.prompt_overrides?.system_prompt) {
-      return agentConfig.prompt_overrides.system_prompt;
+    return systemPrompts[agentType as keyof typeof systemPrompts] || systemPrompts.flow_agent;
+  }
+
+  private enhancePromptWithContext(prompt: string, context?: any): string {
+    if (!context) return prompt + "\n\nUse British English spelling and grammar throughout your response.";
+
+    if (context.complexity > 0.7) {
+      prompt += "\n\nThis is a complex query requiring detailed analysis and nuanced understanding.";
     }
 
-    return defaultPrompts[agentType as keyof typeof defaultPrompts] || defaultPrompts.flow_agent;
+    if (context.similarNodes?.length > 0) {
+      prompt += `\n\nThere are ${context.similarNodes.length} related discussion points that may be relevant to reference.`;
+    }
+
+    if (context.knowledgeContext && context.knowledgeContext.length > 0) {
+      prompt += `\n\nRELEVANT KNOWLEDGE CONTEXT:\n${context.knowledgeContext}\n\nUse this knowledge to inform your response when relevant, but always provide balanced and comprehensive information.`;
+    }
+
+    // Add British English instruction
+    prompt += "\n\nUse British English spelling and grammar throughout your response.";
+
+    return prompt;
   }
 }
 
