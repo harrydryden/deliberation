@@ -1,43 +1,39 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
-import { ModelConfigManager } from '../shared/model-config.ts';
-import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  getOpenAIKey,
+  parseAndValidateRequest
+} from '../shared/edge-function-utils.ts';
+import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
+import { ModelConfigManager } from '../shared/model-config.ts';
 
 // Remove the old duplicate cache/config functions - they're now in the shared orchestrator
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const { userId, deliberationId, sessionContext } = await req.json();
+    const { userId, deliberationId, sessionContext } = await parseAndValidateRequest(req, ['userId', 'deliberationId']);
     
-    if (!userId || !deliberationId) {
-      throw new Error('Missing required fields: userId or deliberationId');
-    }
-
     console.log('🤖 Generating enhanced proactive prompt', { 
       userId, 
       deliberationId, 
       sessionContext: sessionContext || 'no session context provided' 
     });
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
+    const openAIApiKey = getOpenAIKey();
 
-    if (!openAIApiKey) {
-      throw new Error('OPENAI_API_KEY not configured');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const orchestrator = new AgentOrchestrator(supabase);
 
     // Get deliberation details and Flo agent configuration using orchestrator

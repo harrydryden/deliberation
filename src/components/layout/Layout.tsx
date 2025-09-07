@@ -2,6 +2,8 @@ import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { Header } from "./Header";
 import { Loader2 } from "lucide-react";
 import { memo } from "react";
+import { LayoutErrorBoundary } from './LayoutErrorBoundary';
+import { PerformanceErrorBoundary } from '@/components/common/PerformanceErrorBoundary';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,11 +24,15 @@ export const Layout = memo(({ children }: LayoutProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-deliberation-bg">
-      <Header />
-      <main className="container mx-auto px-4 py-4">
-        {children}
-      </main>
-    </div>
+    <LayoutErrorBoundary>
+      <PerformanceErrorBoundary>
+        <div className="min-h-screen bg-deliberation-bg">
+          <Header />
+          <main className="container mx-auto px-4 py-4">
+            {children}
+          </main>
+        </div>
+      </PerformanceErrorBoundary>
+    </LayoutErrorBoundary>
   );
 });
