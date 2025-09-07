@@ -5,10 +5,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 // Import centralized utilities
 import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
-import { UnifiedPromptService } from '../shared/unified-prompt-service.ts';
 
 // Re-export types from shared orchestrator
-import type { AgentConfig, AnalysisResult, ConversationContext } from './shared/agent-orchestrator.ts';
+import type { AgentConfig, AnalysisResult, ConversationContext } from '../shared/agent-orchestrator.ts';
 
 // Remove inline orchestrator - now using shared version
 
