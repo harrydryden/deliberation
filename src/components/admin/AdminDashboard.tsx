@@ -92,6 +92,7 @@ export const AdminDashboard = () => {
             onLoadUsers={adminData.fetchUsers}
             onArchiveUser={adminData.archiveUser}
             onUnarchiveUser={adminData.unarchiveUser}
+            deliberations={adminData.deliberations}
           />
         </TabsContent>
 

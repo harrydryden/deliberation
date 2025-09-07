@@ -5,10 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { RefreshCw, Archive, ArchiveRestore, UserCog } from 'lucide-react';
-import { User } from '@/types/index';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { RefreshCw, Archive, ArchiveRestore, UserCog, UserPlus } from 'lucide-react';
+import { User, Deliberation } from '@/types/index';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UserAccessManagementProps {
   users: User[];
@@ -17,6 +19,7 @@ interface UserAccessManagementProps {
   onArchiveUser: (userId: string, reason?: string) => void;
   onUnarchiveUser: (userId: string) => void;
   onUpdateRole?: (userId: string, role: string) => void;
+  deliberations?: Deliberation[];
 }
 
 export const UserAccessManagement = ({ 
@@ -25,11 +28,16 @@ export const UserAccessManagement = ({
   onLoadUsers, 
   onArchiveUser,
   onUnarchiveUser,
-  onUpdateRole
+  onUpdateRole,
+  deliberations = []
 }: UserAccessManagementProps) => {
   const [archivingUser, setArchivingUser] = useState<string | null>(null);
   const [unarchivingUser, setUnarchivingUser] = useState<string | null>(null);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
+  const [showAddToDeliberation, setShowAddToDeliberation] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedDeliberation, setSelectedDeliberation] = useState<string>('');
+  const [addingToDeliberation, setAddingToDeliberation] = useState(false);
 
   useEffect(() => {
     if (users.length === 0 && !loading) {
@@ -66,6 +74,34 @@ export const UserAccessManagement = ({
       toast.error('Failed to update user role');
     } finally {
       setUpdatingRole(null);
+    }
+  };
+
+  const handleAddToDeliberation = async () => {
+    if (!selectedUser || !selectedDeliberation) return;
+    
+    setAddingToDeliberation(true);
+    try {
+      const { error } = await supabase
+        .from('participants')
+        .insert({
+          user_id: selectedUser.id,
+          deliberation_id: selectedDeliberation,
+          role: 'participant'
+        });
+
+      if (error) throw error;
+
+      toast.success(`${selectedUser.accessCode1} added to deliberation`);
+      setShowAddToDeliberation(false);
+      setSelectedUser(null);
+      setSelectedDeliberation('');
+      onLoadUsers(); // Refresh users to show updated deliberation list
+    } catch (error) {
+      console.error('Error adding user to deliberation:', error);
+      toast.error('Failed to add user to deliberation');
+    } finally {
+      setAddingToDeliberation(false);
     }
   };
 
@@ -164,9 +200,22 @@ export const UserAccessManagement = ({
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          {user.isArchived ? (
+                       <TableCell>
+                         <div className="flex gap-2">
+                           {!user.isArchived && (
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => {
+                                 setSelectedUser(user);
+                                 setShowAddToDeliberation(true);
+                               }}
+                             >
+                               <UserPlus className="h-4 w-4 mr-1" />
+                               Add to Deliberation
+                             </Button>
+                           )}
+                           {user.isArchived ? (
                             <Button 
                               variant="outline" 
                               size="sm"
@@ -234,6 +283,65 @@ export const UserAccessManagement = ({
           )}
         </CardContent>
       </Card>
+
+      {/* Add to Deliberation Dialog */}
+      <Dialog open={showAddToDeliberation} onOpenChange={setShowAddToDeliberation}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add User to Deliberation</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Selected User</label>
+              <div className="p-2 bg-muted rounded-md">
+                {selectedUser?.accessCode1} ({selectedUser?.id})
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Deliberation</label>
+              <Select 
+                value={selectedDeliberation} 
+                onValueChange={setSelectedDeliberation}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a deliberation" />
+                </SelectTrigger>
+                <SelectContent>
+                  {deliberations
+                    .filter(delib => !selectedUser?.deliberations?.some(userDelib => userDelib.id === delib.id))
+                    .map((deliberation) => (
+                      <SelectItem key={deliberation.id} value={deliberation.id}>
+                        {deliberation.title}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowAddToDeliberation(false);
+                  setSelectedUser(null);
+                  setSelectedDeliberation('');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAddToDeliberation}
+                disabled={!selectedDeliberation || addingToDeliberation}
+              >
+                {addingToDeliberation ? (
+                  <LoadingSpinner size="sm" />
+                ) : (
+                  'Add to Deliberation'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
