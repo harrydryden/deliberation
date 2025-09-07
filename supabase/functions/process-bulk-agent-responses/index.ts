@@ -170,12 +170,12 @@ serve(async (req) => {
           continue;
         }
 
-        // Verify response was created with progressive delays
+        // Verify response was created with longer, more reliable delays
         let responseVerified = false;
-        const maxVerificationAttempts = 3;
+        const maxVerificationAttempts = 5;
         
         for (let attempt = 1; attempt <= maxVerificationAttempts; attempt++) {
-          await new Promise(resolve => setTimeout(resolve, attempt * 2000)); // 2s, 4s, 6s
+          await new Promise(resolve => setTimeout(resolve, attempt * 3000)); // 3s, 6s, 9s, 12s, 15s
           
           const { data: responseCheck } = await supabase
             .from('messages')

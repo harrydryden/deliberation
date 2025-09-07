@@ -284,13 +284,39 @@ serve(async (req) => {
 
     console.log(`Import completed. Imported: ${importedCount}, Failed: ${failedCount}`);
 
+    // Automatically trigger agent response processing if import was successful
+    if (importedCount > 0) {
+      console.log(`Automatically triggering agent response processing for batch ${batch.id}`);
+      
+      try {
+        const { data: processResult, error: processError } = await supabase.functions.invoke(
+          'process-bulk-agent-responses',
+          {
+            headers: { authorization: authHeader },
+            body: { batchId: batch.id }
+          }
+        );
+
+        if (processError) {
+          console.error('Error triggering agent processing:', processError);
+          // Don't fail the import, just log the error
+        } else {
+          console.log('Agent processing triggered successfully');
+        }
+      } catch (error) {
+        console.error('Failed to trigger agent processing:', error);
+        // Don't fail the import, just log the error
+      }
+    }
+
     return new Response(JSON.stringify({
       success: true,
       batch_id: batch.id,
       total_messages: csvRows.length,
       imported_messages: importedCount,
       failed_messages: failedCount,
-      message: `Successfully imported ${importedCount} of ${csvRows.length} messages`
+      agent_processing_triggered: importedCount > 0,
+      message: `Successfully imported ${importedCount} of ${csvRows.length} messages${importedCount > 0 ? ' and triggered agent processing' : ''}`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
