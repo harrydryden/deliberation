@@ -225,7 +225,7 @@ async function checkAvailableKnowledge(supabase: any, deliberationId: string): P
   }
 }
 
-// Retrieve knowledge for bill agent responses
+// Retrieve knowledge for bill agent responses using LangChain RAG
 async function retrieveBillAgentKnowledge(query: string, deliberationId: string): Promise<string> {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -262,22 +262,70 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
     }
 
     const agentId = billAgents[0].id;
-    console.log(`📚 Querying knowledge for agent: ${agentId}`);
+    console.log(`📚 Using LangChain RAG for agent: ${agentId} with query: "${query.substring(0, 100)}..."`);
 
-    // Try to get general knowledge
-    const { data: generalKnowledge } = await supabase
+    // Check if agent has any knowledge first
+    const { data: knowledgeCheck } = await supabase
       .from('agent_knowledge')
-      .select('content, metadata')
+      .select('id')
       .eq('agent_id', agentId)
-      .limit(3);
-        
-    if (generalKnowledge && generalKnowledge.length > 0) {
-      const contextChunks = generalKnowledge.map((item: any) => item.content).join('\n\n');
-      console.log(`📚 Retrieved ${generalKnowledge.length} general knowledge chunks`);
-      return contextChunks;
+      .limit(1);
+
+    if (!knowledgeCheck || knowledgeCheck.length === 0) {
+      console.log('📚 No knowledge available for agent, skipping RAG retrieval');
+      return '';
     }
 
-    return '';
+    // Use LangChain RAG system for semantic knowledge retrieval
+    try {
+      console.log('🧠 Calling LangChain RAG system...');
+      const { data: ragResult, error: ragError } = await supabase.functions.invoke('langchain-query-knowledge', {
+        body: {
+          query: query,
+          agentId: agentId,
+          maxResults: 5 // Get more results than the basic approach for better context
+        }
+      });
+
+      if (ragError) {
+        console.error('❌ LangChain RAG error:', ragError);
+        throw new Error(`RAG query failed: ${ragError.message}`);
+      }
+
+      if (ragResult?.success && ragResult?.relevantKnowledge?.length > 0) {
+        // Extract content from relevant knowledge chunks
+        const contextChunks = ragResult.relevantKnowledge
+          .map((chunk: any) => chunk.content)
+          .join('\n\n');
+        
+        console.log(`✅ LangChain RAG retrieved ${ragResult.relevantKnowledge.length} semantically relevant chunks`);
+        console.log(`📄 Sources: ${ragResult.sources?.join(', ') || 'Unknown'}`);
+        
+        return contextChunks;
+      } else {
+        console.log('📚 LangChain RAG returned no relevant results');
+        return '';
+      }
+
+    } catch (ragError) {
+      console.error('❌ LangChain RAG system failed, falling back to basic retrieval:', ragError);
+      
+      // Fallback to basic knowledge retrieval if RAG fails
+      const { data: generalKnowledge } = await supabase
+        .from('agent_knowledge')
+        .select('content, metadata')
+        .eq('agent_id', agentId)
+        .limit(3);
+          
+      if (generalKnowledge && generalKnowledge.length > 0) {
+        const contextChunks = generalKnowledge.map((item: any) => item.content).join('\n\n');
+        console.log(`📚 Fallback: Retrieved ${generalKnowledge.length} general knowledge chunks`);
+        return contextChunks;
+      }
+
+      return '';
+    }
+
   } catch (error) {
     console.error('📚 Knowledge retrieval error:', error);
     return '';
