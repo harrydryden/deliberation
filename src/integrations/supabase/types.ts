@@ -973,22 +973,6 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
-      cleanup_expired_processing_locks: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      cleanup_orphaned_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      generate_access_code_1: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      generate_access_code_2: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
       get_admin_system_stats: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -1034,19 +1018,25 @@ export type Database = {
         }[]
       }
       get_message_rating_summary: {
-        Args:
-          | { message_uuid: string }
-          | { message_uuid: string; user_uuid: string }
+        Args: { message_uuid: string; user_uuid: string }
         Returns: {
-          average_rating: number
           helpful_count: number
-          helpful_percentage: number
           total_ratings: number
           unhelpful_count: number
+          user_rating: number
         }[]
       }
       get_prompt_template: {
         Args: { template_name: string; template_variables?: Json }
+        Returns: {
+          category: string
+          template_text: string
+          variables: Json
+          version: number
+        }[]
+      }
+      get_prompt_template_optimized: {
+        Args: { template_name: string }
         Returns: {
           category: string
           template_text: string
@@ -1136,10 +1126,6 @@ export type Database = {
           p_record_id?: string
           p_table_name?: string
         }
-        Returns: undefined
-      }
-      log_security_event: {
-        Args: { details?: Json; event_type: string }
         Returns: undefined
       }
       match_agent_knowledge: {
