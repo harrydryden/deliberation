@@ -166,6 +166,54 @@ export const BulkMessageImport: React.FC = () => {
     }
   };
 
+  const handleDebugParticipants = async () => {
+    if (!selectedFile || !selectedDeliberation) {
+      toast.error('Please select a file and deliberation first');
+      return;
+    }
+
+    try {
+      const csvText = await selectedFile.text();
+      const lines = csvText.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      
+      const userIds: string[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+        const userIdIndex = headers.indexOf('user_id');
+        if (userIdIndex >= 0 && values[userIdIndex]) {
+          userIds.push(values[userIdIndex]);
+        }
+      }
+
+      const { data, error } = await supabase.functions.invoke('debug-participants', {
+        body: {
+          deliberationId: selectedDeliberation,
+          userIds: [...new Set(userIds)]
+        }
+      });
+
+      if (error) throw error;
+
+      console.log('Debug participants result:', data);
+      
+      // Show detailed info in toast
+      const missingCount = data.debugInfo.missingUsers.length;
+      if (missingCount > 0) {
+        toast.error(`${missingCount} users not participants: ${data.debugInfo.missingUsers.join(', ')}`);
+      } else {
+        toast.success('All users are valid participants!');
+      }
+      
+      // Log detailed debug info to console for inspection
+      console.table(data.checkResults);
+      
+    } catch (error) {
+      console.error('Debug error:', error);
+      toast.error(`Debug failed: ${error.message}`);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       pending: { variant: 'secondary' as const, icon: AlertCircle },
@@ -254,6 +302,17 @@ export const BulkMessageImport: React.FC = () => {
               </>
             )}
           </Button>
+
+          {selectedFile && selectedDeliberation && (
+            <Button 
+              onClick={handleDebugParticipants} 
+              variant="outline"
+              className="w-full mt-2"
+            >
+              <AlertCircle className="mr-2 h-4 w-4" />
+              Debug Participants
+            </Button>
+          )}
         </CardContent>
       </Card>
 

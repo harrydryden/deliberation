@@ -22,6 +22,9 @@ verify_jwt = false
 [functions.process-bulk-agent-responses]
 verify_jwt = false
 
+[functions.debug-participants]
+verify_jwt = false
+
 [functions.test-pdf-processor]
 verify_jwt = false
 
