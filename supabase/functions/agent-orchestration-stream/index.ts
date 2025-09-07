@@ -84,25 +84,34 @@ async function processStreamingOrchestration(
     // Service client for database operations
     const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // CRITICAL: Use PostgreSQL advisory lock to prevent concurrent processing
-    const lockId = parseInt(messageId.substring(0, 8), 16); // Convert message ID to integer for lock
-    console.log(`🔒 Attempting to acquire advisory lock for message ${messageId} (lockId: ${lockId})...`);
+    // CRITICAL: Use database-based locking to prevent concurrent processing
+    console.log(`🔒 Attempting to acquire processing lock for message ${messageId}...`);
     
-    const { data: lockResult, error: lockError } = await serviceSupabase.rpc('pg_try_advisory_lock', { key: lockId });
+    // Try to insert a processing record to act as a lock
+    const processingKey = `processing_${messageId}`;
+    const { data: lockResult, error: lockError } = await serviceSupabase
+      .from('message_processing_locks')
+      .insert({ 
+        message_id: messageId,
+        processing_key: processingKey,
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 minute expiry
+      });
     
     if (lockError) {
-      console.error(`❌ Error acquiring lock: ${lockError.message}`);
-      sendData({ content: '', done: true, duplicate: true, reason: 'lock_error' });
-      return;
+      // If insert fails, it likely means another process is already handling this
+      if (lockError.code === '23505') { // unique constraint violation
+        console.log(`🔒 Message ${messageId} is already being processed by another instance`);
+        sendData({ content: '', done: true, duplicate: true, reason: 'already_processing' });
+        return;
+      } else {
+        console.error(`❌ Error acquiring processing lock: ${lockError.message}`);
+        sendData({ content: '', done: true, duplicate: true, reason: 'lock_error' });
+        return;
+      }
     }
     
-    if (!lockResult) {
-      console.log(`🔒 Lock already held for message ${messageId} - another process is handling this message`);
-      sendData({ content: '', done: true, duplicate: true, reason: 'lock_held' });
-      return;
-    }
-    
-    console.log(`✅ Advisory lock acquired for message ${messageId}`);
+    console.log(`✅ Processing lock acquired for message ${messageId}`);
     
     try {
       // Double-check for existing responses after acquiring lock
@@ -439,13 +448,17 @@ async function processStreamingOrchestration(
     console.error('❌ Streaming processing error:', error);
     sendData({ error: error.message, done: true });
   } finally {
-    // Release the advisory lock
-    console.log(`🔓 Releasing advisory lock for message ${messageId} (lockId: ${lockId})...`);
+    // Release the processing lock
+    console.log(`🔓 Releasing processing lock for message ${messageId}...`);
     try {
-      await serviceSupabase.rpc('pg_advisory_unlock', { key: lockId });
-      console.log(`✅ Advisory lock released for message ${messageId}`);
+      const processingKey = `processing_${messageId}`;
+      await serviceSupabase
+        .from('message_processing_locks')
+        .delete()
+        .eq('processing_key', processingKey);
+      console.log(`✅ Processing lock released for message ${messageId}`);
     } catch (unlockError) {
-      console.error(`❌ Error releasing lock: ${unlockError.message}`);
+      console.error(`❌ Error releasing processing lock: ${unlockError.message}`);
     }
   }
   
