@@ -144,7 +144,9 @@ export const useResponseStreaming = () => {
           try {
             // Expect server-sent events format: data: {...}
             const dataLine = line.startsWith('data: ') ? line.slice(6) : line;
+            console.log('🔍 Processing line:', dataLine);
             const parsed: StreamingResponse = JSON.parse(dataLine);
+            console.log('📦 Parsed response:', parsed);
 
             if (parsed.error) {
               logger.error('Streaming error received', { error: parsed.error });
@@ -154,12 +156,14 @@ export const useResponseStreaming = () => {
 
             if (parsed.agentType && !currentAgentType) {
               currentAgentType = parsed.agentType;
+              console.log('🤖 Agent type set:', currentAgentType);
               setStreamingState(prev => ({ ...prev, agentType: currentAgentType }));
               // Don't call onUpdate here - wait for actual content
             }
 
             if (parsed.content) {
               currentContent += parsed.content;
+              console.log('💬 Content received:', parsed.content.substring(0, 100));
               if (!rafPendingRef.current && currentAgentType) {
                 rafPendingRef.current = true;
                 requestAnimationFrame(() => {
@@ -176,6 +180,7 @@ export const useResponseStreaming = () => {
             }
 
             if (parsed.done) {
+              console.log('✅ Streaming done signal received');
               onComplete(currentContent, currentAgentType);
               setStreamingState({
                 isStreaming: false,
@@ -187,6 +192,8 @@ export const useResponseStreaming = () => {
               return;
             }
           } catch (parseError) {
+            console.error('❌ Error parsing streaming response:', parseError);
+            console.error('❌ Problematic line:', line);
             logger.error('Error parsing streaming response', { error: parseError, line });
           }
         }
