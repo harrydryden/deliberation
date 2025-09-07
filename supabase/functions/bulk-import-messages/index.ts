@@ -62,6 +62,14 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Initialize admin client for user validation
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
     // Get the authorization header to verify admin access
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
@@ -237,8 +245,8 @@ serve(async (req) => {
       console.log(`Processing message ${i + 1}/${csvRows.length}: ${row.content.substring(0, 50)}...`);
       
       try {
-        // Insert user message
-        const { data: insertedMessage, error: insertError } = await supabase
+        // Insert user message using admin client to bypass RLS
+        const { data: insertedMessage, error: insertError } = await supabaseAdmin
           .from('messages')
           .insert({
             content: row.content,
@@ -278,7 +286,7 @@ serve(async (req) => {
 
           if (agentError) {
             console.error(`Agent response failed for message ${insertedMessage.id}:`, agentError);
-            await supabase
+            await supabaseAdmin
               .from('messages')
               .update({ bulk_import_status: 'failed' })
               .eq('id', insertedMessage.id);
@@ -286,7 +294,7 @@ serve(async (req) => {
             // Wait briefly and verify response was created
             await new Promise(resolve => setTimeout(resolve, 2000));
             
-            const { data: responseCheck } = await supabase
+            const { data: responseCheck } = await supabaseAdmin
               .from('messages')
               .select('id')
               .eq('deliberation_id', deliberationId)
@@ -297,13 +305,13 @@ serve(async (req) => {
             if (responseCheck && responseCheck.length > 0) {
               console.log(`✅ Agent response created for message ${insertedMessage.id}`);
               agentResponseCount++;
-              await supabase
+              await supabaseAdmin
                 .from('messages')
                 .update({ bulk_import_status: 'agent_response_generated' })
                 .eq('id', insertedMessage.id);
             } else {
               console.error(`❌ Agent response verification failed for message ${insertedMessage.id}`);
-              await supabase
+              await supabaseAdmin
                 .from('messages')
                 .update({ bulk_import_status: 'failed' })
                 .eq('id', insertedMessage.id);
@@ -311,7 +319,7 @@ serve(async (req) => {
           }
         } catch (agentResponseError) {
           console.error(`Error generating agent response for ${insertedMessage.id}:`, agentResponseError);
-          await supabase
+          await supabaseAdmin
             .from('messages')
             .update({ bulk_import_status: 'failed' })
             .eq('id', insertedMessage.id);
@@ -324,7 +332,7 @@ serve(async (req) => {
 
       // Update batch progress every 5 messages
       if ((i + 1) % 5 === 0 || i === csvRows.length - 1) {
-        await supabase
+        await supabaseAdmin
           .from('bulk_import_batches')
           .update({
             imported_messages: importedCount,
@@ -340,7 +348,7 @@ serve(async (req) => {
 
     // Update final batch status - agent responses are handled in background
     const finalStatus = failedCount === 0 ? 'completed' : (importedCount > 0 ? 'completed' : 'failed');
-    await supabase
+    await supabaseAdmin
       .from('bulk_import_batches')
       .update({
         import_status: finalStatus,
