@@ -122,27 +122,17 @@ serve(async (req) => {
         try {
           console.log(`Processing message ${i + 1}/${messages.length}: ${message.id}`);
 
-          // Get conversation context (previous messages in the deliberation)
-          const { data: contextMessages } = await supabase
-            .from('messages')
-            .select('content, message_type, created_at')
-            .eq('deliberation_id', message.deliberation_id)
-            .lt('created_at', message.created_at)
-            .order('created_at', { ascending: false })
-            .limit(10);
-
           // Call the agent orchestration function
           const { data: agentResponse, error: agentError } = await supabase.functions.invoke(
             'agent-orchestration-stream',
             {
+              headers: {
+                authorization: authHeader
+              },
               body: {
-                content: message.content,
-                deliberationId: message.deliberation_id,
-                userId: message.user_id,
-                mode: 'chat',
                 messageId: message.id,
-                conversationHistory: contextMessages || [],
-                isBulkProcessing: true
+                deliberationId: message.deliberation_id,
+                mode: 'chat'
               }
             }
           );
