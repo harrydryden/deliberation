@@ -82,37 +82,37 @@ async function processStreamingOrchestration(
   authHeader: string,
   sendData: (data: any) => void
 ) {
-  console.log(`🚀 Starting processStreamingOrchestration`, { messageId, deliberationId, mode });
-  
-  try {
-    // Initialize Supabase clients
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
+    console.log(`🚀 Starting processStreamingOrchestration`, { messageId, deliberationId, mode });
+    
+    try {
+      // Initialize Supabase clients
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+      const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
 
-    console.log(`🔧 Environment variables check:`, {
-      hasSupabaseUrl: !!supabaseUrl,
-      hasServiceKey: !!supabaseServiceKey,
-      hasAnonKey: !!supabaseAnonKey,
-      hasOpenAI: !!openAIApiKey
-    });
-    
-    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey || !openAIApiKey) {
-      const missing = [];
-      if (!supabaseUrl) missing.push('SUPABASE_URL');
-      if (!supabaseServiceKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
-      if (!supabaseAnonKey) missing.push('SUPABASE_ANON_KEY');
-      if (!openAIApiKey) missing.push('OPENAI_API_KEY');
+      console.log(`🔧 Environment variables check:`, {
+        hasSupabaseUrl: !!supabaseUrl,
+        hasServiceKey: !!supabaseServiceKey,
+        hasAnonKey: !!supabaseAnonKey,
+        hasOpenAI: !!openAIApiKey
+      });
       
-      console.error(`❌ Missing environment variables: ${missing.join(', ')}`);
-      sendData({ error: `Missing environment variables: ${missing.join(', ')}`, done: true });
-      return;
-    }
-    
-    // Service client for database operations
-    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
-    console.log(`📊 Supabase service client created successfully`);
+      if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey || !openAIApiKey) {
+        const missing = [];
+        if (!supabaseUrl) missing.push('SUPABASE_URL');
+        if (!supabaseServiceKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+        if (!supabaseAnonKey) missing.push('SUPABASE_ANON_KEY');
+        if (!openAIApiKey) missing.push('OPENAI_API_KEY');
+        
+        console.error(`❌ Missing environment variables: ${missing.join(', ')}`);
+        sendData({ error: `Missing environment variables: ${missing.join(', ')}`, done: true });
+        return;
+      }
+      
+      // Service client for database operations
+      const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+      console.log(`📊 Supabase service client created successfully`);
     
     // SIMPLIFIED: Check for existing responses without database locks
     console.log(`🔍 Checking for existing responses for message ${messageId}...`);
@@ -659,8 +659,18 @@ async function generateStreamingResponse(
   orchestrator: AgentOrchestrator,
   mode: string = 'stream'
 ): Promise<string> {
+  console.log(`🎯 generateStreamingResponse called:`, {
+    agentType,
+    contentLength: content?.length || 0,
+    mode,
+    hasOrchestrator: !!orchestrator,
+    hasOpenAIKey: !!openAIApiKey
+  });
+
   // Get agent configuration through orchestrator
+  console.log(`🔧 Getting agent config for ${agentType}...`);
   const agentConfig = await orchestrator.getAgentConfig(agentType, deliberationId);
+  console.log(`✅ Agent config retrieved:`, { hasConfig: !!agentConfig, configName: agentConfig?.name });
   
   // Select standardized model (using gpt-5 for best performance)
   const model = 'gpt-5-2025-08-07';
@@ -671,7 +681,13 @@ async function generateStreamingResponse(
   let knowledgeContext = '';
   if (agentType === 'bill_agent') {
     console.log('📚 Retrieving knowledge for bill agent...');
-    knowledgeContext = await retrieveBillAgentKnowledge(content, deliberationId);
+    try {
+      knowledgeContext = await retrieveBillAgentKnowledge(content, deliberationId);
+      console.log(`📚 Knowledge context retrieved: ${knowledgeContext.length} characters`);
+    } catch (knowledgeError) {
+      console.error('❌ Knowledge retrieval error:', knowledgeError);
+      knowledgeContext = '';
+    }
   }
 
   // Generate system prompt using orchestrator
@@ -683,39 +699,41 @@ async function generateStreamingResponse(
   
   console.log('🔧 Enhancement context:', JSON.stringify(enhancementContext, null, 2));
   
-  const systemPrompt = orchestrator.generateSystemPrompt(agentConfig, agentType, enhancementContext);
-  
-  console.log('📝 Generated system prompt length:', systemPrompt?.length || 0);
-  console.log('📝 System prompt preview:', systemPrompt?.substring(0, 200) + '...');
+  try {
+    const systemPrompt = orchestrator.generateSystemPrompt(agentConfig, agentType, enhancementContext);
+    
+    console.log('📝 Generated system prompt length:', systemPrompt?.length || 0);
+    console.log('📝 System prompt preview:', systemPrompt?.substring(0, 200) + '...');
 
-  if (!systemPrompt || systemPrompt.trim().length === 0) {
-    throw new Error('System prompt is empty or undefined');
-  }
+    if (!systemPrompt || systemPrompt.trim().length === 0) {
+      throw new Error('System prompt is empty or undefined');
+    }
 
-  const useStreaming = mode !== 'bulk_processing';
-  
-  const requestBody: any = {
-    model,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: content }
-    ],
-    ...ModelConfigManager.generateAPIParams(selectedModel, [], { maxTokens: 3000, stream: useStreaming })
-  };
+    const useStreaming = mode !== 'bulk_processing';
+    console.log(`🌊 Streaming mode: ${useStreaming}`);
+    
+    const requestBody: any = {
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: content }
+      ],
+      ...ModelConfigManager.generateAPIParams(model, [], { maxTokens: 3000, stream: useStreaming })
+    };
 
-  console.log('🔧 Request body preview:', JSON.stringify({
-    model: requestBody.model,
-    messages: [
-      { role: 'system', content: `${systemPrompt.substring(0, 100)}...` },
-      { role: 'user', content: content }
-    ],
-    stream: requestBody.stream,
-    max_completion_tokens: requestBody.max_completion_tokens
-  }, null, 2));
+    console.log('🔧 Request body preview:', JSON.stringify({
+      model: requestBody.model,
+      messages: [
+        { role: 'system', content: `${systemPrompt.substring(0, 100)}...` },
+        { role: 'user', content: content }
+      ],
+      stream: requestBody.stream,
+      max_completion_tokens: requestBody.max_completion_tokens
+    }, null, 2));
 
-  console.log(`🚀 About to make OpenAI API call (${useStreaming ? 'streaming' : 'non-streaming'})...`);
-  console.log('📏 User content length:', content?.length || 0);
-  console.log('📝 User content preview:', content?.substring(0, 200) + '...');
+    console.log(`🚀 About to make OpenAI API call (${useStreaming ? 'streaming' : 'non-streaming'})...`);
+    console.log('📏 User content length:', content?.length || 0);
+    console.log('📝 User content preview:', content?.substring(0, 200) + '...');
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
