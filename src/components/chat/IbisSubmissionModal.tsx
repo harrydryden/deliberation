@@ -176,7 +176,10 @@ export const IbisSubmissionModal = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add to Deliberation Map (Enhanced)</DialogTitle>
+          <DialogTitle>Add to Deliberation Map (Enhanced) - Smart Connections Active</DialogTitle>
+          <div className="text-xs text-muted-foreground">
+            🧠 AI-powered relationship analysis • 🔗 Manual connections • 📊 Confidence scoring
+          </div>
         </DialogHeader>
 
         {/* AI Classification Status */}
@@ -330,14 +333,24 @@ export const IbisSubmissionModal = ({
           </div>
 
           {/* Enhanced Relationship Selector - Smart + Manual Connections */}
-          {existingNodes.length > 0 && (
-            <EnhancedRelationshipSelector
-              deliberationId={deliberationId}
-              content={messageContent}
-              title={formData.title}
-              nodeType={formData.nodeType as 'issue' | 'position' | 'argument'}
-              onRelationshipsChange={handleSmartConnectionsChange}
-            />
+          {existingNodes.length > 0 ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <span>🚀 Enhanced Relationship Selector Active</span>
+                <Badge variant="outline">Smart + Manual</Badge>
+              </div>
+              <EnhancedRelationshipSelector
+                deliberationId={deliberationId}
+                content={messageContent}
+                title={formData.title}
+                nodeType={formData.nodeType as 'issue' | 'position' | 'argument'}
+                onRelationshipsChange={handleSmartConnectionsChange}
+              />
+            </div>
+          ) : (
+            <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
+              No existing nodes found. Enhanced relationship selector will activate once nodes exist.
+            </div>
           )}
 
           {/* Relationship Summary */}
