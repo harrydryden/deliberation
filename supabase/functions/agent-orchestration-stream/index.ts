@@ -139,6 +139,7 @@ async function processStreamingOrchestration(
         message_type: fastPath.agent,
         user_id: message.user_id,
         deliberation_id: deliberationId,
+        parent_message_id: messageId, // Link to the triggering message
         agent_context: { 
           agent_type: fastPath.agent,
           processing_method: 'high_confidence_fast_path',
@@ -180,6 +181,7 @@ async function processStreamingOrchestration(
         message_type: 'bill_agent',
         user_id: message.user_id,
         deliberation_id: deliberationId,
+        parent_message_id: messageId, // Link to the triggering message
         agent_context: { 
           agent_type: 'bill_agent',
           processing_method: 'mode_forced',
@@ -251,6 +253,7 @@ async function processStreamingOrchestration(
         message_type: selectedAgent,
         user_id: message.user_id,
         deliberation_id: deliberationId,
+        parent_message_id: messageId, // Link to the triggering message
         agent_context: { 
           agent_type: selectedAgent,
           processing_method: 'full_orchestration',
