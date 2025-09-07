@@ -408,7 +408,8 @@ export const BulkMessageImport: React.FC = () => {
                     />
                   )}
 
-                  {batch.import_status === 'imported' && batch.processing_status === 'not_started' && (
+                  {(batch.import_status === 'imported' || batch.import_status === 'completed') && 
+                   (batch.processing_status === 'not_started' || (batch.processed_messages < batch.imported_messages)) && (
                     <Button
                       size="sm"
                       onClick={() => handleProcessAgentResponses(batch.id)}
@@ -422,7 +423,7 @@ export const BulkMessageImport: React.FC = () => {
                       ) : (
                         <>
                           <Play className="mr-2 h-4 w-4" />
-                          Generate Agent Responses
+                          {batch.processed_messages > 0 ? 'Re-generate Agent Responses' : 'Generate Agent Responses'}
                         </>
                       )}
                     </Button>
