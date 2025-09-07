@@ -2,6 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import OpenAI from "https://esm.sh/openai@4.52.6";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.52.1";
+import { ModelConfigManager } from "../shared/model-config.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -185,17 +186,26 @@ Respond in JSON format:
   ]
 }`;
 
-    const aiResponse = await openai.chat.completions.create({
-      model: "gpt-5-2025-08-07",
-      messages: [
+    const selectedModel = ModelConfigManager.selectOptimalModel({
+      complexity: 0.8,
+      requiresReasoning: true,
+      maxTokensNeeded: 1500
+    });
+
+    const apiParams = ModelConfigManager.generateAPIParams(
+      selectedModel,
+      [
         { 
           role: "system", 
           content: "You are an expert in argument analysis and democratic deliberation. Analyse logical relationships between contributions accurately. Use British English spelling and grammar in all responses." 
         },
         { role: "user", content: relationshipPrompt }
       ],
-      max_completion_tokens: 1500
-    });
+      { maxTokens: 1500 }
+    );
+
+    console.log(`🤖 Using model: ${selectedModel} for relationship evaluation`);
+    const aiResponse = await openai.chat.completions.create(apiParams);
 
     let aiRelationships: any[] = [];
     try {

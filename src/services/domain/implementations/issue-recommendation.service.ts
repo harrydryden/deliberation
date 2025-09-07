@@ -120,31 +120,41 @@ export class IssueRecommendationService {
     userId: string
   ): Promise<IssueRecommendation[]> {
     try {
-      if (!userId) {
-        logger.error('[IssueRecommendationService] No user ID provided');
-        return [];
-      }
+      logger.info('[IssueRecommendationService] Calling AI service for recommendations');
 
-      // Call our Supabase Edge Function for issue recommendations
       const { data, error } = await supabase.functions.invoke('generate-issue-recommendations', {
         body: {
-          userId: userId,
-          deliberationId: this.currentDeliberationId,
-          content: content,
-          maxRecommendations: 2,
-          existingIssues: existingIssues
+          content,
+          existingIssues,
+          userId,
+          maxRecommendations: 5
         }
       });
 
       if (error) {
         logger.error('[IssueRecommendationService] Edge function error', { error });
-        throw new Error(`Edge function error: ${error.message}`);
+        throw error;
       }
 
-      return data?.recommendations || [];
+      if (!data?.success || !Array.isArray(data.recommendations)) {
+        logger.warn('[IssueRecommendationService] Unexpected AI response format', { data });
+        return [];
+      }
+
+      logger.info('[IssueRecommendationService] AI recommendations received', { 
+        count: data.recommendations.length 
+      });
+
+      return data.recommendations.map((rec: any) => ({
+        issueId: rec.id || `temp_${Date.now()}_${Math.random()}`,
+        title: rec.title || 'Untitled Issue',
+        description: rec.description || 'No description provided',
+        relevanceScore: Math.max(0, Math.min(1, rec.relevanceScore || rec.relevance_score || 0.5)),
+        explanation: rec.explanation || 'No explanation provided'
+      }));
+
     } catch (error) {
       logger.error('[IssueRecommendationService] AI recommendations failed', { error });
-      // Return empty array on error, fallback will be handled by caller
       return [];
     }
   }

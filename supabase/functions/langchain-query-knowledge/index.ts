@@ -7,6 +7,7 @@ import { SupabaseVectorStore } from 'https://esm.sh/@langchain/community@0.3.0/v
 import { createRetrievalChain } from 'https://esm.sh/langchain@0.3.0/chains/retrieval?no-check';
 import { createStuffDocumentsChain } from 'https://esm.sh/langchain@0.3.0/chains/combine_documents?no-check';
 import { PromptTemplate } from 'https://esm.sh/@langchain/core@0.3.0/prompts?no-check';
+import { ModelConfigManager } from "../shared/model-config.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -111,9 +112,19 @@ serve(async (req) => {
         timeout: 30000, // 30 second timeout
       });
 
+      // Select optimal model for knowledge querying
+      const selectedModel = ModelConfigManager.selectOptimalModel({
+        complexity: 0.7,
+        requiresReasoning: false,
+        maxTokensNeeded: 2000,
+        preferredModel: 'gpt-5-2025-08-07'
+      });
+
+      console.log(`🤖 Using model: ${selectedModel} for knowledge query`);
+
       llm = new ChatOpenAI({
         openAIApiKey: openAIApiKey,
-        modelName: 'gpt-5-2025-08-07',
+        modelName: selectedModel,
         maxRetries: 2,
         timeout: 30000,
       });
