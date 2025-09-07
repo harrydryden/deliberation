@@ -82,88 +82,86 @@ async function processStreamingOrchestration(
   authHeader: string,
   sendData: (data: any) => void
 ) {
+  console.log(`🚀 Starting processStreamingOrchestration`, { messageId, deliberationId, mode });
+  
   try {
     // Initialize Supabase clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
+
+    console.log(`🔧 Environment variables check:`, {
+      hasSupabaseUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceKey,
+      hasAnonKey: !!supabaseAnonKey,
+      hasOpenAI: !!openAIApiKey
+    });
+    
+    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey || !openAIApiKey) {
+      const missing = [];
+      if (!supabaseUrl) missing.push('SUPABASE_URL');
+      if (!supabaseServiceKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+      if (!supabaseAnonKey) missing.push('SUPABASE_ANON_KEY');
+      if (!openAIApiKey) missing.push('OPENAI_API_KEY');
+      
+      console.error(`❌ Missing environment variables: ${missing.join(', ')}`);
+      sendData({ error: `Missing environment variables: ${missing.join(', ')}`, done: true });
+      return;
+    }
     
     // Service client for database operations
     const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log(`📊 Supabase service client created successfully`);
     
-    // CRITICAL: Use database-based locking to prevent concurrent processing
-    console.log(`🔒 Attempting to acquire processing lock for message ${messageId}...`);
+    // SIMPLIFIED: Check for existing responses without database locks
+    console.log(`🔍 Checking for existing responses for message ${messageId}...`);
     
-    // Try to insert a processing record to act as a lock
-    const processingKey = `processing_${messageId}`;
-    const { data: lockResult, error: lockError } = await serviceSupabase
-      .from('message_processing_locks')
-      .insert({ 
-        message_id: messageId,
-        processing_key: processingKey,
-        created_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 minute expiry
-      });
+    // Check for existing responses first
+    const { data: existingResponses, error: checkError } = await serviceSupabase
+      .from('messages')
+      .select('id, agent_context')
+      .eq('deliberation_id', deliberationId)
+      .eq('parent_message_id', messageId)
+      .neq('message_type', 'user');
     
-    if (lockError) {
-      // If insert fails, it likely means another process is already handling this
-      if (lockError.code === '23505') { // unique constraint violation
-        console.log(`🔒 Message ${messageId} is already being processed by another instance`);
-        sendData({ content: '', done: true, duplicate: true, reason: 'already_processing' });
-        return;
-      } else {
-        console.error(`❌ Error acquiring processing lock: ${lockError.message}`);
-        sendData({ content: '', done: true, duplicate: true, reason: 'lock_error' });
-        return;
-      }
+    if (checkError) {
+      console.error(`❌ Error checking existing responses: ${checkError.message}`);
+      sendData({ content: '', done: true, error: 'check_error' });
+      return;
     }
     
-    console.log(`✅ Processing lock acquired for message ${messageId}`);
-    
-    try {
-      // Double-check for existing responses after acquiring lock
-      console.log(`🔍 Double-checking for existing responses after lock acquisition...`);
-      const { data: existingResponses, error: checkError } = await serviceSupabase
-        .from('messages')
-        .select('id, agent_context')
-        .eq('deliberation_id', deliberationId)
-        .eq('parent_message_id', messageId)
-        .neq('message_type', 'user');
-      
-      if (checkError) {
-        console.error(`❌ Error checking existing responses: ${checkError.message}`);
-        sendData({ content: '', done: true, duplicate: true, reason: 'check_error' });
-        return;
-      }
-      
-      if (existingResponses && existingResponses.length > 0) {
-        console.log(`✅ Response(s) already exist for message ${messageId} - skipping processing`);
-        console.log(`   Existing responses: ${existingResponses.map(r => r.id).join(', ')}`);
-        sendData({ 
-          content: '', 
-          done: true,
-          duplicate: true,
-          existingResponseIds: existingResponses.map(r => r.id)
-        });
-        return;
-      }
+    if (existingResponses && existingResponses.length > 0) {
+      console.log(`✅ Response(s) already exist for message ${messageId} - skipping processing`);
+      console.log(`   Existing responses: ${existingResponses.map(r => r.id).join(', ')}`);
+      sendData({ 
+        content: '', 
+        done: true,
+        duplicate: true,
+        existingResponseIds: existingResponses.map(r => r.id)
+      });
+      return;
+    }
       
       console.log(`✅ No existing responses found for message ${messageId} - proceeding with processing`);
     
-      // User client for reading messages (respects RLS)
-      const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-        global: {
-          headers: {
-            authorization: authHeader,
-          },
+    // User client for reading messages (respects RLS)
+    console.log(`🔧 Creating user Supabase client with auth header`);
+    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          authorization: authHeader,
         },
-      });
+      },
+    });
 
-      // Initialize orchestrator with service client
-      const orchestrator = new AgentOrchestrator(serviceSupabase);
+    // Initialize orchestrator with service client
+    console.log(`🤖 Initializing AgentOrchestrator`);
+    const orchestrator = new AgentOrchestrator(serviceSupabase);
+    console.log(`✅ AgentOrchestrator initialized successfully`);
 
     // Get message details using user client (respects RLS)
+    console.log(`📨 Fetching message details for messageId: ${messageId}`);
     const { data: message, error: messageError } = await userSupabase
       .from('messages')
       .select('*')
@@ -171,8 +169,18 @@ async function processStreamingOrchestration(
       .single();
 
     if (messageError || !message) {
-      throw new Error(`Message not found or access denied: ${messageError?.message}`);
+      console.error(`❌ Error fetching message:`, messageError);
+      sendData({ error: `Message not found or access denied: ${messageError?.message}`, done: true });
+      return;
     }
+
+    console.log(`✅ Message fetched successfully:`, {
+      id: message.id,
+      content: message.content?.substring(0, 100) + '...',
+      type: message.message_type,
+      userId: message.user_id,
+      deliberationId: message.deliberation_id
+    });
 
     console.log('📨 Processing message:', message.content);
 
@@ -455,19 +463,6 @@ async function processStreamingOrchestration(
   } catch (error) {
     console.error('❌ Streaming processing error:', error);
     sendData({ error: error.message, done: true });
-  } finally {
-    // Release the processing lock
-    console.log(`🔓 Releasing processing lock for message ${messageId}...`);
-    try {
-      const processingKey = `processing_${messageId}`;
-      await serviceSupabase
-        .from('message_processing_locks')
-        .delete()
-        .eq('processing_key', processingKey);
-      console.log(`✅ Processing lock released for message ${messageId}`);
-    } catch (unlockError) {
-      console.error(`❌ Error releasing processing lock: ${unlockError.message}`);
-    }
   }
   
   } catch (mainError) {
