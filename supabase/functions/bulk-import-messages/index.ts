@@ -227,47 +227,133 @@ serve(async (req) => {
     // Sort messages by created_at to maintain chronological order
     csvRows.sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
 
-    // Import messages in chunks
+    // Import messages sequentially with immediate agent responses
     let importedCount = 0;
     let failedCount = 0;
-    const chunkSize = 100;
+    let agentResponseCount = 0;
 
-    for (let i = 0; i < csvRows.length; i += chunkSize) {
-      const chunk = csvRows.slice(i, i + chunkSize);
-      
-      const messagesToInsert = chunk.map(row => ({
-        content: row.content,
-        user_id: row.user_id,
-        deliberation_id: deliberationId,
-        message_type: 'user' as const,
-        bulk_import_status: 'awaiting_agent_response' as const,
-        created_at: row.created_at
-      }));
+    // Background task for generating agent responses
+    async function generateAgentResponse(messageId: string, deliberationId: string) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Brief delay for DB consistency
+        
+        const { error: agentError } = await supabase.functions.invoke(
+          'agent-orchestration-stream',
+          {
+            headers: { authorization: authHeader },
+            body: {
+              messageId: messageId,
+              deliberationId: deliberationId,
+              mode: 'bulk_processing'
+            }
+          }
+        );
 
-      const { data: insertedMessages, error: insertError } = await supabase
-        .from('messages')
-        .insert(messagesToInsert)
-        .select('id');
+        if (agentError) {
+          console.error(`Agent response failed for message ${messageId}:`, agentError);
+          return false;
+        }
 
-      if (insertError) {
-        console.error(`Error inserting chunk ${i / chunkSize + 1}:`, insertError);
-        failedCount += chunk.length;
-      } else {
-        importedCount += insertedMessages?.length || 0;
+        // Wait for agent response to be created
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          
+          const { data: responseCheck } = await supabase
+            .from('messages')
+            .select('id')
+            .eq('deliberation_id', deliberationId)
+            .eq('parent_message_id', messageId)
+            .neq('message_type', 'user')
+            .limit(1);
+          
+          if (responseCheck && responseCheck.length > 0) {
+            console.log(`✅ Agent response created for message ${messageId}`);
+            return true;
+          }
+        }
+        
+        console.error(`❌ Agent response verification failed for message ${messageId}`);
+        return false;
+      } catch (error) {
+        console.error(`Error generating agent response for ${messageId}:`, error);
+        return false;
       }
-
-      // Update batch progress
-      await supabase
-        .from('bulk_import_batches')
-        .update({
-          imported_messages: importedCount,
-          failed_messages: failedCount
-        })
-        .eq('id', batch.id);
     }
 
-    // Update final batch status
-    const finalStatus = failedCount === 0 ? 'imported' : (importedCount > 0 ? 'imported' : 'failed');
+    // Process messages one by one to maintain chronological order
+    for (let i = 0; i < csvRows.length; i++) {
+      const row = csvRows[i];
+      console.log(`Processing message ${i + 1}/${csvRows.length}: ${row.content.substring(0, 50)}...`);
+      
+      try {
+        // Insert user message
+        const { data: insertedMessage, error: insertError } = await supabase
+          .from('messages')
+          .insert({
+            content: row.content,
+            user_id: row.user_id,
+            deliberation_id: deliberationId,
+            message_type: 'user' as const,
+            bulk_import_status: 'processing' as const,
+            created_at: row.created_at
+          })
+          .select('id')
+          .single();
+
+        if (insertError || !insertedMessage) {
+          console.error(`Error inserting message ${i + 1}:`, insertError);
+          failedCount++;
+          continue;
+        }
+
+        importedCount++;
+        console.log(`✅ Imported user message ${insertedMessage.id}`);
+
+        // Generate agent response immediately using background task
+        EdgeRuntime.waitUntil(
+          generateAgentResponse(insertedMessage.id, deliberationId).then(success => {
+            if (success) {
+              agentResponseCount++;
+              // Update message status to completed
+              supabase
+                .from('messages')
+                .update({ bulk_import_status: 'agent_response_generated' })
+                .eq('id', insertedMessage.id)
+                .then();
+            } else {
+              // Mark as failed
+              supabase
+                .from('messages')
+                .update({ bulk_import_status: 'failed' })
+                .eq('id', insertedMessage.id)
+                .then();
+            }
+          })
+        );
+
+        // Rate limiting to avoid overwhelming the system
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+      } catch (error) {
+        console.error(`Error processing message ${i + 1}:`, error);
+        failedCount++;
+      }
+
+      // Update batch progress every 10 messages
+      if ((i + 1) % 10 === 0 || i === csvRows.length - 1) {
+        await supabase
+          .from('bulk_import_batches')
+          .update({
+            imported_messages: importedCount,
+            failed_messages: failedCount,
+            processed_messages: agentResponseCount
+          })
+          .eq('id', batch.id);
+      }
+    }
+
+    // Update final batch status - agent responses are handled in background
+    const finalStatus = failedCount === 0 ? 'completed' : (importedCount > 0 ? 'completed' : 'failed');
     await supabase
       .from('bulk_import_batches')
       .update({
@@ -275,14 +361,18 @@ serve(async (req) => {
         processing_log: [
           {
             timestamp: new Date().toISOString(),
-            action: 'import_completed',
-            details: { imported: importedCount, failed: failedCount }
+            action: 'import_completed_with_agent_responses',
+            details: { 
+              imported: importedCount, 
+              failed: failedCount,
+              note: 'Agent responses are being generated in background'
+            }
           }
         ]
       })
       .eq('id', batch.id);
 
-    console.log(`Import completed. Imported: ${importedCount}, Failed: ${failedCount}`);
+    console.log(`Import completed with agent response generation in progress. Imported: ${importedCount}, Failed: ${failedCount}`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -290,7 +380,7 @@ serve(async (req) => {
       total_messages: csvRows.length,
       imported_messages: importedCount,
       failed_messages: failedCount,
-      message: `Successfully imported ${importedCount} of ${csvRows.length} messages`
+      message: `Successfully imported ${importedCount} of ${csvRows.length} messages with agent responses generating automatically`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
