@@ -803,6 +803,45 @@ export type Database = {
         }
         Relationships: []
       }
+      message_processing_locks: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          message_id: string
+          processing_key: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          message_id: string
+          processing_key: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          message_id?: string
+          processing_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_message_processing_locks_message_id"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "anonymized_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_message_processing_locks_message_id"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           agent_context: Json | null
@@ -1331,6 +1370,10 @@ export type Database = {
       can_user_change_role: {
         Args: { new_role: string; target_user_id: string }
         Returns: boolean
+      }
+      cleanup_expired_processing_locks: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       cleanup_orphaned_sessions: {
         Args: Record<PropertyKey, never>
