@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { RefreshCw, MessageSquare, Eye, GitBranch, Trash2, Database, Map, Edit } from 'lucide-react';
+import { RefreshCw, MessageSquare, Eye, GitBranch, Trash2, Database, Map, Edit, Lightbulb } from 'lucide-react';
 import { formatToUKDateTime } from '@/utils/timeUtils';
 import { Deliberation } from '@/types/index';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -18,6 +18,7 @@ import { NotionEditor } from './NotionEditor';
 import { serviceContainer } from '@/services/domain/container';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DeliberationOverviewProps {
   deliberations: Deliberation[];
@@ -33,6 +34,7 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
   const [editMode, setEditMode] = useState<'nodes' | 'map' | null>(null);
   const [clearing, setClearing] = useState<{ [key: string]: 'messages' | 'ibis' | null }>({});
   const [deliberations, setDeliberations] = useState(initialDeliberations);
+  const [generatingRoots, setGeneratingRoots] = useState<string | null>(null);
   const navigate = useNavigate();
   const adminService = serviceContainer.adminService;
   const { toast } = useToast();
@@ -133,6 +135,38 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
     setDeliberations(prev => prev.map(d => 
       d.id === deliberationId ? { ...d, notion: newNotion } : d
     ));
+  };
+
+  const handleGenerateIbisRoots = async (deliberation: Deliberation) => {
+    setGeneratingRoots(deliberation.id);
+    try {
+      const { data: rootsData, error: rootsError } = await supabase.functions.invoke('generate-ibis-roots', {
+        body: {
+          deliberationId: deliberation.id,
+          deliberationTitle: deliberation.title,
+          deliberationDescription: deliberation.description,
+          notion: deliberation.notion
+        }
+      });
+
+      if (rootsError) {
+        throw rootsError;
+      }
+
+      toast({
+        title: "IBIS Roots Generated",
+        description: `Generated ${rootsData?.count || 0} root issues for "${deliberation.title}"`
+      });
+    } catch (error) {
+      logger.error('Failed to generate IBIS roots', error as Error, { deliberationId: deliberation.id });
+      toast({
+        title: "Error",
+        description: "Failed to generate IBIS roots. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setGeneratingRoots(null);
+    }
   };
 
   logger.debug('Render check', {
@@ -300,6 +334,16 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
                         >
                           <Map className="h-4 w-4 mr-2" />
                           Edit Map
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGenerateIbisRoots(deliberation)}
+                          disabled={generatingRoots === deliberation.id}
+                        >
+                          <Lightbulb className="h-4 w-4 mr-2" />
+                          {generatingRoots === deliberation.id ? 'Generating...' : 'Generate IBIS Roots'}
                         </Button>
                         
                         <Dialog>
