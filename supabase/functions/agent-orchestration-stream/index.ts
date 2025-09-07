@@ -104,6 +104,10 @@ async function processStreamingOrchestration(
 
     console.log('📨 Processing message:', message.content);
 
+    // Calculate response timestamp: parent message time + 1 second
+    const parentTimestamp = new Date(message.created_at);
+    const responseTimestamp = new Date(parentTimestamp.getTime() + 1000).toISOString();
+
     // Check response cache first
     const cachedResponse = checkResponseCache(message.content, deliberationId);
     if (cachedResponse) {
@@ -140,6 +144,7 @@ async function processStreamingOrchestration(
         user_id: message.user_id,
         deliberation_id: deliberationId,
         parent_message_id: messageId, // Link to the triggering message
+        created_at: responseTimestamp, // Use calculated timestamp for proper ordering
         agent_context: { 
           agent_type: fastPath.agent,
           processing_method: 'high_confidence_fast_path',
@@ -182,6 +187,7 @@ async function processStreamingOrchestration(
         user_id: message.user_id,
         deliberation_id: deliberationId,
         parent_message_id: messageId, // Link to the triggering message
+        created_at: responseTimestamp, // Use calculated timestamp for proper ordering
         agent_context: { 
           agent_type: 'bill_agent',
           processing_method: 'mode_forced',
@@ -254,6 +260,7 @@ async function processStreamingOrchestration(
         user_id: message.user_id,
         deliberation_id: deliberationId,
         parent_message_id: messageId, // Link to the triggering message
+        created_at: responseTimestamp, // Use calculated timestamp for proper ordering
         agent_context: { 
           agent_type: selectedAgent,
           processing_method: 'full_orchestration',
