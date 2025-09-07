@@ -7,6 +7,7 @@ import { Activity, Clock, Users, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatSessionActivity, formatTimestamp } from '@/utils/timeDisplay';
+import { logger } from '@/utils/logger';
 
 interface UserSession {
   id: string;
@@ -56,7 +57,7 @@ export const SessionsManagement: React.FC = () => {
         recentlyActiveCount: recentlyActive.length
       });
     } catch (error) {
-      console.error('Failed to load sessions:', error);
+      logger.error('Failed to load sessions', { error });
       toast({
         title: "Error",
         description: "Failed to load session data.",

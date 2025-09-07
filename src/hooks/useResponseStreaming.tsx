@@ -78,7 +78,7 @@ export const useResponseStreaming = () => {
       }
 
       if (error) {
-        console.error('❌ Supabase function error:', error);
+        logger.error('Supabase function error', { error });
         throw new Error(`Supabase function error: ${error.message}`);
       }
 

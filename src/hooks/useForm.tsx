@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { logger } from '@/utils/logger';
 
 export interface UseFormOptions<T> {
   initialData: T;
@@ -64,7 +65,7 @@ export const useForm = <T extends Record<string, any>>({
         await onSubmit(formData);
         return true;
       } catch (error) {
-        console.error('Form submission error:', error);
+        logger.error('Form submission error', { error });
         return false;
       } finally {
         setIsSubmitting(false);

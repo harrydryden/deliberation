@@ -26,7 +26,7 @@ export const useUserAgents = () => {
         .eq('user_id', user.id);
 
       if (participationError) {
-        console.error('Error fetching user participations:', participationError);
+        logger.error('Error fetching user participations', { participationError });
         throw participationError;
       }
 
@@ -54,7 +54,7 @@ export const useUserAgents = () => {
         .order('created_at', { ascending: false });
 
       if (agentError) {
-        console.error('Error fetching local agents:', agentError);
+        logger.error('Error fetching local agents', { agentError });
         throw agentError;
       }
 
@@ -73,7 +73,7 @@ export const useUserAgents = () => {
       })) || [];
       setLocalAgents(formattedAgents);
     } catch (error: any) {
-      console.error('Error fetching user accessible local agents:', error);
+      logger.error('Error fetching user accessible local agents', { error });
       toast({
         title: "Error",
         description: "Failed to load available agents",

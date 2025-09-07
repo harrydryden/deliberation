@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Brain, Zap, ArrowRight, CheckCircle2, XCircle, Lightbulb, Plus, Trash2 } from 'lucide-react';
+import { logger } from '@/utils/logger';
 import { RELATIONSHIP_TYPE_OPTIONS } from '@/constants/ibisTypes';
 
 interface RelationshipSuggestion {
@@ -112,7 +113,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
         }
       }
     } catch (error: any) {
-      console.error('Error evaluating relationships:', error);
+      logger.error('Error evaluating relationships', { deliberationId, content, title, nodeType, error });
       toast({
         title: "Analysis Failed", 
         description: "Could not analyse relationships with existing content",

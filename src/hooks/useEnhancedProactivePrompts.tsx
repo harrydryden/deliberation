@@ -88,7 +88,7 @@ export const useEnhancedProactivePrompts = ({
           .single();
 
         if (!defaultAgent) {
-          console.error('No default flow_agent configuration found for facilitator session');
+          logger.warn('No default flow_agent configuration found for facilitator session');
           return;
         }
 

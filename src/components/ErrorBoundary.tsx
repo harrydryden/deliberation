@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AlertTriangle } from 'lucide-react';
 import { errorReporter } from '@/utils/errorHandling';
 import { logger } from '@/utils/logger';
-import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 
 interface Props {
   children: ReactNode;

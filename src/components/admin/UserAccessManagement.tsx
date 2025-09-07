@@ -11,6 +11,7 @@ import { User, Deliberation } from '@/types/index';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 interface UserAccessManagementProps {
   users: User[];
@@ -98,7 +99,7 @@ export const UserAccessManagement = ({
       setSelectedDeliberation('');
       onLoadUsers(); // Refresh users to show updated deliberation list
     } catch (error) {
-      console.error('Error adding user to deliberation:', error);
+      logger.error('Error adding user to deliberation', { userId: selectedUser?.id, deliberationId: selectedDeliberation, error });
       toast.error('Failed to add user to deliberation');
     } finally {
       setAddingToDeliberation(false);

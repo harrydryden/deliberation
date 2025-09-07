@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Users } from 'lucide-react';
+import { logger } from '@/utils/logger';
 
 export function AccessCodeCreation() {
   const [isLoading, setIsLoading] = useState(false);
@@ -61,14 +62,14 @@ export function AccessCodeCreation() {
           });
 
           if (error) {
-            console.error(`Error creating user ${i + 1}:`, error);
+            logger.error('Error creating user', { userIndex: i + 1, error });
             errorCount++;
           } else {
             newUsers.push({ code1, code2, email });
             successCount++;
           }
         } catch (error) {
-          console.error(`Exception creating user ${i + 1}:`, error);
+          logger.error('Exception creating user', { userIndex: i + 1, error });
           errorCount++;
         }
       }

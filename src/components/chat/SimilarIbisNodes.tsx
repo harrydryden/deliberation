@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 interface SimilarNode {
   id: string;
@@ -60,7 +61,7 @@ const SimilarIbisNodes: React.FC<SimilarIbisNodesProps> = ({
         description: rating === 1 ? "Marked as helpful" : "Marked as unhelpful",
       });
     } catch (error) {
-      console.error('Error rating IBIS node:', error);
+      logger.error('Error rating IBIS node', { nodeId, rating, error });
       toast({
         title: "Error",
         description: "Failed to submit rating",

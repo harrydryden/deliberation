@@ -161,7 +161,7 @@ export const useAdminData = () => {
       });
 
       if (error) {
-        console.error('Database function error:', error);
+        logger.error('Database function error', { agentId: id, error });
         throw new Error(`Failed to update agent: ${error.message}`);
       }
 
@@ -215,7 +215,7 @@ export const useAdminData = () => {
       });
 
       if (error) {
-        console.error('Database function error:', error);
+        logger.error('Database function error', { agentId: id, error });
         throw new Error(`Failed to update agent: ${error.message}`);
       }
 

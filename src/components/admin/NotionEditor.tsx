@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Edit2, Save, X, AlertTriangle, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 interface NotionEditorProps {
   deliberationId: string;
@@ -63,7 +64,7 @@ export const NotionEditor = ({ deliberationId, currentNotion, onNotionUpdated, d
         description: "Notion updated successfully"
       });
     } catch (error) {
-      console.error('Error updating notion:', error);
+      logger.error('Error updating notion', { deliberationId, error });
       toast({
         title: "Error",
         description: "Failed to update notion",
@@ -110,7 +111,7 @@ export const NotionEditor = ({ deliberationId, currentNotion, onNotionUpdated, d
         throw new Error('No notion generated');
       }
     } catch (error) {
-      console.error('Error generating notion:', error);
+      logger.error('Error generating notion', { deliberationTitle, error });
       toast({
         title: "Error",
         description: "Failed to generate notion statement",

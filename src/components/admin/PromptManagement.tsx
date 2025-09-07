@@ -13,6 +13,7 @@ import { RefreshCw, MessageSquare, Edit, Plus, X } from 'lucide-react';
 import { formatToUKDate } from '@/utils/timeUtils';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { PromptTemplate, promptService } from '@/services/domain/implementations/prompt.service';
+import { logger } from '@/utils/logger';
 
 interface PromptManagementProps {
   onLoad?: () => void;
@@ -38,7 +39,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
       const data = await promptService.getPromptTemplates();
       setPrompts(data);
     } catch (error) {
-      console.error('Failed to load prompts:', error);
+      logger.error('Failed to load prompts', { error });
     } finally {
       setLoading(false);
     }
@@ -88,7 +89,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
       setEditingPrompt(null);
       await loadPrompts();
     } catch (error) {
-      console.error('Failed to update prompt:', error);
+      logger.error('Failed to update prompt', { promptId: editingPrompt.id, error });
     } finally {
       setUpdating(null);
     }
@@ -110,7 +111,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
       setCreating(false);
       await loadPrompts();
     } catch (error) {
-      console.error('Failed to create prompt:', error);
+      logger.error('Failed to create prompt', { promptData: editForm, error });
     } finally {
       setUpdating(null);
     }

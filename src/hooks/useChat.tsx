@@ -7,11 +7,9 @@ import { getErrorMessage } from "@/utils/errors";
 import { useErrorHandler } from './useErrorHandler';
 import { useOptimizedState } from './useOptimizedState';
 import { logger } from '@/utils/logger';
-import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 import { useToast } from '@/hooks/use-toast';
 import { useResponseStreaming } from '@/hooks/useResponseStreaming';
 import { cacheService } from '@/services/cache.service';
-import { useMemoryMonitor } from './useMemoryMonitor';
 
 export const useChat = (deliberationId?: string) => {
   const { user, isLoading: authLoading } = useSupabaseAuth();
@@ -29,8 +27,6 @@ export const useChat = (deliberationId?: string) => {
   
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const { streamingState, startStreaming, stopStreaming } = useResponseStreaming();
-  
-  useMemoryLeakDetection('useChat');
 
   // Memoize services to prevent recreating instances
   const services = useMemo(() => ({
