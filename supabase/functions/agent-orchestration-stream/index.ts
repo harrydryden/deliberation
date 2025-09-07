@@ -6,6 +6,24 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
 
+// Helper function to get fast path system prompt from template
+async function getFastPathSystemPrompt(supabase: any, agentType: string): Promise<string> {
+  try {
+    const { data: templateData, error } = await supabase
+      .rpc('get_prompt_template', { template_name: 'fast_path_response' });
+
+    if (templateData && templateData.length > 0) {
+      const template = templateData[0];
+      return template.template_text.replace(/\{\{agent_type\}\}/g, agentType);
+    }
+  } catch (error) {
+    console.log('Failed to fetch fast path template:', error);
+  }
+  
+  // Fallback
+  return `You are a ${agentType} providing a quick, helpful response. Be concise but informative.`;
+}
+
 // Re-export types from shared orchestrator
 import type { AgentConfig, AnalysisResult, ConversationContext } from '../shared/agent-orchestrator.ts';
 
@@ -134,7 +152,7 @@ async function generateFastResponse(
       messages: [
         {
           role: 'system',
-          content: `You are a ${fastPath.agent} providing a quick, helpful response. Be concise but informative.`
+          content: await getFastPathSystemPrompt(supabase, fastPath.agent)
         },
         { role: 'user', content: content }
       ],

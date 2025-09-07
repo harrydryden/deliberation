@@ -164,9 +164,7 @@ ENHANCED SESSION CONTEXT:
         messages: [
           {
             role: 'system',
-            content: agentConfig ? 
-              `You are ${agentConfig.name || 'Flo'}, an expert facilitator skilled at engaging participants in meaningful deliberation. Always respond with valid JSON. Use British English spelling and grammar throughout.` :
-              'You are Flo, an expert facilitator skilled at engaging participants in meaningful deliberation. Always respond with valid JSON. Use British English spelling and grammar throughout.'
+            content: await getProactivePromptSystemMessage(supabase, agentConfig?.name || 'Flo')
           },
           {
             role: 'user',

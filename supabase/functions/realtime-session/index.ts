@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 
 // Supabase Edge Function: realtime-session
 // Creates an ephemeral OpenAI Realtime session token with our desired defaults
@@ -10,6 +11,23 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Helper function to get voice instructions from template
+async function getVoiceInstructions(supabase: any): Promise<string> {
+  try {
+    const { data: templateData, error } = await supabase
+      .rpc('get_prompt_template', { template_name: 'voice_realtime_instructions' });
+
+    if (templateData && templateData.length > 0) {
+      return templateData[0].template_text;
+    }
+  } catch (error) {
+    console.log('Failed to fetch voice instructions template:', error);
+  }
+  
+  // Fallback
+  return "You are a civic deliberation assistant. Always speak responses. When asked to analyse policy, first search the local agent knowledge with the 'search_knowledge' tool to ground your answer. When asked for IBIS highlights or a summary, use the 'get_ibis_context' tool and then narrate a clear, 30–60 second spoken summary. Use British English spelling and grammar throughout.";
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -34,9 +52,12 @@ serve(async (req) => {
     const model = body?.model || "gpt-4o-realtime-preview-2024-10-01"; // Keep realtime model as is - no GPT-5 realtime yet
     const voice = body?.voice || "alloy";
 
-    const instructions =
-      body?.instructions ||
-      "You are a civic deliberation assistant. Always speak responses. When asked to analyse policy, first search the local agent knowledge with the 'search_knowledge' tool to ground your answer. When asked for IBIS highlights or a summary, use the 'get_ibis_context' tool and then narrate a clear, 30–60 second spoken summary. Use British English spelling and grammar throughout.";
+    // Initialize Supabase client for template fetching
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const instructions = body?.instructions || await getVoiceInstructions(supabase);
 
     const sessionConfig = {
       model,

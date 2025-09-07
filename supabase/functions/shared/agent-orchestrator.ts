@@ -193,15 +193,39 @@ export class AgentOrchestrator {
     }
   }
 
-  // Minimal hardcoded fallback (emergency only)
-  private getHardcodedFallback(agentType: string): string {
-    const fallbacks = {
-      bill_agent: 'You are Bill, a policy analysis agent helping with legislative matters.',
-      peer_agent: 'You are Pia, a peer synthesis agent helping participants understand different perspectives.',
-      flow_agent: 'You are Flo, a conversation facilitation agent helping guide productive discussions.'
-    };
+  // Helper method to get system message from template
+  private async getSystemMessage(templateName: string): Promise<string> {
+    try {
+      const { data: templateData, error } = await this.supabase
+        .rpc('get_prompt_template', { template_name: templateName });
+
+      if (templateData && templateData.length > 0) {
+        return templateData[0].template_text;
+      }
+    } catch (error) {
+      console.log(`Failed to fetch ${templateName} template:`, error);
+    }
     
-    return fallbacks[agentType as keyof typeof fallbacks] || fallbacks.flow_agent;
+    // Fallback for message analysis
+    if (templateName === 'message_analysis_system_message') {
+      return `You are an expert message analyser. Analyse the user's message and return ONLY a valid JSON object with these exact fields:
+{
+  "intent": "string (one of: policy, legal, legislation, participant, perspective, question, clarify, general)",
+  "complexity": number (0.0 to 1.0),
+  "topicRelevance": number (0.0 to 1.0),
+  "requiresExpertise": boolean
+}
+
+Guidelines:
+- complexity: How difficult/nuanced is this message? Simple greetings = 0.1, complex policy discussions = 0.9
+- topicRelevance: How relevant to policy/legislation topics? Off-topic chat = 0.1, direct policy questions = 0.9
+- intent: What is the user trying to do? Use specific categories when applicable
+- requiresExpertise: Does this need specialized knowledge to answer properly?
+
+Return ONLY the JSON, no explanations or markdown.`;
+    }
+    
+    return 'You are a helpful AI assistant specialising in democratic deliberation. Use British English spelling and grammar throughout.';
   }
 
   // ENHANCED AGENT SELECTION ALGORITHM
@@ -372,21 +396,7 @@ export class AgentOrchestrator {
             messages: [
               {
                 role: 'system',
-                content: `You are an expert message analyser. Analyse the user's message and return ONLY a valid JSON object with these exact fields:
-{
-  "intent": "string (one of: policy, legal, legislation, participant, perspective, question, clarify, general)",
-  "complexity": number (0.0 to 1.0),
-  "topicRelevance": number (0.0 to 1.0),
-  "requiresExpertise": boolean
-}
-
-Guidelines:
-- complexity: How difficult/nuanced is this message? Simple greetings = 0.1, complex policy discussions = 0.9
-- topicRelevance: How relevant to policy/legislation topics? Off-topic chat = 0.1, direct policy questions = 0.9
-- intent: What is the user trying to do? Use specific categories when applicable
-- requiresExpertise: Does this need specialized knowledge to answer properly?
-
-Return ONLY the JSON, no explanations or markdown.`
+                content: await this.getSystemMessage('message_analysis_system_message')
               },
               {
                 role: 'user',
