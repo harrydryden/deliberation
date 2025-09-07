@@ -11,23 +11,25 @@ const corsHeaders = {
 // Helper function to get IBIS generation prompt from template system
 async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string, deliberationDescription: string, notion: string): Promise<string> {
   try {
-    console.log('Fetching ibis_generation_prompt template...');
-    // Try to get ibis_generation_prompt template
-    const { data: template, error } = await supabase
-      .from('prompt_templates')
-      .select('template')
-      .eq('prompt_type', 'ibis_generation_prompt')
-      .eq('is_active', true)
-      .eq('is_default', true)
-      .single()
+    console.log('Fetching generate_ibis_roots template...');
+    // Get template using correct column names
+    const { data: templateData, error: templateError } = await supabase
+      .rpc('get_prompt_template', { 
+        template_name: 'generate_ibis_roots'
+      });
 
-    console.log('Template fetch result:', { template, error });
+    console.log('Template fetch result:', { templateData, templateError });
 
-    if (template && template.template) {
+    if (templateData && templateData.length > 0) {
       console.log('Using database template');
-      // Replace template variables
-      return template.template
-        .replace('{deliberationTitle}', deliberationTitle)
+      const template = templateData[0];
+      
+      // Replace template variables with actual values
+      return template.template_text
+        .replace(/\{\{deliberation_title\}\}/g, deliberationTitle)
+        .replace(/\{\{deliberation_description\}\}/g, deliberationDescription || 'No description provided')
+        .replace(/\{\{notion\}\}/g, notion || 'No notion statement provided');
+    }
         .replace('{deliberationDescription}', deliberationDescription || 'No description provided')
         .replace('{notion}', notion ? `Notion for stance scoring: ${notion}` : '')
     }
