@@ -3,9 +3,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 
 // Import centralized utilities
-import { AgentOrchestrator } from './shared/agent-orchestrator.ts';
-import { ModelConfigManager } from './shared/model-config.ts';
-import { UnifiedPromptService } from './shared/unified-prompt-service.ts';
+import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
+import { ModelConfigManager } from '../shared/model-config.ts';
+import { UnifiedPromptService } from '../shared/unified-prompt-service.ts';
 
 // Re-export types from shared orchestrator
 import type { AgentConfig, AnalysisResult, ConversationContext } from './shared/agent-orchestrator.ts';
