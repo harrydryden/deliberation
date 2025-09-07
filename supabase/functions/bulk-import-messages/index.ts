@@ -13,6 +13,43 @@ interface CSVRow {
   created_at?: string;
 }
 
+// Proper CSV parser that handles quoted fields with commas
+function parseCSVRow(row: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  let i = 0;
+  
+  while (i < row.length) {
+    const char = row[i];
+    
+    if (char === '"') {
+      if (inQuotes && row[i + 1] === '"') {
+        // Escaped quote
+        current += '"';
+        i += 2;
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes;
+        i++;
+      }
+    } else if (char === ',' && !inQuotes) {
+      // End of field
+      result.push(current.trim());
+      current = '';
+      i++;
+    } else {
+      current += char;
+      i++;
+    }
+  }
+  
+  // Add the last field
+  result.push(current.trim());
+  
+  return result;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -81,9 +118,9 @@ serve(async (req) => {
       });
     }
 
-    // Parse CSV data
+    // Parse CSV data with proper quoted field handling
     const lines = csvData.trim().split('\n');
-    const headers = lines[0].split(',').map((h: string) => h.trim().replace(/"/g, ''));
+    const headers = parseCSVRow(lines[0]);
     
     console.log('CSV Headers:', headers);
 
@@ -97,10 +134,10 @@ serve(async (req) => {
       });
     }
 
-    // Parse CSV rows
+    // Parse CSV rows with proper handling of quoted fields
     const csvRows: CSVRow[] = [];
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map((v: string) => v.trim().replace(/"/g, ''));
+      const values = parseCSVRow(lines[i]);
       const row: any = {};
       
       headers.forEach((header, index) => {

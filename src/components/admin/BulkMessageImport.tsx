@@ -174,12 +174,50 @@ export const BulkMessageImport: React.FC = () => {
 
     try {
       const csvText = await selectedFile.text();
+      
+      // Use the same CSV parsing logic as the server
+      const parseCSVRow = (row: string): string[] => {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        let i = 0;
+        
+        while (i < row.length) {
+          const char = row[i];
+          
+          if (char === '"') {
+            if (inQuotes && row[i + 1] === '"') {
+              // Escaped quote
+              current += '"';
+              i += 2;
+            } else {
+              // Toggle quote state
+              inQuotes = !inQuotes;
+              i++;
+            }
+          } else if (char === ',' && !inQuotes) {
+            // End of field
+            result.push(current.trim());
+            current = '';
+            i++;
+          } else {
+            current += char;
+            i++;
+          }
+        }
+        
+        // Add the last field
+        result.push(current.trim());
+        
+        return result;
+      };
+      
       const lines = csvText.trim().split('\n');
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+      const headers = parseCSVRow(lines[0]);
       
       const userIds: string[] = [];
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+        const values = parseCSVRow(lines[i]);
         const userIdIndex = headers.indexOf('user_id');
         if (userIdIndex >= 0 && values[userIdIndex]) {
           userIds.push(values[userIdIndex]);
