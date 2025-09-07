@@ -84,49 +84,6 @@ async function processStreamingOrchestration(
     // Service client for database operations
     const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // CRITICAL: Atomic duplicate prevention using immediate message creation
-    console.log(`🔒 Attempting atomic message creation for ${messageId} agent ${agentType}...`);
-    
-    // First, try to create a placeholder message to claim this message+agent combination
-    const placeholderAgentContext = {
-      agentType,
-      processing: true,
-      startTime: new Date().toISOString()
-    };
-    
-    // Check for existing response first
-    const { data: existingResponse, error: checkError } = await serviceSupabase
-      .from('messages')
-      .select('id, agent_context')
-      .eq('deliberation_id', deliberationId)
-      .eq('parent_message_id', messageId)
-      .neq('message_type', 'user')
-      .not('agent_context', 'is', null);
-    
-    if (checkError) {
-      console.error(`❌ Error checking existing responses: ${checkError.message}`);
-      sendData({ content: '', done: true, duplicate: true, reason: 'check_error' });
-      return;
-    }
-    
-    // Check if this specific agent type already has a response
-    const existingAgentResponse = existingResponse?.find(msg => 
-      msg.agent_context?.agentType === agentType
-    );
-    
-    if (existingAgentResponse) {
-      console.log(`✅ Response already exists for agent ${agentType} (${existingAgentResponse.id}) - skipping duplicate`);
-      sendData({ 
-        content: '', 
-        done: true,
-        duplicate: true,
-        existingResponseId: existingAgentResponse.id
-      });
-      return;
-    } else {
-      console.log(`✅ No existing response found for agent ${agentType} - proceeding with creation`);
-    }
-    
     // User client for reading messages (respects RLS)
     const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
