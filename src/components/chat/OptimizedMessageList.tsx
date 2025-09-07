@@ -148,18 +148,6 @@ const OptimizedMessageItem = memo(({
           </Card>
           
           <div className="mt-2 flex gap-2">
-            {!isUser && deliberationId && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddToIbis}
-                className="text-xs"
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Add to IBIS
-              </Button>
-            )}
-            
             <Button
               variant="ghost"
               size="sm"
@@ -179,6 +167,18 @@ const OptimizedMessageItem = memo(({
               <Copy className="h-3 w-3 mr-1" />
               Copy
             </Button>
+            
+            {!isUser && deliberationId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddToIbis}
+                className="text-xs"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Add to IBIS
+              </Button>
+            )}
           </div>
         </div>
       </div>
