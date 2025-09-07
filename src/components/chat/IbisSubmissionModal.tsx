@@ -185,9 +185,6 @@ export const IbisSubmissionModal = ({
       <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add to Deliberation Map (Enhanced) - Smart Connections Active</DialogTitle>
-          <div className="text-xs text-muted-foreground">
-            🧠 AI-powered relationship analysis • 🔗 Manual connections • 📊 Confidence scoring
-          </div>
         </DialogHeader>
 
         {/* AI Classification Status */}
