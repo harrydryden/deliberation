@@ -519,7 +519,7 @@ async function generateStreamingResponse(
       { role: 'user', content: content }
     ],
     stream: true,
-    max_completion_tokens: 1500
+    max_completion_tokens: 3000  // Increased from 1500 to allow fuller responses
   };
 
   console.log('🔧 Request body preview:', JSON.stringify({
@@ -533,6 +533,8 @@ async function generateStreamingResponse(
   }, null, 2));
 
   console.log('🚀 About to make OpenAI API call...');
+  console.log('📏 User content length:', content?.length || 0);
+  console.log('📝 User content preview:', content?.substring(0, 200) + '...');
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -542,6 +544,9 @@ async function generateStreamingResponse(
     },
     body: JSON.stringify(requestBody),
   });
+
+  console.log('📡 Response status:', response.status);
+  console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -694,9 +699,38 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
       console.warn('📚 LangChain function not available, using fallback:', langchainError);
     }
 
-    // Fallback removed - query-agent-knowledge-optimized function deleted
-    // If LangChain query fails, we'll return empty string
-    console.log('📚 LangChain query failed, no fallback available');
+    // Fallback: Use direct Supabase query for knowledge retrieval
+    console.log('📚 LangChain query failed, using direct knowledge query as fallback');
+    
+    try {
+      const { data: knowledgeData } = await supabaseClient
+        .rpc('match_agent_knowledge', {
+          query_embedding: null, // Will need embedding but for now just get random knowledge
+          match_count: 5,
+          agent_filter: agentId
+        });
+
+      if (knowledgeData && knowledgeData.length > 0) {
+        const contextChunks = knowledgeData.map((item: any) => item.content).join('\n\n');
+        console.log(`📚 Retrieved ${knowledgeData.length} knowledge chunks via fallback`);
+        return contextChunks;
+      }
+      
+      // If no specific knowledge, get general agent knowledge
+      const { data: generalKnowledge } = await supabaseClient
+        .from('agent_knowledge')
+        .select('content, metadata')
+        .eq('agent_id', agentId)
+        .limit(3);
+        
+      if (generalKnowledge && generalKnowledge.length > 0) {
+        const contextChunks = generalKnowledge.map((item: any) => item.content).join('\n\n');
+        console.log(`📚 Retrieved ${generalKnowledge.length} general knowledge chunks`);
+        return contextChunks;
+      }
+    } catch (fallbackError) {
+      console.error('📚 Fallback knowledge query error:', fallbackError);
+    }
 
     return '';
   } catch (error) {
