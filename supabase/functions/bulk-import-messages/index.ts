@@ -227,60 +227,11 @@ serve(async (req) => {
     // Sort messages by created_at to maintain chronological order
     csvRows.sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
 
-    // Import messages sequentially with immediate agent responses
+    // Process messages sequentially with immediate agent responses
     let importedCount = 0;
     let failedCount = 0;
     let agentResponseCount = 0;
 
-    // Background task for generating agent responses
-    async function generateAgentResponse(messageId: string, deliberationId: string) {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Brief delay for DB consistency
-        
-        const { error: agentError } = await supabase.functions.invoke(
-          'agent-orchestration-stream',
-          {
-            headers: { authorization: authHeader },
-            body: {
-              messageId: messageId,
-              deliberationId: deliberationId,
-              mode: 'bulk_processing'
-            }
-          }
-        );
-
-        if (agentError) {
-          console.error(`Agent response failed for message ${messageId}:`, agentError);
-          return false;
-        }
-
-        // Wait for agent response to be created
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
-          
-          const { data: responseCheck } = await supabase
-            .from('messages')
-            .select('id')
-            .eq('deliberation_id', deliberationId)
-            .eq('parent_message_id', messageId)
-            .neq('message_type', 'user')
-            .limit(1);
-          
-          if (responseCheck && responseCheck.length > 0) {
-            console.log(`✅ Agent response created for message ${messageId}`);
-            return true;
-          }
-        }
-        
-        console.error(`❌ Agent response verification failed for message ${messageId}`);
-        return false;
-      } catch (error) {
-        console.error(`Error generating agent response for ${messageId}:`, error);
-        return false;
-      }
-    }
-
-    // Process messages one by one to maintain chronological order
     for (let i = 0; i < csvRows.length; i++) {
       const row = csvRows[i];
       console.log(`Processing message ${i + 1}/${csvRows.length}: ${row.content.substring(0, 50)}...`);
@@ -309,38 +260,70 @@ serve(async (req) => {
         importedCount++;
         console.log(`✅ Imported user message ${insertedMessage.id}`);
 
-        // Generate agent response immediately using background task
-        EdgeRuntime.waitUntil(
-          generateAgentResponse(insertedMessage.id, deliberationId).then(success => {
-            if (success) {
+        // Generate agent response immediately (not in background for now)
+        try {
+          console.log(`🤖 Generating agent response for message ${insertedMessage.id}...`);
+          
+          const { error: agentError } = await supabase.functions.invoke(
+            'agent-orchestration-stream',
+            {
+              headers: { authorization: req.headers.get('authorization') },
+              body: {
+                messageId: insertedMessage.id,
+                deliberationId: deliberationId,
+                mode: 'bulk_processing'
+              }
+            }
+          );
+
+          if (agentError) {
+            console.error(`Agent response failed for message ${insertedMessage.id}:`, agentError);
+            await supabase
+              .from('messages')
+              .update({ bulk_import_status: 'failed' })
+              .eq('id', insertedMessage.id);
+          } else {
+            // Wait briefly and verify response was created
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            const { data: responseCheck } = await supabase
+              .from('messages')
+              .select('id')
+              .eq('deliberation_id', deliberationId)
+              .eq('parent_message_id', insertedMessage.id)
+              .neq('message_type', 'user')
+              .limit(1);
+            
+            if (responseCheck && responseCheck.length > 0) {
+              console.log(`✅ Agent response created for message ${insertedMessage.id}`);
               agentResponseCount++;
-              // Update message status to completed
-              supabase
+              await supabase
                 .from('messages')
                 .update({ bulk_import_status: 'agent_response_generated' })
-                .eq('id', insertedMessage.id)
-                .then();
+                .eq('id', insertedMessage.id);
             } else {
-              // Mark as failed
-              supabase
+              console.error(`❌ Agent response verification failed for message ${insertedMessage.id}`);
+              await supabase
                 .from('messages')
                 .update({ bulk_import_status: 'failed' })
-                .eq('id', insertedMessage.id)
-                .then();
+                .eq('id', insertedMessage.id);
             }
-          })
-        );
-
-        // Rate limiting to avoid overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (agentResponseError) {
+          console.error(`Error generating agent response for ${insertedMessage.id}:`, agentResponseError);
+          await supabase
+            .from('messages')
+            .update({ bulk_import_status: 'failed' })
+            .eq('id', insertedMessage.id);
+        }
 
       } catch (error) {
         console.error(`Error processing message ${i + 1}:`, error);
         failedCount++;
       }
 
-      // Update batch progress every 10 messages
-      if ((i + 1) % 10 === 0 || i === csvRows.length - 1) {
+      // Update batch progress every 5 messages
+      if ((i + 1) % 5 === 0 || i === csvRows.length - 1) {
         await supabase
           .from('bulk_import_batches')
           .update({
@@ -350,6 +333,9 @@ serve(async (req) => {
           })
           .eq('id', batch.id);
       }
+
+      // Rate limiting between messages
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     // Update final batch status - agent responses are handled in background
