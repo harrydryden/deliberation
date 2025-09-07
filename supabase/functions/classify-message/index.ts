@@ -122,12 +122,10 @@ Notion: "${deliberationNotion}"`
         'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
-        max_completion_tokens: 1000,
-        messages: [{
+        ...ModelConfigManager.generateAPIParams('gpt-5-2025-08-07', [{
           role: 'user',
           content: prompt
-        }]
+        }], { maxTokens: 1000 })
       })
     })
 

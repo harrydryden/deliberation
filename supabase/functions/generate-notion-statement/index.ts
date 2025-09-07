@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
+import { ModelConfigManager } from '../shared/model-config.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,12 +52,10 @@ Generate a single, clear notion statement for this deliberation (150-240 charact
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
-        messages: [
+        ...ModelConfigManager.generateAPIParams('gpt-5-2025-08-07', [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
-        ],
-        max_completion_tokens: 150,
+        ], { maxTokens: 150 })
       }),
     });
 
