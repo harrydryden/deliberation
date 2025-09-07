@@ -132,41 +132,40 @@ const OptimizedMessageItem = memo(({
             </span>
           </div>
           
-          <Card className="p-3 bg-card">
+          <Card className={`p-3 bg-card ${isUser ? 'relative' : ''}`}>
             <Suspense fallback={<Skeleton className="h-4 w-full" />}>
               <LazyMarkdownMessage content={message.content} />
             </Suspense>
+            
+            {/* Corner Share Button for User Messages */}
+            {isUser && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleShare}
+                className="absolute top-1 right-1 h-6 w-6 p-0 opacity-60 hover:opacity-100 transition-opacity"
+                title="Share to IBIS - add descriptions and links"
+              >
+                <Share2 className="h-3 w-3" />
+              </Button>
+            )}
           </Card>
           
-          <div className="mt-2 flex gap-2">
-            {isUser ? (
-              // User messages: Show share button to submit to IBIS
+          {/* Message Actions for Agent Messages Only */}
+          {!isUser && deliberationId && (
+            <div className="mt-2 flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleShare}
+                onClick={handleAddToIbis}
                 className="text-xs"
-                title="Share to IBIS - add descriptions and links"
+                title="Add this message to IBIS map"
               >
-                <Share2 className="h-3 w-3 mr-1" />
-                Share
+                <Plus className="h-3 w-3 mr-1" />
+                Add to IBIS
               </Button>
-            ) : (
-              // Agent messages: Show Add to IBIS button
-              deliberationId && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddToIbis}
-                  className="text-xs"
-                  title="Add this message to IBIS map"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add to IBIS
-                </Button>
-              )
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
