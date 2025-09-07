@@ -1,102 +1,47 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 
-// Import centralized utilities
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  getOpenAIKey,
+  parseAndValidateRequest,
+  createStreamingResponse,
+  scheduleCleanup
+} from '../shared/edge-function-utils.ts';
+import { responseCache, configCache, createCacheKey } from '../shared/cache-manager.ts';
 import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
 
-// Helper function to get fast path system prompt from template
+// Re-export types from shared orchestrator
+import type { AgentConfig, AnalysisResult, ConversationContext } from '../shared/agent-orchestrator.ts';
+
+// Helper function to get fast path system prompt from template with caching
 async function getFastPathSystemPrompt(supabase: any, agentType: string): Promise<string> {
+  const cacheKey = createCacheKey('fast_path_prompt', agentType);
+  const cached = configCache.get(cacheKey);
+  
+  if (cached) {
+    return cached.replace(/\{\{agent_type\}\}/g, agentType);
+  }
+
   try {
     const { data: templateData, error } = await supabase
       .rpc('get_prompt_template', { template_name: 'fast_path_response' });
 
     if (templateData && templateData.length > 0) {
       const template = templateData[0];
+      configCache.set(cacheKey, template.template_text);
       return template.template_text.replace(/\{\{agent_type\}\}/g, agentType);
     }
   } catch (error) {
     console.log('Failed to fetch fast path template:', error);
     throw new Error('Fast path response template not available');
   }
-}
-
-// Re-export types from shared orchestrator
-import type { AgentConfig, AnalysisResult, ConversationContext } from '../shared/agent-orchestrator.ts';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Enhanced response cache with cleanup
-interface CacheEntry {
-  response: string;
-  agentType: string;
-  timestamp: number;
-  hits: number;
-}
-
-const responseCache = new Map<string, CacheEntry>();
-const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
-const MAX_CACHE_SIZE = 1000; // Prevent memory leaks
-
-function checkResponseCache(content: string, deliberationId?: string): CacheEntry | null {
-  const key = `${deliberationId || 'global'}:${content.toLowerCase().trim()}`;
-  const cached = responseCache.get(key);
-  
-  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-    cached.hits++;
-    return cached;
-  }
-  
-  // Remove expired entry if found
-  if (cached) {
-    responseCache.delete(key);
-  }
-  
-  return null;
-}
-
-function cacheResponse(content: string, response: string, agentType: string, deliberationId?: string): void {
-  // Clean up cache if it's getting too large
-  if (responseCache.size >= MAX_CACHE_SIZE) {
-    cleanupCache();
-  }
-  
-  const key = `${deliberationId || 'global'}:${content.toLowerCase().trim()}`;
-  responseCache.set(key, {
-    response,
-    agentType,
-    timestamp: Date.now(),
-    hits: 0
-  });
-}
-
-function cleanupCache(): void {
-  const now = Date.now();
-  const keysToDelete: string[] = [];
-  
-  // Remove expired entries
-  for (const [key, entry] of responseCache.entries()) {
-    if ((now - entry.timestamp) > CACHE_DURATION) {
-      keysToDelete.push(key);
-    }
-  }
-  
-  // If still too many, remove least recently used
-  if (responseCache.size - keysToDelete.length > MAX_CACHE_SIZE) {
-    const sortedEntries = Array.from(responseCache.entries())
-      .filter(([key]) => !keysToDelete.includes(key))
-      .sort(([,a], [,b]) => a.timestamp - b.timestamp);
-    
-    const toRemove = sortedEntries.slice(0, 200); // Remove oldest 200
-    keysToDelete.push(...toRemove.map(([key]) => key));
-  }
-  
-  keysToDelete.forEach(key => responseCache.delete(key));
-  console.log(`🧹 Cleaned up cache: removed ${keysToDelete.length} entries`);
 }
 
 // Fast path pattern matching with high confidence threshold
@@ -132,13 +77,16 @@ function checkFastPath(content: string): { agent: string; confidence: number } |
   return null;
 }
 
-// Generate fast response using templates and simple AI
-async function generateFastResponse(
-  content: string,
-  fastPath: any,
-  openAIApiKey: string,
-  sendData: (data: any) => void
-): Promise<string> {
+// Optimized response caching with shared cache manager
+function checkResponseCache(content: string, deliberationId?: string): string | null {
+  const cacheKey = createCacheKey('agent_response', deliberationId || 'global', content.toLowerCase().trim());
+  return responseCache.get(cacheKey);
+}
+
+function cacheResponse(content: string, response: string, agentType: string, deliberationId?: string): void {
+  const cacheKey = createCacheKey('agent_response', deliberationId || 'global', content.toLowerCase().trim());
+  responseCache.set(cacheKey, response);
+}
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -634,36 +582,25 @@ async function processStreamingOrchestration(
   console.log(`🔐 Auth header present:`, !!authHeader);
   
   try {
-    // Initialize Supabase clients
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
+    // Use shared environment validation with caching
+    const { supabase: serviceSupabase, userSupabase } = validateAndGetEnvironment();
+    const openAIApiKey = getOpenAIKey();
 
-    console.log(`🔧 Environment variables check:`, {
-      hasSupabaseUrl: !!supabaseUrl,
-      hasServiceKey: !!supabaseServiceKey,
-      hasAnonKey: !!supabaseAnonKey,
-      hasOpenAI: !!openAIApiKey
-    });
-    
-    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey || !openAIApiKey) {
-      const missing = [];
-      if (!supabaseUrl) missing.push('SUPABASE_URL');
-      if (!supabaseServiceKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
-      if (!supabaseAnonKey) missing.push('SUPABASE_ANON_KEY');
-      if (!openAIApiKey) missing.push('OPENAI_API_KEY');
-      
-      console.error(`❌ Missing environment variables: ${missing.join(', ')}`);
-      sendData({ error: `Missing environment variables: ${missing.join(', ')}`, done: true });
-      return;
-    }
-    
-    // Service client for database operations
-    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
-    console.log(`📊 Supabase service client created successfully`);
+    // Configure user client with auth header
+    const authenticatedUserSupabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      {
+        global: {
+          headers: { authorization: authHeader }
+        },
+        auth: { persistSession: false }
+      }
+    );
+
+    console.log(`📊 Supabase clients created successfully`);
   
-    // Check for existing responses first
+    // Check for existing responses first with improved performance
     console.log(`🔍 Checking for existing responses for message ${messageId}...`);
     
     const { data: existingResponses, error: checkError } = await serviceSupabase
@@ -692,13 +629,6 @@ async function processStreamingOrchestration(
     }
       
     console.log(`✅ No existing responses found for message ${messageId} - proceeding with processing`);
-  
-    // User client for reading messages (respects RLS)
-    console.log(`🔧 Creating user Supabase client with auth header`);
-    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          authorization: authHeader,
         },
       },
     });

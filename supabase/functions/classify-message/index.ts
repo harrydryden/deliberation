@@ -1,11 +1,17 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment,
+  createErrorResponse,
+  createSuccessResponse,
+  handleCORSPreflight,
+  getOpenAIKey,
+  parseAndValidateRequest
+} from '../shared/edge-function-utils.ts';
+import { configCache, createCacheKey } from '../shared/cache-manager.ts';
 
 // Helper function to get classification prompt from template system
 async function getClassificationPrompt(supabase: any, content: string, deliberationContext: string, deliberationNotion: string): Promise<string> {
@@ -33,45 +39,101 @@ async function getClassificationPrompt(supabase: any, content: string, deliberat
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const { content, deliberationId } = await req.json()
+    const { content, deliberationId } = await parseAndValidateRequest(req, ['content']);
 
-    if (!content) {
-      throw new Error('Message content is required')
-    }
-
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
-    if (!openaiApiKey) {
-      throw new Error('OPENAI_API_KEY is not set')
-    }
-
-    // Create Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
+    const openAIApiKey = getOpenAIKey();
 
     // Fetch deliberation context if deliberationId is provided
-    let deliberationContext = ''
-    let deliberationNotion = ''
-    let hasExistingNodes = true
+    let deliberationContext = '';
+    let deliberationNotion = '';
+    let hasExistingNodes = true;
     
     if (deliberationId) {
       const { data: deliberation } = await supabase
         .from('deliberations')
         .select('title, description, notion')
         .eq('id', deliberationId)
-        .single()
+        .maybeSingle();
       
       // Check if there are existing IBIS nodes
       const { data: existingNodes } = await supabase
         .from('ibis_nodes')
         .select('id')
         .eq('deliberation_id', deliberationId)
+        .limit(1);
+        
+      hasExistingNodes = existingNodes && existingNodes.length > 0;
+      
+      if (deliberation) {
+        deliberationContext = `\n\nDeliberation: "${deliberation.title}"\nDescription: ${deliberation.description || 'No description provided'}`;
+        deliberationNotion = deliberation.notion || '';
+      }
+    }
+
+    const prompt = await getClassificationPrompt(supabase, content, deliberationContext, deliberationNotion);
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-2025-08-07',
+        messages: [
+          { 
+            role: 'system', 
+            content: 'You are an AI that classifies messages for democratic deliberation. Respond only with valid JSON.' 
+          },
+          { role: 'user', content: prompt }
+        ],
+        max_completion_tokens: 1500,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const result = data.choices[0].message.content;
+
+    try {
+      const parsedResult = JSON.parse(result);
+      
+      // Validate the parsed result has required fields
+      const requiredFields = ['title', 'keywords', 'nodeType', 'confidence', 'description', 'stanceScore'];
+      const missingFields = requiredFields.filter(field => !(field in parsedResult));
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields in classification result: ${missingFields.join(', ')}`);
+      }
+      
+      return createSuccessResponse({
+        ...parsedResult,
+        hasExistingNodes,
+        deliberationNotion
+      });
+      
+    } catch (parseError) {
+      console.error('JSON parsing error:', parseError);
+      console.error('Raw result:', result);
+      throw new Error('Failed to parse classification result as JSON');
+    }
+
+  } catch (error) {
+    console.error('Classification error:', error);
+    return createErrorResponse(error, 500, 'message classification');
+  }
+});
         .limit(1)
       
       hasExistingNodes = existingNodes && existingNodes.length > 0
