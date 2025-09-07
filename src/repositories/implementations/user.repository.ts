@@ -234,7 +234,7 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
 
   async archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void> {
     try {
-      console.log('UserRepository: Attempting to archive user:', userId);
+      logger.debug('UserRepository: Attempting to archive user:', userId);
       
       const { error } = await supabase
         .from('profiles')
@@ -248,15 +248,15 @@ export class UserRepository extends SupabaseBaseRepository implements IUserRepos
         .eq('id', userId);
       
       if (error) {
-        console.error('UserRepository: Archive error:', error);
+        logger.error('UserRepository: Archive error:', error);
         logger.error('User repository archive error', error, { userId, archivedBy });
         throw error;
       }
       
-      console.log('UserRepository: Archive operation completed');
+      logger.debug('UserRepository: Archive operation completed');
       logger.info('User archived successfully from repository', { userId, archivedBy });
     } catch (error) {
-      console.error('UserRepository: Archive failed:', error);
+      logger.error('UserRepository: Archive failed:', error);
       logger.error('User repository archive failed', error, { userId, archivedBy });
       throw error;
     }

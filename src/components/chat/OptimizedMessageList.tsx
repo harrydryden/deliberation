@@ -103,7 +103,6 @@ const OptimizedMessageItem = memo(({
 
   const handleShare = useCallback(() => {
     // For user messages, "Share" means submit to IBIS
-    console.log('Share button clicked - opening IBIS submission modal');
     if (isUser) {
       onAddToIbis?.(message.id, message.content);
     }
@@ -188,11 +187,11 @@ export const OptimizedMessageList = memo(({
   const prevCountRef = useRef(0);
   const didAutoScrollRef = useRef(false);
   
-  // Performance optimization hooks
-  const { createOptimizedCallback, createOptimizedMemo } = usePerformanceOptimization({
+  // Simplified performance optimization - keep only essential optimizations
+  const { createOptimizedCallback } = usePerformanceOptimization({
     componentName: 'OptimizedMessageList',
-    enableLogging: false, // Disable logging to reduce overhead
-    memoryThreshold: 100 // Higher threshold
+    enableLogging: false,
+    memoryThreshold: 200 // Increased threshold to reduce overhead
   });
 
   // Optimized agent configs map with proper typing and stability check

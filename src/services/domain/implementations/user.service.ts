@@ -63,14 +63,14 @@ export class UserService implements IUserService {
 
   async archiveUser(userId: string, archivedBy: string, reason?: string): Promise<void> {
     try {
-      console.log('UserService: Starting archiving for user:', userId);
+      logger.debug('UserService: Starting archiving for user:', userId);
       
       // First check if user exists
       const existingUser = await this.userRepository.findById(userId);
-      console.log('UserService: User found before archiving:', existingUser);
+      logger.debug('UserService: User found before archiving:', existingUser);
       
       if (!existingUser) {
-        console.log('UserService: User not found, cannot archive');
+        logger.warn('UserService: User not found, cannot archive');
         throw new Error('User not found');
       }
       
@@ -82,7 +82,7 @@ export class UserService implements IUserService {
       
       logger.info('User archived successfully', { userId, archivedBy, reason });
     } catch (error) {
-      console.error('UserService: Archive user failed:', error);
+      logger.error('UserService: Archive user failed:', error);
       logger.error('User service archiveUser failed', { error, userId, archivedBy });
       throw error;
     }
@@ -90,7 +90,7 @@ export class UserService implements IUserService {
 
   async unarchiveUser(userId: string): Promise<void> {
     try {
-      console.log('UserService: Starting unarchiving for user:', userId);
+      logger.debug('UserService: Starting unarchiving for user:', userId);
       
       // Check if user exists and is archived
       const existingUser = await this.userRepository.findAllIncludingArchived({ id: userId });
@@ -108,7 +108,7 @@ export class UserService implements IUserService {
       
       logger.info('User unarchived successfully', { userId });
     } catch (error) {
-      console.error('UserService: Unarchive user failed:', error);
+      logger.error('UserService: Unarchive user failed:', error);
       logger.error('User service unarchiveUser failed', { error, userId });
       throw error;
     }

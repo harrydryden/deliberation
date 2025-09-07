@@ -15,7 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { OptimizedMessageList } from "@/components/chat/OptimizedMessageList";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useOptimizedDeliberationService } from "@/hooks/useOptimizedDeliberationService";
-import { useStableServices } from "@/hooks/useStableServices";
+import { useServices } from "@/hooks/useServices";
 import { useChat } from "@/hooks/useChat";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/utils/logger";
@@ -47,7 +47,7 @@ const OptimizedDeliberationChat = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const deliberationService = useOptimizedDeliberationService();
-  const { messageService, agentService } = useStableServices();
+  const { messageService, agentService } = useServices();
   const isMobile = useIsMobile();
   
   // Ref for MessageInput to access setMessage function

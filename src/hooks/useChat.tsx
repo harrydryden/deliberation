@@ -31,11 +31,6 @@ export const useChat = (deliberationId?: string) => {
   const { streamingState, startStreaming, stopStreaming } = useResponseStreaming();
   
   useMemoryLeakDetection('useChat');
-  useMemoryMonitor({
-    componentName: 'useChat',
-    warningThreshold: 30,
-    criticalThreshold: 50
-  });
 
   // Memoize services to prevent recreating instances
   const services = useMemo(() => ({

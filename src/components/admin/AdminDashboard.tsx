@@ -19,7 +19,6 @@ import { AgentRatingDashboard } from './AgentRatingDashboard';
 import { BulkMessageImport } from './BulkMessageImport';
 
 import { useAdminData } from '@/hooks/useAdminData';
-import { useMemoryLeakDetection } from '@/utils/performanceUtils';
 import { logger } from '@/utils/logger';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { Button } from '@/components/ui/button';
@@ -30,8 +29,6 @@ export const AdminDashboard = () => {
   const { handleAsyncError } = useErrorHandler();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  useMemoryLeakDetection('AdminDashboard');
 
   useEffect(() => {
     const initializeData = async () => {

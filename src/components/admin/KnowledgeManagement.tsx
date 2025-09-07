@@ -122,7 +122,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         throw new Error('Failed to create signed URL for processing');
       }
 
-      console.log('KnowledgeManagement: Created signed URL for processing:', {
+      logger.info('KnowledgeManagement: Created signed URL for processing:', {
         originalPath: uploadData.path,
         signedUrlLength: signed.signedUrl.length,
         signedUrlPreview: signed.signedUrl.substring(0, 100) + '...'
@@ -146,16 +146,16 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       const processingFunction = 'robust-pdf-processor';
       logger.component.update('KnowledgeManagement', { action: 'processingStart', function: processingFunction });
       
-      console.log('KnowledgeManagement: About to call edge function...');
-      console.log('KnowledgeManagement: Function name:', processingFunction);
-      console.log('KnowledgeManagement: Request body:', {
+      logger.info('KnowledgeManagement: About to call edge function...');
+      logger.info('KnowledgeManagement: Function name:', processingFunction);
+      logger.info('KnowledgeManagement: Request body:', {
         fileUrl: signed.signedUrl,
         fileName: file.name,
         deliberationId: selectedAgent,
         userId: user.id
       });
       
-      console.log('KnowledgeManagement: Calling robust PDF processor with:', {
+      logger.info('KnowledgeManagement: Calling robust PDF processor with:', {
         function: processingFunction,
         fileName: file.name,
         urlLength: signed.signedUrl.length,
@@ -172,8 +172,8 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         }
       });
 
-      console.log('KnowledgeManagement: Edge function response received!');
-      console.log('KnowledgeManagement: Edge function response:', {
+      logger.info('KnowledgeManagement: Edge function response received!');
+      logger.info('KnowledgeManagement: Edge function response:', {
         hasData: !!data,
         hasError: !!error,
         dataKeys: data ? Object.keys(data) : [],

@@ -9,8 +9,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Upload, FileText, Play, Pause, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import { useStableServices } from '@/hooks/useStableServices';
+import { useServices } from '@/hooks/useServices';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 interface ImportBatch {
   id: string;
@@ -40,7 +41,7 @@ export const BulkMessageImport: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<{ imported: number; total: number }>({ imported: 0, total: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { adminService } = useStableServices();
+  const { adminService } = useServices();
 
   React.useEffect(() => {
     loadDeliberations();
@@ -166,92 +167,6 @@ export const BulkMessageImport: React.FC = () => {
     }
   };
 
-  const handleDebugParticipants = async () => {
-    if (!selectedFile || !selectedDeliberation) {
-      toast.error('Please select a file and deliberation first');
-      return;
-    }
-
-    try {
-      const csvText = await selectedFile.text();
-      
-      // Use the same CSV parsing logic as the server
-      const parseCSVRow = (row: string): string[] => {
-        const result: string[] = [];
-        let current = '';
-        let inQuotes = false;
-        let i = 0;
-        
-        while (i < row.length) {
-          const char = row[i];
-          
-          if (char === '"') {
-            if (inQuotes && row[i + 1] === '"') {
-              // Escaped quote
-              current += '"';
-              i += 2;
-            } else {
-              // Toggle quote state
-              inQuotes = !inQuotes;
-              i++;
-            }
-          } else if (char === ',' && !inQuotes) {
-            // End of field
-            result.push(current.trim());
-            current = '';
-            i++;
-          } else {
-            current += char;
-            i++;
-          }
-        }
-        
-        // Add the last field
-        result.push(current.trim());
-        
-        return result;
-      };
-      
-      const lines = csvText.trim().split('\n');
-      const headers = parseCSVRow(lines[0]);
-      
-      const userIds: string[] = [];
-      for (let i = 1; i < lines.length; i++) {
-        const values = parseCSVRow(lines[i]);
-        const userIdIndex = headers.indexOf('user_id');
-        if (userIdIndex >= 0 && values[userIdIndex]) {
-          userIds.push(values[userIdIndex]);
-        }
-      }
-
-      const { data, error } = await supabase.functions.invoke('debug-participants', {
-        body: {
-          deliberationId: selectedDeliberation,
-          userIds: [...new Set(userIds)]
-        }
-      });
-
-      if (error) throw error;
-
-      console.log('Debug participants result:', data);
-      
-      // Show detailed info in toast
-      const missingCount = data.debugInfo.missingUsers.length;
-      if (missingCount > 0) {
-        toast.error(`${missingCount} users not participants: ${data.debugInfo.missingUsers.join(', ')}`);
-      } else {
-        toast.success('All users are valid participants!');
-      }
-      
-      // Log detailed debug info to console for inspection
-      console.table(data.checkResults);
-      
-    } catch (error) {
-      console.error('Debug error:', error);
-      toast.error(`Debug failed: ${error.message}`);
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       pending: { variant: 'secondary' as const, icon: AlertCircle },
@@ -341,16 +256,6 @@ export const BulkMessageImport: React.FC = () => {
             )}
           </Button>
 
-          {selectedFile && selectedDeliberation && (
-            <Button 
-              onClick={handleDebugParticipants} 
-              variant="outline"
-              className="w-full mt-2"
-            >
-              <AlertCircle className="mr-2 h-4 w-4" />
-              Debug Participants
-            </Button>
-          )}
         </CardContent>
       </Card>
 
