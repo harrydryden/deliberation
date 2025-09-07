@@ -256,51 +256,155 @@ export class AgentOrchestrator {
 
   // UNIFIED MESSAGE ANALYSIS
   async analyzeMessage(content: string, openAIApiKey: string): Promise<AnalysisResult> {
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-5-2025-08-07',
-          messages: [
-            {
-              role: 'system',
-              content: 'Analyse this message and return JSON with: intent, complexity (0-1), topicRelevance (0-1), requiresExpertise (boolean). Focus on policy, legal, participant, or clarification intents. Use British English spelling and grammar.'
-            },
-            {
-              role: 'user',
-              content: content
-            }
-          ],
-          max_completion_tokens: 150
-        }),
-      });
+    const maxRetries = 3;
+    let lastError: any = null;
 
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔍 Message analysis attempt ${attempt}/${maxRetries} for content: "${content.substring(0, 100)}..."`);
+
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-5-2025-08-07',
+            messages: [
+              {
+                role: 'system',
+                content: `You are an expert message analyser. Analyse the user's message and return ONLY a valid JSON object with these exact fields:
+{
+  "intent": "string (one of: policy, legal, legislation, participant, perspective, question, clarify, general)",
+  "complexity": number (0.0 to 1.0),
+  "topicRelevance": number (0.0 to 1.0),
+  "requiresExpertise": boolean
+}
+
+Guidelines:
+- complexity: How difficult/nuanced is this message? Simple greetings = 0.1, complex policy discussions = 0.9
+- topicRelevance: How relevant to policy/legislation topics? Off-topic chat = 0.1, direct policy questions = 0.9
+- intent: What is the user trying to do? Use specific categories when applicable
+- requiresExpertise: Does this need specialized knowledge to answer properly?
+
+Return ONLY the JSON, no explanations or markdown.`
+              },
+              {
+                role: 'user',
+                content: content.trim()
+              }
+            ],
+            max_completion_tokens: 200,
+            response_format: { type: "json_object" }
+          }),
+        });
+
+        console.log(`📡 OpenAI API response status: ${response.status}`);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ OpenAI API error ${response.status}:`, errorText);
+          throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        const analysisContent = data.choices?.[0]?.message?.content;
+        
+        console.log(`📄 Raw analysis response:`, analysisContent);
+
+        if (!analysisContent) {
+          throw new Error('No analysis content received from OpenAI');
+        }
+
+        // Parse and validate the JSON response
+        let parsedResult: any;
+        try {
+          parsedResult = JSON.parse(analysisContent);
+        } catch (parseError) {
+          console.error(`❌ JSON parse error:`, parseError);
+          throw new Error(`Invalid JSON response: ${analysisContent}`);
+        }
+
+        // Validate required fields and types
+        const result: AnalysisResult = {
+          intent: this.validateIntent(parsedResult.intent) || 'general',
+          complexity: this.validateNumber(parsedResult.complexity, 0, 1) ?? 0.5,
+          topicRelevance: this.validateNumber(parsedResult.topicRelevance, 0, 1) ?? 0.5,
+          requiresExpertise: Boolean(parsedResult.requiresExpertise)
+        };
+
+        console.log(`✅ Message analysis successful:`, result);
+        return result;
+
+      } catch (error) {
+        lastError = error;
+        console.error(`❌ Message analysis attempt ${attempt} failed:`, error);
+        
+        if (attempt < maxRetries) {
+          console.log(`🔄 Retrying in ${attempt * 1000}ms...`);
+          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+        }
       }
-
-      const data = await response.json();
-      const analysisContent = data.choices?.[0]?.message?.content;
-      
-      if (!analysisContent) {
-        throw new Error('No analysis content received');
-      }
-
-      return JSON.parse(analysisContent);
-    } catch (error) {
-      console.error('❌ Message analysis failed:', error);
-      // Return safe defaults
-      return { 
-        intent: 'general', 
-        complexity: 0.5, 
-        topicRelevance: 0.5, 
-        requiresExpertise: false 
-      };
     }
+
+    // All retries failed, return intelligent defaults based on content analysis
+    console.error(`❌ All message analysis attempts failed, using intelligent defaults:`, lastError);
+    return this.generateIntelligentDefaults(content);
+  }
+
+  private validateIntent(intent: any): string | null {
+    const validIntents = ['policy', 'legal', 'legislation', 'participant', 'perspective', 'question', 'clarify', 'general'];
+    if (typeof intent === 'string' && validIntents.includes(intent.toLowerCase())) {
+      return intent.toLowerCase();
+    }
+    return null;
+  }
+
+  private validateNumber(value: any, min: number, max: number): number | null {
+    const num = Number(value);
+    if (!isNaN(num) && num >= min && num <= max) {
+      return num;
+    }
+    return null;
+  }
+
+  private generateIntelligentDefaults(content: string): AnalysisResult {
+    const lowerContent = content.toLowerCase();
+    
+    // Basic intent detection using keywords
+    let intent = 'general';
+    if (lowerContent.includes('policy') || lowerContent.includes('bill') || lowerContent.includes('legislation')) {
+      intent = 'policy';
+    } else if (lowerContent.includes('legal') || lowerContent.includes('law')) {
+      intent = 'legal';  
+    } else if (lowerContent.includes('what') || lowerContent.includes('how') || lowerContent.includes('?')) {
+      intent = 'question';
+    } else if (lowerContent.includes('other') || lowerContent.includes('participant') || lowerContent.includes('people')) {
+      intent = 'participant';
+    }
+
+    // Basic complexity estimation
+    let complexity = 0.3; // Lower default
+    if (content.length > 200) complexity += 0.2;
+    if (lowerContent.includes('complex') || lowerContent.includes('detailed') || lowerContent.includes('nuanced')) complexity += 0.3;
+    if (content.split(' ').length > 50) complexity += 0.2;
+    complexity = Math.min(complexity, 1.0);
+
+    // Basic topic relevance
+    let topicRelevance = 0.3; // Lower default
+    if (intent === 'policy' || intent === 'legal') topicRelevance = 0.8;
+    else if (lowerContent.includes('deliberation') || lowerContent.includes('discussion')) topicRelevance = 0.6;
+
+    const result = {
+      intent,
+      complexity: Math.round(complexity * 100) / 100,
+      topicRelevance: Math.round(topicRelevance * 100) / 100,
+      requiresExpertise: intent === 'policy' || intent === 'legal' || complexity > 0.7
+    };
+
+    console.log(`🧠 Intelligent defaults generated:`, result);
+    return result;
   }
 
   // CACHE MANAGEMENT
