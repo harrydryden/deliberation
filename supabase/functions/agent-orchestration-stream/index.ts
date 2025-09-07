@@ -138,7 +138,7 @@ async function processStreamingOrchestration(
       cacheResponse(message.content, response, fastPath.agent, deliberationId);
 
       // Store response using service client
-      await serviceSupabase.from('messages').insert({
+      const { data: fastInsertData, error: fastInsertError } = await serviceSupabase.from('messages').insert({
         content: response,
         message_type: fastPath.agent,
         user_id: message.user_id,
@@ -151,6 +151,11 @@ async function processStreamingOrchestration(
           confidence: fastPath.confidence 
         }
       });
+
+      if (fastInsertError) {
+        console.error('❌ Fast path database insert error:', fastInsertError);
+        throw new Error(`Failed to save fast path response: ${fastInsertError.message}`);
+      }
 
       sendData({ done: true });
       return;
@@ -270,6 +275,7 @@ async function processStreamingOrchestration(
 
       if (insertError) {
         console.error('❌ Database insert error:', insertError);
+        throw new Error(`Failed to save response: ${insertError.message}`);
       } else {
         console.log('✅ Response stored successfully in database');
       }
