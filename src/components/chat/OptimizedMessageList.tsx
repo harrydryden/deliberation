@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, lazy, Suspense, memo, 
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Bot, User, Users, Workflow, FileText, Plus, Loader2, Share2, Copy } from "lucide-react";
+import { Bot, User, Users, Workflow, FileText, Plus, Loader2, Share2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMessageTime } from '@/utils/timeDisplay';
 const LazyMarkdownMessage = lazy(() => import("@/components/common/MarkdownMessage").then(m => ({ default: m.MarkdownMessage })));
@@ -101,72 +101,12 @@ const OptimizedMessageItem = memo(({
     onRetry?.(message.id, message.content);
   }, [onRetry, message.id, message.content]);
 
-  const handleShare = useCallback(async () => {
-    try {
-      // Check if Web Share API is supported and available
-      if (navigator.share && navigator.canShare) {
-        const shareData = {
-          title: 'Deliberation Message',
-          text: message.content,
-          url: window.location.href
-        };
-        
-        if (navigator.canShare(shareData)) {
-          await navigator.share(shareData);
-          return;
-        }
-      }
-      
-      // Fallback to clipboard
-      await navigator.clipboard.writeText(message.content);
-      
-      // Show success feedback (you might want to add toast here)
-      console.log('Message copied to clipboard');
-    } catch (err) {
-      console.error('Share failed:', err);
-      // Last resort: try to copy without permissions
-      try {
-        const textArea = document.createElement('textarea');
-        textArea.value = message.content;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        textArea.style.top = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand('copy');
-        textArea.remove();
-        console.log('Message copied using fallback method');
-      } catch (fallbackErr) {
-        console.error('All share methods failed:', fallbackErr);
-      }
+  const handleShare = useCallback(() => {
+    // For user messages, "Share" means submit to IBIS
+    if (isUser) {
+      onAddToIbis?.(message.id, message.content);
     }
-  }, [message.content]);
-
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(message.content);
-      console.log('Message copied to clipboard');
-    } catch (err) {
-      console.error('Copy failed:', err);
-      // Fallback method
-      try {
-        const textArea = document.createElement('textarea');
-        textArea.value = message.content;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        textArea.style.top = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand('copy');
-        textArea.remove();
-        console.log('Message copied using fallback method');
-      } catch (fallbackErr) {
-        console.error('All copy methods failed:', fallbackErr);
-      }
-    }
-  }, [message.content]);
+  }, [isUser, onAddToIbis, message.id, message.content]);
 
   return (
     <div className="pb-4">
@@ -198,40 +138,32 @@ const OptimizedMessageItem = memo(({
           </Card>
           
           <div className="mt-2 flex gap-2">
-            {/* Debug: Always show at least one button to verify rendering */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleShare}
-              className="text-xs border border-border bg-background hover:bg-accent"
-              title="Share this message"
-            >
-              <Share2 className="h-3 w-3 mr-1" />
-              Share
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleCopy}
-              className="text-xs border border-border bg-background hover:bg-accent"
-              title="Copy message to clipboard"
-            >
-              <Copy className="h-3 w-3 mr-1" />
-              Copy
-            </Button>
-            
-            {!isUser && deliberationId && (
+            {isUser ? (
+              // User messages: Show share button to submit to IBIS
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleAddToIbis}
+                onClick={handleShare}
                 className="text-xs"
-                title="Add this message to IBIS map"
+                title="Share to IBIS - add descriptions and links"
               >
-                <Plus className="h-3 w-3 mr-1" />
-                Add to IBIS
+                <Share2 className="h-3 w-3 mr-1" />
+                Share
               </Button>
+            ) : (
+              // Agent messages: Show Add to IBIS button
+              deliberationId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddToIbis}
+                  className="text-xs"
+                  title="Add this message to IBIS map"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add to IBIS
+                </Button>
+              )
             )}
           </div>
         </div>
