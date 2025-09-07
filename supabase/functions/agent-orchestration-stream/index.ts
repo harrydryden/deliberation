@@ -18,10 +18,8 @@ async function getFastPathSystemPrompt(supabase: any, agentType: string): Promis
     }
   } catch (error) {
     console.log('Failed to fetch fast path template:', error);
+    throw new Error('Fast path response template not available');
   }
-  
-  // Fallback
-  return `You are a ${agentType} providing a quick, helpful response. Be concise but informative.`;
 }
 
 // Re-export types from shared orchestrator

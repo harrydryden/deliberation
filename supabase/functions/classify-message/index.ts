@@ -27,35 +27,9 @@ async function getClassificationPrompt(supabase: any, content: string, deliberat
         .replace('{deliberationNotion}', deliberationNotion)
     }
   } catch (error) {
-    console.log('Failed to fetch classification prompt template:', error)
+    console.log('Failed to fetch classification prompt template:', error);
+    throw new Error('Classification prompt template not available');
   }
-
-  // Fallback to hardcoded prompt
-  return `Analyse this message from a democratic deliberation and extract the following information:
-
-Message: "${content}"${deliberationContext}
-
-Please respond with a JSON object containing:
-1. "title": A concise, descriptive title (max 60 characters)
-2. "keywords": An array of 3-5 relevant keywords
-3. "nodeType": One of "issue", "position", or "argument" based on IBIS methodology
-4. "confidence": A number between 0 and 1 indicating confidence in the classification
-5. "description": A brief description explaining the classification
-6. "stanceScore": A number between -1 and 1 indicating the stance relative to the deliberation topic (-1 = strongly against, 0 = neutral, 1 = strongly in favour)
-
-IBIS Guidelines:
-- "issue": Questions, problems, or topics to be discussed
-- "position": Potential solutions, options, or answers to issues
-- "argument": Supporting or opposing evidence for positions
-
-Stance Analysis:
-- Analyse the message's position relative to the deliberation's NOTION: "${deliberationNotion}"
-- Consider the emotional tone, supporting/opposing language, and explicit positions taken
-- Return a score between -1 (strongly opposing) and 1 (strongly supporting) with 0 being neutral
-- Base the stance specifically on the deliberation's notion, not the general topic or sub-issues
-- If no notion is provided, base it on the overall deliberation topic
-
-Use British English spelling and grammar throughout. Respond only with valid JSON.`
 }
 
 serve(async (req) => {

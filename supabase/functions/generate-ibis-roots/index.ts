@@ -54,42 +54,9 @@ async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string,
         .replace(/\{\{notion_context\}\}/g, notion || 'No notion statement provided');
     }
   } catch (error) {
-    console.log('Failed to fetch IBIS generation prompt template:', error)
+    console.log('Failed to fetch IBIS generation prompt template:', error);
+    throw new Error('IBIS generation prompt template not available');
   }
-
-  console.log('Using enhanced fallback prompt');
-  // Enhanced fallback prompt with topic-specific guidance
-  return `You are an expert facilitator helping to identify specific, actionable root issues for the deliberation topic "${deliberationTitle}".
-
-DELIBERATION CONTEXT:
-Title: "${deliberationTitle}"
-Description: "${deliberationDescription || 'No description provided'}"
-${notion ? `Stance Scoring Notion: "${notion}"` : ''}
-
-CRITICAL REQUIREMENTS:
-1. Issues must be DIRECTLY RELATED to "${deliberationTitle}" - not abstract concepts
-2. Issues must be SPECIFIC policy/implementation questions within this topic
-3. Issues must be ACTIONABLE - participants can take clear positions 
-4. Issues must address CORE DILEMMAS or decisions needed for this specific topic
-5. Issues should reference concrete aspects mentioned in the description above
-
-EXAMPLES for "${deliberationTitle}":
-${deliberationTitle.toLowerCase().includes('assisted dying') ? 
-  '- GOOD: "Should safeguards require multiple doctor assessments?", "What eligibility criteria should apply?"' +
-  '\n- BAD: "What is the meaning of life?", "Should we value individual rights?"' :
-  '- GOOD: Specific implementation questions, eligibility criteria, policy mechanisms' +
-  '\n- BAD: Abstract philosophical concepts, unrelated broad themes'
-}
-
-Generate 3-5 issues that directly address decision points participants need to resolve about "${deliberationTitle}".
-
-Respond with ONLY a valid JSON array:
-[
-  {
-    "title": "Specific decision question about ${deliberationTitle} (max 80 chars)",
-    "description": "Why this specific aspect of ${deliberationTitle} needs resolution (max 250 chars)"
-  }
-]`;
 }
 
 serve(async (req) => {

@@ -204,28 +204,8 @@ export class AgentOrchestrator {
       }
     } catch (error) {
       console.log(`Failed to fetch ${templateName} template:`, error);
+      throw new Error(`Template ${templateName} not available`);
     }
-    
-    // Fallback for message analysis
-    if (templateName === 'message_analysis_system_message') {
-      return `You are an expert message analyser. Analyse the user's message and return ONLY a valid JSON object with these exact fields:
-{
-  "intent": "string (one of: policy, legal, legislation, participant, perspective, question, clarify, general)",
-  "complexity": number (0.0 to 1.0),
-  "topicRelevance": number (0.0 to 1.0),
-  "requiresExpertise": boolean
-}
-
-Guidelines:
-- complexity: How difficult/nuanced is this message? Simple greetings = 0.1, complex policy discussions = 0.9
-- topicRelevance: How relevant to policy/legislation topics? Off-topic chat = 0.1, direct policy questions = 0.9
-- intent: What is the user trying to do? Use specific categories when applicable
-- requiresExpertise: Does this need specialized knowledge to answer properly?
-
-Return ONLY the JSON, no explanations or markdown.`;
-    }
-    
-    return 'You are a helpful AI assistant specialising in democratic deliberation. Use British English spelling and grammar throughout.';
   }
 
   // ENHANCED AGENT SELECTION ALGORITHM
