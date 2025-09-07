@@ -74,7 +74,9 @@ export const useResponseStreaming = () => {
       });
 
       if (process.env.NODE_ENV === 'development') {
-        logger.debug('Function invoke response', { hasData: !!data, hasError: !!error });
+        logger.debug('Function invoke response', { hasData: !!data, hasError: !!error, data });
+        console.log('🔍 Function invoke data:', data);
+        console.log('🔍 Function invoke error:', error);
       }
 
       if (error) {
@@ -84,6 +86,7 @@ export const useResponseStreaming = () => {
 
       // If the function returns data directly (non-streaming), handle it
       if (data && !data.stream) {
+        console.log('📄 Non-streaming response received:', data);
         onComplete(data.content || '', data.agentType || 'flow_agent');
         setStreamingState({
           isStreaming: false,
@@ -94,8 +97,11 @@ export const useResponseStreaming = () => {
         return;
       }
 
+      console.log('🌊 Proceeding to streaming fetch call...');
+
       // For streaming responses, we need to make a direct fetch call with proper auth
       const { data: { session: currentSession } } = await supabase.auth.getSession();
+      console.log('🔄 Making direct fetch call for streaming...');
       const response = await fetch(`https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/agent-orchestration-stream`, {
         method: 'POST',
         headers: {
@@ -111,7 +117,12 @@ export const useResponseStreaming = () => {
         signal: streamControllerRef.current.signal,
       });
 
+      console.log('📡 Fetch response status:', response.status);
+      console.log('📡 Fetch response ok:', response.ok);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Fetch error response:', errorText);
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -205,6 +216,11 @@ export const useResponseStreaming = () => {
       }
 
     } catch (error: any) {
+      console.error('❌ Streaming error caught:', error);
+      console.error('❌ Error name:', error.name);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error stack:', error.stack);
+      
       if (error.name === 'AbortError') {
         logger.info('Streaming aborted by user');
       } else {
