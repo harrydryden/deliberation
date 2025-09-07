@@ -11,7 +11,7 @@ export class AdminRepository extends SupabaseBaseRepository implements IAdminRep
     activeDeliberations: number;
   }> {
     try {
-      const { data, error } = await supabase.rpc('get_admin_system_stats');
+      const { data, error } = await supabase.rpc('admin_get_system_stats');
       
       if (error) {
         logger.error({ error }, 'Admin repository getSystemStats RPC error');
