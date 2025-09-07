@@ -114,13 +114,6 @@ export type Database = {
             foreignKeyName: "agent_interactions_message_id_fkey"
             columns: ["message_id"]
             isOneToOne: false
-            referencedRelation: "anonymized_messages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "agent_interactions_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
             referencedRelation: "messages"
             referencedColumns: ["id"]
           },
@@ -215,13 +208,6 @@ export type Database = {
             foreignKeyName: "agent_ratings_message_id_fkey"
             columns: ["message_id"]
             isOneToOne: false
-            referencedRelation: "anonymized_messages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "agent_ratings_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
             referencedRelation: "messages"
             referencedColumns: ["id"]
           },
@@ -312,69 +298,6 @@ export type Database = {
             columns: ["deliberation_id"]
             isOneToOne: false
             referencedRelation: "deliberations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      classified_items: {
-        Row: {
-          ai_generated: boolean | null
-          confidence_score: number | null
-          created_at: string | null
-          created_by: string
-          deliberation_id: string | null
-          full_content: string
-          headline: string
-          id: string
-          item_type: string
-          stance_score: number | null
-          status: string | null
-          submission_id: string | null
-          user_edited: boolean | null
-        }
-        Insert: {
-          ai_generated?: boolean | null
-          confidence_score?: number | null
-          created_at?: string | null
-          created_by: string
-          deliberation_id?: string | null
-          full_content: string
-          headline: string
-          id?: string
-          item_type: string
-          stance_score?: number | null
-          status?: string | null
-          submission_id?: string | null
-          user_edited?: boolean | null
-        }
-        Update: {
-          ai_generated?: boolean | null
-          confidence_score?: number | null
-          created_at?: string | null
-          created_by?: string
-          deliberation_id?: string | null
-          full_content?: string
-          headline?: string
-          id?: string
-          item_type?: string
-          stance_score?: number | null
-          status?: string | null
-          submission_id?: string | null
-          user_edited?: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "classified_items_deliberation_id_fkey"
-            columns: ["deliberation_id"]
-            isOneToOne: false
-            referencedRelation: "deliberations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "classified_items_submission_id_fkey"
-            columns: ["submission_id"]
-            isOneToOne: false
-            referencedRelation: "submissions"
             referencedColumns: ["id"]
           },
         ]
@@ -579,13 +502,6 @@ export type Database = {
             foreignKeyName: "ibis_nodes_message_id_fkey"
             columns: ["message_id"]
             isOneToOne: false
-            referencedRelation: "anonymized_messages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ibis_nodes_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
             referencedRelation: "messages"
             referencedColumns: ["id"]
           },
@@ -650,159 +566,6 @@ export type Database = {
           },
         ]
       }
-      item_keywords: {
-        Row: {
-          classified_item_id: string | null
-          created_at: string | null
-          id: string
-          keyword_id: string | null
-          relevance_score: number | null
-        }
-        Insert: {
-          classified_item_id?: string | null
-          created_at?: string | null
-          id?: string
-          keyword_id?: string | null
-          relevance_score?: number | null
-        }
-        Update: {
-          classified_item_id?: string | null
-          created_at?: string | null
-          id?: string
-          keyword_id?: string | null
-          relevance_score?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "item_keywords_classified_item_id_fkey"
-            columns: ["classified_item_id"]
-            isOneToOne: false
-            referencedRelation: "classified_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "item_keywords_keyword_id_fkey"
-            columns: ["keyword_id"]
-            isOneToOne: false
-            referencedRelation: "keywords"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      item_relationships: {
-        Row: {
-          ai_generated: boolean | null
-          created_at: string | null
-          id: string
-          relationship_type: string
-          source_item_id: string | null
-          strength: number | null
-          target_item_id: string | null
-          user_confirmed: boolean | null
-        }
-        Insert: {
-          ai_generated?: boolean | null
-          created_at?: string | null
-          id?: string
-          relationship_type: string
-          source_item_id?: string | null
-          strength?: number | null
-          target_item_id?: string | null
-          user_confirmed?: boolean | null
-        }
-        Update: {
-          ai_generated?: boolean | null
-          created_at?: string | null
-          id?: string
-          relationship_type?: string
-          source_item_id?: string | null
-          strength?: number | null
-          target_item_id?: string | null
-          user_confirmed?: boolean | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "item_relationships_source_item_id_fkey"
-            columns: ["source_item_id"]
-            isOneToOne: false
-            referencedRelation: "classified_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "item_relationships_target_item_id_fkey"
-            columns: ["target_item_id"]
-            isOneToOne: false
-            referencedRelation: "classified_items"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      item_similarities: {
-        Row: {
-          computed_at: string | null
-          id: string
-          item1_id: string | null
-          item2_id: string | null
-          similarity_score: number | null
-          similarity_type: string | null
-        }
-        Insert: {
-          computed_at?: string | null
-          id?: string
-          item1_id?: string | null
-          item2_id?: string | null
-          similarity_score?: number | null
-          similarity_type?: string | null
-        }
-        Update: {
-          computed_at?: string | null
-          id?: string
-          item1_id?: string | null
-          item2_id?: string | null
-          similarity_score?: number | null
-          similarity_type?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "item_similarities_item1_id_fkey"
-            columns: ["item1_id"]
-            isOneToOne: false
-            referencedRelation: "classified_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "item_similarities_item2_id_fkey"
-            columns: ["item2_id"]
-            isOneToOne: false
-            referencedRelation: "classified_items"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      keywords: {
-        Row: {
-          category: string | null
-          created_at: string | null
-          id: string
-          keyword: string
-          usage_count: number | null
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string | null
-          id?: string
-          keyword: string
-          usage_count?: number | null
-        }
-        Update: {
-          category?: string | null
-          created_at?: string | null
-          id?: string
-          keyword?: string
-          usage_count?: number | null
-        }
-        Relationships: []
-      }
       message_processing_locks: {
         Row: {
           created_at: string
@@ -826,13 +589,6 @@ export type Database = {
           processing_key?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "fk_message_processing_locks_message_id"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "anonymized_messages"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "fk_message_processing_locks_message_id"
             columns: ["message_id"]
@@ -883,13 +639,6 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "messages_parent_message_id_fkey"
-            columns: ["parent_message_id"]
-            isOneToOne: false
-            referencedRelation: "anonymized_messages"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "messages_parent_message_id_fkey"
             columns: ["parent_message_id"]
@@ -1023,82 +772,6 @@ export type Database = {
           },
         ]
       }
-      simplified_events: {
-        Row: {
-          created_at: string | null
-          details: Json | null
-          event_type: string
-          id: string
-        }
-        Insert: {
-          created_at?: string | null
-          details?: Json | null
-          event_type: string
-          id?: string
-        }
-        Update: {
-          created_at?: string | null
-          details?: Json | null
-          event_type?: string
-          id?: string
-        }
-        Relationships: []
-      }
-      submissions: {
-        Row: {
-          created_at: string | null
-          deliberation_id: string | null
-          id: string
-          message_id: string | null
-          processing_status: string | null
-          raw_content: string
-          submission_type: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          deliberation_id?: string | null
-          id?: string
-          message_id?: string | null
-          processing_status?: string | null
-          raw_content: string
-          submission_type?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          deliberation_id?: string | null
-          id?: string
-          message_id?: string | null
-          processing_status?: string | null
-          raw_content?: string
-          submission_type?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "submissions_deliberation_id_fkey"
-            columns: ["deliberation_id"]
-            isOneToOne: false
-            referencedRelation: "deliberations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "submissions_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "anonymized_messages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "submissions_message_id_fkey"
-            columns: ["message_id"]
-            isOneToOne: false
-            referencedRelation: "messages"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_activity_logs: {
         Row: {
           activity_data: Json | null
@@ -1221,60 +894,7 @@ export type Database = {
       }
     }
     Views: {
-      anonymized_messages: {
-        Row: {
-          agent_context: Json | null
-          content: string | null
-          created_at_daily: string | null
-          created_at_hourly: string | null
-          deliberation_id: string | null
-          id: string | null
-          message_type: Database["public"]["Enums"]["message_type"] | null
-          parent_message_id: string | null
-          submitted_to_ibis: boolean | null
-          user_id: string | null
-        }
-        Insert: {
-          agent_context?: Json | null
-          content?: string | null
-          created_at_daily?: never
-          created_at_hourly?: never
-          deliberation_id?: string | null
-          id?: string | null
-          message_type?: Database["public"]["Enums"]["message_type"] | null
-          parent_message_id?: string | null
-          submitted_to_ibis?: boolean | null
-          user_id?: string | null
-        }
-        Update: {
-          agent_context?: Json | null
-          content?: string | null
-          created_at_daily?: never
-          created_at_hourly?: never
-          deliberation_id?: string | null
-          id?: string | null
-          message_type?: Database["public"]["Enums"]["message_type"] | null
-          parent_message_id?: string | null
-          submitted_to_ibis?: boolean | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "messages_parent_message_id_fkey"
-            columns: ["parent_message_id"]
-            isOneToOne: false
-            referencedRelation: "anonymized_messages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "messages_parent_message_id_fkey"
-            columns: ["parent_message_id"]
-            isOneToOne: false
-            referencedRelation: "messages"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       admin_create_ibis_relationship: {
@@ -1347,18 +967,6 @@ export type Database = {
           updated_at: string
         }[]
       }
-      anonymize_old_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      anonymize_timestamp_to_day: {
-        Args: { ts: string }
-        Returns: string
-      }
-      anonymize_timestamp_to_hour: {
-        Args: { ts: string }
-        Returns: string
-      }
       auth_is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -1378,18 +986,6 @@ export type Database = {
       cleanup_orphaned_sessions: {
         Args: Record<PropertyKey, never>
         Returns: number
-      }
-      debug_auth_functions: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      debug_current_user_settings: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      debug_storage_context: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
       }
       generate_access_code_1: {
         Args: Record<PropertyKey, never>
@@ -1458,10 +1054,6 @@ export type Database = {
           total_ratings: number
           unhelpful_count: number
         }[]
-      }
-      get_profile_count: {
-        Args: Record<PropertyKey, never>
-        Returns: number
       }
       get_prompt_template: {
         Args: { template_name: string; template_variables?: Json }
@@ -1601,10 +1193,6 @@ export type Database = {
         Args: { details?: Json; event_type: string }
         Returns: undefined
       }
-      mark_sessions_inactive: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
       match_agent_knowledge: {
         Args: {
           input_agent_id: string
@@ -1625,10 +1213,6 @@ export type Database = {
           title: string
         }[]
       }
-      set_config: {
-        Args: { is_local?: boolean; new_value: string; setting_name: string }
-        Returns: string
-      }
       sparsevec_out: {
         Args: { "": unknown }
         Returns: unknown
@@ -1640,10 +1224,6 @@ export type Database = {
       sparsevec_typmod_in: {
         Args: { "": unknown[] }
         Returns: number
-      }
-      update_session_activity_simple: {
-        Args: { session_uuid: string }
-        Returns: boolean
       }
       user_participates_in_deliberation: {
         Args: { deliberation_uuid: string; user_uuid: string }
