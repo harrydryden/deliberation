@@ -117,7 +117,7 @@ serve(async (req) => {
     // Ultra-robust processing for 99%+ success rate
     const chunkSize = 10; // Smaller chunks for better reliability
     const maxRetries = 3; // Max retries per message
-    const orchestrationTimeout = 45000; // 45 second timeout for orchestration
+    const orchestrationTimeout = 60000; // 60 second timeout for orchestration (allows for full verification)
     
     for (let chunkIndex = 0; chunkIndex < messages.length; chunkIndex += chunkSize) {
       const chunk = messages.slice(chunkIndex, Math.min(chunkIndex + chunkSize, messages.length));

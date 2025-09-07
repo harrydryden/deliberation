@@ -810,7 +810,7 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
     console.log('📚 LangChain query failed, using direct knowledge query as fallback');
     
     try {
-      const { data: knowledgeData } = await supabaseClient
+      const { data: knowledgeData } = await supabase
         .rpc('match_agent_knowledge', {
           query_embedding: null, // Will need embedding but for now just get random knowledge
           match_count: 5,
@@ -824,7 +824,7 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
       }
       
       // If no specific knowledge, get general agent knowledge
-      const { data: generalKnowledge } = await supabaseClient
+      const { data: generalKnowledge } = await supabase
         .from('agent_knowledge')
         .select('content, metadata')
         .eq('agent_id', agentId)
