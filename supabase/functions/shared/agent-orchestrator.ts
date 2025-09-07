@@ -181,6 +181,25 @@ export class AgentOrchestrator {
     });
     
     await Promise.all(configPromises);
+
+    // Check IBIS node count for Flow vs Peer agent prioritization
+    let ibisNodeCount = 0;
+    if (deliberationId) {
+      try {
+        const { data: nodeData, error } = await this.supabase
+          .from('ibis_nodes')
+          .select('id')
+          .eq('deliberation_id', deliberationId);
+        
+        if (!error && nodeData) {
+          ibisNodeCount = nodeData.length;
+        }
+      } catch (error) {
+        console.error('Error fetching IBIS node count:', error);
+      }
+    }
+
+    console.log(`📊 IBIS nodes in deliberation: ${ibisNodeCount}`);
     
     const scores = {
       bill_agent: 0,
@@ -196,7 +215,8 @@ export class AgentOrchestrator {
       topicRelevance: analysis.topicRelevance || 0.5,
       messageCount: conversationContext.messageCount || 0,
       recentMessageTypes: this.getRecentMessageTypes(conversationContext.recentMessages || []),
-      hasKnowledge: availableKnowledge || {}
+      hasKnowledge: availableKnowledge || {},
+      ibisNodeCount
     };
 
     // Bill Agent scoring - enhanced with knowledge availability
@@ -211,16 +231,22 @@ export class AgentOrchestrator {
       scores.bill_agent += factors.hasKnowledge.bill_agent ? 15 : 0; // Boost if knowledge available
     }
 
-    // Peer Agent scoring
+    // Peer Agent scoring - reduced when IBIS has fewer than 10 nodes
     const peerConfig = agentConfigs.get('peer_agent');
     if (peerConfig?.is_active !== false) {
       scores.peer_agent += factors.messageCount > 5 ? 20 : 0;
       scores.peer_agent += factors.intent.includes('participant') ? 25 : 0;
       scores.peer_agent += factors.intent.includes('perspective') ? 20 : 0;
       scores.peer_agent += this.getRecentBillAgentCount(factors.recentMessageTypes) > 2 ? 15 : 0;
+      
+      // CRITICAL: Reduce Peer agent priority until IBIS has 10+ nodes
+      if (factors.ibisNodeCount < 10) {
+        scores.peer_agent -= 25; // Significant penalty for early deliberation
+        console.log(`🚫 Peer agent penalty applied: IBIS has only ${factors.ibisNodeCount} nodes (need 10+)`);
+      }
     }
 
-    // Flow Agent scoring  
+    // Flow Agent scoring - boosted when IBIS has fewer than 10 nodes
     const flowConfig = agentConfigs.get('flow_agent');
     if (flowConfig?.is_active !== false) {
       scores.flow_agent += factors.messageCount < 3 ? 25 : 0;
@@ -228,6 +254,12 @@ export class AgentOrchestrator {
       scores.flow_agent += factors.intent.includes('clarify') ? 25 : 0;
       scores.flow_agent += factors.complexity < 0.3 ? 15 : 0;
       scores.flow_agent += this.getRecentFlowAgentCount(factors.recentMessageTypes) === 0 ? 10 : 0;
+      
+      // CRITICAL: Boost Flow agent until IBIS has 10+ nodes
+      if (factors.ibisNodeCount < 10) {
+        scores.flow_agent += 30; // Strong boost for early deliberation
+        console.log(`🚀 Flow agent boost applied: IBIS has only ${factors.ibisNodeCount} nodes (need 10+)`);
+      }
     }
 
     // Anti-repetition logic
@@ -246,6 +278,8 @@ export class AgentOrchestrator {
       scores,
       factors,
       selected: selectedAgent,
+      ibisNodeCount: factors.ibisNodeCount,
+      flowBoosted: factors.ibisNodeCount < 10,
       availableConfigs: Object.fromEntries(
         Array.from(agentConfigs.entries()).map(([type, config]) => [type, !!config])
       )
