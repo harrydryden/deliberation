@@ -176,7 +176,7 @@ export const IbisSubmissionModal = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add to Deliberation Map</DialogTitle>
+          <DialogTitle>Add to Deliberation Map (Enhanced)</DialogTitle>
         </DialogHeader>
 
         {/* AI Classification Status */}

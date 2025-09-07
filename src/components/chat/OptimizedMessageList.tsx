@@ -103,6 +103,7 @@ const OptimizedMessageItem = memo(({
 
   const handleShare = useCallback(() => {
     // For user messages, "Share" means submit to IBIS
+    console.log('Share button clicked - opening IBIS submission modal');
     if (isUser) {
       onAddToIbis?.(message.id, message.content);
     }
