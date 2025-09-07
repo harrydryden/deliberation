@@ -386,7 +386,7 @@ async function generateStreamingResponse(
   console.log('🔧 Enhancement context:', JSON.stringify(enhancementContext, null, 2));
   
   try {
-    const systemPrompt = orchestrator.generateSystemPrompt(agentConfig, agentType, enhancementContext);
+    const systemPrompt = await orchestrator.generateSystemPrompt(agentConfig, agentType, enhancementContext);
     
     console.log('📝 Generated system prompt length:', systemPrompt?.length || 0);
     console.log('📝 System prompt preview:', systemPrompt?.substring(0, 200) + '...');

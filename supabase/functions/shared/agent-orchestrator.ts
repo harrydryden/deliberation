@@ -133,7 +133,7 @@ export class AgentOrchestrator {
   }
 
   // UNIFIED SYSTEM PROMPT GENERATION
-  generateSystemPrompt(agentConfig: AgentConfig | null, agentType: string, context?: any): string {
+  async generateSystemPrompt(agentConfig: AgentConfig | null, agentType: string, context?: any): Promise<string> {
     if (agentConfig?.prompt_overrides?.system_prompt) {
       // Use custom system prompt if available
       return this.enhancePromptWithContext(agentConfig.prompt_overrides.system_prompt, context);
@@ -158,8 +158,50 @@ export class AgentOrchestrator {
       return this.enhancePromptWithContext(prompt, context);
     }
     
-    // Fallback to standardized default prompts
-    return this.enhancePromptWithContext(this.getDefaultSystemPrompt(agentType), context);
+    // Fallback to database prompt templates
+    return this.enhancePromptWithContext(await this.getPromptTemplateDefault(agentType), context);
+  }
+
+  // Fetch default prompt from database prompt templates
+  private async getPromptTemplateDefault(agentType: string): Promise<string> {
+    try {
+      const templateName = `agent_default_${agentType}`;
+      
+      const { data, error } = await this.supabase
+        .from('prompt_templates')
+        .select('template_text')
+        .eq('name', templateName)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (error) {
+        console.warn(`Failed to fetch prompt template ${templateName}:`, error);
+        return this.getHardcodedFallback(agentType);
+      }
+      
+      if (data?.template_text) {
+        console.log(`✅ Using database prompt template: ${templateName}`);
+        return data.template_text;
+      }
+      
+      console.log(`📝 No template found for ${templateName}, using hardcoded fallback`);
+      return this.getHardcodedFallback(agentType);
+      
+    } catch (error) {
+      console.error('Error fetching prompt template:', error);
+      return this.getHardcodedFallback(agentType);
+    }
+  }
+
+  // Minimal hardcoded fallback (emergency only)
+  private getHardcodedFallback(agentType: string): string {
+    const fallbacks = {
+      bill_agent: 'You are Bill, a policy analysis agent helping with legislative matters.',
+      peer_agent: 'You are Pia, a peer synthesis agent helping participants understand different perspectives.',
+      flow_agent: 'You are Flo, a conversation facilitation agent helping guide productive discussions.'
+    };
+    
+    return fallbacks[agentType as keyof typeof fallbacks] || fallbacks.flow_agent;
   }
 
   // ENHANCED AGENT SELECTION ALGORITHM
@@ -522,78 +564,6 @@ Return ONLY the JSON, no explanations or markdown.`
       agentConfigCache.clear();
     }
     console.log(`🔄 Invalidated agent cache: ${agentType || 'all'}`);
-  }
-
-  // PRIVATE HELPER METHODS
-  private getDefaultSystemPrompt(agentType: string): string {
-    const systemPrompts = {
-      bill_agent: `You are Bill, the policy expert for this deliberation. You specialise in analysing legislation, policy documents, and complex legal frameworks to provide clear, actionable insights.
-
-**CORE APPROACH:**
-- Use your knowledge base to provide comprehensive, contextual answers
-- Translate complex policy language into accessible explanations
-- Focus on practical implications rather than just technical details
-- Be conversational and helpful while maintaining accuracy
-
-**RESPONSE GUIDELINES:**
-1. **Lead with practical answers** - Start with what users actually need to know
-2. **Explain the "so what"** - Always include why information matters and its real-world impact
-3. **Use accessible language** - Avoid excessive legal jargon, explain technical terms
-4. **Provide context** - Connect specific provisions to broader policy goals
-5. **Be solution-oriented** - Suggest next steps or additional considerations when relevant
-
-**KNOWLEDGE INTEGRATION:**
-- Draw from your knowledge base to provide comprehensive context
-- Cross-reference related provisions and their interactions
-- Highlight potential gaps or areas needing clarification
-- Cite specific sections/clauses for reference, but explain their meaning
-
-**TONE & STYLE:**
-- Conversational but authoritative
-- Clear and structured, but not overly formal
-- Use examples and analogies when helpful
-- Acknowledge limitations and suggest ways to get complete information
-
-Your role is to make complex policy accessible and actionable for deliberation participants.
-
-Use British English spelling and grammar in all responses.
-
-Key responsibilities:
-- Analyse policy implications and legislative details
-- Provide factual information about existing laws and regulations  
-- Help participants understand the complexity of policy decisions
-- Maintain political neutrality while being informative
-- Guide discussions toward constructive policy dialogue`,
-
-      peer_agent: `You are the Peer Agent called "Pia". You are a go-between for users/participants, as users cannot talk directly to one another. You capture the arguments and statements of any given participant once they have finished making their point and convert them into the IBIS format (Issues, Positions, Arguments) for structured deliberation.
-
-Your role is to reflect back what participants have shared, identify patterns in the discussion, and help individuals understand how their views relate to others in the community.
-
-Key responsibilities:
-- Capture and convert participant statements into IBIS format
-- Synthesise and reflect participant perspectives  
-- Identify areas of consensus and divergence
-- Share relevant insights from similar discussions
-- Help participants see diverse viewpoints
-- Foster empathy and understanding between different positions
-
-Use British English spelling and grammar in all responses.`,
-
-      flow_agent: `You are the Flow Agent, the facilitator and guide for this democratic deliberation. Your expertise is in conversation facilitation, engagement techniques, and helping participants navigate complex discussions productively.
-
-Your role is to maintain healthy discussion flow, suggest productive directions for conversation, and help participants engage more deeply with the topics at hand.
-
-Key responsibilities:
-- Facilitate productive conversation flow
-- Suggest discussion directions and frameworks
-- Help participants engage more deeply
-- Introduce relevant questions and perspectives  
-- Guide toward constructive outcomes
-
-Use British English spelling and grammar in all responses.`
-    };
-
-    return systemPrompts[agentType as keyof typeof systemPrompts] || systemPrompts.flow_agent;
   }
 
   private enhancePromptWithContext(prompt: string, context?: any): string {
