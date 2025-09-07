@@ -139,214 +139,108 @@ serve(async (req) => {
           continue;
         }
 
-        // Use agent orchestration with simpler timeout handling
+        // Robust agent orchestration with multiple retries - NO FALLBACKS
         console.log(`🚀 Invoking agent orchestration for message ${message.id}`);
         
-        const orchestrationPromise = supabase.functions.invoke(
-          'agent-orchestration-stream',
-          {
-            headers: { authorization: authHeader },
-            body: {
-              messageId: message.id,
-              deliberationId: message.deliberation_id,
-              mode: 'bulk_processing'
-            }
-          }
-        );
-
-        // Simple 30-second timeout
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Orchestration timeout after 30s')), 30000)
-        );
-
-        const { error: orchestrationError } = await Promise.race([
-          orchestrationPromise,
-          timeoutPromise
-        ]);
-
-        if (orchestrationError) {
-          console.error(`❌ Agent orchestration failed for message ${message.id}:`, orchestrationError);
-          console.log(`🔧 Initial orchestration failed, creating fallback response for message ${message.id}`);
-          
-          // Get agent info for fallback
-          const { data: agentConfigs } = await supabase
-            .from('agent_configurations')
-            .select('id, name, agent_type')
-            .eq('deliberation_id', message.deliberation_id)
-            .eq('is_active', true)
-            .limit(1);
-          
-          const fallbackAgent = agentConfigs?.[0];
-          const fallbackContent = `Thank you for your message. I'll respond to this shortly as we continue our deliberation.`;
-          
-          // Insert fallback response directly
-          const { error: fallbackError } = await supabase
-            .from('messages')
-            .insert({
-              deliberation_id: message.deliberation_id,
-              user_id: fallbackAgent?.id || message.user_id,
-              content: fallbackContent,
-              message_type: fallbackAgent?.agent_type || 'bill_agent',
-              parent_message_id: message.id,
-              agent_config_id: fallbackAgent?.id,
-              bulk_import_status: 'completed'
-            });
-          
-          if (fallbackError) {
-            console.error(`❌ Fallback response failed for message ${message.id}:`, fallbackError);
-            throw new Error('Both orchestration and fallback failed');
-          }
-          
-          console.log(`✅ Fallback response created for message ${message.id}`);
-          processedCount++;
-          
-          await supabase
-            .from('messages')
-            .update({ bulk_import_status: 'agent_response_generated' })
-            .eq('id', message.id);
-          
-          // Skip to next message since we've handled this one
-          continue;
-        }
-
-        console.log(`✅ Agent orchestration completed for message ${message.id}`);
-
-        // Simple verification - just check once after a reasonable delay
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        let orchestrationSuccess = false;
+        let attempt = 0;
+        const maxAttempts = 5;
         
-        const { data: responseCheck } = await supabase
-          .from('messages')
-          .select('id')
-          .eq('deliberation_id', message.deliberation_id)
-          .eq('parent_message_id', message.id)
-          .neq('message_type', 'user')
-          .limit(1);
-        
-        if (responseCheck && responseCheck.length > 0) {
-          console.log(`🎉 Agent response verified for message ${message.id}`);
-          processedCount++;
+        while (!orchestrationSuccess && attempt < maxAttempts) {
+          attempt++;
+          console.log(`🔄 Orchestration attempt ${attempt}/${maxAttempts} for message ${message.id}`);
           
-          await supabase
-            .from('messages')
-            .update({ bulk_import_status: 'agent_response_generated' })
-            .eq('id', message.id);
-        } else {
-          // One retry attempt
-          console.log(`⚠️ No response found, retrying for message ${message.id}...`);
-          
-          const { error: retryError } = await supabase.functions.invoke(
-            'agent-orchestration-stream',
-            {
-              headers: { authorization: authHeader },
-              body: {
-                messageId: message.id,
-                deliberationId: message.deliberation_id,
-                mode: 'bulk_processing_retry'
+          try {
+            // Longer timeout for orchestration
+            const orchestrationPromise = supabase.functions.invoke(
+              'agent-orchestration-stream',
+              {
+                headers: { authorization: authHeader },
+                body: {
+                  messageId: message.id,
+                  deliberationId: message.deliberation_id,
+                  mode: 'bulk_processing',
+                  attempt: attempt
+                }
               }
-            }
-          );
+            );
 
-          if (!retryError) {
-            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds for retry
-            
-            const { data: retryCheck } = await supabase
-              .from('messages')
-              .select('id')
-              .eq('deliberation_id', message.deliberation_id)
-              .eq('parent_message_id', message.id)
-              .neq('message_type', 'user')
-              .limit(1);
-            
-            if (retryCheck && retryCheck.length > 0) {
-              console.log(`✅ Retry successful for message ${message.id}`);
-              processedCount++;
+            // 60-second timeout per attempt
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Orchestration timeout after 60s')), 60000)
+            );
+
+            const { error: orchestrationError } = await Promise.race([
+              orchestrationPromise,
+              timeoutPromise
+            ]);
+
+            if (orchestrationError) {
+              console.error(`❌ Orchestration attempt ${attempt} failed for message ${message.id}:`, orchestrationError);
               
-              await supabase
-                .from('messages')
-                .update({ bulk_import_status: 'agent_response_generated' })
-                .eq('id', message.id);
+              if (attempt < maxAttempts) {
+                console.log(`⏳ Waiting before retry attempt ${attempt + 1} for message ${message.id}`);
+                await new Promise(resolve => setTimeout(resolve, attempt * 2000)); // Exponential backoff
+                continue;
+              }
             } else {
-              // GUARANTEED FALLBACK - create simple response if orchestration fails
-              console.log(`🔧 Orchestration failed, creating fallback response for message ${message.id}`);
+              console.log(`✅ Agent orchestration completed for message ${message.id}`);
               
-              // Get agent info for fallback
-              const { data: agentConfigs } = await supabase
-                .from('agent_configurations')
-                .select('id, name, agent_type')
-                .eq('deliberation_id', message.deliberation_id)
-                .eq('is_active', true)
-                .limit(1);
-              
-              const fallbackAgent = agentConfigs?.[0];
-              const fallbackContent = `Thank you for your message. I'll respond to this shortly as we continue our deliberation.`;
-              
-              // Insert fallback response directly
-              const { error: fallbackError } = await supabase
-                .from('messages')
-                .insert({
-                  deliberation_id: message.deliberation_id,
-                  user_id: fallbackAgent?.id || message.user_id,
-                  content: fallbackContent,
-                  message_type: fallbackAgent?.agent_type || 'bill_agent',
-                  parent_message_id: message.id,
-                  agent_config_id: fallbackAgent?.id,
-                  bulk_import_status: 'completed'
-                });
-              
-              if (fallbackError) {
-                console.error(`❌ Fallback response failed for message ${message.id}:`, fallbackError);
-                throw new Error('Both orchestration and fallback failed');
+              // Verify the response was created - wait longer and check multiple times
+              let verificationSuccess = false;
+              for (let check = 1; check <= 5; check++) {
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+                
+                const { data: responseCheck } = await supabase
+                  .from('messages')
+                  .select('id, content')
+                  .eq('deliberation_id', message.deliberation_id)
+                  .eq('parent_message_id', message.id)
+                  .neq('message_type', 'user')
+                  .limit(1);
+                
+                if (responseCheck && responseCheck.length > 0) {
+                  console.log(`🎉 Agent response verified for message ${message.id} (check ${check})`);
+                  verificationSuccess = true;
+                  orchestrationSuccess = true;
+                  processedCount++;
+                  
+                  await supabase
+                    .from('messages')
+                    .update({ bulk_import_status: 'agent_response_generated' })
+                    .eq('id', message.id);
+                  break;
+                }
+                
+                console.log(`⏳ Response not found yet for message ${message.id}, check ${check}/5`);
               }
               
-              console.log(`✅ Fallback response created for message ${message.id}`);
-              processedCount++;
-              
-              await supabase
-                .from('messages')
-                .update({ bulk_import_status: 'agent_response_generated' })
-                .eq('id', message.id);
+              if (!verificationSuccess) {
+                console.error(`❌ No response found after orchestration for message ${message.id}, attempt ${attempt}`);
+                if (attempt < maxAttempts) {
+                  console.log(`🔄 Will retry orchestration for message ${message.id}`);
+                  continue;
+                }
+              }
             }
-          } else {
-            // GUARANTEED FALLBACK - create simple response if retry fails
-            console.log(`🔧 Retry failed, creating fallback response for message ${message.id}`);
-            
-            // Get agent info for fallback
-            const { data: agentConfigs } = await supabase
-              .from('agent_configurations')
-              .select('id, name, agent_type')
-              .eq('deliberation_id', message.deliberation_id)
-              .eq('is_active', true)
-              .limit(1);
-            
-            const fallbackAgent = agentConfigs?.[0];
-            const fallbackContent = `Thank you for your message. I'll respond to this shortly as we continue our deliberation.`;
-            
-            // Insert fallback response directly
-            const { error: fallbackError } = await supabase
-              .from('messages')
-              .insert({
-                deliberation_id: message.deliberation_id,
-                user_id: fallbackAgent?.id || message.user_id,
-                content: fallbackContent,
-                message_type: fallbackAgent?.agent_type || 'bill_agent',
-                parent_message_id: message.id,
-                agent_config_id: fallbackAgent?.id,
-                bulk_import_status: 'completed'
-              });
-            
-            if (fallbackError) {
-              console.error(`❌ Fallback response failed for message ${message.id}:`, fallbackError);
-              throw new Error('Both retry and fallback failed');
+          } catch (error) {
+            console.error(`❌ Exception during orchestration attempt ${attempt} for message ${message.id}:`, error);
+            if (attempt < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+              continue;
             }
-            
-            console.log(`✅ Fallback response created for message ${message.id}`);
-            processedCount++;
-            
-            await supabase
-              .from('messages')
-              .update({ bulk_import_status: 'agent_response_generated' })
-              .eq('id', message.id);
           }
+        }
+        
+        // If all attempts failed, mark as failed - DO NOT CREATE FALLBACK
+        if (!orchestrationSuccess) {
+          console.error(`💥 All orchestration attempts failed for message ${message.id}`);
+          failedCount++;
+          
+          await supabase
+            .from('messages')
+            .update({ bulk_import_status: 'orchestration_failed' })
+            .eq('id', message.id);
         }
 
         // Small delay between messages
