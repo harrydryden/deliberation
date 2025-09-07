@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, lazy, Suspense, memo, 
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Bot, User, Users, Workflow, FileText, Plus, Loader2 } from "lucide-react";
+import { Bot, User, Users, Workflow, FileText, Plus, Loader2, Share2, Copy } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMessageTime } from '@/utils/timeDisplay';
 const LazyMarkdownMessage = lazy(() => import("@/components/common/MarkdownMessage").then(m => ({ default: m.MarkdownMessage })));
@@ -101,6 +101,23 @@ const OptimizedMessageItem = memo(({
     onRetry?.(message.id, message.content);
   }, [onRetry, message.id, message.content]);
 
+  const handleShare = useCallback(async () => {
+    try {
+      await navigator.share({
+        title: 'Deliberation Message',
+        text: message.content,
+        url: window.location.href
+      });
+    } catch (err) {
+      // Fallback to clipboard if Web Share API not available
+      await navigator.clipboard.writeText(message.content);
+    }
+  }, [message.content]);
+
+  const handleCopy = useCallback(async () => {
+    await navigator.clipboard.writeText(message.content);
+  }, [message.content]);
+
   return (
     <div className="pb-4">
       <div className="flex gap-3">
@@ -130,8 +147,28 @@ const OptimizedMessageItem = memo(({
             </Suspense>
           </Card>
           
-          {!isUser && deliberationId && (
-            <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleShare}
+              className="text-xs"
+            >
+              <Share2 className="h-3 w-3 mr-1" />
+              Share
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCopy}
+              className="text-xs"
+            >
+              <Copy className="h-3 w-3 mr-1" />
+              Copy
+            </Button>
+            
+            {!isUser && deliberationId && (
               <Button
                 variant="outline"
                 size="sm"
@@ -141,8 +178,8 @@ const OptimizedMessageItem = memo(({
                 <Plus className="h-3 w-3 mr-1" />
                 Add to IBIS
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -257,7 +294,7 @@ export const OptimizedMessageList = memo(({
       {messages.length === 0 && !isTyping ? (
         <div className="text-center text-muted-foreground py-12">
           <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <h3 className="text-lg font-medium mb-2">Welcome to Democratic Deliberation</h3>
+          <h3 className="text-lg font-medium mb-2">Welcome to Deliberation</h3>
           <p>Join the conversation...</p>
         </div>
       ) : (

@@ -1,7 +1,319 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
-import { AgentOrchestrator, type AnalysisResult, type ConversationContext } from '../shared/agent-orchestrator.ts';
+
+// Inline orchestrator types and logic to avoid import issues
+interface AgentConfig {
+  id: string;
+  name: string;
+  description?: string;
+  agent_type: string;
+  goals?: string[];
+  response_style?: string;
+  is_active: boolean;
+  is_default: boolean;
+  deliberation_id?: string;
+  prompt_overrides?: {
+    system_prompt?: string;
+  };
+  facilitator_config?: Record<string, any>;
+  preferred_model?: string;
+}
+
+interface AnalysisResult {
+  intent: string;
+  complexity: number;
+  topicRelevance: number;
+  requiresExpertise: boolean;
+  confidence?: number;
+}
+
+interface ConversationContext {
+  messageCount: number;
+  recentMessages: any[];
+  lastAgentType?: string;
+  userEngagement?: any;
+}
+
+// Simplified inline orchestrator class
+class AgentOrchestrator {
+  private supabase: any;
+  
+  constructor(supabase: any) {
+    this.supabase = supabase;
+  }
+
+  // AI-powered message analysis using OpenAI
+  async analyzeMessage(content: string, openAIApiKey: string): Promise<AnalysisResult> {
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-5-2025-08-07',
+          messages: [
+            {
+              role: 'system',
+              content: 'Analyse this message and return JSON with: intent, complexity (0-1), topicRelevance (0-1), requiresExpertise (boolean). Focus on policy, legal, participant, or clarification intents. Use British English spelling and grammar.'
+            },
+            {
+              role: 'user',
+              content: content
+            }
+          ],
+          max_completion_tokens: 150
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const analysisContent = data.choices?.[0]?.message?.content;
+      
+      if (!analysisContent) {
+        throw new Error('No analysis content received');
+      }
+
+      return JSON.parse(analysisContent);
+    } catch (error) {
+      console.error('❌ Message analysis failed:', error);
+      // Return safe defaults based on content analysis
+      const lowerContent = content.toLowerCase();
+      return { 
+        intent: lowerContent.includes('what') || lowerContent.includes('how') ? 'question' : 
+               lowerContent.includes('policy') || lowerContent.includes('law') ? 'policy' : 'general',
+        complexity: content.length > 200 ? 0.8 : content.length > 100 ? 0.6 : 0.3,
+        topicRelevance: lowerContent.includes('policy') || lowerContent.includes('law') || 
+                       lowerContent.includes('regulation') || lowerContent.includes('bill') ? 0.9 : 0.5,
+        requiresExpertise: lowerContent.includes('legal') || lowerContent.includes('regulation') || 
+                          lowerContent.includes('bill') || lowerContent.includes('legislation')
+      };
+    }
+  }
+
+  // Enhanced agent selection with proper scoring algorithm
+  async selectOptimalAgent(
+    analysis: AnalysisResult, 
+    conversationContext: ConversationContext,
+    deliberationId: string,
+    availableKnowledge: Record<string, boolean> = {}
+  ): Promise<string> {
+    // Get available agent configurations
+    const agentTypes = ['bill_agent', 'peer_agent', 'flow_agent'];
+    const agentConfigs = new Map<string, AgentConfig | null>();
+    
+    // Fetch all agent configs in parallel
+    const configPromises = agentTypes.map(async (type) => {
+      const config = await this.getAgentConfig(type, deliberationId);
+      agentConfigs.set(type, config);
+      return { type, config };
+    });
+    
+    await Promise.all(configPromises);
+    
+    const scores = {
+      bill_agent: 0,
+      peer_agent: 0,
+      flow_agent: 0
+    };
+
+    // Enhanced scoring with agent configuration awareness
+    const factors = {
+      complexity: analysis.complexity || 0.5,
+      requiresExpertise: analysis.requiresExpertise || false,
+      intent: analysis.intent || 'general',
+      topicRelevance: analysis.topicRelevance || 0.5,
+      messageCount: conversationContext.messageCount || 0,
+      recentMessageTypes: this.getRecentMessageTypes(conversationContext.recentMessages || []),
+      hasKnowledge: availableKnowledge
+    };
+
+    // Bill Agent scoring - enhanced with knowledge availability
+    const billConfig = agentConfigs.get('bill_agent');
+    if (billConfig?.is_active !== false) {
+      scores.bill_agent += factors.complexity * 40;
+      scores.bill_agent += factors.requiresExpertise ? 30 : 0;
+      scores.bill_agent += factors.topicRelevance * 25;
+      scores.bill_agent += factors.intent.includes('policy') ? 20 : 0;
+      scores.bill_agent += factors.intent.includes('legal') ? 20 : 0;
+      scores.bill_agent += factors.intent.includes('legislation') ? 25 : 0;
+      scores.bill_agent += factors.hasKnowledge.bill_agent ? 15 : 0;
+    }
+
+    // Peer Agent scoring
+    const peerConfig = agentConfigs.get('peer_agent');
+    if (peerConfig?.is_active !== false) {
+      scores.peer_agent += factors.messageCount > 5 ? 20 : 0;
+      scores.peer_agent += factors.intent.includes('participant') ? 25 : 0;
+      scores.peer_agent += factors.intent.includes('perspective') ? 20 : 0;
+      scores.peer_agent += this.getRecentBillAgentCount(factors.recentMessageTypes) > 2 ? 15 : 0;
+    }
+
+    // Flow Agent scoring  
+    const flowConfig = agentConfigs.get('flow_agent');
+    if (flowConfig?.is_active !== false) {
+      scores.flow_agent += factors.messageCount < 3 ? 25 : 0;
+      scores.flow_agent += factors.intent.includes('question') ? 20 : 0;
+      scores.flow_agent += factors.intent.includes('clarify') ? 25 : 0;
+      scores.flow_agent += factors.complexity < 0.3 ? 15 : 0;
+      scores.flow_agent += this.getRecentFlowAgentCount(factors.recentMessageTypes) === 0 ? 10 : 0;
+    }
+
+    // Anti-repetition logic
+    const lastAgentType = this.getLastAgentType(factors.recentMessageTypes);
+    if (lastAgentType && scores[lastAgentType as keyof typeof scores] !== undefined) {
+      scores[lastAgentType as keyof typeof scores] -= 10;
+    }
+
+    // Select agent with highest score, defaulting to flow_agent
+    const selectedAgent = Object.entries(scores).reduce((max, [agent, score]) => 
+      score > max.score ? { agent, score } : max, 
+      { agent: 'flow_agent', score: -1 }
+    ).agent;
+
+    console.log(`🔬 Enhanced agent scoring results:`, {
+      scores,
+      factors,
+      selected: selectedAgent,
+      availableConfigs: Object.fromEntries(
+        Array.from(agentConfigs.entries()).map(([type, config]) => [type, !!config])
+      )
+    });
+
+    return selectedAgent;
+  }
+
+  // Get agent configuration
+  async getAgentConfig(agentType: string, deliberationId?: string): Promise<AgentConfig | null> {
+    try {
+      const { data: configs } = await this.supabase
+        .from('agent_configurations')
+        .select('*')
+        .eq('agent_type', agentType)
+        .eq('is_active', true)
+        .or(`deliberation_id.eq.${deliberationId || 'null'},deliberation_id.is.null`)
+        .order('deliberation_id', { ascending: false, nullsLast: true })
+        .limit(1);
+
+      return configs?.[0] || null;
+    } catch (error) {
+      console.error(`Failed to get agent config for ${agentType}:`, error);
+      return null;
+    }
+  }
+
+  // Generate system prompt with context enhancement
+  generateSystemPrompt(agentConfig: AgentConfig | null, agentType: string, enhancementContext?: any): string {
+    if (agentConfig?.prompt_overrides?.system_prompt) {
+      return this.enhancePromptWithContext(agentConfig.prompt_overrides.system_prompt, enhancementContext);
+    }
+    
+    if (agentConfig) {
+      // Auto-generate from agent configuration
+      let prompt = `You are ${agentConfig.name}`;
+      
+      if (agentConfig.description) {
+        prompt += `, ${agentConfig.description}`;
+      }
+      
+      if (agentConfig.goals?.length) {
+        prompt += `\n\nYour goals are:\n${agentConfig.goals.map(g => `- ${g}`).join('\n')}`;
+      }
+      
+      if (agentConfig.response_style) {
+        prompt += `\n\nResponse style: ${agentConfig.response_style}`;
+      }
+      
+      return this.enhancePromptWithContext(prompt, enhancementContext);
+    }
+    
+    // Fallback to standardized default prompts
+    return this.enhancePromptWithContext(this.getDefaultSystemPrompt(agentType), enhancementContext);
+  }
+
+  // Helper methods for agent selection
+  private getRecentMessageTypes(messages: any[]): string[] {
+    return messages.slice(0, 5).map(m => m.message_type || 'unknown');
+  }
+
+  private getRecentBillAgentCount(messageTypes: string[]): number {
+    return messageTypes.filter(type => type === 'bill_agent').length;
+  }
+
+  private getRecentFlowAgentCount(messageTypes: string[]): number {
+    return messageTypes.filter(type => type === 'flow_agent').length;
+  }
+
+  private getLastAgentType(messageTypes: string[]): string | null {
+    return messageTypes.find(type => type !== 'user') || null;
+  }
+
+  private getDefaultSystemPrompt(agentType: string): string {
+    const systemPrompts = {
+      bill_agent: `You are the Bill Agent, a specialised AI facilitator for democratic deliberation. Your expertise lies in policy analysis, legislative frameworks, and the nuanced understanding of how laws and regulations impact society.
+
+Your role is to provide factual, balanced information about policy matters, help clarify complex legislative issues, and guide participants toward evidence-based discussions about governance and policy implementation.
+
+Key responsibilities:
+- Analyse policy implications and legislative details
+- Provide factual information about existing laws and regulations  
+- Help participants understand the complexity of policy decisions
+- Maintain political neutrality while being informative
+- Guide discussions toward constructive policy dialogue`,
+
+      peer_agent: `You are the Peer Agent called "Pia". You are a go-between for users/participants, as users cannot talk directly to one another. You capture the arguments and statements of any given participant once they have finished making their point and convert them into the IBIS format (Issues, Positions, Arguments) for structured deliberation.
+
+Your role is to reflect back what participants have shared, identify patterns in the discussion, and help individuals understand how their views relate to others in the community.
+
+Key responsibilities:
+- Capture and convert participant statements into IBIS format
+- Synthesise and reflect participant perspectives  
+- Identify areas of consensus and divergence
+- Share relevant insights from similar discussions
+- Help participants see diverse viewpoints
+- Foster empathy and understanding between different positions`,
+
+      flow_agent: `You are the Flow Agent, the facilitator and guide for this democratic deliberation. Your expertise is in conversation facilitation, engagement techniques, and helping participants navigate complex discussions productively.
+
+Your role is to maintain healthy discussion flow, suggest productive directions for conversation, and help participants engage more deeply with the topics at hand.
+
+Key responsibilities:
+- Facilitate productive conversation flow
+- Suggest discussion directions and frameworks
+- Help participants engage more deeply
+- Introduce relevant questions and perspectives  
+- Guide toward constructive outcomes`
+    };
+
+    return systemPrompts[agentType as keyof typeof systemPrompts] || systemPrompts.flow_agent;
+  }
+
+  private enhancePromptWithContext(prompt: string, context?: any): string {
+    if (!context) return prompt + "\n\nUse British English spelling and grammar throughout your response.";
+
+    if (context.complexity > 0.7) {
+      prompt += "\n\nThis is a complex query requiring detailed analysis and nuanced understanding.";
+    }
+
+    if (context.similarNodes?.length > 0) {
+      prompt += `\n\nThere are ${context.similarNodes.length} related discussion points that may be relevant to reference.`;
+    }
+
+    if (context.knowledgeContext && context.knowledgeContext.length > 0) {
+      prompt += `\n\nRELEVANT KNOWLEDGE CONTEXT:\n${context.knowledgeContext}\n\nUse this knowledge to inform your response when relevant, but always provide balanced and comprehensive information.`;
+    }
+
+    // Add British English instruction
+    prompt += "\n\nUse British English spelling and grammar throughout your response.";
+
+    return prompt;
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,9 +336,14 @@ serve(async (req) => {
       });
     }
 
-    const { messageId, deliberationId, mode } = await req.json();
+    const { messageId, deliberationId, mode = 'stream' } = await req.json();
     
     console.log('🚀 Starting streaming agent orchestration', { messageId, deliberationId, mode });
+    
+    // Special handling for bulk processing mode
+    if (mode === 'bulk_processing') {
+      console.log(`🔄 Bulk processing mode enabled for message ${messageId}`);
+    }
 
     // Create streaming response
     const { readable, writable } = new TransformStream();
@@ -76,20 +393,79 @@ async function processStreamingOrchestration(
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
     
-    // User client for reading messages (respects RLS)
-    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          authorization: authHeader,
-        },
-      },
-    });
-
-    // Service client for writing agent messages (bypasses RLS)
+    // Service client for database operations
     const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // CRITICAL: Use database-based locking to prevent concurrent processing
+    console.log(`🔒 Attempting to acquire processing lock for message ${messageId}...`);
+    
+    // Try to insert a processing record to act as a lock
+    const processingKey = `processing_${messageId}`;
+    const { data: lockResult, error: lockError } = await serviceSupabase
+      .from('message_processing_locks')
+      .insert({ 
+        message_id: messageId,
+        processing_key: processingKey,
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 minute expiry
+      });
+    
+    if (lockError) {
+      // If insert fails, it likely means another process is already handling this
+      if (lockError.code === '23505') { // unique constraint violation
+        console.log(`🔒 Message ${messageId} is already being processed by another instance`);
+        sendData({ content: '', done: true, duplicate: true, reason: 'already_processing' });
+        return;
+      } else {
+        console.error(`❌ Error acquiring processing lock: ${lockError.message}`);
+        sendData({ content: '', done: true, duplicate: true, reason: 'lock_error' });
+        return;
+      }
+    }
+    
+    console.log(`✅ Processing lock acquired for message ${messageId}`);
+    
+    try {
+      // Double-check for existing responses after acquiring lock
+      console.log(`🔍 Double-checking for existing responses after lock acquisition...`);
+      const { data: existingResponses, error: checkError } = await serviceSupabase
+        .from('messages')
+        .select('id, agent_context')
+        .eq('deliberation_id', deliberationId)
+        .eq('parent_message_id', messageId)
+        .neq('message_type', 'user');
+      
+      if (checkError) {
+        console.error(`❌ Error checking existing responses: ${checkError.message}`);
+        sendData({ content: '', done: true, duplicate: true, reason: 'check_error' });
+        return;
+      }
+      
+      if (existingResponses && existingResponses.length > 0) {
+        console.log(`✅ Response(s) already exist for message ${messageId} - skipping processing`);
+        console.log(`   Existing responses: ${existingResponses.map(r => r.id).join(', ')}`);
+        sendData({ 
+          content: '', 
+          done: true,
+          duplicate: true,
+          existingResponseIds: existingResponses.map(r => r.id)
+        });
+        return;
+      }
+      
+      console.log(`✅ No existing responses found for message ${messageId} - proceeding with processing`);
+    
+      // User client for reading messages (respects RLS)
+      const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: {
+            authorization: authHeader,
+          },
+        },
+      });
 
-    // Initialize orchestrator with service client
-    const orchestrator = new AgentOrchestrator(serviceSupabase);
+      // Initialize orchestrator with service client
+      const orchestrator = new AgentOrchestrator(serviceSupabase);
 
     // Get message details using user client (respects RLS)
     const { data: message, error: messageError } = await userSupabase
@@ -103,6 +479,10 @@ async function processStreamingOrchestration(
     }
 
     console.log('📨 Processing message:', message.content);
+
+    // Calculate response timestamp: parent message time + 1 second
+    const parentTimestamp = new Date(message.created_at);
+    const responseTimestamp = new Date(parentTimestamp.getTime() + 1000).toISOString();
 
     // Check response cache first
     const cachedResponse = checkResponseCache(message.content, deliberationId);
@@ -133,18 +513,48 @@ async function processStreamingOrchestration(
       // Cache the response
       cacheResponse(message.content, response, fastPath.agent, deliberationId);
 
-      // Store response using service client
-      await serviceSupabase.from('messages').insert({
+      // Store response using service client with enhanced verification for bulk processing
+      const insertData = {
         content: response,
         message_type: fastPath.agent,
         user_id: message.user_id,
         deliberation_id: deliberationId,
+        parent_message_id: messageId, // Link to the triggering message
+        created_at: responseTimestamp, // Use calculated timestamp for proper ordering
         agent_context: { 
           agent_type: fastPath.agent,
           processing_method: 'high_confidence_fast_path',
-          confidence: fastPath.confidence 
+          confidence: fastPath.confidence,
+          processing_mode: mode
         }
-      });
+      };
+
+      const { data: fastInsertData, error: fastInsertError } = await serviceSupabase.from('messages').insert(insertData);
+
+      if (fastInsertError) {
+        console.error('❌ Fast path database insert error:', fastInsertError);
+        throw new Error(`Failed to save fast path response: ${fastInsertError.message}`);
+      }
+
+      // Enhanced verification for bulk processing
+      if (mode === 'bulk_processing') {
+        console.log('✅ Fast path response stored, verifying for bulk processing...');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        const { data: verifyData } = await serviceSupabase
+          .from('messages')
+          .select('id')
+          .eq('parent_message_id', messageId)
+          .eq('deliberation_id', deliberationId)
+          .neq('message_type', 'user')
+          .single();
+          
+        if (!verifyData) {
+          throw new Error('Fast path response verification failed');
+        }
+        
+        console.log(`✅ Fast path response verified: ${verifyData.id}`);
+      }
 
       sendData({ done: true });
       return;
@@ -171,7 +581,9 @@ async function processStreamingOrchestration(
         [],
         deliberationId,
         openAIApiKey,
-        sendData
+        sendData,
+        orchestrator,
+        mode
       );
 
       // Store response using service client
@@ -180,6 +592,8 @@ async function processStreamingOrchestration(
         message_type: 'bill_agent',
         user_id: message.user_id,
         deliberation_id: deliberationId,
+        parent_message_id: messageId, // Link to the triggering message
+        created_at: responseTimestamp, // Use calculated timestamp for proper ordering
         agent_context: { 
           agent_type: 'bill_agent',
           processing_method: 'mode_forced',
@@ -194,19 +608,38 @@ async function processStreamingOrchestration(
     // Enhanced orchestration using unified service
     console.log('🔄 Using enhanced orchestration');
     
-    // Parallel analysis and context gathering
-    const analysisPromise = orchestrator.analyzeMessage(message.content, openAIApiKey);
-    const conversationPromise = getConversationState(userSupabase, deliberationId, message.user_id);
-    const similarNodesPromise = findSimilarNodes(userSupabase, message.content);
-    const knowledgePromise = checkAvailableKnowledge(serviceSupabase, deliberationId);
+    // For bulk processing, skip complex analysis to avoid timeouts
+    let analysis, conversationState, similarNodes, availableKnowledge;
+    
+    if (mode === 'bulk_processing') {
+      console.log('📦 Bulk mode: Using simplified analysis');
+      // Use default analysis for bulk processing
+      analysis = {
+        intent: 'general',
+        complexity: 0.5,
+        topicRelevance: 0.5,
+        requiresExpertise: false
+      };
+      // Get simplified context
+      conversationState = await getConversationState(userSupabase, deliberationId, message.user_id);
+      similarNodes = [];
+      availableKnowledge = await checkAvailableKnowledge(serviceSupabase, deliberationId);
+    } else {
+      // Full analysis for normal processing
+      console.log('🔄 Full analysis mode');
+      const analysisPromise = orchestrator.analyzeMessage(message.content, openAIApiKey);
+      const conversationPromise = getConversationState(userSupabase, deliberationId, message.user_id);
+      const similarNodesPromise = findSimilarNodes(userSupabase, message.content);
+      const knowledgePromise = checkAvailableKnowledge(serviceSupabase, deliberationId);
 
-    // Wait for all parallel operations
-    const [analysis, conversationState, similarNodes, availableKnowledge] = await Promise.all([
-      analysisPromise,
-      conversationPromise,
-      similarNodesPromise,
-      knowledgePromise
-    ]);
+      // Wait for all parallel operations
+      [analysis, conversationState, similarNodes, availableKnowledge] = await Promise.all([
+        analysisPromise,
+        conversationPromise,
+        similarNodesPromise,
+        knowledgePromise
+      ]);
+    }
 
     console.log('📊 Analysis complete, selecting optimal agent...');
 
@@ -235,7 +668,8 @@ async function processStreamingOrchestration(
         deliberationId,
         openAIApiKey,
         sendData,
-        orchestrator
+        orchestrator,
+        mode
       );
 
       console.log(`✅ Generated response length: ${response.length}`);
@@ -246,22 +680,69 @@ async function processStreamingOrchestration(
 
       // Store final response using service client
       console.log('💾 Storing response in database...');
-      const { data: insertData, error: insertError } = await serviceSupabase.from('messages').insert({
+      
+      const insertData = {
         content: response,
         message_type: selectedAgent,
         user_id: message.user_id,
         deliberation_id: deliberationId,
+        parent_message_id: messageId, // Link to the triggering message
+        created_at: responseTimestamp, // Use calculated timestamp for proper ordering
         agent_context: { 
           agent_type: selectedAgent,
           processing_method: 'full_orchestration',
-          analysis 
+          analysis: analysis,
+          processing_mode: mode
         }
-      });
+      };
+
+      const { data: insertResult, error: insertError } = await serviceSupabase
+        .from('messages')
+        .insert(insertData)
+        .select('id')
+        .single();
 
       if (insertError) {
         console.error('❌ Database insert error:', insertError);
+        sendData({ error: 'Failed to save response to database', insertError: insertError.message });
+        throw new Error(`Failed to save response: ${insertError.message}`);
       } else {
         console.log('✅ Response stored successfully in database');
+        
+        // Enhanced verification for bulk processing
+        if (mode === 'bulk_processing') {
+          console.log('🔍 Running enhanced verification for bulk processing...');
+          
+          // Wait for database write to complete
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          const { data: verifyData } = await serviceSupabase
+            .from('messages')
+            .select('id, content')
+            .eq('id', insertResult.id)
+            .single();
+          
+          if (!verifyData || !verifyData.content) {
+            console.error('❌ Bulk processing verification failed - no content found');
+            throw new Error('Bulk processing verification failed');
+          } else {
+            console.log(`✅ Bulk processing response verified: ${verifyData.id}`);
+          }
+        } else {
+          // Standard verification for regular processing
+          const { data: verifyData } = await serviceSupabase
+            .from('messages')
+            .select('id, content')
+            .eq('id', insertResult.id)
+            .single();
+          
+          if (!verifyData || !verifyData.content) {
+            console.error('❌ Response verification failed - no content found');
+            throw new Error('Response verification failed');
+          } else {
+            console.log('✅ Response verified in database');
+          }
+        }
       }
 
     } catch (responseError) {
@@ -278,6 +759,24 @@ async function processStreamingOrchestration(
   } catch (error) {
     console.error('❌ Streaming processing error:', error);
     sendData({ error: error.message, done: true });
+  } finally {
+    // Release the processing lock
+    console.log(`🔓 Releasing processing lock for message ${messageId}...`);
+    try {
+      const processingKey = `processing_${messageId}`;
+      await serviceSupabase
+        .from('message_processing_locks')
+        .delete()
+        .eq('processing_key', processingKey);
+      console.log(`✅ Processing lock released for message ${messageId}`);
+    } catch (unlockError) {
+      console.error(`❌ Error releasing processing lock: ${unlockError.message}`);
+    }
+  }
+  
+  } catch (mainError) {
+    console.error('❌ Main orchestration error:', mainError);
+    sendData({ error: mainError.message, done: true });
   }
 }
 
@@ -467,7 +966,8 @@ async function generateStreamingResponse(
   deliberationId: string,
   openAIApiKey: string,
   sendData: (data: any) => void,
-  orchestrator: AgentOrchestrator
+  orchestrator: AgentOrchestrator,
+  mode: string = 'stream'
 ): Promise<string> {
   // Get agent configuration through orchestrator
   const agentConfig = await orchestrator.getAgentConfig(agentType, deliberationId);
@@ -502,14 +1002,16 @@ async function generateStreamingResponse(
     throw new Error('System prompt is empty or undefined');
   }
 
+  const useStreaming = mode !== 'bulk_processing';
+  
   const requestBody: any = {
     model,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: content }
     ],
-    stream: true,
-    max_completion_tokens: 1500
+    stream: useStreaming,
+    max_completion_tokens: 3000
   };
 
   console.log('🔧 Request body preview:', JSON.stringify({
@@ -522,7 +1024,9 @@ async function generateStreamingResponse(
     max_completion_tokens: requestBody.max_completion_tokens
   }, null, 2));
 
-  console.log('🚀 About to make OpenAI API call...');
+  console.log(`🚀 About to make OpenAI API call (${useStreaming ? 'streaming' : 'non-streaming'})...`);
+  console.log('📏 User content length:', content?.length || 0);
+  console.log('📝 User content preview:', content?.substring(0, 200) + '...');
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -532,6 +1036,9 @@ async function generateStreamingResponse(
     },
     body: JSON.stringify(requestBody),
   });
+
+  console.log('📡 Response status:', response.status);
+  console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -568,6 +1075,18 @@ async function generateStreamingResponse(
   console.log(`✅ OpenAI API call successful for ${agentType}`);
   console.log('📡 Response status:', response.status);
   console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
+  // Handle non-streaming response for bulk processing
+  if (!useStreaming) {
+    console.log('📦 Processing non-streaming response for bulk mode');
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    console.log(`✅ Non-streaming response received: ${content.length} characters`);
+    
+    // Send the content as if it were streamed
+    sendData({ content, done: false });
+    return content;
+  }
 
   const reader = response.body?.getReader();
   const decoder = new TextDecoder();
@@ -664,29 +1183,87 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
     const agentId = billAgents[0].id;
     console.log(`📚 Querying knowledge for agent: ${agentId}`);
 
-    // Try LangChain query first (more advanced)
-    try {
-      const { data, error } = await supabase.functions.invoke('langchain-query-knowledge', {
-        body: { 
-          query, 
-          agentId, 
-          maxResults: 5 
-        }
-      });
+    // Try LangChain query first (more advanced) with retry logic
+    let langchainSuccess = false;
+    const maxRetries = 2;
+    
+    for (let attempt = 1; attempt <= maxRetries && !langchainSuccess; attempt++) {
+      try {
+        console.log(`📚 LangChain attempt ${attempt}/${maxRetries}`);
+        
+        const langchainPromise = supabase.functions.invoke('langchain-query-knowledge', {
+          body: { 
+            query, 
+            agentId, 
+            maxResults: 5 
+          }
+        });
+        
+        // Add timeout to LangChain call
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('LangChain timeout')), 45000);
+        });
+        
+        const { data, error } = await Promise.race([langchainPromise, timeoutPromise]);
 
-      if (!error && data?.response) {
-        console.log('📚 LangChain knowledge retrieved successfully');
-        return data.response;
-      } else {
-        console.log('📚 LangChain query failed, falling back to direct knowledge query');
+        if (!error && data?.response) {
+          console.log('✅ LangChain knowledge retrieved successfully');
+          langchainSuccess = true;
+          return data.response;
+        } else {
+          console.log(`❌ LangChain attempt ${attempt} failed:`, error?.message || 'No response');
+          if (attempt === maxRetries) {
+            console.log('📚 All LangChain attempts failed, falling back to direct query');
+          }
+        }
+      } catch (langchainError) {
+        console.warn(`❌ LangChain attempt ${attempt} error:`, langchainError.message);
+        if (langchainError.message.includes('timeout')) {
+          console.log('🕒 LangChain timeout detected');
+        }
+        if (attempt === maxRetries) {
+          console.warn('📚 All LangChain attempts failed, using fallback');
+        }
       }
-    } catch (langchainError) {
-      console.warn('📚 LangChain function not available, using fallback:', langchainError);
+      
+      // Wait before retry (except on last attempt)
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
     }
 
-    // Fallback removed - query-agent-knowledge-optimized function deleted
-    // If LangChain query fails, we'll return empty string
-    console.log('📚 LangChain query failed, no fallback available');
+    // Fallback: Use direct Supabase query for knowledge retrieval
+    console.log('📚 LangChain query failed, using direct knowledge query as fallback');
+    
+    try {
+      const { data: knowledgeData } = await supabase
+        .rpc('match_agent_knowledge', {
+          query_embedding: null, // Will need embedding but for now just get random knowledge
+          match_count: 5,
+          agent_filter: agentId
+        });
+
+      if (knowledgeData && knowledgeData.length > 0) {
+        const contextChunks = knowledgeData.map((item: any) => item.content).join('\n\n');
+        console.log(`📚 Retrieved ${knowledgeData.length} knowledge chunks via fallback`);
+        return contextChunks;
+      }
+      
+      // If no specific knowledge, get general agent knowledge
+      const { data: generalKnowledge } = await supabase
+        .from('agent_knowledge')
+        .select('content, metadata')
+        .eq('agent_id', agentId)
+        .limit(3);
+        
+      if (generalKnowledge && generalKnowledge.length > 0) {
+        const contextChunks = generalKnowledge.map((item: any) => item.content).join('\n\n');
+        console.log(`📚 Retrieved ${generalKnowledge.length} general knowledge chunks`);
+        return contextChunks;
+      }
+    } catch (fallbackError) {
+      console.error('📚 Fallback knowledge query error:', fallbackError);
+    }
 
     return '';
   } catch (error) {

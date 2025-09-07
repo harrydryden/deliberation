@@ -31,6 +31,7 @@ export type Database = {
           preset_questions: Json | null
           prompt_overrides: Json | null
           response_style: string | null
+          updated_at: string | null
         }
         Insert: {
           agent_type: string
@@ -48,6 +49,7 @@ export type Database = {
           preset_questions?: Json | null
           prompt_overrides?: Json | null
           response_style?: string | null
+          updated_at?: string | null
         }
         Update: {
           agent_type?: string
@@ -65,6 +67,7 @@ export type Database = {
           preset_questions?: Json | null
           prompt_overrides?: Json | null
           response_style?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -253,6 +256,65 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      bulk_import_batches: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          deliberation_id: string
+          error_details: Json | null
+          failed_messages: number
+          filename: string
+          id: string
+          import_status: string
+          imported_messages: number
+          processed_messages: number
+          processing_log: Json | null
+          processing_status: string
+          total_messages: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          deliberation_id: string
+          error_details?: Json | null
+          failed_messages?: number
+          filename: string
+          id?: string
+          import_status?: string
+          imported_messages?: number
+          processed_messages?: number
+          processing_log?: Json | null
+          processing_status?: string
+          total_messages?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          deliberation_id?: string
+          error_details?: Json | null
+          failed_messages?: number
+          filename?: string
+          id?: string
+          import_status?: string
+          imported_messages?: number
+          processed_messages?: number
+          processing_log?: Json | null
+          processing_status?: string
+          total_messages?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_import_batches_deliberation_id_fkey"
+            columns: ["deliberation_id"]
+            isOneToOne: false
+            referencedRelation: "deliberations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       classified_items: {
         Row: {
@@ -741,9 +803,49 @@ export type Database = {
         }
         Relationships: []
       }
+      message_processing_locks: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          message_id: string
+          processing_key: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          message_id: string
+          processing_key: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          message_id?: string
+          processing_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_message_processing_locks_message_id"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "anonymized_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_message_processing_locks_message_id"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           agent_context: Json | null
+          bulk_import_status: string | null
           content: string
           created_at: string | null
           deliberation_id: string | null
@@ -756,6 +858,7 @@ export type Database = {
         }
         Insert: {
           agent_context?: Json | null
+          bulk_import_status?: string | null
           content: string
           created_at?: string | null
           deliberation_id?: string | null
@@ -768,6 +871,7 @@ export type Database = {
         }
         Update: {
           agent_context?: Json | null
+          bulk_import_status?: string | null
           content?: string
           created_at?: string | null
           deliberation_id?: string | null
@@ -1266,6 +1370,10 @@ export type Database = {
       can_user_change_role: {
         Args: { new_role: string; target_user_id: string }
         Returns: boolean
+      }
+      cleanup_expired_processing_locks: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       cleanup_orphaned_sessions: {
         Args: Record<PropertyKey, never>
