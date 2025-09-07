@@ -134,18 +134,6 @@ serve(async (req) => {
     return createErrorResponse(error, 500, 'message classification');
   }
 });
-        .limit(1)
-      
-      hasExistingNodes = existingNodes && existingNodes.length > 0
-      
-      if (deliberation) {
-        deliberationNotion = deliberation.notion || ''
-        deliberationContext = `\n\nDeliberation Context:
-Title: "${deliberation.title}"
-Description: "${deliberation.description || 'No description provided'}"
-Notion: "${deliberationNotion}"`
-      }
-    }
 
     // Get classification prompt from template system
     const prompt = await getClassificationPrompt(supabase, content, deliberationContext, deliberationNotion)
