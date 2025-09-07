@@ -138,7 +138,11 @@ serve(async (req) => {
 
     if (participantsError) {
       console.error('Error checking participants:', participantsError);
-      return new Response(JSON.stringify({ error: 'Error validating participants' }), {
+      return new Response(JSON.stringify({ 
+        error: 'Error validating participants', 
+        details: participantsError.message,
+        user_ids_checked: uniqueUserIds
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -148,9 +152,12 @@ serve(async (req) => {
     const missingUsers = uniqueUserIds.filter(id => !participantUserIds.includes(id));
 
     if (missingUsers.length > 0) {
+      console.error('Missing users not in deliberation:', missingUsers);
       return new Response(JSON.stringify({ 
         error: 'Some users are not participants in this deliberation',
-        missing_users: missingUsers
+        missing_users: missingUsers,
+        found_participants: participantUserIds,
+        all_csv_users: uniqueUserIds
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
