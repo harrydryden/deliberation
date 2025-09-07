@@ -23,7 +23,10 @@ export abstract class SupabaseBaseRepository {
     return user?.id || null;
   }
 
+  // Note: Admin status checking is handled by useSupabaseAuth hook in components
+  // This repository should focus on data operations, not auth logic
   protected async isCurrentUserAdmin(): Promise<boolean> {
+    // This method is deprecated - use useSupabaseAuth().isAdmin in components
     const userId = await this.getCurrentUserId();
     if (!userId) return false;
 

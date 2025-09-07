@@ -44,7 +44,7 @@ export class IssueRecommendationService {
       }
 
       // Call AI service for recommendations using OpenAI
-      const aiRecommendations = await this.getAIRecommendations('', content, existingIssues);
+      const aiRecommendations = await this.getAIRecommendations('', content, existingIssues, userId);
 
       // If AI recommendations failed, use fallback
       if (!aiRecommendations || aiRecommendations.length === 0) {
@@ -111,19 +111,17 @@ export class IssueRecommendationService {
 
   /**
    * Get AI recommendations using OpenAI via Supabase Edge Function
+   * @param userId - The authenticated user ID (passed from component)
    */
   private async getAIRecommendations(
     prompt: string, 
     content: string, 
-    existingIssues: Array<{ id: string; title: string; description?: string }>
+    existingIssues: Array<{ id: string; title: string; description?: string }>,
+    userId: string
   ): Promise<IssueRecommendation[]> {
     try {
-      // Get current user from Supabase auth
-      const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
-      
       if (!userId) {
-        logger.error('[IssueRecommendationService] No authenticated user found');
+        logger.error('[IssueRecommendationService] No user ID provided');
         return [];
       }
 

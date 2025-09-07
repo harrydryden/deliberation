@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Agent } from '@/types/index';
 import { useToast } from '@/hooks/use-toast';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { logger } from '@/utils/logger';
 
 export const useUserAgents = () => {
+  const { user } = useSupabaseAuth();
   const [localAgents, setLocalAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -12,8 +14,7 @@ export const useUserAgents = () => {
   const fetchUserAccessibleLocalAgents = async () => {
     setLoading(true);
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      // Check if user is authenticated
       if (!user) {
         setLocalAgents([]);
         return;

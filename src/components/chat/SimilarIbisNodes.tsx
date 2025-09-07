@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 
@@ -30,12 +31,13 @@ const SimilarIbisNodes: React.FC<SimilarIbisNodesProps> = ({
   messageId, 
   deliberationId 
 }) => {
+  const { user } = useSupabaseAuth();
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   const handleRate = async (nodeId: string, rating: 1 | -1) => {
-    if (!deliberationId) return;
+    if (!deliberationId || !user?.id) return;
     
     setLoading(prev => ({ ...prev, [nodeId]: true }));
     
@@ -45,7 +47,7 @@ const SimilarIbisNodes: React.FC<SimilarIbisNodesProps> = ({
         .upsert({
           ibis_node_id: nodeId,
           message_id: messageId,
-          user_id: (await supabase.auth.getUser()).data.user?.id,
+          user_id: user.id,
           rating,
           deliberation_id: deliberationId,
         }, {
