@@ -14,14 +14,6 @@ serve(async (req) => {
   }
 
   try {
-    // Check for required OpenAI API key
-    if (!Deno.env.get('OPENAI_API_KEY')) {
-      return new Response(JSON.stringify({ error: 'OpenAI API key not configured' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -121,7 +113,7 @@ serve(async (req) => {
     let processedCount = 0;
     let failedCount = 0;
 
-    // Simple, reliable processing - one message at a time
+    // Simple, reliable processing - one message at a time with agent orchestration
     for (let i = 0; i < messages.length; i++) {
       const message = messages[i];
       console.log(`🔄 Processing message ${i + 1}/${messages.length}: ${message.id}`);
@@ -147,92 +139,102 @@ serve(async (req) => {
           continue;
         }
 
-        // Get recent messages for context
-        const { data: recentMessages } = await supabase
-          .from('messages')
-          .select('id, content, message_type, created_at, agent_config_id')
-          .eq('deliberation_id', message.deliberation_id)
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        // Get agent configs for this deliberation
-        const { data: agentConfigs } = await supabase
-          .from('agent_configurations')
-          .select('id, name, agent_type, system_prompt, response_style, goals')
-          .eq('deliberation_id', message.deliberation_id)
-          .eq('is_active', true);
-
-        if (!agentConfigs || agentConfigs.length === 0) {
-          console.log(`⚠️ No active agent configs found for deliberation ${message.deliberation_id}`);
-          failedCount++;
-          continue;
-        }
-
-        // Simple agent selection - just use the first active agent of type bill_agent, or any agent
-        const billAgent = agentConfigs.find(a => a.agent_type === 'bill_agent');
-        const selectedAgent = billAgent || agentConfigs[0];
-
-        console.log(`🤖 Selected agent: ${selectedAgent.name} (${selectedAgent.agent_type})`);
-
-        // Create agent response directly via OpenAI
-        const systemPrompt = selectedAgent.system_prompt || `You are ${selectedAgent.name}. ${selectedAgent.response_style || ''}`;
+        // Use agent orchestration with simpler timeout handling
+        console.log(`🚀 Invoking agent orchestration for message ${message.id}`);
         
-        const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'gpt-4',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: message.content }
-            ],
-            max_tokens: 2000,
-            temperature: 0.7
-          })
-        });
+        const orchestrationPromise = supabase.functions.invoke(
+          'agent-orchestration-stream',
+          {
+            headers: { authorization: authHeader },
+            body: {
+              messageId: message.id,
+              deliberationId: message.deliberation_id,
+              mode: 'bulk_processing'
+            }
+          }
+        );
 
-        if (!openAIResponse.ok) {
-          throw new Error(`OpenAI API error: ${openAIResponse.status}`);
+        // Simple 30-second timeout
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Orchestration timeout after 30s')), 30000)
+        );
+
+        const { error: orchestrationError } = await Promise.race([
+          orchestrationPromise,
+          timeoutPromise
+        ]);
+
+        if (orchestrationError) {
+          console.error(`❌ Agent orchestration failed for message ${message.id}:`, orchestrationError);
+          throw orchestrationError;
         }
 
-        const openAIData = await openAIResponse.json();
-        const agentResponseContent = openAIData.choices[0]?.message?.content;
+        console.log(`✅ Agent orchestration completed for message ${message.id}`);
 
-        if (!agentResponseContent) {
-          throw new Error('No response content from OpenAI');
-        }
-
-        // Insert agent response message
-        const { error: insertError } = await supabase
+        // Simple verification - just check once after a reasonable delay
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        
+        const { data: responseCheck } = await supabase
           .from('messages')
-          .insert({
-            deliberation_id: message.deliberation_id,
-            user_id: selectedAgent.id, // Use agent config ID as user_id for agent messages
-            content: agentResponseContent,
-            message_type: selectedAgent.agent_type,
-            parent_message_id: message.id,
-            agent_config_id: selectedAgent.id,
-            bulk_import_status: 'completed'
-          });
+          .select('id')
+          .eq('deliberation_id', message.deliberation_id)
+          .eq('parent_message_id', message.id)
+          .neq('message_type', 'user')
+          .limit(1);
+        
+        if (responseCheck && responseCheck.length > 0) {
+          console.log(`🎉 Agent response verified for message ${message.id}`);
+          processedCount++;
+          
+          await supabase
+            .from('messages')
+            .update({ bulk_import_status: 'agent_response_generated' })
+            .eq('id', message.id);
+        } else {
+          // One retry attempt
+          console.log(`⚠️ No response found, retrying for message ${message.id}...`);
+          
+          const { error: retryError } = await supabase.functions.invoke(
+            'agent-orchestration-stream',
+            {
+              headers: { authorization: authHeader },
+              body: {
+                messageId: message.id,
+                deliberationId: message.deliberation_id,
+                mode: 'bulk_processing_retry'
+              }
+            }
+          );
 
-        if (insertError) {
-          throw new Error(`Failed to insert agent response: ${insertError.message}`);
+          if (!retryError) {
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds for retry
+            
+            const { data: retryCheck } = await supabase
+              .from('messages')
+              .select('id')
+              .eq('deliberation_id', message.deliberation_id)
+              .eq('parent_message_id', message.id)
+              .neq('message_type', 'user')
+              .limit(1);
+            
+            if (retryCheck && retryCheck.length > 0) {
+              console.log(`✅ Retry successful for message ${message.id}`);
+              processedCount++;
+              
+              await supabase
+                .from('messages')
+                .update({ bulk_import_status: 'agent_response_generated' })
+                .eq('id', message.id);
+            } else {
+              throw new Error('No response after retry');
+            }
+          } else {
+            throw new Error(`Retry failed: ${retryError.message}`);
+          }
         }
 
-        // Mark original message as processed
-        await supabase
-          .from('messages')
-          .update({ bulk_import_status: 'agent_response_generated' })
-          .eq('id', message.id);
-
-        console.log(`✅ Successfully created agent response for message ${message.id}`);
-        processedCount++;
-
-        // Small delay to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Small delay between messages
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
       } catch (error) {
         console.error(`❌ Failed to process message ${message.id}:`, error);
@@ -244,8 +246,8 @@ serve(async (req) => {
           .eq('id', message.id);
       }
 
-      // Update progress every 10 messages
-      if (i % 10 === 0 || i === messages.length - 1) {
+      // Update progress every 5 messages
+      if (i % 5 === 0 || i === messages.length - 1) {
         const successRate = ((processedCount / (processedCount + failedCount)) * 100).toFixed(1);
         console.log(`📊 Progress: ${processedCount + failedCount}/${messages.length} (${successRate}% success rate)`);
         
