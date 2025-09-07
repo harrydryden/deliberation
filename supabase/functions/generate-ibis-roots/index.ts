@@ -28,10 +28,7 @@ async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string,
       return template.template_text
         .replace(/\{\{deliberation_title\}\}/g, deliberationTitle)
         .replace(/\{\{deliberation_description\}\}/g, deliberationDescription || 'No description provided')
-        .replace(/\{\{notion\}\}/g, notion || 'No notion statement provided');
-    }
-        .replace('{deliberationDescription}', deliberationDescription || 'No description provided')
-        .replace('{notion}', notion ? `Notion for stance scoring: ${notion}` : '')
+        .replace(/\{\{notion_context\}\}/g, notion || 'No notion statement provided');
     }
   } catch (error) {
     console.log('Failed to fetch IBIS generation prompt template:', error)
