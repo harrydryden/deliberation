@@ -114,7 +114,7 @@ const OptimizedMessageItem = memo(({
       <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
         <div className={`flex gap-3 max-w-[80%] ${isUser ? 'flex-row-reverse' : ''}`}>
           <Avatar className="h-8 w-8 flex-shrink-0">
-            <AvatarFallback className={isUser ? 'bg-primary' : agentInfo?.color || 'bg-muted-foreground'}>
+            <AvatarFallback className={isUser ? 'bg-accent' : agentInfo?.color || 'bg-muted-foreground'}>
               {isUser ? (
                 <User className="h-4 w-4 text-white" />
               ) : (
