@@ -95,8 +95,6 @@ export const AdminDashboard = () => {
 
         <TabsContent value="agents" className="space-y-4">
           <div className="space-y-6">
-            <AgentManagement />
-            <PromptManagement />
             <LocalAgentManagement
               localAgents={adminData.localAgents}
               deliberations={adminData.deliberations}
@@ -105,6 +103,8 @@ export const AdminDashboard = () => {
               onUpdate={adminData.updateLocalAgent}
               onCreate={adminData.createLocalAgent}
             />
+            <AgentManagement />
+            <PromptManagement />
           </div>
         </TabsContent>
 
