@@ -219,46 +219,54 @@ export class AgentOrchestrator {
       ibisNodeCount
     };
 
-    // Bill Agent scoring - enhanced with knowledge availability
+    // Bill Agent scoring - normalized to max ~100 points
     const billConfig = agentConfigs.get('bill_agent');
-    if (billConfig?.is_active !== false) { // Only score if agent exists and is active
-      scores.bill_agent += factors.complexity * 40;
-      scores.bill_agent += factors.requiresExpertise ? 30 : 0;
-      scores.bill_agent += factors.topicRelevance * 25;
-      scores.bill_agent += factors.intent.includes('policy') ? 20 : 0;
-      scores.bill_agent += factors.intent.includes('legal') ? 20 : 0;
-      scores.bill_agent += factors.intent.includes('legislation') ? 25 : 0;
-      scores.bill_agent += factors.hasKnowledge.bill_agent ? 15 : 0; // Boost if knowledge available
+    if (billConfig?.is_active !== false) {
+      scores.bill_agent += factors.complexity * 30;  // Reduced from 40
+      scores.bill_agent += factors.requiresExpertise ? 25 : 0;  // Reduced from 30
+      scores.bill_agent += factors.topicRelevance * 20;  // Reduced from 25
+      scores.bill_agent += factors.intent.includes('policy') ? 15 : 0;  // Reduced from 20
+      scores.bill_agent += factors.intent.includes('legal') ? 15 : 0;  // Reduced from 20
+      scores.bill_agent += factors.intent.includes('legislation') ? 20 : 0;  // Reduced from 25
+      scores.bill_agent += factors.hasKnowledge.bill_agent ? 10 : 0;  // Reduced from 15
     }
 
-    // Peer Agent scoring - reduced when IBIS has fewer than 10 nodes
+    // Peer Agent scoring - gradual reduction when IBIS has fewer than 10 nodes
     const peerConfig = agentConfigs.get('peer_agent');
     if (peerConfig?.is_active !== false) {
-      scores.peer_agent += factors.messageCount > 5 ? 20 : 0;
-      scores.peer_agent += factors.intent.includes('participant') ? 25 : 0;
-      scores.peer_agent += factors.intent.includes('perspective') ? 20 : 0;
-      scores.peer_agent += this.getRecentBillAgentCount(factors.recentMessageTypes) > 2 ? 15 : 0;
+      scores.peer_agent += factors.messageCount > 5 ? 25 : 0;  // Increased from 20
+      scores.peer_agent += factors.messageCount >= 3 && factors.messageCount <= 5 ? 15 : 0;  // Fill the gap
+      scores.peer_agent += factors.intent.includes('participant') ? 30 : 0;  // Increased from 25
+      scores.peer_agent += factors.intent.includes('perspective') ? 25 : 0;  // Increased from 20
+      scores.peer_agent += this.getRecentBillAgentCount(factors.recentMessageTypes) > 2 ? 20 : 0;  // Increased from 15
+      scores.peer_agent += factors.hasKnowledge.peer_agent ? 10 : 0;  // Added knowledge boost
       
-      // CRITICAL: Reduce Peer agent priority until IBIS has 10+ nodes
+      // CRITICAL: Gradual reduction based on IBIS node count (less aggressive)
       if (factors.ibisNodeCount < 10) {
-        scores.peer_agent -= 25; // Significant penalty for early deliberation
-        console.log(`🚫 Peer agent penalty applied: IBIS has only ${factors.ibisNodeCount} nodes (need 10+)`);
+        const reductionFactor = Math.max(0, (10 - factors.ibisNodeCount) / 10);  // 0-1 based on how far below 10
+        const penalty = Math.floor(reductionFactor * 15);  // Max 15 point penalty, not 25
+        scores.peer_agent -= penalty;
+        console.log(`🚫 Peer agent penalty applied: -${penalty} points (${factors.ibisNodeCount}/10 nodes)`);
       }
     }
 
-    // Flow Agent scoring - boosted when IBIS has fewer than 10 nodes
+    // Flow Agent scoring - gradual boost when IBIS has fewer than 10 nodes
     const flowConfig = agentConfigs.get('flow_agent');
     if (flowConfig?.is_active !== false) {
-      scores.flow_agent += factors.messageCount < 3 ? 25 : 0;
-      scores.flow_agent += factors.intent.includes('question') ? 20 : 0;
-      scores.flow_agent += factors.intent.includes('clarify') ? 25 : 0;
-      scores.flow_agent += factors.complexity < 0.3 ? 15 : 0;
-      scores.flow_agent += this.getRecentFlowAgentCount(factors.recentMessageTypes) === 0 ? 10 : 0;
+      scores.flow_agent += factors.messageCount < 3 ? 30 : 0;  // Increased from 25
+      scores.flow_agent += factors.messageCount >= 3 && factors.messageCount <= 5 ? 20 : 0;  // Fill the gap
+      scores.flow_agent += factors.intent.includes('question') ? 25 : 0;  // Increased from 20
+      scores.flow_agent += factors.intent.includes('clarify') ? 30 : 0;  // Increased from 25
+      scores.flow_agent += factors.complexity < 0.3 ? 20 : 0;  // Increased from 15
+      scores.flow_agent += this.getRecentFlowAgentCount(factors.recentMessageTypes) === 0 ? 15 : 0;  // Increased from 10
+      scores.flow_agent += factors.hasKnowledge.flow_agent ? 10 : 0;  // Added knowledge boost
       
-      // CRITICAL: Boost Flow agent until IBIS has 10+ nodes
+      // CRITICAL: Gradual boost based on IBIS node count (less aggressive)
       if (factors.ibisNodeCount < 10) {
-        scores.flow_agent += 30; // Strong boost for early deliberation
-        console.log(`🚀 Flow agent boost applied: IBIS has only ${factors.ibisNodeCount} nodes (need 10+)`);
+        const boostFactor = Math.max(0, (10 - factors.ibisNodeCount) / 10);  // 0-1 based on how far below 10
+        const boost = Math.floor(boostFactor * 20);  // Max 20 point boost, not 30
+        scores.flow_agent += boost;
+        console.log(`🚀 Flow agent boost applied: +${boost} points (${factors.ibisNodeCount}/10 nodes)`);
       }
     }
 
