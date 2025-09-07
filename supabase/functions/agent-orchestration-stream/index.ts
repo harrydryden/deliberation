@@ -481,11 +481,6 @@ async function processStreamingOrchestration(
     console.error('❌ Streaming processing error:', error);
     sendData({ error: error.message, done: true });
   }
-  
-  } catch (mainError) {
-    console.error('❌ Main orchestration error:', mainError);
-    sendData({ error: mainError.message, done: true });
-  }
 }
 
 // Enhanced fast path pattern matching with higher confidence threshold
