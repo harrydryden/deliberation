@@ -138,7 +138,7 @@ serve(async (req) => {
           );
 
           if (agentError) {
-            console.error(`Agent orchestration failed for message ${message.id}:`, agentError);
+            console.error(`❌ Agent orchestration failed for message ${message.id}:`, agentError);
             failedCount++;
             
             // Mark message as failed
@@ -149,20 +149,42 @@ serve(async (req) => {
               })
               .eq('id', message.id);
           } else {
-            console.log(`Agent response generated for message ${message.id}`);
-            processedCount++;
-            
-            // Mark message as processed
-            await supabase
+            // Verify that an actual response was generated and saved
+            const { data: responseCheck } = await supabase
               .from('messages')
-              .update({
-                bulk_import_status: 'agent_response_generated'
-              })
-              .eq('id', message.id);
+              .select('id')
+              .eq('deliberation_id', message.deliberation_id)
+              .eq('parent_message_id', message.id)
+              .neq('message_type', 'user')
+              .limit(1);
+            
+            if (responseCheck && responseCheck.length > 0) {
+              console.log(`✅ Agent response verified for message ${message.id}`);
+              processedCount++;
+              
+              // Mark message as processed
+              await supabase
+                .from('messages')
+                .update({
+                  bulk_import_status: 'agent_response_generated'
+                })
+                .eq('id', message.id);
+            } else {
+              console.error(`❌ No agent response found in database for message ${message.id}`);
+              failedCount++;
+              
+              // Mark message as failed - orchestration succeeded but no response saved
+              await supabase
+                .from('messages')
+                .update({
+                  bulk_import_status: 'failed'
+                })
+                .eq('id', message.id);
+            }
           }
 
-          // Rate limiting - wait 1 second between API calls
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          // Rate limiting - wait 2 seconds between API calls to reduce load
+          await new Promise(resolve => setTimeout(resolve, 2000));
 
         } catch (error) {
           console.error(`Error processing message ${message.id}:`, error);

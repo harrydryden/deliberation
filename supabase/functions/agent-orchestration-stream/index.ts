@@ -275,9 +275,23 @@ async function processStreamingOrchestration(
 
       if (insertError) {
         console.error('❌ Database insert error:', insertError);
+        sendData({ error: 'Failed to save response to database', insertError: insertError.message });
         throw new Error(`Failed to save response: ${insertError.message}`);
       } else {
         console.log('✅ Response stored successfully in database');
+        // Verify the response was actually saved
+        const { data: verifyData } = await serviceSupabase
+          .from('messages')
+          .select('id, content')
+          .eq('id', insertData[0].id)
+          .single();
+        
+        if (!verifyData || !verifyData.content) {
+          console.error('❌ Response verification failed - no content found');
+          throw new Error('Response verification failed');
+        } else {
+          console.log('✅ Response verified in database');
+        }
       }
 
     } catch (responseError) {
@@ -685,24 +699,53 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
     const agentId = billAgents[0].id;
     console.log(`📚 Querying knowledge for agent: ${agentId}`);
 
-    // Try LangChain query first (more advanced)
-    try {
-      const { data, error } = await supabase.functions.invoke('langchain-query-knowledge', {
-        body: { 
-          query, 
-          agentId, 
-          maxResults: 5 
-        }
-      });
+    // Try LangChain query first (more advanced) with retry logic
+    let langchainSuccess = false;
+    const maxRetries = 2;
+    
+    for (let attempt = 1; attempt <= maxRetries && !langchainSuccess; attempt++) {
+      try {
+        console.log(`📚 LangChain attempt ${attempt}/${maxRetries}`);
+        
+        const langchainPromise = supabase.functions.invoke('langchain-query-knowledge', {
+          body: { 
+            query, 
+            agentId, 
+            maxResults: 5 
+          }
+        });
+        
+        // Add timeout to LangChain call
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('LangChain timeout')), 45000);
+        });
+        
+        const { data, error } = await Promise.race([langchainPromise, timeoutPromise]);
 
-      if (!error && data?.response) {
-        console.log('📚 LangChain knowledge retrieved successfully');
-        return data.response;
-      } else {
-        console.log('📚 LangChain query failed, falling back to direct knowledge query');
+        if (!error && data?.response) {
+          console.log('✅ LangChain knowledge retrieved successfully');
+          langchainSuccess = true;
+          return data.response;
+        } else {
+          console.log(`❌ LangChain attempt ${attempt} failed:`, error?.message || 'No response');
+          if (attempt === maxRetries) {
+            console.log('📚 All LangChain attempts failed, falling back to direct query');
+          }
+        }
+      } catch (langchainError) {
+        console.warn(`❌ LangChain attempt ${attempt} error:`, langchainError.message);
+        if (langchainError.message.includes('timeout')) {
+          console.log('🕒 LangChain timeout detected');
+        }
+        if (attempt === maxRetries) {
+          console.warn('📚 All LangChain attempts failed, using fallback');
+        }
       }
-    } catch (langchainError) {
-      console.warn('📚 LangChain function not available, using fallback:', langchainError);
+      
+      // Wait before retry (except on last attempt)
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
     }
 
     // Fallback: Use direct Supabase query for knowledge retrieval
