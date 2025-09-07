@@ -16,6 +16,168 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Enhanced response cache with cleanup
+interface CacheEntry {
+  response: string;
+  agentType: string;
+  timestamp: number;
+  hits: number;
+}
+
+const responseCache = new Map<string, CacheEntry>();
+const CACHE_DURATION = 1000 * 60 * 30; // 30 minutes
+const MAX_CACHE_SIZE = 1000; // Prevent memory leaks
+
+function checkResponseCache(content: string, deliberationId?: string): CacheEntry | null {
+  const key = `${deliberationId || 'global'}:${content.toLowerCase().trim()}`;
+  const cached = responseCache.get(key);
+  
+  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+    cached.hits++;
+    return cached;
+  }
+  
+  // Remove expired entry if found
+  if (cached) {
+    responseCache.delete(key);
+  }
+  
+  return null;
+}
+
+function cacheResponse(content: string, response: string, agentType: string, deliberationId?: string): void {
+  // Clean up cache if it's getting too large
+  if (responseCache.size >= MAX_CACHE_SIZE) {
+    cleanupCache();
+  }
+  
+  const key = `${deliberationId || 'global'}:${content.toLowerCase().trim()}`;
+  responseCache.set(key, {
+    response,
+    agentType,
+    timestamp: Date.now(),
+    hits: 0
+  });
+}
+
+function cleanupCache(): void {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+  
+  // Remove expired entries
+  for (const [key, entry] of responseCache.entries()) {
+    if ((now - entry.timestamp) > CACHE_DURATION) {
+      keysToDelete.push(key);
+    }
+  }
+  
+  // If still too many, remove least recently used
+  if (responseCache.size - keysToDelete.length > MAX_CACHE_SIZE) {
+    const sortedEntries = Array.from(responseCache.entries())
+      .filter(([key]) => !keysToDelete.includes(key))
+      .sort(([,a], [,b]) => a.timestamp - b.timestamp);
+    
+    const toRemove = sortedEntries.slice(0, 200); // Remove oldest 200
+    keysToDelete.push(...toRemove.map(([key]) => key));
+  }
+  
+  keysToDelete.forEach(key => responseCache.delete(key));
+  console.log(`🧹 Cleaned up cache: removed ${keysToDelete.length} entries`);
+}
+
+// Fast path pattern matching with high confidence threshold
+function checkFastPath(content: string): { agent: string; confidence: number } | null {
+  const patterns = [
+    {
+      regex: /^(what|which|how many|list)\s+(countries|nations|jurisdictions)\s+(have|allow|permit|legalized|legalised)\s+(assisted dying|euthanasia|MAID)/i,
+      agent: 'bill_agent',
+      confidence: 0.98
+    },
+    {
+      regex: /^what\s+(specific\s+)?(safeguards|protections|requirements|criteria)\s+(are|exist|in place)/i,
+      agent: 'bill_agent', 
+      confidence: 0.97
+    },
+    {
+      regex: /^(what did|what have|have any)\s+(other\s+)?(participants|people|users)\s+(said|mentioned|shared|contributed)/i,
+      agent: 'peer_agent',
+      confidence: 0.96
+    },
+    // Removed lower confidence patterns to force more analysis
+  ];
+
+  for (const pattern of patterns) {
+    if (pattern.regex.test(content)) {
+      console.log(`🎯 High-confidence fast path: "${content}" -> ${pattern.agent} (confidence: ${pattern.confidence})`);
+      return {
+        agent: pattern.agent,
+        confidence: pattern.confidence
+      };
+    }
+  }
+
+  return null;
+}
+
+// Generate fast response using templates and simple AI
+async function generateFastResponse(
+  content: string,
+  fastPath: any,
+  openAIApiKey: string,
+  sendData: (data: any) => void
+): Promise<string> {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${openAIApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-5-2025-08-07',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a ${fastPath.agent} providing a quick, helpful response. Be concise but informative.`
+        },
+        { role: 'user', content: content }
+      ],
+      max_completion_tokens: 1000,
+      stream: true
+    }),
+  });
+
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+  let fullResponse = '';
+
+  if (reader) {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
+      
+      for (const line of lines) {
+        if (line.includes('[DONE]')) continue;
+        
+        try {
+          const data = JSON.parse(line.slice(6));
+          const content = data.choices?.[0]?.delta?.content || '';
+          if (content) {
+            fullResponse += content;
+            sendData({ content, done: false });
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+    }
+  }
+
+  return fullResponse;
+}
+
 // Streaming response handler for real-time agent responses
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -577,66 +739,6 @@ async function generateFastResponse(
   }
 
   return fullResponse;
-}
-
-// Enhanced knowledge availability check
-async function checkAvailableKnowledge(supabase: any, deliberationId?: string): Promise<Record<string, boolean>> {
-  const knowledge = {
-    bill_agent: false,
-    peer_agent: false,
-    flow_agent: false
-  };
-
-  try {
-    // Check if bill agent has knowledge base
-    const { data: billAgents } = await supabase
-      .from('agent_configurations')
-      .select('id')
-      .eq('agent_type', 'bill_agent')
-      .or(`deliberation_id.eq.${deliberationId},deliberation_id.is.null`)
-      .eq('is_active', true)
-      .limit(1);
-
-    if (billAgents && billAgents.length > 0) {
-      const { data: knowledge_count } = await supabase
-        .from('agent_knowledge')
-        .select('id', { count: 'exact' })
-        .eq('agent_id', billAgents[0].id)
-        .limit(1);
-
-      knowledge.bill_agent = knowledge_count && knowledge_count.length > 0;
-    }
-  } catch (error) {
-    console.warn('Knowledge availability check failed:', error);
-  }
-
-  return knowledge;
-}
-
-// Get conversation state
-async function getConversationState(supabase: any, deliberationId: string, userId: string): Promise<any> {
-  const { data: messages } = await supabase
-    .from('messages')
-    .select('*')
-    .eq('deliberation_id', deliberationId)
-    .order('created_at', { ascending: false })
-    .limit(10);
-
-  return {
-    messageCount: messages?.length || 0,
-    recentMessages: messages || []
-  };
-}
-
-// Find similar IBIS nodes
-async function findSimilarNodes(supabase: any, content: string): Promise<any[]> {
-  // Simplified - would normally use embedding similarity
-  const { data: nodes } = await supabase
-    .from('ibis_nodes')
-    .select('*')
-    .limit(5);
-
-  return nodes || [];
 }
 
 // Legacy function - replaced by orchestrator method
