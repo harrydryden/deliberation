@@ -132,37 +132,25 @@ const OptimizedMessageItem = memo(({
             </span>
           </div>
           
-          <Card className={`p-3 bg-card ${isUser ? 'relative' : ''}`}>
+          <Card className="p-3 bg-card">
             <Suspense fallback={<Skeleton className="h-4 w-full" />}>
               <LazyMarkdownMessage content={message.content} />
             </Suspense>
-            
-            {/* Corner Share Button for User Messages */}
-            {isUser && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleShare}
-                className="absolute top-1 right-1 h-6 w-6 p-0 opacity-60 hover:opacity-100 transition-opacity"
-                title="Share to IBIS - add descriptions and links"
-              >
-                <Share2 className="h-3 w-3" />
-              </Button>
-            )}
           </Card>
           
-          {/* Message Actions for Agent Messages Only */}
-          {!isUser && deliberationId && (
-            <div className="mt-2 flex gap-2">
+          {/* Share button for user messages only */}
+          {isUser && (
+            <div className="mt-2 flex justify-end">
               <Button
-                variant="outline"
+                variant={message.submitted_to_ibis ? "secondary" : "outline"}
                 size="sm"
-                onClick={handleAddToIbis}
+                onClick={message.submitted_to_ibis ? undefined : handleShare}
+                disabled={message.submitted_to_ibis}
                 className="text-xs"
-                title="Add this message to IBIS map"
+                title={message.submitted_to_ibis ? "Already shared to IBIS" : "Share to IBIS - add descriptions and links"}
               >
-                <Plus className="h-3 w-3 mr-1" />
-                Add to IBIS
+                <Share2 className="h-3 w-3 mr-1" />
+                {message.submitted_to_ibis ? "Submitted" : "Share"}
               </Button>
             </div>
           )}
