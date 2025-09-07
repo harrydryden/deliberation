@@ -84,6 +84,35 @@ async function processStreamingOrchestration(
     // Service client for database operations
     const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
     
+    // CRITICAL: Check for existing responses BEFORE proceeding
+    console.log(`🔍 Checking for existing responses for message ${messageId}...`);
+    const { data: existingResponses, error: checkError } = await serviceSupabase
+      .from('messages')
+      .select('id, agent_context')
+      .eq('deliberation_id', deliberationId)
+      .eq('parent_message_id', messageId)
+      .neq('message_type', 'user');
+    
+    if (checkError) {
+      console.error(`❌ Error checking existing responses: ${checkError.message}`);
+      sendData({ content: '', done: true, duplicate: true, reason: 'check_error' });
+      return;
+    }
+    
+    if (existingResponses && existingResponses.length > 0) {
+      console.log(`✅ Response(s) already exist for message ${messageId} - skipping processing`);
+      console.log(`   Existing responses: ${existingResponses.map(r => r.id).join(', ')}`);
+      sendData({ 
+        content: '', 
+        done: true,
+        duplicate: true,
+        existingResponseIds: existingResponses.map(r => r.id)
+      });
+      return;
+    } else {
+      console.log(`✅ No existing responses found for message ${messageId} - proceeding with processing`);
+    }
+    
     // User client for reading messages (respects RLS)
     const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
