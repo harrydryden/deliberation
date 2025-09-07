@@ -134,21 +134,24 @@ const OptimizedMessageItem = memo(({
             </div>
             
             <Card className="p-3 relative bg-card border">
-              <div className={`${isUser ? 'pr-16' : ''}`}>
+              <div className={`${isUser ? 'pr-20 pb-8' : ''}`}>
                 <Suspense fallback={<Skeleton className="h-4 w-full" />}>
-                  <LazyMarkdownMessage content={message.content} />
+                  <LazyMarkdownMessage 
+                    content={message.content}
+                    className={isUser ? 'max-w-none overflow-hidden' : ''}
+                  />
                 </Suspense>
               </div>
               
               {/* Integrated Share button for user messages */}
               {isUser && (
-                <div className="absolute bottom-2 right-2">
+                <div className="absolute bottom-2 right-2 z-10">
                   <Button
                     variant={message.submitted_to_ibis ? "secondary" : "outline"}
                     size="sm"
                     onClick={message.submitted_to_ibis ? undefined : handleShare}
                     disabled={message.submitted_to_ibis}
-                    className="text-xs h-6 bg-background/90 backdrop-blur-sm border shadow-sm"
+                    className="text-xs h-6 bg-background border shadow-sm whitespace-nowrap"
                     title={message.submitted_to_ibis ? "Already shared to IBIS" : "Share to IBIS - add descriptions and links"}
                   >
                     <Share2 className="h-3 w-3 mr-1" />
