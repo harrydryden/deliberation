@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, lazy, Suspense, memo, 
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Bot, User, Users, Workflow, FileText, Plus, Loader2, Share2 } from "lucide-react";
+import { Bot, User, Users, Workflow, FileText, Loader2, Share2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMessageTime } from '@/utils/timeDisplay';
 const LazyMarkdownMessage = lazy(() => import("@/components/common/MarkdownMessage").then(m => ({ default: m.MarkdownMessage })));

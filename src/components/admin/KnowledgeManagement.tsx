@@ -182,7 +182,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       });
 
       if (error) {
-        console.error('Processing error:', error);
+        logger.error('Processing error', { error });
         // Clean up uploaded file on processing error
         await supabase.storage.from('documents').remove([uploadData.path]);
         throw new Error(error.message || 'Processing failed');
@@ -204,7 +204,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         throw new Error(data?.error || 'Processing failed');
       }
     } catch (error: any) {
-      console.error('Upload error:', error);
+      logger.error('Upload error', { error });
       toast({
         title: "Error",
         description: `Failed to process file: ${error.message}`,
@@ -243,7 +243,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         throw new Error(data.error);
       }
     } catch (error) {
-      console.error('Query error:', error);
+      logger.error('Query error', { error });
       toast({
         title: "Error",
         description: `Failed to query knowledge: ${error.message}`,
@@ -272,7 +272,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
         loadKnowledgeForAgent(selectedAgent);
       }
     } catch (error) {
-      console.error('Delete error:', error);
+      logger.error('Delete error', { error });
       toast({
         title: "Error",
         description: "Failed to delete knowledge item",
@@ -301,7 +301,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       setDeleteAllOpen(false);
       setKnowledgeItems([]);
     } catch (error) {
-      console.error('Delete all error:', error);
+      logger.error('Delete all error', { error });
       toast({
         title: "Error", 
         description: "Failed to delete all knowledge items",

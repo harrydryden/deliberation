@@ -1,5 +1,5 @@
 // Performance monitoring provider for global app performance
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useGlobalMemoryMonitor } from '@/hooks/useMemoryMonitor';
 import { logger } from '@/utils/logger';
 

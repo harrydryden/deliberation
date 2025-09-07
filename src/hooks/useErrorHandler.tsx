@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/utils/logger';
 
 export const useErrorHandler = () => {
   const { toast } = useToast();
@@ -8,7 +9,7 @@ export const useErrorHandler = () => {
     // Simple error handling for performance
     const message = error?.message || 'An error occurred';
     
-    console.error(`Error${context ? ` in ${context}` : ''}:`, error);
+    logger.error(`Error${context ? ` in ${context}` : ''}`, { error, context });
 
     // Show generic error toast
     toast({

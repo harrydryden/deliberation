@@ -1,4 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz';
+import { logger } from '@/utils/logger';
 
 const UK_TIMEZONE = 'Europe/London';
 
@@ -11,7 +12,7 @@ export function formatToUKTime(date: string | Date | null | undefined, format: s
     
     return formatInTimeZone(dateObj, UK_TIMEZONE, format);
   } catch (error) {
-    console.warn('Invalid date provided to formatToUKTime:', date);
+    logger.warn('Invalid date provided to formatToUKTime', { date });
     return '--:--:--';
   }
 }
@@ -25,7 +26,7 @@ export function formatToUKDate(date: string | Date | null | undefined, format: s
     
     return formatInTimeZone(dateObj, UK_TIMEZONE, format);
   } catch (error) {
-    console.warn('Invalid date provided to formatToUKDate:', date);
+    logger.warn('Invalid date provided to formatToUKDate', { date });
     return '--/--/----';
   }
 }
@@ -39,7 +40,7 @@ export function formatToUKDateTime(date: string | Date | null | undefined, forma
     
     return formatInTimeZone(dateObj, UK_TIMEZONE, format);
   } catch (error) {
-    console.warn('Invalid date provided to formatToUKDateTime:', date);
+    logger.warn('Invalid date provided to formatToUKDateTime', { date });
     return '--/--/---- --:--';
   }
 }

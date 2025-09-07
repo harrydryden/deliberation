@@ -58,7 +58,7 @@ export const BulkMessageImport: React.FC = () => {
       if (error) throw error;
       setDeliberations(data || []);
     } catch (error) {
-      console.error('Error loading deliberations:', error);
+      logger.error('Error loading deliberations', { error });
       toast.error('Failed to load deliberations');
     }
   };
@@ -78,7 +78,7 @@ export const BulkMessageImport: React.FC = () => {
       if (error) throw error;
       setImportBatches(data || []);
     } catch (error) {
-      console.error('Error loading import batches:', error);
+      logger.error('Error loading import batches', { error });
       toast.error('Failed to load import history');
     }
   };
@@ -140,7 +140,7 @@ export const BulkMessageImport: React.FC = () => {
       loadImportBatches();
       
     } catch (error) {
-      console.error('Import error:', error);
+      logger.error('Import error', { error });
       toast.error(`Import failed: ${error.message}`);
     } finally {
       setIsImporting(false);
@@ -160,7 +160,7 @@ export const BulkMessageImport: React.FC = () => {
       loadImportBatches();
       
     } catch (error) {
-      console.error('Processing error:', error);
+      logger.error('Processing error', { error });
       toast.error(`Failed to start processing: ${error.message}`);
     } finally {
       setIsProcessing(null);
