@@ -81,6 +81,34 @@ async function processStreamingOrchestration(
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY')!;
     
+    // Service client for checking existing responses
+    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // CRITICAL: Check for existing response to prevent duplicates
+    console.log(`🔍 Checking for existing response for message ${messageId}...`);
+    const { data: existingResponse, error: checkError } = await serviceSupabase
+      .from('messages')
+      .select('id')
+      .eq('deliberation_id', deliberationId)
+      .eq('parent_message_id', messageId)
+      .neq('message_type', 'user')
+      .limit(1);
+    
+    if (checkError) {
+      console.error(`❌ Error checking existing responses: ${checkError.message}`);
+    } else if (existingResponse && existingResponse.length > 0) {
+      console.log(`✅ Response already exists (${existingResponse[0].id}) - skipping duplicate creation`);
+      sendData({ 
+        content: '', 
+        done: true,
+        duplicate: true,
+        existingResponseId: existingResponse[0].id
+      });
+      return;
+    } else {
+      console.log(`✅ No existing response found - proceeding with creation`);
+    }
+    
     // User client for reading messages (respects RLS)
     const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
@@ -89,9 +117,6 @@ async function processStreamingOrchestration(
         },
       },
     });
-
-    // Service client for writing agent messages (bypasses RLS)
-    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Initialize orchestrator with service client
     const orchestrator = new AgentOrchestrator(serviceSupabase);
