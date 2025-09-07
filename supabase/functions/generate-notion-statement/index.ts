@@ -28,22 +28,27 @@ serve(async (req) => {
 
     console.log('Generating notion statement for:', { title, description });
 
-    const systemPrompt = `You are an expert in deliberation and democratic discourse. Your task is to generate a clear, actionable notion statement that will help structure a deliberation.
+    // Get notion statement prompt from template system
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const tempSupabase = createClient(supabaseUrl, supabaseServiceKey);
 
-A good notion statement:
-- Uses stance language (should, must, ought, need to, required, necessary, appropriate)
-- Is specific and actionable
-- Frames the key decision or position to be deliberated
-- Is neutral but clear about what's being considered
-- Must be between 150-240 characters long
-- Should be clear and comprehensive while staying within the character limit
+    const { data: templateData, error: templateError } = await tempSupabase
+      .rpc('get_prompt_template', { 
+        template_name: 'generate_notion_statement'
+      });
 
-Generate a notion statement based on the deliberation title and description provided.`;
+    if (templateError || !templateData || templateData.length === 0) {
+      throw new Error(`Failed to get prompt template: ${templateError?.message || 'Template not found'}`);
+    }
 
-    const userPrompt = `Title: ${title}
-${description ? `Description: ${description}` : ''}
-
-Generate a single, clear notion statement for this deliberation (150-240 characters):`;
+    const template = templateData[0];
+    
+    // Replace template variables with actual values
+    const descriptionText = description ? `Description: ${description}` : '';
+    const combinedPrompt = template.template_text
+      .replace(/\{\{title\}\}/g, title)
+      .replace(/\{\{description\}\}/g, descriptionText);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -53,8 +58,7 @@ Generate a single, clear notion statement for this deliberation (150-240 charact
       },
       body: JSON.stringify({
         ...ModelConfigManager.generateAPIParams('gpt-5-2025-08-07', [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { role: 'user', content: combinedPrompt }
         ], { maxTokens: 150 })
       }),
     });

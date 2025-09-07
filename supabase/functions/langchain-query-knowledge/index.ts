@@ -154,29 +154,29 @@ serve(async (req) => {
       },
     });
 
-    // Create enhanced prompt template for policy analysis
-    const promptTemplate = PromptTemplate.fromTemplate(`
-You are an expert policy analyst specialising in legislative documents and policy interpretation. 
-Your role is to provide insightful, contextual analysis rather than simple factual recitation.
+    // Get policy analysis prompt from template system
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const tempSupabase = createClient(supabaseUrl, supabaseServiceKey);
 
-Use British English spelling and grammar throughout your response.
+    const { data: templateData, error: templateError } = await tempSupabase
+      .rpc('get_prompt_template', { 
+        template_name: 'langchain_policy_analysis'
+      });
 
-Context from relevant documents:
-{context}
+    if (templateError || !templateData || templateData.length === 0) {
+      throw new Error(`Failed to get prompt template: ${templateError?.message || 'Template not found'}`);
+    }
 
-Question: {input}
+    const template = templateData[0];
 
-Instructions:
-1. Analyse the provided context thoroughly
-2. Provide comprehensive insights, not just basic facts
-3. Include practical implications and applications
-4. Connect related concepts when relevant
-5. If the context is insufficient, specify what additional information would be helpful
-6. Maintain an authoritative but accessible tone
-7. Cite specific sections or documents when referencing information
-
-Generate a detailed analytical response:
-`);
+    // Create enhanced prompt template for policy analysis using database template
+    // Convert our {{variable}} format to LangChain's {variable} format
+    const langchainTemplate = template.template_text
+      .replace(/\{\{context\}\}/g, '{context}')
+      .replace(/\{\{input\}\}/g, '{input}');
+    
+    const promptTemplate = PromptTemplate.fromTemplate(langchainTemplate);
 
     console.log('Creating retrieval chain...');
 
