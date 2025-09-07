@@ -62,7 +62,7 @@ class MessageProcessor {
       };
     }
 
-    const MAX_ATTEMPTS = 8;
+    const MAX_ATTEMPTS = 3;
     let attempt = 0;
 
     while (attempt < MAX_ATTEMPTS) {
@@ -82,17 +82,15 @@ class MessageProcessor {
           };
         }
 
-        // Call orchestration with specific attempt tracking
+        // Use simplified bulk orchestration - no streaming, no complex analysis
         const orchestrationResult = await this.supabase.functions.invoke(
-          'agent-orchestration-stream',
+          'bulk-agent-orchestration',
           {
             headers: { authorization: this.authHeader },
             body: {
               messageId: messageId,
               deliberationId: deliberationId,
-              mode: 'bulk_processing',
-              attempt: attempt,
-              preventDuplicates: true
+              attempt: attempt
             }
           }
         );
@@ -101,7 +99,7 @@ class MessageProcessor {
           console.error(`❌ Orchestration attempt ${attempt} failed for message ${messageId}:`, orchestrationResult.error);
           
           if (attempt < MAX_ATTEMPTS) {
-            const backoffDelay = Math.min(2000 * Math.pow(1.5, attempt), 10000);
+            const backoffDelay = Math.min(1000 * attempt, 3000); // Faster retries
             console.log(`⏳ Waiting ${backoffDelay}ms before retry attempt ${attempt + 1}`);
             await new Promise(resolve => setTimeout(resolve, backoffDelay));
             continue;
@@ -112,20 +110,19 @@ class MessageProcessor {
 
         console.log(`✅ Orchestration completed for message ${messageId}`);
 
-        // Robust verification with multiple checks and longer waits
+        // Simplified verification - just 3 quick checks
         let verificationSuccess = false;
         let responseId = null;
         
-        for (let checkAttempt = 1; checkAttempt <= 10; checkAttempt++) {
-          const waitTime = checkAttempt <= 3 ? 2000 : checkAttempt <= 6 ? 5000 : 8000;
-          await new Promise(resolve => setTimeout(resolve, waitTime));
+        for (let checkAttempt = 1; checkAttempt <= 3; checkAttempt++) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second wait
           
-          console.log(`🔍 Verification check ${checkAttempt}/10 for message ${messageId}`);
+          console.log(`🔍 Quick verification ${checkAttempt}/3 for message ${messageId}`);
           
           const verificationResult = await this.hasExistingResponse(messageId, deliberationId);
           
           if (verificationResult.exists) {
-            console.log(`🎉 Agent response verified for message ${messageId} on check ${checkAttempt}`);
+            console.log(`🎉 Agent response verified for message ${messageId}`);
             verificationSuccess = true;
             responseId = verificationResult.responseId;
             break;
@@ -286,8 +283,8 @@ serve(async (req) => {
     // Initialize processor
     const processor = new MessageProcessor(supabase, authHeader);
     
-    // Process messages in smaller batches for better reliability
-    const BATCH_SIZE = 25; // Smaller batches for better monitoring
+    // Process messages in larger batches for speed
+    const BATCH_SIZE = 50;
     const results: ProcessingResult[] = [];
     
     for (let batchStart = 0; batchStart < messages.length; batchStart += BATCH_SIZE) {
