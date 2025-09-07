@@ -114,123 +114,178 @@ serve(async (req) => {
     let failedCount = 0;
     const processingResults = [];
 
-    // Process messages in smaller chunks to prevent timeouts
-    const chunkSize = 20; // Process 20 messages at a time
+    // Ultra-robust processing for 99%+ success rate
+    const chunkSize = 10; // Smaller chunks for better reliability
+    const maxRetries = 3; // Max retries per message
+    const orchestrationTimeout = 45000; // 45 second timeout for orchestration
     
     for (let chunkIndex = 0; chunkIndex < messages.length; chunkIndex += chunkSize) {
       const chunk = messages.slice(chunkIndex, Math.min(chunkIndex + chunkSize, messages.length));
-      console.log(`Processing chunk ${Math.floor(chunkIndex / chunkSize) + 1}/${Math.ceil(messages.length / chunkSize)} (${chunk.length} messages)`);
+      console.log(`📦 Processing chunk ${Math.floor(chunkIndex / chunkSize) + 1}/${Math.ceil(messages.length / chunkSize)} (${chunk.length} messages)`);
       
-      // Process each message in the chunk
+      // Process each message in the chunk with robust retry logic
       for (let messageIndex = 0; messageIndex < chunk.length; messageIndex++) {
         const globalMessageIndex = chunkIndex + messageIndex;
         const message = chunk[messageIndex];
-        console.log(`Processing message ${globalMessageIndex + 1}/${messages.length}: ${message.id}`);
+        console.log(`🔄 Processing message ${globalMessageIndex + 1}/${messages.length}: ${message.id}`);
 
-      try {
-        // First check if a response already exists
-        const { data: existingResponse } = await supabase
-          .from('messages')
-          .select('id')
-          .eq('deliberation_id', message.deliberation_id)
-          .eq('parent_message_id', message.id)
-          .neq('message_type', 'user')
-          .limit(1);
-        
-        if (existingResponse && existingResponse.length > 0) {
-          console.log(`✅ Agent response already exists for message ${message.id}`);
-          processedCount++;
-          
-          // Mark message as processed
-          await supabase
-            .from('messages')
-            .update({
-              bulk_import_status: 'agent_response_generated'
-            })
-            .eq('id', message.id);
-          
-          continue;
-        }
+        let messageProcessed = false;
+        let lastError = null;
 
-        // Call the agent orchestration function once
-        const { data: agentResponse, error: agentError } = await supabase.functions.invoke(
-          'agent-orchestration-stream',
-          {
-            headers: {
-              authorization: authHeader
-            },
-            body: {
-              messageId: message.id,
-              deliberationId: message.deliberation_id,
-              mode: 'bulk_processing'
+        // Try up to maxRetries times for each message
+        for (let retryAttempt = 1; retryAttempt <= maxRetries && !messageProcessed; retryAttempt++) {
+          try {
+            console.log(`🎯 Attempt ${retryAttempt}/${maxRetries} for message ${message.id}`);
+            
+            // First check if a response already exists
+            const { data: existingResponse } = await supabase
+              .from('messages')
+              .select('id')
+              .eq('deliberation_id', message.deliberation_id)
+              .eq('parent_message_id', message.id)
+              .neq('message_type', 'user')
+              .limit(1);
+            
+            if (existingResponse && existingResponse.length > 0) {
+              console.log(`✅ Agent response already exists for message ${message.id}`);
+              processedCount++;
+              messageProcessed = true;
+              
+              // Mark message as processed
+              await supabase
+                .from('messages')
+                .update({
+                  bulk_import_status: 'agent_response_generated'
+                })
+                .eq('id', message.id);
+              
+              processingResults.push({ messageId: message.id, status: 'existing', attempts: retryAttempt });
+              continue;
+            }
+
+            // Call agent orchestration with timeout protection
+            console.log(`🚀 Invoking agent orchestration for message ${message.id} (attempt ${retryAttempt})`);
+            
+            const orchestrationPromise = supabase.functions.invoke(
+              'agent-orchestration-stream',
+              {
+                headers: {
+                  authorization: authHeader
+                },
+                body: {
+                  messageId: message.id,
+                  deliberationId: message.deliberation_id,
+                  mode: 'bulk_processing'
+                }
+              }
+            );
+
+            // Race between orchestration and timeout
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Orchestration timeout')), orchestrationTimeout)
+            );
+
+            const { data: agentResponse, error: agentError } = await Promise.race([
+              orchestrationPromise,
+              timeoutPromise
+            ]);
+
+            if (agentError) {
+              console.error(`❌ Agent orchestration failed for message ${message.id} (attempt ${retryAttempt}):`, agentError);
+              lastError = agentError;
+              
+              // Wait before retry
+              if (retryAttempt < maxRetries) {
+                const retryDelay = 2000 * retryAttempt; // 2s, 4s, 6s
+                console.log(`⏳ Waiting ${retryDelay}ms before retry...`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+              }
+              continue;
+            }
+
+            console.log(`✅ Agent orchestration successful for message ${message.id}`);
+
+            // Ultra-robust verification with progressive delays
+            let responseVerified = false;
+            const maxVerificationAttempts = 8;
+            
+            for (let verifyAttempt = 1; verifyAttempt <= maxVerificationAttempts; verifyAttempt++) {
+              // Progressive delays: 1s, 2s, 3s, 5s, 8s, 12s, 18s, 25s
+              const delay = verifyAttempt <= 3 ? verifyAttempt * 1000 : 
+                           verifyAttempt <= 5 ? (verifyAttempt - 2) * 2000 + 3000 :
+                           (verifyAttempt - 5) * 6000 + 12000;
+              
+              console.log(`🔍 Verification attempt ${verifyAttempt}/${maxVerificationAttempts} for message ${message.id} (waiting ${delay}ms)`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              
+              const { data: responseCheck } = await supabase
+                .from('messages')
+                .select('id')
+                .eq('deliberation_id', message.deliberation_id)
+                .eq('parent_message_id', message.id)
+                .neq('message_type', 'user')
+                .limit(1);
+              
+              if (responseCheck && responseCheck.length > 0) {
+                console.log(`🎉 Agent response verified for message ${message.id} (verification attempt ${verifyAttempt})`);
+                processedCount++;
+                responseVerified = true;
+                messageProcessed = true;
+                
+                // Mark message as processed
+                await supabase
+                  .from('messages')
+                  .update({
+                    bulk_import_status: 'agent_response_generated'
+                  })
+                  .eq('id', message.id);
+                
+                processingResults.push({ 
+                  messageId: message.id, 
+                  status: 'success', 
+                  orchestrationAttempts: retryAttempt,
+                  verificationAttempts: verifyAttempt
+                });
+                break;
+              }
+            }
+            
+            if (!responseVerified && retryAttempt === maxRetries) {
+              console.error(`💔 Verification failed after ${maxVerificationAttempts} attempts for message ${message.id}`);
+              failedCount++;
+              await supabase
+                .from('messages')
+                .update({
+                  bulk_import_status: 'verification_failed'
+                })
+                .eq('id', message.id);
+              
+              processingResults.push({ 
+                messageId: message.id, 
+                status: 'verification_failed', 
+                orchestrationAttempts: retryAttempt,
+                verificationAttempts: maxVerificationAttempts
+              });
+            } else if (!responseVerified) {
+              console.log(`⚠️ Verification failed, will retry orchestration for message ${message.id}`);
+              lastError = new Error('Verification timeout');
+            }
+
+          } catch (error) {
+            console.error(`💥 Unexpected error processing message ${message.id} (attempt ${retryAttempt}):`, error);
+            lastError = error;
+            
+            if (retryAttempt < maxRetries) {
+              const retryDelay = 3000 * retryAttempt; // 3s, 6s, 9s
+              console.log(`⏳ Waiting ${retryDelay}ms before retry due to error...`);
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
             }
           }
-        );
-
-        if (agentError) {
-          console.error(`❌ Agent orchestration failed for message ${message.id}:`, agentError);
-          failedCount++;
-          await supabase
-            .from('messages')
-            .update({
-              bulk_import_status: 'failed'
-            })
-            .eq('id', message.id);
-          continue;
         }
 
-        // Use exponential backoff for robust verification
-        let responseVerified = false;
-        const maxVerificationAttempts = 6;
-        
-        for (let attempt = 1; attempt <= maxVerificationAttempts; attempt++) {
-          // Exponential backoff: 500ms, 1s, 2s, 4s, 8s, 16s (max 31.5s total)
-          const delay = Math.min(500 * Math.pow(2, attempt - 1), 16000);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          
-          const { data: responseCheck } = await supabase
-            .from('messages')
-            .select('id')
-            .eq('deliberation_id', message.deliberation_id)
-            .eq('parent_message_id', message.id)
-            .neq('message_type', 'user')
-            .limit(1);
-          
-          if (responseCheck && responseCheck.length > 0) {
-            console.log(`✅ Agent response verified for message ${message.id} (attempt ${attempt})`);
-            processedCount++;
-            responseVerified = true;
-            
-            // Mark message as processed
-            await supabase
-              .from('messages')
-              .update({
-                bulk_import_status: 'agent_response_generated'
-              })
-              .eq('id', message.id);
-            
-            processingResults.push({ messageId: message.id, status: 'success', attempts: attempt });
-            break;
-          } else if (attempt < maxVerificationAttempts) {
-            console.log(`🔍 Attempt ${attempt}/${maxVerificationAttempts}: Waiting for response for message ${message.id}...`);
-          }
-        }
-        
-        if (!responseVerified) {
-          console.error(`❌ No response found after ${maxVerificationAttempts} attempts for message ${message.id}`);
-          failedCount++;
-          await supabase
-            .from('messages')
-            .update({
-              bulk_import_status: 'verification_failed'
-            })
-            .eq('id', message.id);
-          
-          processingResults.push({ messageId: message.id, status: 'verification_failed', attempts: maxVerificationAttempts });
-        }
-
-        } catch (error) {
-          console.error(`Error processing message ${message.id}:`, error);
+        // If message still not processed after all retries
+        if (!messageProcessed) {
+          console.error(`🔥 Message ${message.id} failed after ${maxRetries} attempts. Last error:`, lastError);
           failedCount++;
           await supabase
             .from('messages')
@@ -239,19 +294,51 @@ serve(async (req) => {
             })
             .eq('id', message.id);
           
-          processingResults.push({ messageId: message.id, status: 'processing_error', error: error.message });
+          processingResults.push({ 
+            messageId: message.id, 
+            status: 'processing_error', 
+            attempts: maxRetries,
+            error: lastError?.message || 'Unknown error'
+          });
         }
 
-        // Minimal delay between messages within chunk
+        // Progress logging
+        const completedMessages = processedCount + failedCount;
+        const successRate = completedMessages > 0 ? (processedCount / completedMessages * 100).toFixed(1) : '0';
+        console.log(`📊 Progress: ${completedMessages}/${messages.length} (${successRate}% success rate)`);
+
+        // Brief pause between messages to prevent overwhelming
         if (messageIndex < chunk.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
       
-      // Longer pause between chunks to prevent overwhelming the system
+      // Update batch progress after each chunk
+      await supabase
+        .from('bulk_import_batches')
+        .update({
+          processed_messages: processedCount,
+          failed_messages: failedCount,
+          processing_log: [
+            ...(batch.processing_log || []),
+            {
+              timestamp: new Date().toISOString(),
+              action: 'chunk_completed',
+              details: { 
+                chunk: Math.floor(chunkIndex / chunkSize) + 1,
+                processed: processedCount, 
+                failed: failedCount,
+                success_rate: (processedCount + failedCount > 0 ? (processedCount / (processedCount + failedCount) * 100).toFixed(1) + '%' : '0%')
+              }
+            }
+          ]
+        })
+        .eq('id', batchId);
+      
+      // Pause between chunks to prevent system overload
       if (chunkIndex + chunkSize < messages.length) {
-        console.log(`Chunk ${Math.floor(chunkIndex / chunkSize) + 1} completed. Pausing before next chunk...`);
-        await new Promise(resolve => setTimeout(resolve, 3000)); // 3 second pause between chunks
+        console.log(`✨ Chunk ${Math.floor(chunkIndex / chunkSize) + 1} completed. Pausing 5s before next chunk...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
     }
 
