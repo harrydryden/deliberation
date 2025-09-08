@@ -70,7 +70,11 @@ export const useResponseStreaming = () => {
 
     // Cancel any existing stream
     if (streamControllerRef.current) {
-      streamControllerRef.current.abort();
+      try {
+        streamControllerRef.current.abort();
+      } catch (error) {
+        console.warn('⚠️ Error aborting previous stream:', error);
+      }
     }
 
     streamControllerRef.current = new AbortController();
@@ -85,7 +89,11 @@ export const useResponseStreaming = () => {
     const timeoutId = setTimeout(() => {
       console.log('⏰ Main streaming timeout reached (30s), aborting...');
       if (streamControllerRef.current) {
-        streamControllerRef.current.abort();
+        try {
+          streamControllerRef.current.abort();
+        } catch (error) {
+          console.warn('⚠️ Error aborting on timeout:', error);
+        }
       }
       // CRITICAL FIX: Clear streaming state on timeout
       setStreamingState({
@@ -179,7 +187,7 @@ export const useResponseStreaming = () => {
           deliberationId,
           mode: 'chat'
         }),
-        signal: streamControllerRef.current.signal
+        signal: streamControllerRef.current?.signal
       });
       
       console.log('📊 Response status:', response.status, response.statusText);
@@ -223,7 +231,7 @@ export const useResponseStreaming = () => {
       while (true) {
         const { done, value } = await reader.read();
         
-        if (streamControllerRef.current?.signal.aborted) {
+        if (streamControllerRef.current?.signal?.aborted) {
           console.log('🛑 Stream aborted by user');
           break;
         }
@@ -365,7 +373,11 @@ export const useResponseStreaming = () => {
   const stopStreaming = useCallback(() => {
     console.log('🛑 Stopping stream...');
     if (streamControllerRef.current) {
-      streamControllerRef.current.abort();
+      try {
+        streamControllerRef.current.abort();
+      } catch (error) {
+        console.warn('⚠️ Error aborting stream:', error);
+      }
       streamControllerRef.current = null;
     }
     
