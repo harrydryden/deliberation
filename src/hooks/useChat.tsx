@@ -493,9 +493,13 @@ export const useChat = (deliberationId?: string) => {
       }
     };
 
-    // PHASE 1 FIX: Process immediately for better responsiveness
-    processNext();
-  }, [hasWork, user, deliberationId, stableProcessQueuedMessage, stableGetNextMessage, queueStats]);
+    // CRITICAL FIX: Only process when there's actual work (new messages or failed retries)
+    // Don't retrigger on status changes of existing messages
+    const { queued, failed, canProcess } = queueStats;
+    if ((queued > 0 || failed > 0) && canProcess) {
+      processNext();
+    }
+  }, [hasWork, user, deliberationId, stableProcessQueuedMessage, stableGetNextMessage]);
 
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!user || !content.trim()) return;
