@@ -1,16 +1,24 @@
+import React, { memo } from "react";
 import { Switch } from "@/components/ui/switch";
 import { MessageCircle, GraduationCap } from "lucide-react";
+import { performanceMonitor } from "@/utils/performanceMonitor";
 export type ChatMode = 'chat' | 'learn';
 interface ChatModeSelectorProps {
   mode: ChatMode;
   onModeChange: (mode: ChatMode) => void;
   variant?: 'boxed' | 'bare';
 }
-export const ChatModeSelector = ({
+export const ChatModeSelector = memo(({
   mode,
   onModeChange,
   variant = 'boxed'
 }: ChatModeSelectorProps) => {
+  // Performance tracking
+  const startTime = performance.now();
+  React.useEffect(() => {
+    performanceMonitor.trackRender('ChatModeSelector', startTime);
+  });
+
   const handleModeSwitch = (checked: boolean) => {
     onModeChange(checked ? 'learn' : 'chat');
   };
@@ -33,4 +41,6 @@ export const ChatModeSelector = ({
         <span>Policy Q&A</span>
       </div>
     </div>;
-};
+});
+
+ChatModeSelector.displayName = 'ChatModeSelector';

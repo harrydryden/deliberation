@@ -1,15 +1,23 @@
 // View mode toggle switch (Chat | IBIS), styled like ChatModeSelector
+import React, { memo } from "react";
 import { MessageSquare, GitBranch } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { performanceMonitor } from "@/utils/performanceMonitor";
 export type ViewMode = 'chat' | 'ibis';
 interface ViewModeSelectorProps {
   mode: ViewMode;
   onModeChange: (mode: ViewMode) => void;
 }
-export const ViewModeSelector = ({
+export const ViewModeSelector = memo(({
   mode,
   onModeChange
 }: ViewModeSelectorProps) => {
+  // Performance tracking
+  const startTime = performance.now();
+  React.useEffect(() => {
+    performanceMonitor.trackRender('ViewModeSelector', startTime);
+  });
+
   const handleSwitch = (checked: boolean) => {
     onModeChange(checked ? 'ibis' : 'chat');
   };
@@ -32,4 +40,6 @@ export const ViewModeSelector = ({
         <span>Map</span>
       </div>
     </div>;
-};
+});
+
+ViewModeSelector.displayName = 'ViewModeSelector';
