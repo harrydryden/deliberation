@@ -35,7 +35,10 @@ interface KnowledgeManagementProps {
 }
 
 export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManagementProps) => {
-  logger.component.mount('KnowledgeManagement', { agentCount: agents.length, loading });
+  // Add null check to prevent runtime errors
+  const safeAgents = agents || [];
+  
+  logger.component.mount('KnowledgeManagement', { agentCount: safeAgents.length, loading });
   
   const { user } = useSupabaseAuth();
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -313,7 +316,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
   };
 
   const getAgentName = (agentId: string) => {
-    const agent = agents.find(a => a.id === agentId);
+    const agent = safeAgents.find(a => a.id === agentId);
     return agent?.name || 'Unknown Agent';
   };
 
@@ -328,7 +331,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {agents.length === 0 ? (
+          {safeAgents.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-semibold mb-2">No Local Agents Available</h3>
@@ -354,7 +357,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
                     <SelectValue placeholder="Choose a local agent to manage knowledge" />
                   </SelectTrigger>
                   <SelectContent>
-                    {agents.map((agent) => (
+                    {safeAgents.map((agent) => (
                       <SelectItem key={agent.id} value={agent.id}>
                         <div className="flex items-center gap-2">
                           <span>{agent.name}</span>
@@ -368,7 +371,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
                 </Select>
               </div>
 
-              {selectedAgent && agents.length > 0 && (
+              {selectedAgent && safeAgents.length > 0 && (
               <div className="flex gap-4">
                 <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
                   <DialogTrigger asChild>

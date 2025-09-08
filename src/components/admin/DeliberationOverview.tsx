@@ -21,20 +21,22 @@ interface DeliberationOverviewProps {
 }
 
 export const DeliberationOverview = ({ deliberations: initialDeliberations, loading, onLoad, onUpdateStatus }: DeliberationOverviewProps) => {
-  logger.component.mount('DeliberationOverview', { deliberationCount: initialDeliberations.length });
+  // Add null check to prevent runtime errors
+  const safeInitialDeliberations = initialDeliberations || [];
+  logger.component.mount('DeliberationOverview', { deliberationCount: safeInitialDeliberations.length });
   const [updating, setUpdating] = useState<string | null>(null);
   const [selectedDeliberation, setSelectedDeliberation] = useState<Deliberation | null>(null);
   const [editMode, setEditMode] = useState<'nodes' | 'map' | null>(null);
   const [clearing, setClearing] = useState<{ [key: string]: 'messages' | 'ibis' | null }>({});
-  const [deliberations, setDeliberations] = useState(initialDeliberations);
+  const [deliberations, setDeliberations] = useState(safeInitialDeliberations);
   const [generatingRoots, setGeneratingRoots] = useState<string | null>(null);
   const adminService = serviceContainer.adminService;
   const { toast } = useToast();
   const { invokeFunction } = useOptimizedApiCalls();
 
   useEffect(() => {
-    setDeliberations(initialDeliberations);
-  }, [initialDeliberations]);
+    setDeliberations(safeInitialDeliberations);
+  }, [safeInitialDeliberations]);
 
   useEffect(() => {
     if (deliberations.length === 0 && !loading) {

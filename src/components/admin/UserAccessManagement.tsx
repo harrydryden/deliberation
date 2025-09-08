@@ -34,6 +34,8 @@ export const UserAccessManagement = ({
 }: UserAccessManagementProps) => {
   // Add null check for users to prevent runtime errors
   const safeUsers = users || [];
+  // Add null check for deliberations to prevent runtime errors
+  const safeDeliberations = deliberations || [];
   const [archivingUser, setArchivingUser] = useState<string | null>(null);
   const [unarchivingUser, setUnarchivingUser] = useState<string | null>(null);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
@@ -310,7 +312,7 @@ export const UserAccessManagement = ({
                   <SelectValue placeholder="Select a deliberation" />
                 </SelectTrigger>
                 <SelectContent>
-                  {deliberations
+                  {safeDeliberations
                     .filter(delib => !selectedUser?.deliberations?.some(userDelib => userDelib.id === delib.id))
                     .map((deliberation) => (
                       <SelectItem key={deliberation.id} value={deliberation.id}>

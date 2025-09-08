@@ -22,6 +22,9 @@ interface LocalAgentManagementProps {
 }
 
 export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLoad, onUpdate, onCreate }: LocalAgentManagementProps) => {
+  // Add null checks to prevent runtime errors
+  const safeLocalAgents = localAgents || [];
+  const safeDeliberations = deliberations || [];
   const [updating, setUpdating] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
 
@@ -90,7 +93,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
             </div>
         <div className="flex gap-2">
           <LocalAgentCreationModal
-            deliberations={deliberations}
+            deliberations={safeDeliberations}
             onCreateAgent={onCreate}
             loading={loading}
           />
@@ -101,9 +104,9 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
         </div>
       </CardHeader>
       <CardContent>
-        {loading && localAgents.length === 0 ? (
+        {loading && safeLocalAgents.length === 0 ? (
           <LoadingSpinner />
-        ) : localAgents.length === 0 ? (
+        ) : safeLocalAgents.length === 0 ? (
           <div className="text-center py-8">
             <Bot className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">No local agents found</p>
@@ -115,24 +118,24 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
-                <div className="text-2xl font-bold">{localAgents.length}</div>
+                <div className="text-2xl font-bold">{safeLocalAgents.length}</div>
                 <div className="text-sm text-muted-foreground">Total Local</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
-                  {localAgents.filter(a => a.is_active).length}
+                  {safeLocalAgents.filter(a => a.is_active).length}
                 </div>
                 <div className="text-sm text-muted-foreground">Active</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
-                  {localAgents.filter(a => a.deliberation?.status === 'active').length}
+                  {safeLocalAgents.filter(a => a.deliberation?.status === 'active').length}
                 </div>
                 <div className="text-sm text-muted-foreground">In Active Deliberations</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-gray-600">
-                  {new Set(localAgents.map(a => a.deliberation?.id)).size}
+                  {new Set(safeLocalAgents.map(a => a.deliberation?.id)).size}
                 </div>
                 <div className="text-sm text-muted-foreground">Deliberations</div>
               </div>
@@ -152,7 +155,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {localAgents.map((agent) => (
+                {safeLocalAgents.map((agent) => (
                   <>
                     <TableRow key={agent.id}>
                       <TableCell className="font-medium">
