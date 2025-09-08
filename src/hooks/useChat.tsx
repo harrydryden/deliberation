@@ -201,6 +201,14 @@ export const useChat = (deliberationId?: string) => {
 
     const { id: queueId, content, parentMessageId } = queuedMessage;
     
+    console.log('🔧 DEBUG: Starting processQueuedMessage', { 
+      queueId, 
+      content: content.substring(0, 50),
+      timestamp: new Date().toISOString(),
+      hasUser: !!user,
+      hasDeliberationId: !!deliberationId
+    });
+    
     logger.debug('Starting to process queued message', { 
       queueId, 
       content: content.substring(0, 50),
@@ -213,11 +221,8 @@ export const useChat = (deliberationId?: string) => {
       
       logger.debug('Sending message to service', { queueId });
       
-  // F006 Fix: Selective cache invalidation - only clear when sending new messages
-  const clearRelevantCache = useCallback(() => {
-    // Only clear chat history cache, preserve other caches for better performance
-    cacheService.clearNamespace('chat-history');
-  }, []);
+      // Clear cache when sending new messages
+      cacheService.clearNamespace('chat-history');
       
       const saved = await services.messageService.sendMessage(
         content.trim(), 
@@ -243,24 +248,6 @@ export const useChat = (deliberationId?: string) => {
       };
       
       setChatState(prev => {
-  // F005 Fix: Simplified and memoized message sorting function
-  const sortMessagesByOrder = useCallback((messages: ChatMessage[]): ChatMessage[] => {
-    return [...messages].sort((a, b) => {
-      const timeA = new Date(a.created_at).getTime();
-      const timeB = new Date(b.created_at).getTime();
-      
-      // If message B is a direct response to message A, B should follow A
-      if (b.parent_message_id === a.id) return -1;
-      if (a.parent_message_id === b.id) return 1;
-      
-      // For same-parent messages, maintain chronological order
-      if (a.parent_message_id === b.parent_message_id) return timeA - timeB;
-      
-      // Default chronological sort
-      return timeA - timeB;
-    });
-  }, []);
-        
         return {
           ...prev,
           messages: sortMessagesByOrder([...prev.messages, userMessage])
@@ -398,6 +385,11 @@ export const useChat = (deliberationId?: string) => {
       
     } catch (error) {
       const errMsg = getErrorMessage(error);
+      console.log('🚨 DEBUG: processQueuedMessage failed', { 
+        queueId, 
+        error: errMsg,
+        timestamp: new Date().toISOString()
+      });
       logger.error('Failed to process queued message', new Error(errMsg), { 
         queueId, 
         timestamp: new Date().toISOString() 
