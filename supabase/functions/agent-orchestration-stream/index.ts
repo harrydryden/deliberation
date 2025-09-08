@@ -914,8 +914,6 @@ async function processStreamingOrchestration(
       done: true 
     });
     return; // Exit early on error
-  }
-
   } catch (error) {
     console.error('❌ Streaming processing error:', error);
     sendData({ error: error.message, done: true });
