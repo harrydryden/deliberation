@@ -6,6 +6,7 @@ import {
   handleCORSPreflight,
   parseAndValidateRequest
 } from '../shared/edge-function-utils.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 interface PdfProcessingRequest {
   fileUrl: string;
@@ -24,14 +25,14 @@ interface PdfProcessingResult {
 }
 
 serve(async (req) => {
-  console.log('PDF Processor function called:', req.method, req.url);
+  EdgeLogger.debug('PDF Processor function called', { method: req.method, url: req.url });
   
   // Handle CORS preflight requests
   const corsResponse = handleCORSPreflight(req);
   if (corsResponse) return corsResponse;
 
   try {
-    console.log('Processing PDF extraction request...');
+    EdgeLogger.debug('Processing PDF extraction request');
     
     // Validate environment and get clients
     const { supabase, userSupabase } = validateAndGetEnvironment();
@@ -39,7 +40,7 @@ serve(async (req) => {
     // Verify JWT token
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      console.error('No authorization header provided');
+      EdgeLogger.error('No authorization header provided');
       throw new Error('No authorization header');
     }
 

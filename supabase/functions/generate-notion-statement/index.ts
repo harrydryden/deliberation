@@ -12,6 +12,7 @@ import {
   getOpenAIKey
 } from '../shared/edge-function-utils.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 
 serve(async (req) => {
@@ -26,7 +27,7 @@ serve(async (req) => {
     const { supabase } = validateAndGetEnvironment();
     const openAIApiKey = getOpenAIKey();
 
-    console.log('Generating notion statement for:', { title, description });
+    EdgeLogger.debug('Generating notion statement for', { title, description });
 
     // Get notion statement prompt from template system
 

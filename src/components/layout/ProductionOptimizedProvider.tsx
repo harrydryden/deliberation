@@ -12,7 +12,7 @@ export const ProductionOptimizedProvider: React.FC<ProductionOptimizedProviderPr
     return <>{children}</>;
   }
   
-  // In development, we can still have light monitoring
+  // In development, we can still have very light monitoring
   return (
     <div data-testid="performance-provider">
       {children}

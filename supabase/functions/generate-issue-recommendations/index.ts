@@ -12,6 +12,7 @@ import {
   getOpenAIKey
 } from '../shared/edge-function-utils.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 // Helper function to get system message from template
 async function getSystemMessage(supabase: any, templateName: string): Promise<string> {
@@ -23,7 +24,7 @@ async function getSystemMessage(supabase: any, templateName: string): Promise<st
       return templateData[0].template_text;
     }
   } catch (error) {
-    console.log(`Failed to fetch ${templateName} template:`, error);
+    EdgeLogger.error(`Failed to fetch ${templateName} template`, error);
   }
   
   // Fallbacks based on template name
@@ -44,7 +45,7 @@ serve(async (req) => {
   try {
     const { userId, deliberationId, content, maxRecommendations = 2 } = await parseAndValidateRequest(req, ['userId', 'deliberationId', 'content']);
 
-    console.log('🔍 Generating issue recommendations', { userId, deliberationId, contentLength: content.length });
+    EdgeLogger.debug('Generating issue recommendations', { userId, deliberationId, contentLength: content.length });
 
     // Get environment and clients with caching
     const { supabase } = validateAndGetEnvironment();

@@ -18,10 +18,10 @@ import { createRetrievalChain } from 'https://esm.sh/langchain@0.3.0/chains/retr
 import { createStuffDocumentsChain } from 'https://esm.sh/langchain@0.3.0/chains/combine_documents?no-check';
 import { PromptTemplate } from 'https://esm.sh/@langchain/core@0.3.0/prompts?no-check';
 import { ModelConfigManager } from "../shared/model-config.ts";
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 serve(async (req) => {
-  console.log('=== LANGCHAIN QUERY EDGE FUNCTION CALLED ===');
-  console.log('Method:', req.method);
+  EdgeLogger.debug('LANGCHAIN QUERY EDGE FUNCTION CALLED', { method: req.method });
 
   const startTime = Date.now();
   
@@ -30,7 +30,7 @@ serve(async (req) => {
     const corsResponse = handleCORSPreflight(req);
     if (corsResponse) return corsResponse;
 
-    console.log('Processing POST request...');
+    EdgeLogger.debug('Processing POST request');
 
     // Add timeout wrapper for the entire function
     const timeoutPromise = new Promise((_, reject) => {
@@ -39,14 +39,13 @@ serve(async (req) => {
 
     // Parse request body with validation
     const { query, agentId, maxResults = 5 } = await parseAndValidateRequest(req, ['query', 'agentId']);
-    console.log('Query:', query);
-    console.log('Agent ID:', agentId);
+    EdgeLogger.debug('Query received', { query: query.substring(0, 50), agentId, maxResults });
 
     // Get environment and clients with caching
     const { supabase } = validateAndGetEnvironment();
 
     // Validate that the agent is a local agent (not a global template)
-    console.log('Validating agent type...');
+    EdgeLogger.debug('Validating agent type');
     const { data: agentData, error: agentError } = await supabase
       .from('agent_configurations')
       .select('id, deliberation_id')

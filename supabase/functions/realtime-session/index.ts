@@ -10,6 +10,7 @@ import {
   handleCORSPreflight,
   getOpenAIKey
 } from '../shared/edge-function-utils.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 // Supabase Edge Function: realtime-session
 // Creates an ephemeral OpenAI Realtime session token with our desired defaults
@@ -27,7 +28,7 @@ async function getVoiceInstructions(supabase: any): Promise<string> {
       return templateData[0].template_text;
     }
   } catch (error) {
-    console.log('Failed to fetch voice instructions template:', error);
+    EdgeLogger.error('Failed to fetch voice instructions template', error);
   }
   
   // Fallback

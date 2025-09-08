@@ -12,6 +12,7 @@ import {
   parseAndValidateRequest
 } from '../shared/edge-function-utils.ts';
 import { ModelConfigManager } from "../shared/model-config.ts";
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 // Helper function to get system message from template
 async function getSystemMessage(supabase: any, templateName: string): Promise<string> {
@@ -23,7 +24,7 @@ async function getSystemMessage(supabase: any, templateName: string): Promise<st
       return templateData[0].template_text;
     }
   } catch (error) {
-    console.log(`Failed to fetch ${templateName} template:`, error);
+    EdgeLogger.error(`Failed to fetch ${templateName} template`, error);
   }
   
   // Fallbacks based on template name

@@ -12,6 +12,7 @@ import {
   parseAndValidateRequest
 } from '../shared/edge-function-utils.ts';
 import { configCache, createCacheKey } from '../shared/cache-manager.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 // Helper function to get classification prompt from template system
 async function getClassificationPrompt(supabase: any, content: string, deliberationContext: string, deliberationNotion: string): Promise<string> {
@@ -33,7 +34,7 @@ async function getClassificationPrompt(supabase: any, content: string, deliberat
         .replace('{deliberationNotion}', deliberationNotion)
     }
   } catch (error) {
-    console.log('Failed to fetch classification prompt template:', error);
+    EdgeLogger.error('Failed to fetch classification prompt template', error);
     throw new Error('Classification prompt template not available');
   }
 }

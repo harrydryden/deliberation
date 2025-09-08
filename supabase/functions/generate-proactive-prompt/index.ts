@@ -13,6 +13,7 @@ import {
 } from '../shared/edge-function-utils.ts';
 import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 // Remove the old duplicate cache/config functions - they're now in the shared orchestrator
 
@@ -24,7 +25,7 @@ serve(async (req) => {
   try {
     const { userId, deliberationId, sessionContext } = await parseAndValidateRequest(req, ['userId', 'deliberationId']);
     
-    console.log('🤖 Generating enhanced proactive prompt', { 
+    EdgeLogger.debug('Generating enhanced proactive prompt', { 
       userId, 
       deliberationId, 
       sessionContext: sessionContext || 'no session context provided' 

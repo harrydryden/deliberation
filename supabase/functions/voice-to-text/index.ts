@@ -10,6 +10,7 @@ import {
   parseAndValidateRequest,
   getOpenAIKey
 } from '../shared/edge-function-utils.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 // Process base64 in chunks to prevent memory issues
 function processBase64Chunks(base64String: string, chunkSize = 32768) {

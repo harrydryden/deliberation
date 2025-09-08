@@ -12,6 +12,7 @@ import {
   getOpenAIKey
 } from '../shared/edge-function-utils.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 // Helper function to get system message from template
 async function getSystemMessage(supabase: any, templateName: string): Promise<string> {
@@ -23,7 +24,7 @@ async function getSystemMessage(supabase: any, templateName: string): Promise<st
       return templateData[0].template_text;
     }
   } catch (error) {
-    console.log(`Failed to fetch ${templateName} template:`, error);
+    EdgeLogger.error(`Failed to fetch ${templateName} template`, error);
   }
   
   // Fallbacks based on template name
@@ -40,14 +41,14 @@ async function getSystemMessage(supabase: any, templateName: string): Promise<st
 // Helper function to get IBIS generation prompt from template system
 async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string, deliberationDescription: string, notion: string): Promise<string> {
   try {
-    console.log('Fetching generate_ibis_roots template...');
+    EdgeLogger.debug('Fetching generate_ibis_roots template');
     // Get template using correct column names
     const { data: templateData, error: templateError } = await supabase
       .rpc('get_prompt_template', { 
         template_name: 'generate_ibis_roots'
       });
 
-    console.log('Template fetch result:', { templateData, templateError });
+    EdgeLogger.debug('Template fetch result', { templateData: !!templateData, templateError });
 
     if (templateData && templateData.length > 0) {
       console.log('Using database template');
