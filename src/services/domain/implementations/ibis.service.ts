@@ -54,45 +54,138 @@ export class IBISService {
   }
 
   /**
-   * Create a new IBIS node
+   * Create a new IBIS node with validation and duplicate prevention
    */
   async createNode(nodeData: IBISNode): Promise<{ id: string; node_type: string }> {
     try {
-      logger.info('[IBISService] Creating IBIS node', { nodeData });
+      logger.info('[IBISService] Creating IBIS node', { 
+        title: nodeData.title,
+        nodeType: nodeData.node_type,
+        deliberationId: nodeData.deliberation_id 
+      });
+
+      // CRITICAL: Input validation
+      if (!nodeData.title || nodeData.title.trim().length === 0) {
+        throw new Error('IBIS node title is required');
+      }
+
+      if (!nodeData.node_type || !['issue', 'position', 'argument', 'uncategorized'].includes(nodeData.node_type)) {
+        throw new Error('Valid IBIS node type is required');
+      }
+
+      if (!nodeData.deliberation_id) {
+        throw new Error('Deliberation ID is required for IBIS node');
+      }
+
+      if (!nodeData.created_by) {
+        throw new Error('Creator user ID is required');
+      }
+
+      // Sanitize title and description
+      const sanitizedTitle = nodeData.title.trim().substring(0, 200);
+      const sanitizedDescription = nodeData.description?.trim().substring(0, 1000) || null;
+
+      // Check for duplicate nodes in the same deliberation
+      const { data: existingNodes } = await supabase
+        .from('ibis_nodes')
+        .select('id, title')
+        .eq('deliberation_id', nodeData.deliberation_id)
+        .eq('created_by', nodeData.created_by)
+        .gte('created_at', new Date(Date.now() - 30000).toISOString()) // Last 30 seconds
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      // Check for near-duplicate titles
+      const duplicateNode = existingNodes?.find(node => {
+        const similarity = this.calculateTitleSimilarity(sanitizedTitle, node.title);
+        return similarity > 0.85; // 85% similarity threshold
+      });
+
+      if (duplicateNode) {
+        logger.warn('[IBISService] Potential duplicate node detected', {
+          existingNodeId: duplicateNode.id,
+          existingTitle: duplicateNode.title,
+          newTitle: sanitizedTitle
+        });
+        throw new Error(`Similar node already exists: "${duplicateNode.title}"`);
+      }
 
       const position = this.calculateNodePosition(nodeData.node_type, nodeData.parent_node_id);
 
+      // Use transaction-like approach for consistency
+      const nodeInsertData = {
+        title: sanitizedTitle,
+        description: sanitizedDescription,
+        node_type: nodeData.node_type,
+        parent_node_id: nodeData.parent_node_id && nodeData.parent_node_id !== 'none' ? nodeData.parent_node_id : null,
+        deliberation_id: nodeData.deliberation_id,
+        message_id: nodeData.message_id,
+        created_by: nodeData.created_by,
+        position_x: nodeData.position_x ?? position.x,
+        position_y: nodeData.position_y ?? position.y
+      };
+
       const { data: inserted, error: nodeError } = await supabase
         .from('ibis_nodes')
-        .insert({
-          title: nodeData.title.trim(),
-          description: nodeData.description?.trim() || null,
-          node_type: nodeData.node_type,
-          parent_node_id: nodeData.parent_node_id && nodeData.parent_node_id !== 'none' ? nodeData.parent_node_id : null,
-          deliberation_id: nodeData.deliberation_id,
-          message_id: nodeData.message_id,
-          created_by: nodeData.created_by,
-          position_x: nodeData.position_x ?? position.x,
-          position_y: nodeData.position_y ?? position.y
-        })
+        .insert(nodeInsertData)
         .select('id, node_type')
         .maybeSingle();
 
       if (nodeError) {
-        logger.error('[IBISService] Error creating node', { error: nodeError });
+        logger.error('[IBISService] Error creating node', { error: nodeError, nodeData: nodeInsertData });
         throw nodeError;
       }
       
       if (!inserted) {
-        throw new Error('Failed to create IBIS node');
+        throw new Error('Failed to create IBIS node - no data returned');
       }
 
-      logger.info('[IBISService] Node created successfully', { nodeId: inserted.id });
+      // Trigger embedding generation asynchronously
+      try {
+        await supabase.functions.invoke('compute-ibis-embeddings', {
+          body: {
+            deliberationId: nodeData.deliberation_id,
+            nodeId: inserted.id,
+            force: false
+          }
+        });
+      } catch (embeddingError) {
+        logger.warn('[IBISService] Embedding generation failed - node created without embedding', {
+          nodeId: inserted.id,
+          error: embeddingError
+        });
+        // Don't fail node creation if embedding fails
+      }
+
+      logger.info('[IBISService] Node created successfully', { 
+        nodeId: inserted.id,
+        title: sanitizedTitle,
+        nodeType: inserted.node_type 
+      });
+      
       return inserted;
     } catch (error) {
-      logger.error('[IBISService] Error in createNode', { error });
+      logger.error('[IBISService] Error in createNode', { error, nodeData });
       throw error;
     }
+  }
+
+  /**
+   * Calculate similarity between two titles for duplicate detection
+   */
+  private calculateTitleSimilarity(title1: string, title2: string): number {
+    const t1 = title1.toLowerCase().replace(/[^\w\s]/g, '').trim();
+    const t2 = title2.toLowerCase().replace(/[^\w\s]/g, '').trim();
+    
+    if (t1 === t2) return 1;
+    
+    const words1 = t1.split(/\s+/);
+    const words2 = t2.split(/\s+/);
+    
+    const intersection = words1.filter(word => words2.includes(word));
+    const union = [...new Set([...words1, ...words2])];
+    
+    return intersection.length / union.length;
   }
 
   /**

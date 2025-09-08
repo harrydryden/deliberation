@@ -135,16 +135,67 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
 
   async create(data: Omit<Message, 'id' | 'createdAt' | 'updatedAt'>): Promise<Message> {
     try {
-      // Context set automatically via headers
-      
-      // Map the data to database column names
+      // CRITICAL: Input validation and sanitization
+      if (!data.content || typeof data.content !== 'string') {
+        throw new Error('Message content is required and must be a string');
+      }
+
+      if (!data.user_id) {
+        throw new Error('User ID is required');
+      }
+
+      // Sanitize content for security
+      const sanitizedContent = this.sanitizeMessageContent(data.content);
+      if (sanitizedContent !== data.content) {
+        logger.warn('Message content was sanitized', { 
+          originalLength: data.content.length,
+          sanitizedLength: sanitizedContent.length 
+        });
+      }
+
+      // Validate message length
+      if (sanitizedContent.length > 10000) {
+        throw new Error('Message content exceeds maximum length of 10,000 characters');
+      }
+
+      if (sanitizedContent.trim().length === 0) {
+        throw new Error('Message content cannot be empty after sanitization');
+      }
+
+      // Map the data to database column names with validation
       const dbData = {
-        content: data.content,
-        message_type: data.message_type,
+        content: sanitizedContent,
+        message_type: data.message_type || 'user',
         user_id: data.user_id,
-        deliberation_id: data.deliberation_id,
+        deliberation_id: data.deliberation_id || null,
         submitted_to_ibis: data.submitted_to_ibis || false
       };
+
+      // Check for potential duplicates to prevent race conditions
+      if (dbData.deliberation_id) {
+        const { data: recentMessages } = await supabase
+          .from('messages')
+          .select('id, content, created_at')
+          .eq('user_id', dbData.user_id)
+          .eq('deliberation_id', dbData.deliberation_id)
+          .gte('created_at', new Date(Date.now() - 5000).toISOString()) // Last 5 seconds
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        // Check for exact duplicate
+        const exactDuplicate = recentMessages?.find(msg => 
+          msg.content.trim() === sanitizedContent.trim()
+        );
+
+        if (exactDuplicate) {
+          logger.warn('Duplicate message detected', { 
+            messageId: exactDuplicate.id, 
+            userId: dbData.user_id,
+            deliberationId: dbData.deliberation_id 
+          });
+          throw new Error('Duplicate message detected - message not created');
+        }
+      }
 
       const { data: result, error } = await supabase
         .from('messages')
@@ -153,19 +204,42 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
         .single();
 
       if (error) {
-        logger.error('Message repository create error', error as Error, { data });
+        logger.error('Message repository create error', error as Error, { data: dbData });
         throw error;
       }
 
-      // Agent orchestration is handled at the service layer, not repository layer
-
-      logger.info('Message created successfully', { messageId: result.id, type: data.message_type });
+      logger.info('Message created successfully', { 
+        messageId: result.id, 
+        type: data.message_type,
+        contentLength: sanitizedContent.length,
+        deliberationId: data.deliberation_id 
+      });
       
-      // Map back to API format
       return this.mapToMessage(result);
     } catch (error) {
       logger.error('Message repository create failed', error as Error, { data });
       throw error;
     }
+  }
+
+  /**
+   * Sanitize message content to prevent XSS and other injection attacks
+   */
+  private sanitizeMessageContent(content: string): string {
+    // Remove potential script tags and dangerous HTML
+    let sanitized = content
+      .replace(/<script[^>]*>.*?<\/script>/gi, '')
+      .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
+      .replace(/<object[^>]*>.*?<\/object>/gi, '')
+      .replace(/<embed[^>]*>/gi, '')
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '');
+
+    // Remove excessive whitespace but preserve formatting
+    sanitized = sanitized
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    return sanitized;
   }
 }

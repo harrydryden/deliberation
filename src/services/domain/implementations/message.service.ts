@@ -30,28 +30,61 @@ export class MessageService implements IMessageService {
         throw new Error('User ID is required to send a message');
       }
 
-      const messageData = {
-        content: content.trim(),
-        message_type: messageType as any,
-        user_id: userId,
-        deliberation_id: deliberationId,
-      } as any;
+      // CRITICAL: Prevent race conditions with processing lock
+      const { MessageProcessingLockManager } = await import('@/utils/messageProcessingLock');
+      const contentHash = MessageProcessingLockManager.generateContentHash(content);
 
-      const message = await this.messageRepository.create(messageData);
-      
-      logger.info('Message sent successfully', { 
-        messageId: message.id, 
-        type: messageType, 
+      return await MessageProcessingLockManager.executeWithLock(
+        userId,
+        deliberationId,
+        'creating',
+        async () => {
+          // Validate and sanitize content
+          if (!content || typeof content !== 'string') {
+            throw new Error('Message content is required and must be a string');
+          }
+
+          const trimmedContent = content.trim();
+          if (trimmedContent.length === 0) {
+            throw new Error('Message content cannot be empty');
+          }
+
+          if (trimmedContent.length > 10000) {
+            throw new Error('Message content exceeds maximum length of 10,000 characters');
+          }
+
+          const messageData = {
+            content: trimmedContent,
+            message_type: messageType as any,
+            user_id: userId,
+            deliberation_id: deliberationId,
+          } as any;
+
+          const message = await this.messageRepository.create(messageData);
+          
+          logger.info('Message sent successfully', { 
+            messageId: message.id, 
+            type: messageType, 
+            deliberationId,
+            userId,
+            contentLength: trimmedContent.length
+          });
+
+          // Agent orchestration is now handled via streaming in the frontend
+          // Remove automatic orchestration to prevent duplicate responses
+          
+          return message;
+        },
+        contentHash
+      );
+    } catch (error) {
+      logger.error('Message service sendMessage failed', { 
+        error, 
+        content: content?.slice(0, 50),
+        messageType,
         deliberationId,
         userId 
       });
-
-      // Agent orchestration is now handled via streaming in the frontend
-      // Remove automatic orchestration to prevent duplicate responses
-      
-      return message;
-    } catch (error) {
-      logger.error('Message service sendMessage failed', { error, content: content.slice(0, 50) });
       throw error;
     }
   }
