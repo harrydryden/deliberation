@@ -13,7 +13,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { OptimizedMessageList } from "@/components/chat/OptimizedMessageList";
-import { MessageQueueIndicator } from "@/components/chat/MessageQueueIndicator";
+import { MessageQueueStatus } from "@/components/chat/MessageQueueStatus";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useOptimizedDeliberationService } from "@/hooks/useOptimizedDeliberationService";
 import { useServices } from "@/hooks/useServices";
@@ -259,18 +259,6 @@ const OptimizedDeliberationChat = () => {
   const ChatPanel = useCallback(() => (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-hidden min-h-0">
-        {/* Message Queue Indicator */}
-        {messageQueue && messageQueue.queue.length > 0 && (
-          <div className="p-3 pb-0">
-            <MessageQueueIndicator
-              queuedMessages={messageQueue.queue}
-              processingCount={messageQueue.stats.processing}
-              onRetryMessage={messageQueue.retryMessage}
-              onRemoveMessage={messageQueue.removeMessage}
-            />
-          </div>
-        )}
-        
         <OptimizedMessageList 
           messages={messages} 
           isLoading={chatLoading} 
@@ -283,7 +271,7 @@ const OptimizedDeliberationChat = () => {
       </div>
       <MessageInput ref={messageInputRef} onSendMessage={sendMessage} disabled={chatLoading} />
     </div>
-  ), [messages, chatLoading, isTyping, handleAddToIbis, retryMessage, deliberationId, state.agentConfigs, sendMessage, messageQueue]);
+  ), [messages, chatLoading, isTyping, handleAddToIbis, retryMessage, deliberationId, state.agentConfigs, sendMessage]);
 
   if (isLoading || state.loading) {
     return (
@@ -312,24 +300,34 @@ const OptimizedDeliberationChat = () => {
         <div className="border-b bg-card backdrop-blur-sm sticky top-16 z-40">
           {/* Mobile Header */}
           <div className="lg:hidden">
-            <div className="p-3 flex items-center justify-between">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <h1 className="text-lg font-semibold text-democratic-blue truncate">
-                  {state.deliberation.title}
-                </h1>
-                <Badge className={`${getStatusColor(state.deliberation.status)} text-white text-xs shrink-0`}>
-                  {state.deliberation.status}
-                </Badge>
+              <div className="p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <h1 className="text-lg font-semibold text-democratic-blue truncate">
+                    {state.deliberation.title}
+                  </h1>
+                  <Badge className={`${getStatusColor(state.deliberation.status)} text-white text-xs shrink-0`}>
+                    {state.deliberation.status}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {messageQueue && messageQueue.queue.length > 0 && (
+                    <MessageQueueStatus
+                      queuedMessages={messageQueue.queue}
+                      processingCount={messageQueue.stats.processing}
+                      onRetryMessage={messageQueue.retryMessage}
+                      onRemoveMessage={messageQueue.removeMessage}
+                    />
+                  )}
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setState(prev => ({ ...prev, isHeaderCollapsed: !prev.isHeaderCollapsed }))}
+                    className="shrink-0"
+                  >
+                    {state.isHeaderCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => setState(prev => ({ ...prev, isHeaderCollapsed: !prev.isHeaderCollapsed }))}
-                className="shrink-0"
-              >
-                {state.isHeaderCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-              </Button>
-            </div>
 
             {!state.isHeaderCollapsed && (
               <div className="px-3 pb-3 space-y-3">
@@ -405,9 +403,19 @@ const OptimizedDeliberationChat = () => {
                         {state.deliberation.status}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
-                      <Users className="h-4 w-4" />
-                      <span>{state.deliberation.participants?.length || state.deliberation.participant_count || 0}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        <span>{state.deliberation.participants?.length || state.deliberation.participant_count || 0}</span>
+                      </div>
+                      {messageQueue && messageQueue.queue.length > 0 && (
+                        <MessageQueueStatus
+                          queuedMessages={messageQueue.queue}
+                          processingCount={messageQueue.stats.processing}
+                          onRetryMessage={messageQueue.retryMessage}
+                          onRemoveMessage={messageQueue.removeMessage}
+                        />
+                      )}
                     </div>
                   </div>
                   
