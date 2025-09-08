@@ -173,14 +173,22 @@ export const useChat = (deliberationId?: string) => {
   }, [stableToast, setUiState]);
 
 
-  // Process queued messages automatically
   const processQueuedMessage = useCallback(async (queuedMessage: any) => {
     if (!user || !deliberationId) return;
 
     const { id: queueId, content, parentMessageId } = queuedMessage;
     
+    console.log('🔥 Starting to process queued message:', { 
+      queueId, 
+      content: content.substring(0, 50),
+      timestamp: new Date().toISOString()
+    });
+    
     try {
+      // Update status to processing ONLY when we actually start processing
       messageQueue.updateMessageStatus(queueId, 'processing');
+      
+      console.log('📤 Sending message to service...', { queueId });
       
       // Clear relevant caches when sending new messages
       cacheService.clearNamespace('chat-history');
@@ -192,6 +200,12 @@ export const useChat = (deliberationId?: string) => {
         'chat', 
         user?.id
       );
+      
+      console.log('✅ Message saved to database:', { 
+        queueId, 
+        savedMessageId: saved.id,
+        timestamp: new Date().toISOString()
+      });
       
       const savedChat = convertApiMessageToChatMessage(saved);
       
@@ -245,7 +259,8 @@ export const useChat = (deliberationId?: string) => {
         messageId: saved.id,
         queueId,
         deliberationId, 
-        hasStartStreamingFn: !!startStreaming 
+        hasStartStreamingFn: !!startStreaming,
+        timestamp: new Date().toISOString()
       });
       
       await startStreaming(
@@ -254,6 +269,13 @@ export const useChat = (deliberationId?: string) => {
         // onUpdate callback
         (streamContent: string, messageId: string, agentType: string | null) => {
           if (!streamContent.trim()) return;
+          
+          console.log('📡 Streaming update received:', { 
+            queueId, 
+            messageId, 
+            contentLength: streamContent.length,
+            agentType 
+          });
           
           const streamingMessage: ChatMessage = {
             id: `streaming-${saved.id}`,
@@ -309,6 +331,14 @@ export const useChat = (deliberationId?: string) => {
         },
         // onComplete callback
         async (finalContent: string, messageId: string, agentType: string | null) => {
+          console.log('🏁 Streaming completed for queued message:', { 
+            queueId, 
+            messageId, 
+            contentLength: finalContent.length,
+            agentType,
+            timestamp: new Date().toISOString()
+          });
+          
           if (!finalContent.trim()) {
             messageQueue.updateMessageStatus(queueId, 'failed', 'Empty agent response');
             return;
@@ -357,9 +387,16 @@ export const useChat = (deliberationId?: string) => {
           });
           
           messageQueue.updateMessageStatus(queueId, 'completed');
+          console.log('✅ Queue message marked as completed:', { queueId, timestamp: new Date().toISOString() });
         },
         // onError callback
         (error: string) => {
+          console.error('❌ Streaming error occurred for queued message', { 
+            error, 
+            queueId, 
+            timestamp: new Date().toISOString() 
+          });
+          
           // Don't mark as failed if it was intentionally aborted
           if (error.includes('aborted') || error.includes('AbortError')) {
             console.log('🛑 Message processing was aborted intentionally', { queueId });
@@ -367,7 +404,6 @@ export const useChat = (deliberationId?: string) => {
             return;
           }
           
-          console.error('❌ Streaming error occurred for queued message', { error, queueId });
           setChatState(prev => ({
             ...prev,
             messages: prev.messages.filter(m => m.id !== `streaming-${saved.id}` && !m.id.startsWith('streaming-'))
@@ -378,6 +414,11 @@ export const useChat = (deliberationId?: string) => {
       
     } catch (error) {
       const errMsg = getErrorMessage(error);
+      console.error('💥 Failed to process queued message:', { 
+        error: errMsg, 
+        queueId, 
+        timestamp: new Date().toISOString() 
+      });
       messageQueue.updateMessageStatus(queueId, 'failed', errMsg);
       logger.error('Failed to process queued message', { error: errMsg, queueId });
     }
@@ -386,19 +427,37 @@ export const useChat = (deliberationId?: string) => {
   // Auto-process queue when messages are available
   useEffect(() => {
     const processNext = async () => {
+      console.log('🔍 Checking queue for next message...');
       const nextMessage = messageQueue.getNextQueuedMessage();
       if (nextMessage && user && deliberationId) {
+        console.log('🚀 Processing next queued message:', { 
+          messageId: nextMessage.id, 
+          content: nextMessage.content.substring(0, 50) 
+        });
         await processQueuedMessage(nextMessage);
+      } else {
+        console.log('⏸️ No messages to process:', { 
+          hasNextMessage: !!nextMessage, 
+          hasUser: !!user, 
+          hasDeliberationId: !!deliberationId,
+          queueStats: messageQueue.getQueueStats()
+        });
       }
     };
 
-    // Check for next message every 500ms when queue has items
+    // Process immediately when queue has items, then check every 500ms
     const queueStats = messageQueue.getQueueStats();
     if (queueStats.queued > 0 && queueStats.canProcess) {
+      console.log('📋 Queue has items, processing immediately...', queueStats);
+      
+      // Process first message immediately
+      processNext();
+      
+      // Set up interval for subsequent messages
       const timer = setTimeout(processNext, 500);
       return () => clearTimeout(timer);
     }
-  }, [messageQueue, processQueuedMessage, user, deliberationId]);
+  }, [messageQueue.queue, messageQueue.processing, processQueuedMessage, user, deliberationId]);
 
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!user || !content.trim()) return;
