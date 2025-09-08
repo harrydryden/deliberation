@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
-import { logger } from '@/utils/logger';
+import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/utils/logger';
 
 interface StreamingState {
   isStreaming: boolean;
@@ -26,26 +26,20 @@ export const useResponseStreaming = () => {
   });
 
   const streamControllerRef = useRef<AbortController | null>(null);
-  const rafPendingRef = useRef<boolean>(false);
+  const accumulatorRef = useRef<string>('');
+  const rafIdRef = useRef<number | null>(null);
 
   const startStreaming = useCallback(async (
     messageId: string,
     deliberationId: string,
-    onUpdate: (content: string, agentType: string) => void,
-    onComplete: (finalContent: string, agentType: string) => void,
+    onUpdate: (content: string, messageId: string, agentType: string | null) => void,
+    onComplete: (finalContent: string, messageId: string, agentType: string | null) => void,
     onError: (error: string) => void
   ) => {
-      if (process.env.NODE_ENV === 'development') {
-        logger.debug('Starting streaming for message', { messageId, deliberationId });
-      }
+    console.log('🌊 Starting streaming for message:', messageId);
     
-    // Cancel any existing stream
-    if (streamControllerRef.current) {
-      streamControllerRef.current.abort();
-    }
-
-    streamControllerRef.current = new AbortController();
-
+    // Reset previous state
+    accumulatorRef.current = '';
     setStreamingState({
       isStreaming: true,
       currentMessage: '',
@@ -53,41 +47,20 @@ export const useResponseStreaming = () => {
       agentType: null,
     });
 
+    // Cancel any existing stream
+    if (streamControllerRef.current) {
+      streamControllerRef.current.abort();
+    }
+
+    streamControllerRef.current = new AbortController();
+
     try {
-      // Get the current session for authentication
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No authentication session found');
-      }
-
-      if (process.env.NODE_ENV === 'development') {
-        logger.debug('Session found, calling agent-orchestration-stream function');
-      }
-
-      // Use Supabase functions.invoke for proper authentication
-      const { data, error } = await supabase.functions.invoke('agent-orchestration-stream', {
-        body: {
-          messageId,
-          deliberationId,
-          mode: 'chat'
-        }
-      });
-
-      if (process.env.NODE_ENV === 'development') {
-        logger.debug('Function invoke response', { hasData: !!data, hasError: !!error, data });
-        console.log('🔍 Function invoke data:', data);
-        console.log('🔍 Function invoke error:', error);
-      }
-
-      if (error) {
-        logger.error('Supabase function error', { error });
-        throw new Error(`Supabase function error: ${error.message}`);
-      }
-
-      // If the function returns data directly (non-streaming), handle it
-      if (data && !data.stream) {
-        console.log('📄 Non-streaming response received:', data);
-        onComplete(data.content || '', data.agentType || 'flow_agent');
+      console.log('🔍 Checking if streaming is already in progress...');
+      
+      // Check if this message is already streaming
+      const isAlreadyStreaming = streamingState.isStreaming && streamingState.messageId === messageId;
+      if (isAlreadyStreaming) {
+        console.log('⚠️ Message already streaming, skipping...');
         setStreamingState({
           isStreaming: false,
           currentMessage: '',
@@ -97,136 +70,130 @@ export const useResponseStreaming = () => {
         return;
       }
 
-      console.log('🌊 Proceeding to streaming fetch call...');
+      console.log('🌊 Proceeding to streaming function call...');
 
-      // For streaming responses, we need to make a direct fetch call with proper auth
+      // Use Supabase function invoke for streaming
       const { data: { session: currentSession } } = await supabase.auth.getSession();
-      console.log('🔄 Making direct fetch call for streaming...');
-      const response = await fetch(`https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/agent-orchestration-stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentSession?.access_token}`,
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM',
-        },
-        body: JSON.stringify({
+      console.log('🔄 Using optimized streaming function call...');
+      
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (currentSession?.access_token) {
+        headers['Authorization'] = `Bearer ${currentSession.access_token}`;
+      }
+      
+      const response = await supabase.functions.invoke('agent-orchestration-stream', {
+        headers,
+        body: {
           messageId,
           deliberationId,
           mode: 'chat'
-        }),
-        signal: streamControllerRef.current.signal,
+        }
       });
-
-      console.log('📡 Fetch response status:', response.status);
-      console.log('📡 Fetch response ok:', response.ok);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Fetch error response:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      
+      if (response.error) {
+        throw new Error(response.error.message || 'Streaming function failed');
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body reader available');
+      console.log('📡 Streaming response received successfully');
+
+      if (!response.data?.stream) {
+        throw new Error('No stream data received');
       }
 
+      const reader = response.data.stream.getReader();
       const decoder = new TextDecoder();
-      let buffer = '';
-      let currentContent = '';
-      let currentAgentType = '';
+
+      console.log('📖 Starting to read stream...');
+
+      const updateUI = () => {
+        setStreamingState(prev => ({
+          ...prev,
+          currentMessage: accumulatorRef.current,
+        }));
+        onUpdate(accumulatorRef.current, messageId, streamingState.agentType);
+      };
 
       while (true) {
         const { done, value } = await reader.read();
         
-        if (done) break;
+        if (streamControllerRef.current?.signal.aborted) {
+          console.log('🛑 Stream aborted by user');
+          break;
+        }
 
-        // Decode the chunk and add to buffer
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
+        if (done) {
+          console.log('✅ Stream completed');
+          break;
+        }
 
-        // Process complete lines
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+        try {
+          const chunk = decoder.decode(value, { stream: true });
+          console.log('📦 Received chunk:', chunk.substring(0, 100) + '...');
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
-
-          try {
-            // Expect server-sent events format: data: {...}
-            const dataLine = line.startsWith('data: ') ? line.slice(6) : line;
-            console.log('🔍 Processing line:', dataLine);
-            const parsed: StreamingResponse = JSON.parse(dataLine);
-            console.log('📦 Parsed response:', parsed);
-
-            if (parsed.error) {
-              logger.error('Streaming error received', { error: parsed.error });
-              onError(parsed.error);
-              return;
-            }
-
-            if (parsed.agentType && !currentAgentType) {
-              currentAgentType = parsed.agentType;
-              console.log('🤖 Agent type set:', currentAgentType);
-              setStreamingState(prev => ({ ...prev, agentType: currentAgentType }));
-              // Don't call onUpdate here - wait for actual content
-            }
-
-            if (parsed.content) {
-              currentContent += parsed.content;
-              console.log('💬 Content received:', parsed.content.substring(0, 100));
-              if (!rafPendingRef.current && currentAgentType) {
-                rafPendingRef.current = true;
-                requestAnimationFrame(() => {
-                  setStreamingState(prev => ({ 
-                    ...prev, 
-                    currentMessage: currentContent,
-                    agentType: currentAgentType 
-                  }));
-                  // Only update UI if we have both content and agent type
-                  onUpdate(currentContent, currentAgentType);
-                  rafPendingRef.current = false;
-                });
+          // Parse each line as a potential JSON object
+          const lines = chunk.split('\n').filter(line => line.trim());
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.slice(6);
+              if (jsonStr === '[DONE]') {
+                console.log('🏁 Received [DONE] signal');
+                break;
+              }
+              
+              try {
+                const parsed: StreamingResponse = JSON.parse(jsonStr);
+                
+                if (parsed.error) {
+                  throw new Error(parsed.error);
+                }
+                
+                if (parsed.content) {
+                  accumulatorRef.current += parsed.content;
+                  
+                  // Update agent type if provided
+                  if (parsed.agentType && !streamingState.agentType) {
+                    setStreamingState(prev => ({
+                      ...prev,
+                      agentType: parsed.agentType || null,
+                    }));
+                  }
+                  
+                  // Throttle UI updates using requestAnimationFrame
+                  if (rafIdRef.current) {
+                    cancelAnimationFrame(rafIdRef.current);
+                  }
+                  rafIdRef.current = requestAnimationFrame(updateUI);
+                }
+                
+                if (parsed.done) {
+                  console.log('✅ Received done signal from parsed data');
+                  break;
+                }
+              } catch (parseError) {
+                console.warn('⚠️ Failed to parse streaming chunk:', parseError);
+                // Continue processing other lines
               }
             }
-
-            if (parsed.done) {
-              console.log('✅ Streaming done signal received');
-              onComplete(currentContent, currentAgentType);
-              setStreamingState({
-                isStreaming: false,
-                currentMessage: '',
-                messageId: null,
-                agentType: null,
-              });
-              logger.info('Streaming completed successfully');
-              return;
-            }
-          } catch (parseError) {
-            console.error('❌ Error parsing streaming response:', parseError);
-            console.error('❌ Problematic line:', line);
-            logger.error('Error parsing streaming response', { error: parseError, line });
           }
+        } catch (chunkError) {
+          console.error('❌ Error processing chunk:', chunkError);
+          // Continue processing stream
         }
       }
 
-      // If we get here, stream ended without done signal
-      if (currentContent) {
-        onComplete(currentContent, currentAgentType);
-      }
+      // Final update
+      updateUI();
+      onComplete(accumulatorRef.current, messageId, streamingState.agentType);
 
-    } catch (error: any) {
-      console.error('❌ Streaming error caught:', error);
-      console.error('❌ Error name:', error.name);
-      console.error('❌ Error message:', error.message);
-      console.error('❌ Error stack:', error.stack);
-      
-      if (error.name === 'AbortError') {
-        logger.info('Streaming aborted by user');
-      } else {
-        logger.error('Streaming error', { error });
-        onError(error.message || 'Streaming failed');
-      }
+    } catch (error) {
+      console.error('❌ Streaming error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
+      logger.error('Streaming failed', error as Error, { messageId, deliberationId });
+      onError(errorMessage);
     } finally {
       setStreamingState({
         isStreaming: false,
@@ -234,15 +201,27 @@ export const useResponseStreaming = () => {
         messageId: null,
         agentType: null,
       });
+      
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      
       streamControllerRef.current = null;
-      rafPendingRef.current = false;
+      accumulatorRef.current = '';
     }
-  }, []);
+  }, [streamingState.agentType, streamingState.isStreaming, streamingState.messageId]);
 
   const stopStreaming = useCallback(() => {
+    console.log('🛑 Stopping stream...');
     if (streamControllerRef.current) {
       streamControllerRef.current.abort();
       streamControllerRef.current = null;
+    }
+    
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
     }
     
     setStreamingState({
@@ -251,11 +230,13 @@ export const useResponseStreaming = () => {
       messageId: null,
       agentType: null,
     });
+    
+    accumulatorRef.current = '';
   }, []);
 
   const isStreamingMessage = useCallback((messageId: string) => {
     return streamingState.isStreaming && streamingState.messageId === messageId;
-  }, [streamingState]);
+  }, [streamingState.isStreaming, streamingState.messageId]);
 
   return {
     streamingState,

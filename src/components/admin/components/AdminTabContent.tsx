@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { TabsContent } from '@/components/ui/tabs';
-import { AdminErrorBoundary } from '@/components/common/AdminErrorBoundary';
+import { AdminErrorBoundary } from '@/components/error-boundaries/AdminErrorBoundary';
 
 interface AdminTabContentProps {
   value: string;

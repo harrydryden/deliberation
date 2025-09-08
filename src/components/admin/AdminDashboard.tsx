@@ -18,7 +18,7 @@ import { AdminHeader } from './components/AdminHeader';
 import { AdminTabNavigation } from './components/AdminTabNavigation';
 import { AdminTabContent } from './components/AdminTabContent';
 import { useOptimizedAdminData } from '@/hooks/useOptimizedAdminData';
-import { AdminErrorBoundary } from '@/components/common/AdminErrorBoundary';
+import { AdminErrorBoundary } from '@/components/error-boundaries/AdminErrorBoundary';
 import { logger } from '@/utils/logger';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 

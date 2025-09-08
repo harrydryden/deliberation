@@ -1,24 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { RefreshCw, MessageSquare, Eye, GitBranch, Trash2, Database, Map, Edit, Lightbulb } from 'lucide-react';
-import { formatToUKDateTime } from '@/utils/timeUtils';
+import { RefreshCw, MessageSquare } from 'lucide-react';
 import { Deliberation } from '@/types/index';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { ExpandableText } from '@/components/common/ExpandableText';
-import { useNavigate } from 'react-router-dom';
 import { IbisNodeManagement } from './IbisNodeManagement';
 import { AdminIbisMapEditor } from './AdminIbisMapEditor';
-import { NotionEditor } from './NotionEditor';
 import { serviceContainer } from '@/services/domain/container';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
-import { supabase } from '@/integrations/supabase/client';
+import { useOptimizedApiCalls } from '@/hooks/useOptimizedApiCalls';
+import { DeliberationStats } from './components/DeliberationStats';
+import { DeliberationTable } from './components/DeliberationTable';
 
 interface DeliberationOverviewProps {
   deliberations: Deliberation[];
@@ -35,9 +28,9 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
   const [clearing, setClearing] = useState<{ [key: string]: 'messages' | 'ibis' | null }>({});
   const [deliberations, setDeliberations] = useState(initialDeliberations);
   const [generatingRoots, setGeneratingRoots] = useState<string | null>(null);
-  const navigate = useNavigate();
   const adminService = serviceContainer.adminService;
   const { toast } = useToast();
+  const { invokeFunction } = useOptimizedApiCalls();
 
   useEffect(() => {
     setDeliberations(initialDeliberations);
@@ -56,20 +49,6 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
     } finally {
       setUpdating(null);
     }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
-      'draft': 'secondary',
-      'active': 'default',
-      'completed': 'destructive',
-      'archived': 'secondary'
-    };
-    return <Badge variant={variants[status] || 'secondary'}>{status}</Badge>;
-  };
-
-  const formatDate = (dateString: string) => {
-    return formatToUKDateTime(dateString, 'dd MMM yyyy HH:mm');
   };
 
   const handleEditNodes = (deliberation: Deliberation) => {
@@ -140,18 +119,17 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
   const handleGenerateIbisRoots = async (deliberation: Deliberation) => {
     setGeneratingRoots(deliberation.id);
     try {
-      const { data: rootsData, error: rootsError } = await supabase.functions.invoke('generate-ibis-roots', {
-        body: {
-          deliberationId: deliberation.id,
-          deliberationTitle: deliberation.title,
-          deliberationDescription: deliberation.description,
-          notion: deliberation.notion
-        }
+      const { execute } = invokeFunction('generate-ibis-roots', {
+        deliberationId: deliberation.id,
+        deliberationTitle: deliberation.title,
+        deliberationDescription: deliberation.description,
+        notion: deliberation.notion
+      }, {
+        cacheKey: `ibis-roots-${deliberation.id}`,
+        cacheTTL: 60000
       });
 
-      if (rootsError) {
-        throw rootsError;
-      }
+      const rootsData = await execute();
 
       toast({
         title: "IBIS Roots Generated",
@@ -226,218 +204,21 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
           <p className="text-muted-foreground text-center py-8">No deliberations found</p>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold">{deliberations.length}</div>
-                <div className="text-sm text-muted-foreground">Total</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {deliberations.filter(d => d.status === 'active').length}
-                </div>
-                <div className="text-sm text-muted-foreground">Active</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">
-                  {deliberations.filter(d => d.status === 'draft').length}
-                </div>
-                <div className="text-sm text-muted-foreground">Draft</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-gray-600">
-                  {deliberations.filter(d => d.status === 'completed').length}
-                </div>
-                <div className="text-sm text-muted-foreground">Completed</div>
-              </div>
-            </div>
+            <DeliberationStats deliberations={deliberations} />
             
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[200px]">Title</TableHead>
-                    <TableHead className="w-[140px]">Status</TableHead>
-                    <TableHead className="min-w-[250px]">Notion</TableHead>
-                    <TableHead className="min-w-[200px]">Description</TableHead>
-                    <TableHead className="w-[120px]">Created</TableHead>
-                    <TableHead className="w-[120px]">Updated</TableHead>
-                    <TableHead className="min-w-[500px]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-              <TableBody>
-                {deliberations.map((deliberation) => (
-                  <TableRow key={deliberation.id}>
-                    <TableCell className="font-medium">
-                      {deliberation.title}
-                    </TableCell>
-                    <TableCell>
-                      <Select
-                        value={deliberation.status}
-                        onValueChange={(value) => handleStatusUpdate(deliberation.id, value)}
-                        disabled={updating === deliberation.id}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="draft">Draft</SelectItem>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="completed">Completed</SelectItem>
-                          <SelectItem value="archived">Archived</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <ExpandableText 
-                        text={deliberation.notion} 
-                        placeholder="No notion set"
-                        title={`Notion for "${deliberation.title}"`}
-                        maxLength={60}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <ExpandableText 
-                        text={deliberation.description} 
-                        placeholder="No description"
-                        title={`Description for "${deliberation.title}"`}
-                        maxLength={50}
-                      />
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(deliberation.createdAt)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(deliberation.updatedAt)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2 flex-wrap">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/deliberations/${deliberation.id}`)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditNodes(deliberation)}
-                        >
-                          <GitBranch className="h-4 w-4 mr-2" />
-                          Edit Nodes
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditMap(deliberation)}
-                        >
-                          <Map className="h-4 w-4 mr-2" />
-                          Edit Map
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleGenerateIbisRoots(deliberation)}
-                          disabled={generatingRoots === deliberation.id}
-                        >
-                          <Lightbulb className="h-4 w-4 mr-2" />
-                          {generatingRoots === deliberation.id ? 'Generating...' : 'Generate IBIS Roots'}
-                        </Button>
-                        
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                            >
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit Notion
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Edit Notion for "{deliberation.title}"</DialogTitle>
-                            </DialogHeader>
-                            <NotionEditor
-                              deliberationId={deliberation.id}
-                              currentNotion={deliberation.notion || ''}
-                              onNotionUpdated={(newNotion) => handleNotionUpdated(deliberation.id, newNotion)}
-                              deliberationTitle={deliberation.title}
-                              deliberationDescription={deliberation.description}
-                            />
-                          </DialogContent>
-                        </Dialog>
-                        
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={clearing[deliberation.id] === 'messages'}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              {clearing[deliberation.id] === 'messages' ? 'Clearing...' : 'Clear Messages'}
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Clear All Messages</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete all messages from all users in "{deliberation.title}". 
-                                This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleClearMessages(deliberation.id, deliberation.title)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Clear All Messages
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={clearing[deliberation.id] === 'ibis'}
-                            >
-                              <Database className="h-4 w-4 mr-2" />
-                              {clearing[deliberation.id] === 'ibis' ? 'Clearing...' : 'Clear IBIS'}
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Clear All IBIS Data</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete all IBIS nodes, relationships, and ratings from "{deliberation.title}". 
-                                This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleClearIbis(deliberation.id, deliberation.title)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              >
-                                Clear All IBIS Data
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              </Table>
-            </div>
+            <DeliberationTable
+              deliberations={deliberations}
+              updating={updating}
+              clearing={clearing}
+              generatingRoots={generatingRoots}
+              onStatusUpdate={handleStatusUpdate}
+              onEditNodes={handleEditNodes}
+              onEditMap={handleEditMap}
+              onNotionUpdated={handleNotionUpdated}
+              onClearMessages={handleClearMessages}
+              onClearIbis={handleClearIbis}
+              onGenerateIbisRoots={handleGenerateIbisRoots}
+            />
           </div>
         )}
       </CardContent>
