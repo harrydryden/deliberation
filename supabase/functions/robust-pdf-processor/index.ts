@@ -1,15 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.52.1";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Environment variables
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? 'https://iowsxuxkgvpgrvvklwyt.supabase.co';
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM';
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MzMwMDA5NiwiZXhwIjoyMDY4ODc2MDk2fQ.VLD-yck9_WrJjFanhnMZ5MzQcKv_zkfOJ7e5L1dS2Ck';
+import {
+  validateAndGetEnvironment,
+  createErrorResponse,
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest
+} from '../shared/edge-function-utils.ts';
 
 interface PdfProcessingRequest {
   fileUrl: string;
@@ -31,12 +27,14 @@ serve(async (req) => {
   console.log('PDF Processor function called:', req.method, req.url);
   
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
     console.log('Processing PDF extraction request...');
+    
+    // Validate environment and get clients
+    const { supabase, userSupabase } = validateAndGetEnvironment();
     
     // Verify JWT token
     const authHeader = req.headers.get('Authorization');
@@ -45,18 +43,13 @@ serve(async (req) => {
       throw new Error('No authorization header');
     }
 
-    const supabaseClient = createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY,
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    );
-
-    // Verify the user
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    // Create client with user token
+    const supabaseClient = userSupabase;
+    // Set the auth header for the request
+    supabaseClient.auth.setSession = null; // Reset any existing session
+    
+    // Verify the user using the provided token
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
     if (authError || !user) {
       console.error('Authentication failed:', authError);
       throw new Error('Invalid authentication');
@@ -64,18 +57,11 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
-    const requestBody = await req.json();
-    console.log('Request body received:', requestBody);
-    console.log('fileUrl type:', typeof requestBody.fileUrl);
-    console.log('fileUrl value:', requestBody.fileUrl);
-    console.log('fileUrl length:', requestBody.fileUrl?.length);
-    
-    const { fileUrl, fileName, deliberationId, userId }: PdfProcessingRequest = requestBody;
+    const { fileUrl, fileName, deliberationId, userId }: PdfProcessingRequest = await parseAndValidateRequest<PdfProcessingRequest>(
+      req,
+      ['fileUrl', 'fileName', 'deliberationId', 'userId']
+    );
 
-    if (!fileUrl || !fileName || !deliberationId || !userId) {
-      console.error('Missing parameters:', { fileUrl: !!fileUrl, fileName: !!fileName, deliberationId: !!deliberationId, userId: !!userId });
-      throw new Error('Missing required parameters');
-    }
 
     // Validate that fileUrl is a complete URL
     if (!fileUrl.startsWith('http')) {
@@ -93,7 +79,7 @@ serve(async (req) => {
       console.log('PDF processing successful, storing in knowledge base...');
       try {
         // Store the extracted text in the knowledge base
-        await storeExtractedText(result, deliberationId, userId, fileName);
+        await storeExtractedText(result, deliberationId, userId, fileName, supabase);
         console.log('Knowledge chunks stored successfully');
       } catch (storageError) {
         console.error('Failed to store knowledge chunks:', storageError);
@@ -109,29 +95,11 @@ serve(async (req) => {
       console.warn('PDF processing failed:', result.error);
     }
 
-    return new Response(
-      JSON.stringify(result),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
+    return createSuccessResponse(result);
 
   } catch (error) {
     console.error('PDF Processing Error:', error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        text: '',
-        pages: 0,
-        strategy: 'none'
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    );
+    return createErrorResponse(error, 500, 'PDF processing');
   }
 });
 
@@ -413,13 +381,10 @@ async function storeExtractedText(
   result: PdfProcessingResult, 
   deliberationId: string, 
   userId: string, 
-  fileName: string
+  fileName: string,
+  supabaseClient: any
 ): Promise<void> {
   try {
-    const supabaseClient = createClient(
-      SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY
-    );
 
     // Create knowledge chunks from the extracted text
     const chunks = createKnowledgeChunks(result.text, fileName);
