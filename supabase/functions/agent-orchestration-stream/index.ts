@@ -16,6 +16,7 @@ import {
 } from '../shared/edge-function-utils.ts';
 import { responseCache, configCache, createCacheKey } from '../shared/cache-manager.ts';
 import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
+import { ModelConfigManager } from '../shared/model-config.ts';
 
 // Re-export types from shared orchestrator
 import type { AgentConfig, AnalysisResult, ConversationContext } from '../shared/agent-orchestrator.ts';
