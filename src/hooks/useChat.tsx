@@ -208,12 +208,26 @@ export const useChat = (deliberationId?: string) => {
       }));
 
       // Start streaming the agent response
+      console.log('🚀 About to start streaming agent response', { 
+        messageId: saved.id, 
+        deliberationId, 
+        hasStartStreamingFn: !!startStreaming 
+      });
+      
       if (deliberationId) {
-        await startStreaming(
-          saved.id,
-          deliberationId,
-          // onUpdate callback - update streaming message in real-time
-          (streamContent: string, agentType: string) => {
+        console.log('✅ Deliberation ID present, initiating streaming...');
+        try {
+          await startStreaming(
+            saved.id,
+            deliberationId,
+            // onUpdate callback - update streaming message in real-time
+            (streamContent: string, messageId: string, agentType: string | null) => {
+              console.log('🔄 Streaming update received', { 
+                messageId, 
+                contentLength: streamContent?.length || 0, 
+                agentType,
+                contentPreview: streamContent?.substring(0, 50) || '[empty]'
+              });
             // Only create streaming UI messages when we have actual content to show
             if (!streamContent.trim()) {
               return;
@@ -249,7 +263,13 @@ export const useChat = (deliberationId?: string) => {
             });
           },
           // onComplete callback - replace with final message
-          async (finalContent: string, agentType: string) => {
+          async (finalContent: string, messageId: string, agentType: string | null) => {
+            console.log('✅ Streaming completed', { 
+              messageId, 
+              finalContentLength: finalContent?.length || 0, 
+              agentType,
+              contentPreview: finalContent?.substring(0, 50) || '[empty]'
+            });
             // Don't create messages with empty content
             if (!finalContent.trim()) {
               setChatState(prev => ({ ...prev, isTyping: false }));
@@ -258,15 +278,15 @@ export const useChat = (deliberationId?: string) => {
             
             try {
               // Replace streaming placeholder with final agent message locally to avoid full reload
-              const finalMessage: ChatMessage = {
-                id: `${saved.id}-final` as string,
-                content: finalContent,
-                message_type: agentType as ChatMessage['message_type'],
-                created_at: new Date().toISOString(),
-                user_id: 'agent',
-                status: 'sent',
-                agent_context: { agentType }
-              };
+            const finalMessage: ChatMessage = {
+              id: `${saved.id}-final` as string,
+              content: finalContent,
+              message_type: (agentType || 'agent') as ChatMessage['message_type'],
+              created_at: new Date().toISOString(),
+              user_id: 'agent',
+              status: 'sent',
+              agent_context: { agentType: agentType || 'agent' }
+            };
 
               setChatState(prev => {
                 const withoutStreaming = prev.messages.filter(m => m.id !== `streaming-${saved.id}`);
@@ -283,6 +303,7 @@ export const useChat = (deliberationId?: string) => {
           },
           // onError callback
           (error: string) => {
+            console.error('❌ Streaming error occurred', { error });
             logger.error('Streaming error', { error });
             // Clean up any streaming messages on error
             setChatState(prev => ({
@@ -297,7 +318,18 @@ export const useChat = (deliberationId?: string) => {
             });
           }
         );
+        console.log('🎯 Streaming initiated successfully');
+      } catch (streamingError) {
+        console.error('❌ Failed to start streaming', { streamingError });
+        setUiState(prev => ({ ...prev, isTyping: false }));
+        stableToast({
+          title: "Streaming Error",
+          description: "Failed to start agent response streaming. Please try again.",
+          variant: "destructive"
+        });
+      }
       } else {
+        console.warn('⚠️ No deliberation ID, skipping streaming');
         setUiState(prev => ({ ...prev, isTyping: false }));
       }
 
