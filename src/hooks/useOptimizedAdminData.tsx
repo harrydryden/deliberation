@@ -45,12 +45,16 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
   } = useOptimizedAsync(
     async () => {
       logger.info('Fetching admin users');
+      // Consistent session-based auth for admin API calls  
+      const session = await supabase.auth.getSession();
+      const headers = {
+        'Authorization': `Bearer ${session.data.session?.access_token}`,
+        'Content-Type': 'application/json'
+      };
+      
       const response = await supabase.functions.invoke('admin-get-users', {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          'Content-Type': 'application/json'
-        }
+        headers
       });
       
       if (response.error) throw new Error(response.error.message);

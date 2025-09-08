@@ -42,18 +42,12 @@ serve(async (req) => {
     console.log('🎫 Extracting token from authorization header...');
     const token = authHeader.replace('Bearer ', '');
     
-    // Create a temporary client with the user's token to verify
+    // Verify the user token using proper JWT authentication
     console.log('👤 Verifying user token...');
-    const { createClient: createUserClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-    const userSupabase = createUserClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    });
+    const userAuthClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!);
     
-    const { data: { user }, error: userError } = await userSupabase.auth.getUser();
+    // Set the auth header and verify user
+    const { data: { user }, error: userError } = await userAuthClient.auth.getUser(token);
     if (userError || !user) {
       console.error('❌ Invalid user token:', userError);
       return createErrorResponse('Invalid user token', 401);

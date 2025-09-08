@@ -72,7 +72,7 @@ export const useResponseStreaming = () => {
 
       console.log('🌊 Proceeding to streaming function call...');
 
-      // Use Supabase function invoke for streaming
+      // Consistent session-based auth for streaming API calls
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       console.log('🔄 Using optimized streaming function call...');
       

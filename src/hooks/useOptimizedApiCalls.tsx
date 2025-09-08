@@ -31,6 +31,7 @@ export const useOptimizedApiCalls = () => {
       async () => {
         logger.info(`Invoking function: ${functionName}`, { body });
         
+        // Consistent session-based auth for API calls
         const session = await supabase.auth.getSession();
         const headers: Record<string, string> = {
           'Content-Type': 'application/json'

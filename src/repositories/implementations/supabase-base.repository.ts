@@ -13,14 +13,26 @@ import type {
  * Provides common functionality for all repositories using Supabase auth
  */
 export abstract class SupabaseBaseRepository {
+  // Standardized auth helper - always use session for API calls
+  protected async getCurrentSession() {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session;
+  }
+
   protected async getCurrentUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    return user;
+    const session = await this.getCurrentSession();
+    return session?.user || null;
   }
 
   protected async getCurrentUserId(): Promise<string | null> {
     const user = await this.getCurrentUser();
     return user?.id || null;
+  }
+
+  // Get access token for API calls
+  protected async getAccessToken(): Promise<string | null> {
+    const session = await this.getCurrentSession();
+    return session?.access_token || null;
   }
 
   // Note: Admin status checking is handled by useSupabaseAuth hook in components

@@ -1090,6 +1090,10 @@ export type Database = {
         Args: { "": unknown }
         Returns: unknown
       }
+      is_authenticated_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       is_participant_in_deliberation: {
         Args: { deliberation_id: string; user_id: string }
         Returns: boolean

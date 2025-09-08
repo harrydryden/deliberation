@@ -12,10 +12,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
-// Simple helper function to get current user from Supabase Auth session
+// Standardized helper function - use session for consistency
 export const getCurrentUser = async () => {
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.user || null
+}
+
+// Helper to get session (useful for access tokens)
+export const getCurrentSession = async () => {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session
 }
 
 // Note: Legacy compatibility functions have been removed - use Supabase Auth directly

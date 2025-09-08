@@ -75,7 +75,7 @@ serve(async (req) => {
       });
     }
 
-    // Verify user is admin
+    // Verify user is admin using the JWT token and service role client
     const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Invalid authorization' }), {

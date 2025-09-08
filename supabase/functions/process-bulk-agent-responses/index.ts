@@ -186,8 +186,9 @@ serve(async (req) => {
       return createErrorResponse('Missing authorization header', 401);
     }
 
-    // Verify user is admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    // Verify user is admin using JWT token
+    const userAuthClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!);
+    const { data: { user }, error: authError } = await userAuthClient.auth.getUser(authHeader.replace('Bearer ', ''));
     if (authError || !user) {
       return createErrorResponse('Invalid authorization', 401);
     }
