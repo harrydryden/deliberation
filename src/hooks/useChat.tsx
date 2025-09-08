@@ -424,8 +424,13 @@ export const useChat = (deliberationId?: string) => {
     }
   }, [user, deliberationId, services.messageService, startStreaming, setChatState, messageQueue]);
 
-  // Auto-process queue when messages are available
+  // Auto-process queue when messages are available - optimized to reduce re-renders
+  const queueStats = messageQueue.getQueueStats;
+  const hasWork = queueStats.queued > 0 && queueStats.canProcess;
+  
   useEffect(() => {
+    if (!hasWork || !user || !deliberationId) return;
+    
     const processNext = async () => {
       console.log('🔍 Checking queue for next message...');
       const nextMessage = messageQueue.getNextQueuedMessage();
@@ -440,24 +445,20 @@ export const useChat = (deliberationId?: string) => {
           hasNextMessage: !!nextMessage, 
           hasUser: !!user, 
           hasDeliberationId: !!deliberationId,
-          queueStats: messageQueue.getQueueStats()
+          queueStats: queueStats
         });
       }
     };
 
-    // Process immediately when queue has items, then check every 500ms
-    const queueStats = messageQueue.getQueueStats();
-    if (queueStats.queued > 0 && queueStats.canProcess) {
-      console.log('📋 Queue has items, processing immediately...', queueStats);
-      
-      // Process first message immediately
-      processNext();
-      
-      // Set up interval for subsequent messages
-      const timer = setTimeout(processNext, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [messageQueue.queue, messageQueue.processing, processQueuedMessage, user, deliberationId]);
+    console.log('📋 Queue has items, processing immediately...', queueStats);
+    
+    // Process first message immediately
+    processNext();
+    
+    // Set up interval for subsequent messages with debouncing
+    const timer = setTimeout(processNext, 500);
+    return () => clearTimeout(timer);
+  }, [hasWork, processQueuedMessage, user, deliberationId, messageQueue]);
 
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!user || !content.trim()) return;
@@ -476,9 +477,10 @@ export const useChat = (deliberationId?: string) => {
       });
 
     // Show immediate feedback that message was queued
+    const currentStats = messageQueue.getQueueStats;
     stableToast({
       title: "Message Queued",
-      description: `Your message has been added to the queue (position ${messageQueue.getQueueStats().total}).`,
+      description: `Your message has been added to the queue (position ${currentStats.total}).`,
       variant: "default"
     });
 
@@ -519,13 +521,13 @@ export const useChat = (deliberationId?: string) => {
     retryMessage,
     streamingState,
     stopStreaming,
-    // Message queue functionality
-    messageQueue: {
+    // Message queue functionality - memoized to prevent re-renders
+    messageQueue: useMemo(() => ({
       queue: messageQueue.queue,
-      stats: messageQueue.getQueueStats(),
+      stats: messageQueue.getQueueStats,
       retryMessage: messageQueue.retryMessage,
       removeMessage: messageQueue.removeFromQueue,
       clearQueue: messageQueue.clearQueue
-    }
+    }), [messageQueue.queue, messageQueue.getQueueStats, messageQueue.retryMessage, messageQueue.removeFromQueue, messageQueue.clearQueue])
   };
 };

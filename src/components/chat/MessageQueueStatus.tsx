@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clock, AlertCircle, RotateCcw } from 'lucide-react';
@@ -12,19 +12,33 @@ interface MessageQueueStatusProps {
   onRemoveMessage: (messageId: string) => void;
 }
 
-export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = ({
+export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(({
   queuedMessages,
   processingCount,
   onRetryMessage,
   onRemoveMessage
 }) => {
+  // Memoize expensive computations to prevent re-renders
+  const { queuedCount, failedCount, totalActive } = useMemo(() => {
+    const queued = queuedMessages.filter(msg => msg.status === 'queued').length;
+    const failed = queuedMessages.filter(msg => msg.status === 'failed').length;
+    return {
+      queuedCount: queued,
+      failedCount: failed,
+      totalActive: queued + processingCount
+    };
+  }, [queuedMessages, processingCount]);
+
+  const getBadgeVariant = useMemo(() => {
+    if (failedCount > 0) return 'destructive';
+    if (processingCount > 0) return 'default';
+    return 'secondary';
+  }, [failedCount, processingCount]);
+
+  // Early return for empty queue
   if (queuedMessages.length === 0) {
     return null;
   }
-
-  const queuedCount = queuedMessages.filter(msg => msg.status === 'queued').length;
-  const failedCount = queuedMessages.filter(msg => msg.status === 'failed').length;
-  const completedCount = queuedMessages.filter(msg => msg.status === 'completed').length;
 
   const getStatusIcon = (status: QueuedMessage['status']) => {
     switch (status) {
@@ -39,20 +53,12 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = ({
     }
   };
 
-  const getBadgeVariant = () => {
-    if (failedCount > 0) return 'destructive';
-    if (processingCount > 0) return 'default';
-    return 'secondary';
-  };
-
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="h-8 px-2 gap-1">
           <Clock className="h-3 w-3" />
-          <span className="text-xs">
-            {queuedCount + processingCount}
-          </span>
+          <span className="text-xs">{totalActive}</span>
           {failedCount > 0 && (
             <AlertCircle className="h-3 w-3 text-destructive" />
           )}
@@ -62,7 +68,7 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = ({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium">Message Queue</h3>
-            <Badge variant={getBadgeVariant()} className="text-xs">
+            <Badge variant={getBadgeVariant} className="text-xs">
               {queuedCount} queued • {processingCount} processing
             </Badge>
           </div>
@@ -116,4 +122,4 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = ({
       </PopoverContent>
     </Popover>
   );
-};
+});

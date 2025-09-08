@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense, useCallback, useRef } from "react";
+import React, { useEffect, useState, lazy, Suspense, useCallback, useRef, useMemo } from "react";
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
@@ -228,8 +228,18 @@ const OptimizedDeliberationChat = () => {
     loadDeliberation();
   }, [loadChatHistory, loadDeliberation]);
 
-  // Load data on mount
-  useEffect(() => {
+  // Memoize queue status to prevent unnecessary re-renders
+  const queueStatusProps = useMemo(() => ({
+    queuedMessages: messageQueue?.queue || [],
+    processingCount: messageQueue?.stats.processing || 0,
+    onRetryMessage: messageQueue?.retryMessage || (() => {}),
+    onRemoveMessage: messageQueue?.removeMessage || (() => {})
+  }), [
+    messageQueue?.queue, 
+    messageQueue?.stats.processing, 
+    messageQueue?.retryMessage, 
+    messageQueue?.removeMessage
+  ]);
     if (!isLoading && !user) {
       navigate("/auth");
       return;
@@ -311,12 +321,7 @@ const OptimizedDeliberationChat = () => {
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {messageQueue && messageQueue.queue.length > 0 && (
-                    <MessageQueueStatus
-                      queuedMessages={messageQueue.queue}
-                      processingCount={messageQueue.stats.processing}
-                      onRetryMessage={messageQueue.retryMessage}
-                      onRemoveMessage={messageQueue.removeMessage}
-                    />
+                    <MessageQueueStatus {...queueStatusProps} />
                   )}
                   <Button
                     variant="default"
@@ -409,12 +414,7 @@ const OptimizedDeliberationChat = () => {
                         <span>{state.deliberation.participants?.length || state.deliberation.participant_count || 0}</span>
                       </div>
                       {messageQueue && messageQueue.queue.length > 0 && (
-                        <MessageQueueStatus
-                          queuedMessages={messageQueue.queue}
-                          processingCount={messageQueue.stats.processing}
-                          onRetryMessage={messageQueue.retryMessage}
-                          onRemoveMessage={messageQueue.removeMessage}
-                        />
+                        <MessageQueueStatus {...queueStatusProps} />
                       )}
                     </div>
                   </div>

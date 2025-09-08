@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { logger } from '@/utils/logger';
 
 export interface QueuedMessage {
@@ -161,7 +161,7 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
     logger.info('🧹 Message queue cleared');
   }, []);
 
-  const getQueueStats = useCallback(() => {
+  const getQueueStats = useMemo(() => {
     const { queue, processing } = queueState;
     return {
       total: queue.length,
@@ -171,7 +171,7 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
       failed: queue.filter(msg => msg.status === 'failed').length,
       canProcess: processing.size < queueState.maxConcurrent
     };
-  }, [queueState]);
+  }, [queueState.queue.length, queueState.processing.size, queueState.maxConcurrent]);
 
   return {
     queue: queueState.queue,
