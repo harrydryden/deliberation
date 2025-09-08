@@ -8,6 +8,7 @@ import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 export const useStandardizedAdminData = () => {
   const services = useServices();
   const deliberationService = useDeliberationService();
+  const { user } = useSupabaseAuth();
 
   // Users CRUD
   const users = useCrudOperations<User>({
@@ -82,7 +83,6 @@ export const useStandardizedAdminData = () => {
 
   // Custom admin operations that don't fit CRUD pattern
   const archiveUser = async (userId: string, reason?: string) => {
-    const { user } = useSupabaseAuth();
     if (!user?.id) {
       throw new Error('User not authenticated');
     }
