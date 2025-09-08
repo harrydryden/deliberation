@@ -1,6 +1,15 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest
+} from '../shared/edge-function-utils.ts';
 
 interface ProcessingResult {
   messageId: string;
@@ -10,10 +19,6 @@ interface ProcessingResult {
   responseId?: string;
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 class MessageProcessor {
   private supabase: any;
@@ -167,33 +172,24 @@ class MessageProcessor {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
 
     // Get the authorization header to verify admin access
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return createErrorResponse('Missing authorization header', 401);
     }
 
     // Verify user is admin
     const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Invalid authorization' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return createErrorResponse('Invalid authorization', 401);
     }
 
     const { data: profile } = await supabase
@@ -203,19 +199,13 @@ serve(async (req) => {
       .single();
 
     if (!profile || profile.user_role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Admin access required' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return createErrorResponse('Admin access required', 403);
     }
 
-    const { batchId } = await req.json();
+    const { batchId } = await parseAndValidateRequest(req, ['batchId']);
 
     if (!batchId) {
-      return new Response(JSON.stringify({ error: 'Missing batchId' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return createErrorResponse('Missing batchId', 400);
     }
 
     console.log(`🚀 Starting HIGH-RELIABILITY agent response processing for batch: ${batchId}`);
@@ -228,10 +218,7 @@ serve(async (req) => {
       .single();
 
     if (batchError || !batch) {
-      return new Response(JSON.stringify({ error: 'Batch not found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return createErrorResponse('Batch not found', 404);
     }
 
     // Update batch status to processing
@@ -252,19 +239,14 @@ serve(async (req) => {
 
     if (messagesError) {
       console.error('❌ Error fetching messages:', messagesError);
-      return new Response(JSON.stringify({ error: 'Failed to fetch messages' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return createErrorResponse('Failed to fetch messages', 500);
     }
 
     if (!messages || messages.length === 0) {
       console.log('✅ No messages found awaiting agent responses');
-      return new Response(JSON.stringify({ 
+      return createSuccessResponse({ 
         message: 'No messages found awaiting agent responses',
         batch_id: batchId
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -355,7 +337,7 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({
+    return createSuccessResponse({
       success: true,
       batch_id: batchId,
       total_messages: messages.length,
@@ -367,18 +349,10 @@ serve(async (req) => {
       details: {
         results: results
       }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('💥 Critical error in process-bulk-agent-responses function:', error);
-    return new Response(JSON.stringify({ 
-      error: 'Internal server error',
-      details: error.message 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return createErrorResponse(error, 500, 'process-bulk-agent-responses');
   }
 });

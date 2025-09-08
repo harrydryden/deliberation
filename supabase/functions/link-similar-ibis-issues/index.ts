@@ -1,13 +1,15 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.52.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest
+} from '../shared/edge-function-utils.ts';
 
 interface RequestBody {
   deliberationId?: string;
@@ -31,29 +33,15 @@ function cosineSim(a: number[], b: number[]): number {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const body = (await req.json()) as RequestBody;
-    const { deliberationId, nodeId, threshold = 0.83, nodeType } = body || {};
+    const { deliberationId, nodeId, threshold = 0.83, nodeType } = await parseAndValidateRequest(req);
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    if (!SUPABASE_URL || !SERVICE_KEY) throw new Error("Missing Supabase configuration");
-
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
 
     // Fetch target nodes with embeddings of the requested type
     const TYPE = nodeType || 'issue';
@@ -73,9 +61,7 @@ serve(async (req) => {
     if (nodeId) {
       const deliberation = targetNodes?.[0]?.deliberation_id;
       if (!deliberation) {
-        return new Response(JSON.stringify({ success: false, processed: 0, reason: "node_not_found" }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return createSuccessResponse({ success: false, processed: 0, reason: "node_not_found" });
       }
       const { data: others, error: othersErr } = await supabase
         .from("ibis_nodes")
@@ -91,9 +77,7 @@ serve(async (req) => {
     const nodesWithEmb = nodes.filter((n: any) => Array.isArray(n.embedding) && n.embedding.length > 0);
 
     if (nodesWithEmb.length < 2) {
-      return new Response(JSON.stringify({ success: true, processed: 0, reason: "insufficient_embeddings" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return createSuccessResponse({ success: true, processed: 0, reason: "insufficient_embeddings" });
     }
 
     // Group by deliberation to avoid cross-deliberation links
@@ -174,14 +158,9 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, created }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e: any) {
-    console.error("link-similar-ibis-issues error:", e);
-    return new Response(JSON.stringify({ error: e.message || String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return createSuccessResponse({ success: true, created });
+  } catch (error) {
+    console.error("link-similar-ibis-issues error:", error);
+    return createErrorResponse(error, 500, 'link-similar-ibis-issues');
   }
 });

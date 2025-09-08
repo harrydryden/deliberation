@@ -1,6 +1,16 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
+
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest,
+  getOpenAIKey
+} from '../shared/edge-function-utils.ts';
 import { OpenAIEmbeddings } from 'https://esm.sh/@langchain/openai@0.6.0?no-check';
 import { ChatOpenAI } from 'https://esm.sh/@langchain/openai@0.6.0?no-check';
 import { SupabaseVectorStore } from 'https://esm.sh/@langchain/community@0.3.0/vectorstores/supabase?no-check';
@@ -9,11 +19,6 @@ import { createStuffDocumentsChain } from 'https://esm.sh/langchain@0.3.0/chains
 import { PromptTemplate } from 'https://esm.sh/@langchain/core@0.3.0/prompts?no-check';
 import { ModelConfigManager } from "../shared/model-config.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
 serve(async (req) => {
   console.log('=== LANGCHAIN QUERY EDGE FUNCTION CALLED ===');
   console.log('Method:', req.method);
@@ -21,11 +26,9 @@ serve(async (req) => {
   const startTime = Date.now();
   
   try {
-    // Handle CORS preflight requests
-    if (req.method === 'OPTIONS') {
-      console.log('Returning CORS response');
-      return new Response('ok', { headers: corsHeaders });
-    }
+    // Handle CORS preflight with shared utility
+    const corsResponse = handleCORSPreflight(req);
+    if (corsResponse) return corsResponse;
 
     console.log('Processing POST request...');
 
@@ -34,41 +37,13 @@ serve(async (req) => {
       setTimeout(() => reject(new Error('Function timeout after 50 seconds')), 50000);
     });
 
-    // Parse request body
-    const body = await req.json();
-    console.log('Query:', body.query);
-    console.log('Agent ID:', body.agentId);
+    // Parse request body with validation
+    const { query, agentId, maxResults = 5 } = await parseAndValidateRequest(req, ['query', 'agentId']);
+    console.log('Query:', query);
+    console.log('Agent ID:', agentId);
 
-    const { query, agentId, maxResults = 5 } = body;
-
-    if (!query || !agentId) {
-      console.log('Missing required fields');
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Missing query or agentId',
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing Supabase configuration');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
 
     // Validate that the agent is a local agent (not a global template)
     console.log('Validating agent type...');
@@ -92,13 +67,8 @@ serve(async (req) => {
 
     console.log('Agent validation passed - local agent confirmed');
 
-    // Get OpenAI API key
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-
-    if (!openAIApiKey) {
-      console.error('OpenAI API key not configured');
-      throw new Error('Service configuration error');
-    }
+    // Get OpenAI API key with caching
+    const openAIApiKey = getOpenAIKey();
 
     console.log('Initializing LangChain components...');
 
@@ -155,11 +125,8 @@ serve(async (req) => {
     });
 
     // Get policy analysis prompt from template system
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const tempSupabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: templateData, error: templateError } = await tempSupabase
+    const { data: templateData, error: templateError } = await supabase
       .rpc('get_prompt_template', { 
         template_name: 'langchain_policy_analysis'
       });
@@ -226,20 +193,15 @@ serve(async (req) => {
     const processingTime = Date.now() - startTime;
     console.log(`✅ LangChain RAG query completed successfully in ${processingTime}ms`);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        response: result.answer,
-        knowledgeChunks: relevantKnowledge.length,
-        relevantKnowledge,
-        sources: uniqueSources,
-        langchainProcessed: true,
-        processingTimeMs: processingTime,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return createSuccessResponse({
+      success: true,
+      response: result.answer,
+      knowledgeChunks: relevantKnowledge.length,
+      relevantKnowledge,
+      sources: uniqueSources,
+      langchainProcessed: true,
+      processingTimeMs: processingTime,
+    });
   } catch (error) {
     const processingTime = Date.now() - startTime;
     console.error('=== ERROR IN LANGCHAIN QUERY EDGE FUNCTION ===');
@@ -252,17 +214,9 @@ serve(async (req) => {
                      error.message.includes('initialization') ? 'INITIALIZATION' : 
                      error.message.includes('configuration') ? 'CONFIGURATION' : 'PROCESSING';
 
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: `LangChain query error: ${error.message}`,
-        errorType,
-        processingTimeMs: processingTime,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return createErrorResponse(error, 500, 'langchain-query-knowledge', {
+      errorType,
+      processingTimeMs: processingTime,
+    });
   }
 });

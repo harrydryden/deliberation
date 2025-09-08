@@ -1,13 +1,16 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.52.1";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest,
+  getOpenAIKey
+} from '../shared/edge-function-utils.ts';
 
 interface RequestBody {
   deliberationId?: string;
@@ -17,32 +20,17 @@ interface RequestBody {
 }
 
 serve(async (req) => {
-  // CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
-      status: 405,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const body = (await req.json()) as RequestBody;
+    const body = await parseAndValidateRequest(req, ['deliberationId']);
     const { deliberationId, nodeId, force = false, nodeType } = body || {};
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-
-    if (!SUPABASE_URL || !SERVICE_KEY) throw new Error("Missing Supabase configuration");
-    if (!OPENAI_API_KEY) throw new Error("Missing OPENAI_API_KEY secret");
-
-    const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
+    const openAIApiKey = getOpenAIKey();
     
     // Build query to select target nodes of a given type
     const TYPE = nodeType || 'issue';
@@ -82,7 +70,7 @@ serve(async (req) => {
       const res = await fetch("https://api.openai.com/v1/embeddings", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          Authorization: `Bearer ${openAIApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ model: "text-embedding-3-small", input: batch }),
@@ -107,15 +95,13 @@ serve(async (req) => {
       if (!error) updated++;
     }
 
-    return new Response(
-      JSON.stringify({ success: true, processed: updated, total: targets.length }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (e: any) {
-    console.error("compute-ibis-embeddings error:", e);
-    return new Response(JSON.stringify({ error: e.message || String(e) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return createSuccessResponse({ 
+      success: true, 
+      processed: updated, 
+      total: targets.length 
     });
+  } catch (error) {
+    console.error("compute-ibis-embeddings error:", error);
+    return createErrorResponse(error, 500, 'compute-ibis-embeddings');
   }
 });

@@ -1,6 +1,16 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
+
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest,
+  getOpenAIKey
+} from '../shared/edge-function-utils.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
 
 // Helper function to get system message from template
@@ -26,34 +36,19 @@ async function getSystemMessage(supabase: any, templateName: string): Promise<st
   return fallbacks[templateName as keyof typeof fallbacks] || 'You are a helpful AI assistant specialising in democratic deliberation. Use British English spelling and grammar throughout.';
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const { userId, deliberationId, content, maxRecommendations = 2 } = await req.json();
-    
-    if (!userId || !deliberationId || !content) {
-      throw new Error('Missing required fields: userId, deliberationId, or content');
-    }
+    const { userId, deliberationId, content, maxRecommendations = 2 } = await parseAndValidateRequest(req, ['userId', 'deliberationId', 'content']);
 
     console.log('🔍 Generating issue recommendations', { userId, deliberationId, contentLength: content.length });
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-
-    if (!openAIApiKey) {
-      throw new Error('OPENAI_API_KEY not configured');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
+    const openAIApiKey = getOpenAIKey();
 
     // Get existing issues for the deliberation
     const { data: existingIssues, error: issuesError } = await supabase
@@ -70,9 +65,7 @@ serve(async (req) => {
 
     if (!existingIssues || existingIssues.length === 0) {
       console.log('📝 No existing issues found');
-      return new Response(JSON.stringify({ recommendations: [] }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return createSuccessResponse({ recommendations: [] });
     }
 
     // Format issues for AI analysis
@@ -181,21 +174,13 @@ serve(async (req) => {
 
     console.log('✅ Generated recommendations:', finalRecommendations.length);
 
-    return new Response(JSON.stringify({ 
+    return createSuccessResponse({ 
       recommendations: finalRecommendations,
       totalIssuesAnalysed: existingIssues.length 
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('❌ Issue recommendations error:', error);
-    return new Response(JSON.stringify({ 
-      error: error.message,
-      recommendations: [] 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return createErrorResponse(error, 500, 'generate-issue-recommendations');
   }
 });
