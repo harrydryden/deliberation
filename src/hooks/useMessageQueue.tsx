@@ -28,6 +28,31 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
   });
 
   const processingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const completionTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  const removeFromQueue = useCallback((messageId: string) => {
+    setQueueState(prev => ({
+      ...prev,
+      queue: prev.queue.filter(msg => msg.id !== messageId),
+      processing: new Set([...prev.processing].filter(id => id !== messageId))
+    }));
+
+    // Clear any timeout for this message
+    const timeout = processingTimeouts.current.get(messageId);
+    if (timeout) {
+      clearTimeout(timeout);
+      processingTimeouts.current.delete(messageId);
+    }
+
+    // Clear any completion timeout for this message
+    const completionTimeout = completionTimeouts.current.get(messageId);
+    if (completionTimeout) {
+      clearTimeout(completionTimeout);
+      completionTimeouts.current.delete(messageId);
+    }
+
+    logger.info('🗑️ Message removed from queue', { messageId });
+  }, []);
 
   const addToQueue = useCallback((content: string, parentMessageId?: string): string => {
     const messageId = `queue-${crypto.randomUUID()}`;
@@ -88,8 +113,16 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
       };
     });
 
+    // Auto-remove completed messages after 3 seconds
+    if (status === 'completed') {
+      const completionTimeout = setTimeout(() => {
+        removeFromQueue(messageId);
+      }, 3000);
+      completionTimeouts.current.set(messageId, completionTimeout);
+    }
+
     logger.info('🔄 Queue message status updated', { messageId, status, error });
-  }, []);
+  }, [removeFromQueue]);
 
   const getNextQueuedMessage = useCallback((): QueuedMessage | null => {
     if (queueState.processing.size >= queueState.maxConcurrent) {
@@ -104,23 +137,6 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
     return nextMessage || null;
   }, [queueState.queue, queueState.processing.size, queueState.maxConcurrent, queueState.maxRetries]);
 
-  const removeFromQueue = useCallback((messageId: string) => {
-    setQueueState(prev => ({
-      ...prev,
-      queue: prev.queue.filter(msg => msg.id !== messageId),
-      processing: new Set([...prev.processing].filter(id => id !== messageId))
-    }));
-
-    // Clear any timeout for this message
-    const timeout = processingTimeouts.current.get(messageId);
-    if (timeout) {
-      clearTimeout(timeout);
-      processingTimeouts.current.delete(messageId);
-    }
-
-    logger.info('🗑️ Message removed from queue', { messageId });
-  }, []);
-
   const retryMessage = useCallback((messageId: string) => {
     const message = queueState.queue.find(msg => msg.id === messageId);
     if (message && message.retries < queueState.maxRetries) {
@@ -133,6 +149,8 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
     // Clear all timeouts
     processingTimeouts.current.forEach(timeout => clearTimeout(timeout));
     processingTimeouts.current.clear();
+    completionTimeouts.current.forEach(timeout => clearTimeout(timeout));
+    completionTimeouts.current.clear();
 
     setQueueState(prev => ({
       ...prev,

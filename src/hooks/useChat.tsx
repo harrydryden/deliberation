@@ -202,10 +202,35 @@ export const useChat = (deliberationId?: string) => {
         parent_message_id: parentMessageId
       };
       
-      setChatState(prev => ({
-        ...prev,
-        messages: [...prev.messages, userMessage]
-      }));
+      setChatState(prev => {
+        // Sort messages to ensure proper parent-child ordering
+        const sortedMessages = [...prev.messages, userMessage].sort((a, b) => {
+          // First sort by creation time
+          const timeA = new Date(a.created_at).getTime();
+          const timeB = new Date(b.created_at).getTime();
+          
+          // If message B is a response to message A, B should come immediately after A
+          if (b.parent_message_id === a.id) {
+            return -1; // A comes before B
+          }
+          if (a.parent_message_id === b.id) {
+            return 1; // B comes before A
+          }
+          
+          // For messages with the same parent, maintain chronological order
+          if (a.parent_message_id === b.parent_message_id) {
+            return timeA - timeB;
+          }
+          
+          // Default chronological sort
+          return timeA - timeB;
+        });
+        
+        return {
+          ...prev,
+          messages: sortedMessages
+        };
+      });
 
       logger.api.response('POST', '/messages', 200, { 
         deliberationId, 
@@ -243,19 +268,43 @@ export const useChat = (deliberationId?: string) => {
 
           setChatState(prev => {
             const existingStreamingIndex = prev.messages.findIndex(m => m.id === `streaming-${saved.id}`);
+            let updatedMessages;
+            
             if (existingStreamingIndex >= 0) {
-              return {
-                ...prev,
-                messages: prev.messages.map((msg, index) => 
-                  index === existingStreamingIndex ? streamingMessage : msg
-                )
-              };
+              updatedMessages = prev.messages.map((msg, index) => 
+                index === existingStreamingIndex ? streamingMessage : msg
+              );
             } else {
-              return {
-                ...prev,
-                messages: [...prev.messages, streamingMessage]
-              };
+              updatedMessages = [...prev.messages, streamingMessage];
             }
+            
+            // Sort messages to ensure proper parent-child ordering
+            const sortedMessages = updatedMessages.sort((a, b) => {
+              // First sort by creation time
+              const timeA = new Date(a.created_at).getTime();
+              const timeB = new Date(b.created_at).getTime();
+              
+              // If message B is a response to message A, B should come immediately after A
+              if (b.parent_message_id === a.id) {
+                return -1; // A comes before B
+              }
+              if (a.parent_message_id === b.id) {
+                return 1; // B comes before A
+              }
+              
+              // For messages with the same parent, maintain chronological order
+              if (a.parent_message_id === b.parent_message_id) {
+                return timeA - timeB;
+              }
+              
+              // Default chronological sort
+              return timeA - timeB;
+            });
+            
+            return {
+              ...prev,
+              messages: sortedMessages
+            };
           });
         },
         // onComplete callback
@@ -278,9 +327,32 @@ export const useChat = (deliberationId?: string) => {
 
           setChatState(prev => {
             const withoutStreaming = prev.messages.filter(m => m.id !== `streaming-${saved.id}`);
+            // Sort messages to ensure proper parent-child ordering
+            const sortedMessages = [...withoutStreaming, finalMessage].sort((a, b) => {
+              // First sort by creation time
+              const timeA = new Date(a.created_at).getTime();
+              const timeB = new Date(b.created_at).getTime();
+              
+              // If message B is a response to message A, B should come immediately after A
+              if (b.parent_message_id === a.id) {
+                return -1; // A comes before B
+              }
+              if (a.parent_message_id === b.id) {
+                return 1; // B comes before A
+              }
+              
+              // For messages with the same parent, maintain chronological order
+              if (a.parent_message_id === b.parent_message_id) {
+                return timeA - timeB;
+              }
+              
+              // Default chronological sort
+              return timeA - timeB;
+            });
+            
             return {
               ...prev,
-              messages: [...withoutStreaming, finalMessage]
+              messages: sortedMessages
             };
           });
           
