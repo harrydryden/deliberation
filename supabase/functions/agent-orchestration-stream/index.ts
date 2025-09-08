@@ -897,6 +897,9 @@ async function processStreamingOrchestration(
       console.log('✅ Response stored successfully in database');
     }
 
+    sendData({ done: true });
+    console.log('🏁 Sent final completion signal');
+
   } catch (responseError) {
     console.error('❌ Error generating response - FULL ERROR DETAILS:', {
       error: responseError,
@@ -912,9 +915,6 @@ async function processStreamingOrchestration(
     });
     return; // Exit early on error
   }
-
-  sendData({ done: true });
-  console.log('🏁 Sent final completion signal');
 
   } catch (error) {
     console.error('❌ Streaming processing error:', error);
