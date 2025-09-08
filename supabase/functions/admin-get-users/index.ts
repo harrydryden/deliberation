@@ -4,7 +4,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // Import shared utilities for performance and consistency
 import { 
   corsHeaders, 
-  validateAndGetEnvironment, 
   createErrorResponse, 
   createSuccessResponse,
   handleCORSPreflight
@@ -18,8 +17,18 @@ serve(async (req) => {
   try {
     console.log('📋 Admin get users function called');
     
-    // Get environment and clients with caching
-    const { userSupabase } = validateAndGetEnvironment();
+    // Get environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('❌ Missing environment variables');
+      return createErrorResponse('Service configuration error', 500);
+    }
+
+    // Create service role client
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Verify the requesting user is an admin
     console.log('🔐 Checking authorization header...');
@@ -33,33 +42,40 @@ serve(async (req) => {
     console.log('🎫 Extracting token from authorization header...');
     const token = authHeader.replace('Bearer ', '');
     
-    // Verify the token and get user using user client
-    console.log('👤 Verifying user token...');
-    const { data: { user }, error: userError } = await userSupabase.auth.getUser(token);
+    // Verify the token using service role admin method
+    console.log('👤 Verifying user token with admin method...');
+    const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(token);
+    
+    // If admin getUserById fails, try getUser with the token
+    let verifiedUser = user;
     if (userError || !user) {
-      console.error('❌ Invalid user token:', userError);
-      return createErrorResponse('Invalid user token', 401);
+      console.log('🔄 Retrying with getUser method...');
+      const { data: userData, error: getUserError } = await supabase.auth.getUser(token);
+      if (getUserError || !userData.user) {
+        console.error('❌ Invalid user token:', getUserError || userError);
+        return createErrorResponse('Invalid user token', 401);
+      }
+      verifiedUser = userData.user;
     }
 
-    console.log('✅ User verified:', user.id);
+    console.log('✅ User verified:', verifiedUser.id);
 
-    // Check if user has admin role using service client
-    console.log('🔍 Checking admin role for user:', user.id);
-    const { supabase } = validateAndGetEnvironment();
+    // Check if user has admin role
+    console.log('🔍 Checking admin role for user:', verifiedUser.id);
     const { data: userProfile, error: roleError } = await supabase
       .from('profiles')
       .select('user_role')
-      .eq('id', user.id)
+      .eq('id', verifiedUser.id)
       .single();
 
     console.log('📋 User profile query result:', { userProfile, roleError });
 
     if (roleError || !userProfile || userProfile.user_role !== 'admin') {
-      console.error('❌ Admin access check failed:', { roleError, userProfile, userId: user.id });
+      console.error('❌ Admin access check failed:', { roleError, userProfile, userId: verifiedUser.id });
       return createErrorResponse('Admin access required', 403);
     }
 
-    console.log('✅ Admin access verified for user:', user.id);
+    console.log('✅ Admin access verified for user:', verifiedUser.id);
 
     // Get profiles first
     const { data: profiles, error: profilesError } = await supabase
@@ -79,22 +95,9 @@ serve(async (req) => {
 
     console.log(`📋 Found ${profiles.length} profiles`);
 
-    // Create service role client for admin operations  
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (!serviceRoleKey) {
-      console.error('❌ Service role key not found');
-      return createErrorResponse('Service configuration error', 500);
-    }
-
-    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-    const serviceSupabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      serviceRoleKey
-    );
-
     // Get auth users with service role to access metadata
     console.log('🔐 Fetching auth users with service role...');
-    const { data: authData, error: authError } = await serviceSupabase.auth.admin.listUsers();
+    const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
     
     if (authError) {
       console.error('❌ Failed to fetch auth users:', authError);
@@ -184,4 +187,4 @@ serve(async (req) => {
     console.error('💥 Unexpected error in admin-get-users:', error);
     return createErrorResponse(`Internal server error: ${error.message}`, 500);
   }
-})
+});
