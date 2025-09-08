@@ -81,6 +81,7 @@ export const AdminDashboard = () => {
                 onCreate={() => {}}
               />
               <AgentManagement />
+              <PromptManagement />
             </div>
           </AdminTabContent>
 
