@@ -32,6 +32,8 @@ export const UserAccessManagement = ({
   onUpdateRole,
   deliberations = []
 }: UserAccessManagementProps) => {
+  // Add null check for users to prevent runtime errors
+  const safeUsers = users || [];
   const [archivingUser, setArchivingUser] = useState<string | null>(null);
   const [unarchivingUser, setUnarchivingUser] = useState<string | null>(null);
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
@@ -41,10 +43,10 @@ export const UserAccessManagement = ({
   const [addingToDeliberation, setAddingToDeliberation] = useState(false);
 
   useEffect(() => {
-    if (users.length === 0 && !loading) {
+    if (safeUsers.length === 0 && !loading) {
       onLoadUsers();
     }
-  }, [users.length, loading, onLoadUsers]);
+  }, [safeUsers.length, loading, onLoadUsers]);
 
 
   const handleArchiveUser = async (userId: string) => {
@@ -123,18 +125,18 @@ export const UserAccessManagement = ({
           {/* Statistics */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div className="p-3 border rounded-lg">
-              <div className="text-2xl font-semibold">{users.length}</div>
+              <div className="text-2xl font-semibold">{safeUsers.length}</div>
               <div className="text-sm text-muted-foreground">Total Users</div>
             </div>
             <div className="p-3 border rounded-lg">
-              <div className="text-2xl font-semibold">{users.filter(u => u.role === 'admin').length}</div>
+              <div className="text-2xl font-semibold">{safeUsers.filter(u => u.role === 'admin').length}</div>
               <div className="text-sm text-muted-foreground">Admin Users</div>
             </div>
           </div>
 
-          {loading && users.length === 0 ? (
+          {loading && safeUsers.length === 0 ? (
             <LoadingSpinner />
-          ) : users.length > 0 ? (
+          ) : safeUsers.length > 0 ? (
             <div>
               <h3 className="text-lg font-semibold mb-4">Users</h3>
               <Table>
@@ -149,7 +151,7 @@ export const UserAccessManagement = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
+                  {safeUsers.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
                         <code className="font-mono text-xs bg-muted px-2 py-1 rounded block max-w-[120px] truncate">
