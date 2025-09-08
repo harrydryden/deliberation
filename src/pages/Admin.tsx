@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
-import { Layout } from "@/components/layout/Layout";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 
 const Admin = () => {
@@ -25,11 +24,9 @@ const Admin = () => {
   if (!isAdmin) return null;
 
   return (
-    <Layout>
-      <div className="container mx-auto p-6">
-        <AdminDashboard />
-      </div>
-    </Layout>
+    <div className="container mx-auto p-6">
+      <AdminDashboard />
+    </div>
   );
 };
 

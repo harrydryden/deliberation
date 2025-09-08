@@ -1,6 +1,5 @@
 import { useEffect, useState, lazy, Suspense, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Layout } from "@/components/layout/Layout";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
 import { MessageInput, MessageInputRef } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
@@ -39,6 +38,7 @@ interface Deliberation {
   max_participants: number;
   participants?: any[];
   participant_count?: number;
+  created_at?: string;
 }
 
 const OptimizedDeliberationChat = () => {
@@ -292,14 +292,12 @@ const OptimizedDeliberationChat = () => {
   // Render loading state
   if (isLoading || dataState.loading) {
     return (
-      <Layout>
-        <div className="h-[calc(100vh-120px)] flex items-center justify-center">
-          <div className="animate-pulse text-center">
-            <div className="h-8 bg-muted rounded w-48 mx-auto mb-4"></div>
-            <div className="h-4 bg-muted rounded w-32 mx-auto"></div>
-          </div>
+      <div className="h-[calc(100vh-120px)] flex items-center justify-center">
+        <div className="animate-pulse text-center">
+          <div className="h-8 bg-muted rounded w-48 mx-auto mb-4"></div>
+          <div className="h-4 bg-muted rounded w-32 mx-auto"></div>
         </div>
-      </Layout>
+      </div>
     );
   }
 
@@ -309,7 +307,7 @@ const OptimizedDeliberationChat = () => {
   // CRITICAL FIX: Move admin check to JSX render instead of early return
   // This prevents hooks inconsistency errors
   return (
-    <Layout>
+    <>
       {isAdmin ? (
         <AdminDeliberationView />
       ) : (
@@ -404,99 +402,101 @@ const OptimizedDeliberationChat = () => {
 
             {/* Desktop Header */}
             <div className="hidden lg:block p-4">
-              <div className="flex items-stretch gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="rounded-lg border bg-muted/40 p-3 h-32 flex flex-col justify-center">
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <h1 className="text-lg font-semibold text-democratic-blue truncate">
-                          {dataState.deliberation.title}
-                        </h1>
-                        <Badge className="bg-blue-500 text-white text-sm shrink-0">
-                          {dataState.deliberation.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Users className="h-4 w-4" />
-                          <span>{dataState.deliberation.participants?.length || dataState.deliberation.participant_count || 0}</span>
-                        </div>
-                        {messageQueue && messageQueue.queue.length > 0 && (
-                          <MessageQueueStatus {...queueStatusProps} />
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Description and Notion - Desktop */}
-                    <div className="space-y-1 flex-1 overflow-hidden">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-democratic-blue truncate">
+                      {dataState.deliberation.title}
+                    </h1>
+                    <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white shrink-0`}>
+                      {dataState.deliberation.status}
+                    </Badge>
+                  </div>
+                  
+                  {(dataState.deliberation.description || dataState.deliberation.notion) && (
+                    <div className="space-y-1">
                       {dataState.deliberation.description && (
-                        <p className="text-xs text-muted-foreground cursor-pointer" 
+                        <p className="text-sm text-muted-foreground cursor-pointer" 
                            onClick={() => setUiState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
                            title="Click to view full description">
                           <span className="font-bold text-foreground">Description:</span> {dataState.deliberation.description.length > 100 ? `${dataState.deliberation.description.slice(0, 100)}...` : dataState.deliberation.description}
                         </p>
                       )}
-                      
                       {dataState.deliberation.notion && (
-                        <p className="text-xs text-muted-foreground cursor-pointer" 
+                        <p className="text-sm text-muted-foreground cursor-pointer" 
                            onClick={() => setUiState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
                            title="Click to view full notion statement">
                           <span className="font-bold text-foreground">Notion:</span> {dataState.deliberation.notion.length > 100 ? `${dataState.deliberation.notion.slice(0, 100)}...` : dataState.deliberation.notion}
                         </p>
                       )}
                     </div>
-                  </div>
+                  )}
                 </div>
-
-                <div className="shrink-0">
-                  <div className="rounded-lg border bg-muted/40 px-3 py-2 h-32 flex flex-col justify-center space-y-2">
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground mb-1">Text Mode</div>
-                      <ChatModeSelector 
-                        mode={uiState.chatMode} 
-                        onModeChange={(mode) => setUiState(prev => ({ ...prev, chatMode: mode }))} 
-                        variant="bare" 
-                      />
-                    </div>
-                    <div>
-                      <div className="text-xs font-medium text-muted-foreground mb-1">View Mode</div>
-                      <ViewModeSelector 
-                        mode={uiState.viewMode} 
-                        onModeChange={(v) => v && setUiState(prev => ({ ...prev, viewMode: v }))} 
-                      />
-                    </div>
-                  </div>
+                
+                <div className="flex gap-2 shrink-0">
+                  {messageQueue && messageQueue.queue.length > 0 && (
+                    <MessageQueueStatus {...queueStatusProps} />
+                  )}
                 </div>
-
-                <div className="shrink-0">
-                  <div className="rounded-lg border bg-muted/40 px-3 py-2 h-32 flex flex-col justify-center">
-                    <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
-                      <VoiceInterfaceLazy 
-                        deliberationId={dataState.deliberation.id}
-                        variant="panel" 
-                        sendMessage={sendMessage}
-                        setMessageText={setMessageText}
-                      />
-                    </Suspense>
-                  </div>
+              </div>
+              
+              <div className="flex flex-wrap gap-3 mt-4">
+                <div className="rounded-lg border bg-muted/40 p-2">
+                  <ChatModeSelector 
+                    mode={uiState.chatMode} 
+                    onModeChange={(mode) => setUiState(prev => ({ ...prev, chatMode: mode }))} 
+                    variant="bare" 
+                  />
                 </div>
-
-                <div className="shrink-0">
-                  <div className="rounded-lg border bg-muted/40 px-3 py-2 h-32 flex flex-col justify-center">
-                    <ParticipantScoring {...userMetrics} />
-                  </div>
+                <div className="rounded-lg border bg-muted/40 p-2">
+                  <ViewModeSelector 
+                    mode={uiState.viewMode} 
+                    onModeChange={(v) => v && setUiState(prev => ({ ...prev, viewMode: v }))} 
+                  />
+                </div>
+                <div className="rounded-lg border bg-muted/40 p-2 flex-1">
+                  <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
+                    <VoiceInterfaceLazy 
+                      deliberationId={dataState.deliberation.id} 
+                      variant="panel" 
+                      sendMessage={sendMessage}
+                      setMessageText={setMessageText}
+                    />
+                  </Suspense>
+                </div>
+                <div className="rounded-lg border bg-muted/40 px-3 py-2 flex flex-col justify-center">
+                  <ParticipantScoring {...userMetrics} />
+                </div>
+              </div>
+            </div>
+            
+            {/* Participant Count */}
+            <div className="bg-muted/30 border-t border-border/50">
+              <div className="px-4 py-2 flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  <span>{dataState.deliberation.participant_count || 0} participants</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Created {new Date(dataState.deliberation.created_at).toLocaleDateString()}
                 </div>
               </div>
             </div>
 
-            {/* Content Modal */}
-            {(dataState.deliberation.description || dataState.deliberation.notion) && (
-              <Dialog open={uiState.isDescriptionOpen} onOpenChange={(open) => setUiState(prev => ({ ...prev, isDescriptionOpen: open }))}>
-                <DialogContent className="max-w-none w-screen h-screen p-6 sm:p-10 overflow-hidden">
-                  <div className="w-full h-full flex items-center justify-center">
-                    <article className="max-w-3xl text-center text-foreground whitespace-pre-wrap break-words">
-                      {uiState.modalContent === 'description' ? dataState.deliberation.description : dataState.deliberation.notion}
-                    </article>
+            {/* Description Modal */}
+            {uiState.isDescriptionOpen && (
+              <Dialog open={uiState.isDescriptionOpen} onOpenChange={() => setUiState(prev => ({ ...prev, isDescriptionOpen: false }))}>
+                <DialogContent className="max-w-2xl">
+                  <div className="space-y-4">
+                    <h2 className="text-lg font-semibold">
+                      {uiState.modalContent === 'description' ? 'Description' : 'Notion Statement'}
+                    </h2>
+                    <div className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {uiState.modalContent === 'description' 
+                        ? dataState.deliberation.description 
+                        : dataState.deliberation.notion
+                      }
+                    </div>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -527,7 +527,7 @@ const OptimizedDeliberationChat = () => {
           )}
         </div>
       )}
-    </Layout>
+    </>
   );
 };
 
