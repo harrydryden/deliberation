@@ -1,6 +1,6 @@
 // Track React component render performance and identify slow renders
 import { useRef, useLayoutEffect, useCallback, useEffect } from 'react';
-import { logger } from '@/utils/logger';
+import { productionLogger } from '@/utils/productionLogger';
 
 interface RenderMetrics {
   componentName: string;
@@ -64,21 +64,22 @@ export const useRenderPerformanceTracker = (componentName: string, logFrequency:
         metrics.slowRenderCount++;
       }
 
-      // Log periodically or if render is slow
-      const shouldLog = metrics.renderCount % logFrequency === 0 || renderTime > SLOW_RENDER_THRESHOLD;
+      // Log periodically or if render is slow - reduced frequency in production
+      const isProduction = process.env.NODE_ENV === 'production';
+      const shouldLog = (!isProduction && (metrics.renderCount % logFrequency === 0)) || renderTime > SLOW_RENDER_THRESHOLD;
       
       if (shouldLog) {
         const isSlow = renderTime > SLOW_RENDER_THRESHOLD;
-        console.log(`🖼️ [RENDER-PERF] ${componentName} render #${metrics.renderCount}`, {
+        productionLogger.debug(`${componentName} render #${metrics.renderCount}`, {
           renderTime: `${renderTime.toFixed(2)}ms`,
-          performance: isSlow ? '🐌 SLOW' : '⚡ FAST',
+          performance: isSlow ? 'SLOW' : 'FAST',
           averageTime: `${metrics.averageRenderTime.toFixed(2)}ms`,
           slowRenderPercentage: `${((metrics.slowRenderCount / metrics.renderCount) * 100).toFixed(1)}%`,
           totalRenders: metrics.renderCount
         });
 
         if (isSlow) {
-          logger.warn(`Slow render detected in ${componentName}`, {
+          productionLogger.warn(`Slow render detected in ${componentName}`, {
             renderTime,
             renderCount: metrics.renderCount,
             averageTime: metrics.averageRenderTime
@@ -96,11 +97,13 @@ export const useRenderPerformanceTracker = (componentName: string, logFrequency:
     return renderMetricsMap.get(componentName) || null;
   }, [componentName]);
 
-  // Force log current metrics
+  // Force log current metrics - disabled in production
   const logCurrentMetrics = useCallback(() => {
+    if (process.env.NODE_ENV === 'production') return;
+    
     const metrics = getMetrics();
     if (metrics) {
-      console.log(`📊 [RENDER-PERF] ${componentName} summary`, {
+      productionLogger.debug(`${componentName} summary`, {
         totalRenders: metrics.renderCount,
         averageRenderTime: `${metrics.averageRenderTime.toFixed(2)}ms`,
         longestRenderTime: `${metrics.longestRenderTime.toFixed(2)}ms`,
@@ -110,12 +113,14 @@ export const useRenderPerformanceTracker = (componentName: string, logFrequency:
     }
   }, [componentName, getMetrics]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount - production-safe logging
   useEffect(() => {
     return () => {
+      if (process.env.NODE_ENV === 'production') return;
+      
       const metrics = getMetrics();
       if (metrics && metrics.renderCount > 0) {
-        console.log(`🏁 [RENDER-PERF] ${componentName} final summary`, {
+        productionLogger.debug(`${componentName} final summary`, {
           totalRenders: metrics.renderCount,
           totalRenderTime: `${metrics.totalRenderTime.toFixed(2)}ms`,
           averageRenderTime: `${metrics.averageRenderTime.toFixed(2)}ms`,

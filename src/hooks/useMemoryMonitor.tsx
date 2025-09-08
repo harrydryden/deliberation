@@ -1,6 +1,6 @@
 // Memory monitoring and leak detection hook
 import { useEffect, useRef, useCallback } from 'react';
-import { logger } from '@/utils/logger';
+import { productionLogger } from '@/utils/productionLogger';
 
 interface MemoryStats {
   usedJSHeapSize?: number;
@@ -56,8 +56,8 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
       
       const lifespan = Date.now() - mountTimeRef.current;
       
-      // Log memory usage
-      logger.performance.mark(`Memory usage: ${componentName}`, {
+      // Log memory usage - production-safe
+      productionLogger.debug(`Memory usage: ${componentName}`, {
         current: `${currentUsage.toFixed(2)}MB`,
         increase: `${increase.toFixed(2)}MB`,
         lifespan: `${lifespan}ms`
@@ -65,7 +65,7 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
       
       // Warn about high memory usage
       if (increase > warningThreshold && increase < criticalThreshold) {
-        logger.warn(`High memory usage detected in ${componentName}`, {
+        productionLogger.warn(`High memory usage detected in ${componentName}`, {
           increase: `${increase.toFixed(2)}MB`,
           current: `${currentUsage.toFixed(2)}MB`,
           threshold: `${warningThreshold}MB`
@@ -74,7 +74,7 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
       
       // Critical memory usage
       if (increase > criticalThreshold) {
-        logger.error(`Critical memory usage detected in ${componentName}`, {
+        productionLogger.error(`Critical memory usage detected in ${componentName}`, {
           increase: `${increase.toFixed(2)}MB`,
           current: `${currentUsage.toFixed(2)}MB`,
           threshold: `${criticalThreshold}MB`
@@ -97,10 +97,10 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
     if (typeof window !== 'undefined' && 'gc' in window && typeof (window as any).gc === 'function') {
       try {
         (window as any).gc();
-        logger.info(`Forced garbage collection for ${componentName}`);
+        productionLogger.info(`Forced garbage collection for ${componentName}`);
         return true;
       } catch (error) {
-        logger.error('Failed to force garbage collection', error as Error);
+        productionLogger.error('Failed to force garbage collection', error as Error);
         return false;
       }
     }
@@ -119,9 +119,9 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
       checkMemoryUsage();
     }, effectiveSampleInterval);
 
-    // Monitor component lifecycle
+    // Monitor component lifecycle - only in development
     if (!isProduction) {
-      logger.component.mount(componentName);
+      productionLogger.debug(`Component ${componentName} mounted`);
     }
 
     return () => {
@@ -130,7 +130,7 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
       const lifespan = Date.now() - mountTimeRef.current;
       
       if (!isProduction) {
-        logger.component.unmount(componentName, {
+        productionLogger.debug(`Component ${componentName} unmounted`, {
           lifespan: `${lifespan}ms`,
           finalMemory: finalStats ? `${finalStats.currentUsage.toFixed(2)}MB` : 'unknown'
         });
@@ -143,7 +143,7 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
       
       // Warn about long-lived components (production-safe)
       if (lifespan > 300000 && finalStats && finalStats.increase > criticalThreshold) { 
-        console.warn(`Memory leak detected in ${componentName}: ${finalStats.increase.toFixed(2)}MB increase over ${lifespan}ms`);
+        productionLogger.warn(`Memory leak detected in ${componentName}: ${finalStats.increase.toFixed(2)}MB increase over ${lifespan}ms`);
       }
     };
   }, [componentName, effectiveSampleInterval, getMemoryStats, checkMemoryUsage, isProduction, criticalThreshold]);
@@ -178,12 +178,12 @@ export const useGlobalMemoryMonitor = () => {
           // performanceMonitor.recordMetric('global-memory', memory.usedJSHeapSize);
           
           // Log to performance monitor
-          logger.performance.mark('Global memory usage', stats);
+          productionLogger.debug('Global memory usage', stats);
           
           // Warn if using more than 80% of available memory
           const usagePercent = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
           if (usagePercent > 80) {
-            logger.warn('High global memory usage', {
+            productionLogger.warn('High global memory usage', {
               usage: `${usagePercent.toFixed(1)}%`,
               ...stats
             });

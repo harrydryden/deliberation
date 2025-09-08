@@ -1,6 +1,6 @@
 // Progressive fallback system for handling timeouts and errors gracefully
 import { useState, useCallback, useRef } from 'react';
-import { logger } from '@/utils/logger';
+import { productionLogger } from '@/utils/productionLogger';
 
 interface FallbackConfig {
   maxRetries: number;
@@ -59,7 +59,7 @@ export const useProgressiveFallback = <T,>(
     for (let attempt = 1; attempt <= config.maxRetries + 1; attempt++) {
       try {
         setState(prev => ({ ...prev, attempt }));
-        console.log(`🔄 ${operationName} attempt ${attempt}/${config.maxRetries + 1}`);
+        productionLogger.debug(`${operationName} attempt ${attempt}/${config.maxRetries + 1}`);
 
         // Create timeout promise
         const timeoutPromise = new Promise<never>((_, reject) => {
@@ -75,7 +75,7 @@ export const useProgressiveFallback = <T,>(
         ]);
 
         const duration = Date.now() - startTime;
-        console.log(`✅ ${operationName} succeeded on attempt ${attempt} (${duration}ms)`);
+        productionLogger.debug(`${operationName} succeeded on attempt ${attempt} (${duration}ms)`);
 
         setState(prev => ({
           ...prev,
@@ -85,7 +85,7 @@ export const useProgressiveFallback = <T,>(
         }));
 
         // Log success metrics
-        logger.info(`${operationName} succeeded on attempt ${attempt}`, {
+        productionLogger.info(`${operationName} succeeded on attempt ${attempt}`, {
           attempt,
           duration,
           fallbackUsed: false
@@ -95,17 +95,17 @@ export const useProgressiveFallback = <T,>(
 
       } catch (error) {
         const duration = Date.now() - startTime;
-        console.warn(`⚠️ ${operationName} attempt ${attempt} failed after ${duration}ms:`, error);
+        productionLogger.warn(`${operationName} attempt ${attempt} failed after ${duration}ms`, error);
 
         // If this is the last attempt, try fallback
         if (attempt === config.maxRetries + 1) {
           if (fallbackOperation) {
-            console.log(`🔀 ${operationName} trying fallback operation...`);
+            productionLogger.debug(`${operationName} trying fallback operation`);
             try {
               const fallbackResult = await fallbackOperation();
               const fallbackDuration = Date.now() - startTime;
               
-              console.log(`✅ ${operationName} fallback succeeded (${fallbackDuration}ms)`);
+              productionLogger.debug(`${operationName} fallback succeeded (${fallbackDuration}ms)`);
               
               setState(prev => ({
                 ...prev,
@@ -116,7 +116,7 @@ export const useProgressiveFallback = <T,>(
               }));
 
               // Log fallback success
-              logger.info(`${operationName} fallback succeeded`, {
+              productionLogger.info(`${operationName} fallback succeeded`, {
                 totalAttempts: attempt,
                 fallbackDuration,
                 primaryError: error instanceof Error ? error.message : String(error)
@@ -124,11 +124,11 @@ export const useProgressiveFallback = <T,>(
 
               return fallbackResult;
             } catch (fallbackError) {
-              console.error(`❌ ${operationName} fallback failed:`, fallbackError);
+              productionLogger.error(`${operationName} fallback failed`, fallbackError);
               
               // Use configured fallback value if available
               if (config.fallbackValue !== undefined) {
-                console.log(`🎯 ${operationName} using configured fallback value`);
+                productionLogger.debug(`${operationName} using configured fallback value`);
                 
                 setState(prev => ({
                   ...prev,
@@ -142,7 +142,7 @@ export const useProgressiveFallback = <T,>(
               }
             }
           } else if (config.fallbackValue !== undefined) {
-            console.log(`🎯 ${operationName} using configured fallback value (no fallback operation)`);
+            productionLogger.debug(`${operationName} using configured fallback value (no fallback operation)`);
             
             setState(prev => ({
               ...prev,
@@ -166,12 +166,7 @@ export const useProgressiveFallback = <T,>(
           }));
 
           // Log final failure
-          logger.error(`${operationName}_complete_failure`, finalError, {
-            totalAttempts: attempt,
-            totalDuration: Date.now() - startTime,
-            hadFallback: !!fallbackOperation,
-            hadFallbackValue: config.fallbackValue !== undefined
-          });
+          productionLogger.error(`${operationName}_complete_failure`, finalError);
 
           throw finalError;
         }
@@ -179,7 +174,7 @@ export const useProgressiveFallback = <T,>(
         // Wait before retry with exponential backoff
         if (attempt < config.maxRetries + 1) {
           const delay = config.retryDelayMs * Math.pow(2, attempt - 1);
-          console.log(`⏳ ${operationName} waiting ${delay}ms before retry...`);
+          productionLogger.debug(`${operationName} waiting ${delay}ms before retry`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }

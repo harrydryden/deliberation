@@ -1,7 +1,7 @@
 // Optimized message loading hook with enhanced caching and performance
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { logger } from '@/utils/logger';
+import { productionLogger } from '@/utils/productionLogger';
 
 interface Message {
   id: string;
@@ -116,17 +116,17 @@ export const useOptimizedMessageLoading = (deliberationId: string) => {
   // Load messages with enhanced caching and optimizations
   const loadMessages = useCallback(async (page: number = 0, append: boolean = false) => {
     if (isLoadingRef.current && !append) {
-      console.log('📦 Message loading already in progress, skipping...');
+      productionLogger.debug('Message loading already in progress, skipping');
       return;
     }
 
     const startTime = Date.now();
-    console.log(`📨 Loading messages for deliberation ${deliberationId}, page ${page}`);
+    productionLogger.debug('Loading messages for deliberation', { deliberationId, page });
 
     // Check cache first
     const cached = messageCache.get(deliberationId, page);
     if (cached && !append) {
-      console.log(`🚀 Message cache hit for deliberation ${deliberationId}, page ${page}`);
+      productionLogger.debug('Message cache hit', { deliberationId, page });
       setState(prev => ({
         ...prev,
         messages: cached.messages,
@@ -183,7 +183,7 @@ export const useOptimizedMessageLoading = (deliberationId: string) => {
       const totalCount = count || 0;
       const hasMore = totalCount > offset + messageCount;
 
-      console.log(`📨 GET /messages - 200`, {
+      productionLogger.debug('GET /messages - 200', {
         deliberationId,
         messageCount,
         totalCount,
@@ -208,7 +208,7 @@ export const useOptimizedMessageLoading = (deliberationId: string) => {
       }));
 
       // Log performance metrics
-      logger.info('Message loading completed', {
+      productionLogger.info('Message loading completed', {
         deliberationId,
         messageCount,
         loadTime,
@@ -218,11 +218,11 @@ export const useOptimizedMessageLoading = (deliberationId: string) => {
 
     } catch (error) {
       if (error.name === 'AbortError') {
-        console.log('📨 Message loading aborted');
+        productionLogger.debug('Message loading aborted');
         return;
       }
 
-      console.error('❌ Error loading messages:', error);
+      productionLogger.error('Error loading messages', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load messages';
       
       setState(prev => ({
@@ -231,11 +231,7 @@ export const useOptimizedMessageLoading = (deliberationId: string) => {
         error: errorMessage
       }));
 
-      logger.error('Message loading failed', error as Error, {
-        deliberationId,
-        page,
-        loadTime: Date.now() - startTime
-      });
+      productionLogger.error('Message loading failed', error as Error);
     } finally {
       isLoadingRef.current = false;
       abortControllerRef.current = null;
@@ -244,7 +240,7 @@ export const useOptimizedMessageLoading = (deliberationId: string) => {
 
   // Refresh messages (clear cache and reload)
   const refreshMessages = useCallback(() => {
-    console.log(`🔄 Refreshing messages for deliberation ${deliberationId}`);
+    productionLogger.debug('Refreshing messages for deliberation', { deliberationId });
     messageCache.invalidate(deliberationId);
     loadMessages(0, false);
   }, [deliberationId, loadMessages]);

@@ -201,7 +201,7 @@ export const useChat = (deliberationId?: string) => {
 
     const { id: queueId, content, parentMessageId } = queuedMessage;
     
-    console.log('🔥 Starting to process queued message:', { 
+    logger.debug('Starting to process queued message', { 
       queueId, 
       content: content.substring(0, 50),
       timestamp: new Date().toISOString()
@@ -211,7 +211,7 @@ export const useChat = (deliberationId?: string) => {
       // Update status to processing ONLY when we actually start processing
       messageQueue.updateMessageStatus(queueId, 'processing');
       
-      console.log('📤 Sending message to service...', { queueId });
+      logger.debug('Sending message to service', { queueId });
       
   // F006 Fix: Selective cache invalidation - only clear when sending new messages
   const clearRelevantCache = useCallback(() => {
@@ -227,7 +227,7 @@ export const useChat = (deliberationId?: string) => {
         user?.id
       );
       
-      console.log('✅ Message saved to database:', { 
+      logger.debug('Message saved to database', { 
         queueId, 
         savedMessageId: saved.id,
         timestamp: new Date().toISOString()
@@ -276,7 +276,7 @@ export const useChat = (deliberationId?: string) => {
       });
 
       // Start streaming the agent response
-      console.log('🚀 About to start streaming agent response for queued message', { 
+      logger.debug('About to start streaming agent response for queued message', { 
         messageId: saved.id,
         queueId,
         deliberationId, 
@@ -291,7 +291,7 @@ export const useChat = (deliberationId?: string) => {
         (streamContent: string, messageId: string, agentType: string | null) => {
           if (!streamContent.trim()) return;
           
-          console.log('📡 Streaming update received:', { 
+          logger.debug('Streaming update received', { 
             queueId, 
             messageId, 
             contentLength: streamContent.length,
@@ -335,7 +335,7 @@ export const useChat = (deliberationId?: string) => {
         },
         // onComplete callback
         async (finalContent: string, messageId: string, agentType: string | null) => {
-          console.log('🏁 Streaming completed for queued message:', { 
+          logger.debug('Streaming completed for queued message', { 
             queueId, 
             messageId, 
             contentLength: finalContent.length,
@@ -371,11 +371,11 @@ export const useChat = (deliberationId?: string) => {
           });
           
           messageQueue.updateMessageStatus(queueId, 'completed');
-          console.log('✅ Queue message marked as completed:', { queueId, timestamp: new Date().toISOString() });
+          logger.debug('Queue message marked as completed', { queueId, timestamp: new Date().toISOString() });
         },
         // onError callback
         (error: string) => {
-          console.error('❌ Streaming error occurred for queued message', { 
+          logger.error('Streaming error occurred for queued message', { 
             error, 
             queueId, 
             timestamp: new Date().toISOString() 
@@ -383,7 +383,7 @@ export const useChat = (deliberationId?: string) => {
           
           // Don't mark as failed if it was intentionally aborted
           if (error.includes('aborted') || error.includes('AbortError')) {
-            console.log('🛑 Message processing was aborted intentionally', { queueId });
+            logger.debug('Message processing was aborted intentionally', { queueId });
             messageQueue.removeFromQueue(queueId);
             return;
           }
@@ -398,13 +398,11 @@ export const useChat = (deliberationId?: string) => {
       
     } catch (error) {
       const errMsg = getErrorMessage(error);
-      console.error('💥 Failed to process queued message:', { 
-        error: errMsg, 
+      logger.error('Failed to process queued message', new Error(errMsg), { 
         queueId, 
         timestamp: new Date().toISOString() 
       });
       messageQueue.updateMessageStatus(queueId, 'failed', errMsg);
-      logger.error('Failed to process queued message', { error: errMsg, queueId });
     }
   }, [user, deliberationId, services.messageService, startStreaming, setChatState, messageQueue]);
 
@@ -416,16 +414,16 @@ export const useChat = (deliberationId?: string) => {
     if (!hasWork || !user || !deliberationId) return;
     
     const processNext = async () => {
-      console.log('🔍 Checking queue for next message...');
+      logger.debug('Checking queue for next message');
       const nextMessage = messageQueue.getNextQueuedMessage();
       if (nextMessage && user && deliberationId) {
-        console.log('🚀 Processing next queued message:', { 
+        logger.debug('Processing next queued message', { 
           messageId: nextMessage.id, 
           content: nextMessage.content.substring(0, 50) 
         });
         await processQueuedMessage(nextMessage);
       } else {
-        console.log('⏸️ No messages to process:', { 
+        logger.debug('No messages to process', { 
           hasNextMessage: !!nextMessage, 
           hasUser: !!user, 
           hasDeliberationId: !!deliberationId,
@@ -434,7 +432,7 @@ export const useChat = (deliberationId?: string) => {
       }
     };
 
-    console.log('📋 Queue has items, processing immediately...', queueStats);
+    logger.debug('Queue has items, processing immediately', queueStats);
     
     // F001 Fix: Process immediately without delay to align with timeout expectations
     processNext();

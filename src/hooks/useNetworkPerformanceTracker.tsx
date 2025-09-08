@@ -1,6 +1,6 @@
 // Track network performance for API calls and streaming
 import { useCallback, useRef } from 'react';
-import { logger } from '@/utils/logger';
+import { productionLogger } from '@/utils/productionLogger';
 
 interface NetworkRequest {
   id: string;
@@ -36,7 +36,7 @@ class NetworkPerformanceTracker {
       this.requests.delete(oldestKey);
     }
 
-    console.log(`📡 [NET-PERF] Starting ${type} request: ${method} ${url}`, {
+    productionLogger.info(`Starting ${type} request: ${method} ${url}`, {
       id,
       timestamp: new Date().toISOString().slice(11, 23)
     });
@@ -45,7 +45,7 @@ class NetworkPerformanceTracker {
   endRequest(id: string, status?: number, size?: number, error?: string): NetworkRequest | null {
     const request = this.requests.get(id);
     if (!request) {
-      console.warn(`📡 [NET-PERF] No request found for ID: ${id}`);
+      productionLogger.warn(`No request found for ID: ${id}`);
       return null;
     }
 
@@ -59,7 +59,7 @@ class NetworkPerformanceTracker {
     const performanceGrade = this.getPerformanceGrade(request.duration, request.type);
     const sizeInfo = size ? `${(size / 1024).toFixed(2)}KB` : 'unknown';
 
-    console.log(`📡 [NET-PERF] Completed ${request.type} request: ${request.method} ${request.url}`, {
+    productionLogger.info(`Completed ${request.type} request: ${request.method} ${request.url}`, {
       id,
       duration: `${request.duration.toFixed(2)}ms`,
       status: status || 'unknown',
@@ -70,7 +70,7 @@ class NetworkPerformanceTracker {
 
     // Log slow requests
     if (request.duration > this.getSlowThreshold(request.type)) {
-      logger.warn(`Slow ${request.type} request detected`, {
+      productionLogger.warn(`Slow ${request.type} request detected`, {
         url: request.url,
         duration: request.duration,
         method: request.method,
@@ -122,7 +122,7 @@ class NetworkPerformanceTracker {
     const completedRequests = metrics.filter(req => req.duration !== undefined);
     
     if (completedRequests.length === 0) {
-      console.log('📡 [NET-PERF] No completed requests to summarize');
+      productionLogger.debug('No completed requests to summarize');
       return;
     }
 
@@ -139,7 +139,7 @@ class NetworkPerformanceTracker {
       typeBreakdown: this.getTypeBreakdown(completedRequests)
     };
 
-    console.log('📡 [NET-PERF] Network Performance Summary', summary);
+    productionLogger.info('Network Performance Summary', summary);
   }
 
   private getTypeBreakdown(requests: NetworkRequest[]) {

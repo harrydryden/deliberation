@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { logger } from '@/utils/logger';
+import { productionLogger } from '@/utils/productionLogger';
 import { useStreamingPerformanceMonitor } from './useStreamingPerformanceMonitor';
 import { useUIStateDebugger } from './useUIStateDebugger';
 import { useNetworkPerformanceTracker } from './useNetworkPerformanceTracker';
@@ -45,7 +45,7 @@ export const useResponseStreaming = () => {
     onComplete: (finalContent: string, messageId: string, agentType: string | null) => void,
     onError: (error: string) => void
   ) => {
-    console.log('🌊 Starting streaming for message:', messageId);
+    productionLogger.debug('Starting streaming for message', { messageId });
     
     // Start performance monitoring
     perfMonitor.startTracking(messageId);
@@ -73,7 +73,7 @@ export const useResponseStreaming = () => {
       try {
         streamControllerRef.current.abort();
       } catch (error) {
-        console.warn('⚠️ Error aborting previous stream:', error);
+        productionLogger.warn('Error aborting previous stream', error);
       }
     }
 
@@ -87,12 +87,12 @@ export const useResponseStreaming = () => {
     let heartbeatCount = 0;
     
     const timeoutId = setTimeout(() => {
-      console.log('⏰ Main streaming timeout reached (40s), aborting...');
+      productionLogger.warn('Main streaming timeout reached (40s), aborting');
       if (streamControllerRef.current) {
         try {
           streamControllerRef.current.abort();
         } catch (error) {
-          console.warn('⚠️ Error aborting on timeout:', error);
+          productionLogger.warn('Error aborting on timeout', error);
         }
       }
       // F003 Fix: Clear streaming state on timeout
@@ -112,10 +112,10 @@ export const useResponseStreaming = () => {
       heartbeatCount++;
       
       if (timeSinceActivity > 15000) { // 15 seconds without activity
-        console.log(`💓 Heartbeat ${heartbeatCount}: No activity for ${timeSinceActivity}ms, checking connection...`);
+        productionLogger.debug('Heartbeat: No activity detected', { heartbeatCount, timeSinceActivity });
         
         if (timeSinceActivity > 35000) { // F004 Fix: 35 seconds to align with new timeout
-          console.warn('💔 Connection appears stalled, preparing for timeout...');
+          productionLogger.warn('Connection appears stalled, preparing for timeout'); 
           // Pre-emptively clear state to prevent hanging UI
           setStreamingState(prev => ({
             ...prev,
@@ -125,17 +125,17 @@ export const useResponseStreaming = () => {
           onError('Connection stalled - no activity for 35 seconds.');
         }
       } else {
-        console.log(`💓 Heartbeat ${heartbeatCount}: Active (${timeSinceActivity}ms since last activity)`);
+        productionLogger.debug('Heartbeat: Connection active', { heartbeatCount, timeSinceActivity });
       }
     }, HEARTBEAT_INTERVAL);
 
     try {
-      console.log('🔍 Checking if streaming is already in progress...');
+      productionLogger.debug('Checking if streaming is already in progress');
       
       // Check if this message is already streaming
       const isAlreadyStreaming = streamingState.isStreaming && streamingState.messageId === messageId;
       if (isAlreadyStreaming) {
-        console.log('⚠️ Message already streaming, skipping...');
+        productionLogger.warn('Message already streaming, skipping');
         setStreamingState({
           isStreaming: false,
           currentMessage: '',
@@ -145,11 +145,11 @@ export const useResponseStreaming = () => {
         return;
       }
 
-      console.log('🌊 Proceeding to streaming function call...');
+      productionLogger.debug('Proceeding to streaming function call');
 
       // Consistent session-based auth for streaming API calls
       const { data: { session: currentSession } } = await supabase.auth.getSession();
-      console.log('🔄 Using optimized streaming function call...');
+      productionLogger.debug('Using optimized streaming function call');
       
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
@@ -171,13 +171,12 @@ export const useResponseStreaming = () => {
       
       if (currentSession?.access_token) {
         requestHeaders['Authorization'] = `Bearer ${currentSession.access_token}`;
-        console.log('🔑 Added authorization header to request');
+        productionLogger.debug('Added authorization header to request');
       } else {
-        console.warn('⚠️ No access token available for request');
+        productionLogger.warn('No access token available for request');
       }
       
-      console.log('🌐 Making request to:', functionUrl);
-      console.log('📦 Request payload:', { messageId, deliberationId, mode: 'chat' });
+      productionLogger.debug('Making request to streaming function', { functionUrl, messageId, deliberationId });
       
       // Track network request
       const networkId = networkTracker.startTracking(functionUrl, 'POST', 'stream');
@@ -193,22 +192,21 @@ export const useResponseStreaming = () => {
         signal: streamControllerRef.current?.signal
       });
       
-      console.log('📊 Response status:', response.status, response.statusText);
-      console.log('📋 Response headers:', Object.fromEntries(response.headers.entries()));
+      productionLogger.debug('Response received', { status: response.status, statusText: response.statusText });
       
       if (!response.ok) {
         // Log response body for debugging
         let errorBody = '';
         try {
           errorBody = await response.text();
-          console.error('❌ Error response body:', errorBody);
+          productionLogger.error('Error response body', errorBody);
         } catch (e) {
-          console.error('❌ Could not read error response body:', e);
+          productionLogger.error('Could not read error response body', e);
         }
         throw new Error(`Edge function failed with status ${response.status}: ${response.statusText}. Body: ${errorBody}`);
       }
 
-      console.log('📡 Streaming response received successfully');
+      productionLogger.debug('Streaming response received successfully');
       
       // Record first response received
       networkTracker.endTracking(networkId, response.status);
@@ -221,7 +219,7 @@ export const useResponseStreaming = () => {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
-      console.log('📖 Starting to read stream...');
+      productionLogger.debug('Starting to read stream');
 
       const updateUI = () => {
         setStreamingState(prev => ({
@@ -236,20 +234,20 @@ export const useResponseStreaming = () => {
           const { done, value } = await reader.read();
           
           if (streamControllerRef.current?.signal?.aborted) {
-            console.log('🛑 Stream aborted by user');
+            productionLogger.debug('Stream aborted by user');
             await reader.cancel();
             break;
           }
 
           if (done) {
-            console.log('✅ Stream completed');
+            productionLogger.debug('Stream completed');
             break;
           }
 
           try {
             const chunk = decoder.decode(value, { stream: true });
             lastActivity = Date.now(); // Update activity timestamp
-            console.log('📦 Received chunk:', chunk.substring(0, 100) + '...');
+            productionLogger.debug('Received chunk', { chunkLength: chunk.length });
 
             // Parse each line as a potential JSON object
             const lines = chunk.split('\n').filter(line => line.trim());
@@ -258,7 +256,7 @@ export const useResponseStreaming = () => {
               if (line.startsWith('data: ')) {
                 const jsonStr = line.slice(6);
                 if (jsonStr === '[DONE]') {
-                  console.log('🏁 Received [DONE] signal');
+                  productionLogger.debug('Received [DONE] signal');
                   break;
                 }
                 
@@ -289,23 +287,23 @@ export const useResponseStreaming = () => {
                   }
                   
                   if (parsed.done) {
-                    console.log('✅ Received done signal from parsed data');
+                    productionLogger.debug('Received done signal from parsed data');
                     break;
                   }
                 } catch (parseError) {
-                  console.warn('⚠️ Failed to parse streaming chunk:', parseError);
+                  productionLogger.warn('Failed to parse streaming chunk', parseError);
                   // Continue processing other lines
                 }
               }
             }
           } catch (chunkError) {
-            console.error('❌ Error processing chunk:', chunkError);
+            productionLogger.error('Error processing chunk', chunkError);
             // Continue processing stream
           }
         } catch (readError) {
           // Handle specific abort errors gracefully
           if (readError instanceof DOMException && readError.name === 'AbortError') {
-            console.log('🛑 Stream reading aborted intentionally');
+            productionLogger.debug('Stream reading aborted intentionally');
             await reader.cancel();
             return; // Exit early without calling onError
           }
@@ -324,11 +322,11 @@ export const useResponseStreaming = () => {
     } catch (error) {
       // Handle specific abort errors gracefully
       if (error instanceof DOMException && error.name === 'AbortError') {
-        console.log('🛑 Request aborted intentionally');
+        productionLogger.debug('Request aborted intentionally');
         return; // Exit gracefully without calling onError
       }
       
-      console.error('❌ Streaming error:', error);
+      productionLogger.error('Streaming error occurred', error);
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
       
       // Record error for performance monitoring
@@ -336,28 +334,7 @@ export const useResponseStreaming = () => {
       uiDebugger.trackError(errorMessage);
       
       // F005 Fix: Enhanced structured logging for better observability
-      logger.error('Streaming failed', error as Error, { 
-        messageId, 
-        deliberationId,
-        streamingState: {
-          isStreaming: streamingState.isStreaming,
-          currentMessageLength: accumulatorRef.current.length,
-          agentType: streamingState.agentType,
-          messageId: streamingState.messageId
-        },
-        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
-        errorStack: error instanceof Error ? error.stack : undefined,
-        timestamp: new Date().toISOString(),
-        requestInfo: {
-          userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'Unknown',
-          url: typeof window !== 'undefined' ? window.location.href : 'Unknown'
-        },
-        performanceMetrics: {
-          streamDuration: Date.now() - performance.now(),
-          accumulatedBytes: accumulatorRef.current.length,
-          rafCallsScheduled: rafIdRef.current ? 1 : 0
-        }
-      });
+      productionLogger.error('Streaming failed', error as Error);
       
       onError(errorMessage);
     } finally {
@@ -388,17 +365,17 @@ export const useResponseStreaming = () => {
       streamControllerRef.current = null;
       accumulatorRef.current = '';
       
-      console.log('🧹 Streaming cleanup completed with memory leak prevention');
+      productionLogger.debug('Streaming cleanup completed with memory leak prevention');
     }
   }, [streamingState.agentType, streamingState.isStreaming, streamingState.messageId]);
 
   const stopStreaming = useCallback(() => {
-    console.log('🛑 Stopping stream...');
+    productionLogger.debug('Stopping stream');
     if (streamControllerRef.current) {
       try {
         streamControllerRef.current.abort();
       } catch (error) {
-        console.warn('⚠️ Error aborting stream:', error);
+        productionLogger.warn('Error aborting stream', error);
       }
       streamControllerRef.current = null;
     }

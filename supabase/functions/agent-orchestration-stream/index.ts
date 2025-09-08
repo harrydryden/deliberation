@@ -17,12 +17,7 @@ import {
 import { responseCache, configCache, createCacheKey } from '../shared/cache-manager.ts';
 import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
-import { 
-  withTimeout, 
-  executeTieredOperations, 
-  DEFAULT_TIMEOUTS, 
-  OptimizedCache 
-} from '../shared/performance-optimizer.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 // Re-export types from shared orchestrator
 import type { AgentConfig, AnalysisResult, ConversationContext } from '../shared/agent-orchestrator.ts';
@@ -46,7 +41,7 @@ async function getFastPathSystemPrompt(supabase: any, agentType: string): Promis
       return template.template_text.replace(/\{\{agent_type\}\}/g, agentType);
     }
   } catch (error) {
-    console.log('Failed to fetch fast path template:', error);
+    EdgeLogger.error('Failed to fetch fast path template', error);
     throw new Error('Fast path response template not available');
   }
 }
@@ -73,7 +68,7 @@ function checkFastPath(content: string): { agent: string; confidence: number } |
 
   for (const pattern of patterns) {
     if (pattern.regex.test(content)) {
-      console.log(`🎯 High-confidence fast path: "${content}" -> ${pattern.agent} (confidence: ${pattern.confidence})`);
+    EdgeLogger.debug('High-confidence fast path detected', { content: content.substring(0, 50), agent: pattern.agent, confidence: pattern.confidence });
       return {
         agent: pattern.agent,
         confidence: pattern.confidence

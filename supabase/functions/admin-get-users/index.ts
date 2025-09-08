@@ -8,6 +8,7 @@ import {
   createSuccessResponse,
   handleCORSPreflight
 } from '../shared/edge-function-utils.ts';
+import { EdgeLogger } from '../shared/edge-logger.ts';
 
 serve(async (req) => {
   // Handle CORS preflight with shared utility
@@ -15,14 +16,14 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    console.log('📋 Admin get users function called');
+    EdgeLogger.debug('Admin get users function called');
     
     // Get environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error('❌ Missing environment variables');
+      EdgeLogger.error('Missing environment variables');
       return createErrorResponse('Service configuration error', 500);
     }
 
@@ -31,19 +32,19 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Verify the requesting user is an admin
-    console.log('🔐 Checking authorization header...');
+    EdgeLogger.debug('Checking authorization header');
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      console.error('❌ No authorization header found');
+      EdgeLogger.error('No authorization header found');
       return createErrorResponse('No authorization header', 401);
     }
 
     // Extract token from Bearer format
-    console.log('🎫 Extracting token from authorization header...');
+    EdgeLogger.debug('Extracting token from authorization header');
     const token = authHeader.replace('Bearer ', '');
     
     // Verify the user token using proper JWT authentication
-    console.log('👤 Verifying user token...');
+    EdgeLogger.debug('Verifying user token');
     const userAuthClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!);
     
     // Set the auth header and verify user
