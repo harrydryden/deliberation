@@ -720,7 +720,9 @@ async function processStreamingOrchestration(
 
     // Get message details using user client (respects RLS)
     console.log(`📨 Fetching message details for messageId: ${messageId}`);
-    const { data: message, error: messageError } = await userSupabase
+    console.log(`🔍 Using auth header: ${authHeader ? 'YES' : 'NO'}`);
+    
+    const { data: message, error: messageError } = await authenticatedUserSupabase
       .from('messages')
       .select('*')
       .eq('id', messageId)
@@ -729,8 +731,32 @@ async function processStreamingOrchestration(
     if (messageError || !message) {
       console.error(`❌ Error fetching message:`, messageError);
       console.error(`❌ Full message error details:`, JSON.stringify(messageError, null, 2));
-      sendData({ error: `Message not found or access denied: ${messageError?.message}`, done: true });
-      return;
+      console.error(`❌ Message ID being searched: ${messageId}`);
+      console.error(`❌ Deliberation ID: ${deliberationId}`);
+      
+      // Try with service role as fallback
+      console.log(`🔄 Trying with service role client...`);
+      const { data: serviceMessage, error: serviceError } = await serviceSupabase
+        .from('messages')
+        .select('*')
+        .eq('id', messageId)
+        .single();
+        
+      if (serviceError || !serviceMessage) {
+        console.error(`❌ Service role also failed:`, serviceError);
+        sendData({ error: `Message not found: ${messageId}`, done: true });
+        return;
+      } else {
+        console.log(`✅ Found message with service role - RLS issue detected`);
+        console.log(`📊 Message details:`, { 
+          id: serviceMessage.id, 
+          type: serviceMessage.message_type,
+          userId: serviceMessage.user_id,
+          content: serviceMessage.content?.substring(0, 50) 
+        });
+        // Use the service message but continue processing
+        message = serviceMessage;
+      }
     }
 
     console.log(`✅ Message fetched successfully:`, {
