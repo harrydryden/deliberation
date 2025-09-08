@@ -142,7 +142,10 @@ export const DeliberationActionsMenu = ({
               currentNotion={deliberation.notion || ''}
               onNotionUpdated={(newNotion) => {
                 // Handle notion update - could refresh deliberations or update local state
-                console.log('Notion updated:', newNotion);
+                // Production-safe logging
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('Notion updated:', newNotion);
+                }
               }}
               deliberationTitle={deliberation.title}
             />

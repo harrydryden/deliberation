@@ -72,19 +72,22 @@ export class PerformanceErrorBoundary extends Component<PerformanceErrorBoundary
   }
 
   startPerformanceMonitoring = () => {
-    const memoryThreshold = this.props.memoryThreshold || 100; // 100MB default
+    const memoryThreshold = this.props.memoryThreshold || 150; // Increased to 150MB for production
     
-    this.memoryCheckInterval = setInterval(() => {
-      if ('memory' in performance) {
-        const memoryInfo = (performance as any).memory;
-        const usedMB = memoryInfo.usedJSHeapSize / (1024 * 1024);
-        
-        if (usedMB > memoryThreshold) {
-          logger.warn('High memory usage detected:', `${usedMB} MB`);
-          this.setState({ performanceIssue: true });
+    // Only monitor in development or if explicitly enabled
+    if (process.env.NODE_ENV === 'development' || sessionStorage.getItem('performance-monitoring') === 'true') {
+      this.memoryCheckInterval = setInterval(() => {
+        if ('memory' in performance) {
+          const memoryInfo = (performance as any).memory;
+          const usedMB = memoryInfo.usedJSHeapSize / (1024 * 1024);
+          
+          if (usedMB > memoryThreshold) {
+            logger.warn('High memory usage detected:', `${usedMB} MB`);
+            this.setState({ performanceIssue: true });
+          }
         }
-      }
-    }, 5000); // Check every 5 seconds
+      }, 30000); // Check every 30 seconds in production
+    }
   };
 
   handleOptimizedRetry = () => {
