@@ -77,8 +77,8 @@ export const AdminDashboard = () => {
                 deliberations={adminData.deliberations}
                 loading={adminData.loadingLocalAgents}
                 onLoad={adminData.fetchLocalAgents}
-                onUpdate={() => {}} 
-                onCreate={() => {}}
+                onUpdate={adminData.updateLocalAgent} 
+                onCreate={adminData.createLocalAgent}
               />
               <AgentManagement />
               <PromptManagement />

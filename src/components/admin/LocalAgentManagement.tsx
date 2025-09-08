@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -156,7 +157,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
               </TableHeader>
               <TableBody>
                 {safeLocalAgents.map((agent) => (
-                  <>
+                  <React.Fragment key={agent.id}>
                     <TableRow key={agent.id}>
                       <TableCell className="font-medium">
                         <div>
@@ -244,7 +245,7 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
                         </div>
                       </TableCell>
                     </TableRow>
-                  </>
+                  </React.Fragment>
                 ))}
               </TableBody>
             </Table>

@@ -29,6 +29,8 @@ export interface OptimizedAdminData {
   archiveUser: (userId: string, reason: string) => Promise<void>;
   unarchiveUser: (userId: string) => Promise<void>;
   updateDeliberationStatus: (id: string, status: string) => Promise<void>;
+  createLocalAgent: (agentData: any) => Promise<void>;
+  updateLocalAgent: (id: string, updates: any) => Promise<void>;
 }
 
 export const useOptimizedAdminData = (): OptimizedAdminData => {
@@ -174,6 +176,56 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
     }
   }, [adminService, fetchDeliberations, toast]);
 
+  const createLocalAgent = useCallback(async (agentData: any) => {
+    try {
+      // Map LocalAgentCreate to Agent format
+      const agentConfig = {
+        name: agentData.name,
+        agent_type: agentData.agent_type,
+        description: agentData.description || `${agentData.agent_type.replace('_', ' ')} for deliberation`,
+        deliberation_id: agentData.deliberationId,
+        is_active: true,
+        is_default: false,
+        goals: agentData.goals || [],
+        response_style: agentData.response_style || 'conversational',
+        facilitator_config: agentData.facilitator_config || {},
+        prompt_overrides: {}
+      };
+
+      await serviceContainer.agentService.createAgent(agentConfig);
+      await fetchLocalAgents(); // Refresh local agents
+      toast({
+        title: "Success",
+        description: "Local agent created successfully"
+      });
+    } catch (error) {
+      logger.error('Failed to create local agent', error);
+      toast({
+        title: "Error",
+        description: "Failed to create local agent",
+        variant: "destructive"
+      });
+    }
+  }, [fetchLocalAgents, toast]);
+
+  const updateLocalAgent = useCallback(async (id: string, updates: any) => {
+    try {
+      await serviceContainer.agentService.updateAgent(id, updates);
+      await fetchLocalAgents(); // Refresh local agents
+      toast({
+        title: "Success",
+        description: "Local agent updated successfully"
+      });
+    } catch (error) {
+      logger.error('Failed to update local agent', error);
+      toast({
+        title: "Error",
+        description: "Failed to update local agent",
+        variant: "destructive"
+      });
+    }
+  }, [fetchLocalAgents, toast]);
+
   return {
     users,
     deliberations,
@@ -194,6 +246,8 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
     fetchStats,
     archiveUser,
     unarchiveUser,
-    updateDeliberationStatus
+    updateDeliberationStatus,
+    createLocalAgent,
+    updateLocalAgent
   };
 };
