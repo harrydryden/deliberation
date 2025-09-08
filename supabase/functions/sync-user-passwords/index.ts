@@ -1,46 +1,30 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0'
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight
+} from '../shared/edge-function-utils.ts';
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    // Create admin client
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
+    // Get environment and clients with caching
+    const { supabase: supabaseAdmin } = validateAndGetEnvironment();
+    
     // Get regular client for checking auth
-    const supabaseRegular = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
+    const { supabase: supabaseRegular } = validateAndGetEnvironment('anon');
 
     // Get auth header and verify admin access
-    const authHeader = req.headers.get('Authorization')
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'No authorization header' }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      return createErrorResponse('No authorization header', 401);
     }
 
     // Set auth for regular client
@@ -50,31 +34,19 @@ serve(async (req) => {
     } as any)
 
     // Check if user is admin
-    const { data: { user } } = await supabaseRegular.auth.getUser()
+    const { data: { user } } = await supabaseRegular.auth.getUser();
     if (!user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      return createErrorResponse('Unauthorized', 401);
     }
 
     const { data: profile } = await supabaseRegular
       .from('profiles')
       .select('user_role')
       .eq('id', user.id)
-      .single()
+      .single();
 
     if (profile?.user_role !== 'admin') {
-      return new Response(
-        JSON.stringify({ error: 'Admin access required' }),
-        { 
-          status: 403, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      return createErrorResponse('Admin access required', 403);
     }
 
     // Get all profiles with access codes
@@ -82,21 +54,15 @@ serve(async (req) => {
       .from('profiles')
       .select('id, access_code_1, access_code_2')
       .not('access_code_2', 'is', null)
-      .neq('access_code_2', '')
+      .neq('access_code_2', '');
 
     if (profilesError) {
-      console.error('Error fetching profiles:', profilesError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch profiles' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      console.error('Error fetching profiles:', profilesError);
+      return createErrorResponse('Failed to fetch profiles', 500);
     }
 
-    let updated = 0
-    let errors = 0
+    let updated = 0;
+    let errors = 0;
 
     // Update passwords for all users
     for (const profile of profiles || []) {
@@ -104,42 +70,30 @@ serve(async (req) => {
         const { error } = await supabaseAdmin.auth.admin.updateUserById(
           profile.id,
           { password: profile.access_code_2 }
-        )
+        );
 
         if (error) {
-          console.error(`Error updating password for user ${profile.id}:`, error)
-          errors++
+          console.error(`Error updating password for user ${profile.id}:`, error);
+          errors++;
         } else {
-          console.log(`Password updated for user ${profile.access_code_1}`)
-          updated++
+          console.log(`Password updated for user ${profile.access_code_1}`);
+          updated++;
         }
       } catch (error) {
-        console.error(`Exception updating password for user ${profile.id}:`, error)
-        errors++
+        console.error(`Exception updating password for user ${profile.id}:`, error);
+        errors++;
       }
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: `Updated ${updated} user passwords, ${errors} errors`,
-        updated,
-        errors
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
+    return createSuccessResponse({ 
+      success: true, 
+      message: `Updated ${updated} user passwords, ${errors} errors`,
+      updated,
+      errors
+    });
 
   } catch (error) {
-    console.error('Sync passwords error:', error)
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
+    console.error('Sync passwords error:', error);
+    return createErrorResponse(error, 500, 'sync-user-passwords');
   }
-})
+});

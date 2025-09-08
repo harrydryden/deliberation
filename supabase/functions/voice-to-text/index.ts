@@ -1,10 +1,15 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest,
+  getOpenAIKey
+} from '../shared/edge-function-utils.ts';
 
 // Process base64 in chunks to prevent memory issues
 function processBase64Chunks(base64String: string, chunkSize = 32768) {
@@ -37,16 +42,15 @@ function processBase64Chunks(base64String: string, chunkSize = 32768) {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const { audio } = await req.json();
+    const { audio } = await parseAndValidateRequest(req, ['audio']);
 
-    if (!audio) {
-      throw new Error('No audio data provided');
-    }
+    // Get OpenAI API key with caching
+    const openAIApiKey = getOpenAIKey();
 
     // Process audio in chunks
     const binaryAudio = processBase64Chunks(audio);
@@ -61,7 +65,7 @@ serve(async (req) => {
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
       },
       body: formData,
     });
@@ -73,18 +77,9 @@ serve(async (req) => {
 
     const result = await response.json();
 
-    return new Response(
-      JSON.stringify({ text: result.text }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createSuccessResponse({ text: result.text });
 
   } catch (error: any) {
-    return new Response(
-      JSON.stringify({ error: error.message || 'Unknown error' }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return createErrorResponse(error, 500, 'voice-to-text');
   }
 });

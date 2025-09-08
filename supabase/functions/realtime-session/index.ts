@@ -1,16 +1,21 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
+
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  getOpenAIKey
+} from '../shared/edge-function-utils.ts';
 
 // Supabase Edge Function: realtime-session
 // Creates an ephemeral OpenAI Realtime session token with our desired defaults
 // - Public (no JWT) so the web app can call it directly
 // - Returns full JSON from OpenAI, including client_secret.value
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 // Helper function to get voice instructions from template
 async function getVoiceInstructions(supabase: any): Promise<string> {
@@ -30,20 +35,13 @@ async function getVoiceInstructions(supabase: any): Promise<string> {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-    if (!OPENAI_API_KEY) {
-      console.error("❌ OPENAI_API_KEY is not set");
-      return new Response(JSON.stringify({ error: "OPENAI_API_KEY is not set" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Get environment variables with caching
+    const openAIApiKey = getOpenAIKey();
 
     // Optional request body for future customization
     let body: any = {};
@@ -52,10 +50,8 @@ serve(async (req) => {
     const model = body?.model || "gpt-4o-realtime-preview-2024-10-01"; // Keep realtime model as is - no GPT-5 realtime yet
     const voice = body?.voice || "alloy";
 
-    // Initialize Supabase client for template fetching
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
 
     const instructions = body?.instructions || await getVoiceInstructions(supabase);
 
@@ -112,7 +108,7 @@ serve(async (req) => {
     const resp = await fetch("https://api.openai.com/v1/realtime/sessions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${openAIApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(sessionConfig),
@@ -121,21 +117,13 @@ serve(async (req) => {
     const data = await resp.json();
     if (!resp.ok) {
       console.error("❌ Failed to create session:", data);
-      return new Response(JSON.stringify({ error: data?.error || data }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return createErrorResponse(data?.error || data, 500, 'realtime-session');
     }
 
     console.log("✅ Realtime session created", { id: data?.id, created_at: data?.created_at });
-    return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return createSuccessResponse(data);
   } catch (error: any) {
     console.error("❌ Error in realtime-session:", error?.message || error);
-    return new Response(JSON.stringify({ error: error?.message || "unknown_error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return createErrorResponse(error, 500, 'realtime-session');
   }
 });

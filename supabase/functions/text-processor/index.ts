@@ -1,10 +1,14 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest
+} from '../shared/edge-function-utils.ts';
 
 interface TextProcessingRequest {
   text: string;
@@ -24,43 +28,28 @@ interface TextProcessingResult {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const { text, fileName, deliberationId, userId }: TextProcessingRequest = await req.json();
-
-    if (!text || !fileName || !deliberationId || !userId) {
-      throw new Error('Missing required parameters');
-    }
+    const { text, fileName, deliberationId, userId } = await parseAndValidateRequest(req, ['text', 'fileName', 'deliberationId', 'userId']);
 
     // Process the text content
     const result = await processTextContent(text, fileName);
 
-    return new Response(
-      JSON.stringify(result),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return createSuccessResponse(result);
 
   } catch (error) {
     console.error('Text Processing Error:', error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        text: '',
-        wordCount: 0,
-        chunks: [],
-        keywords: []
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return createErrorResponse({
+      success: false,
+      error: error.message,
+      text: '',
+      wordCount: 0,
+      chunks: [],
+      keywords: []
+    }, 500, 'text-processor');
   }
 });
 
