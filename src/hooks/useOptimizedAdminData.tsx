@@ -89,7 +89,7 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
     execute: fetchLocalAgents
   } = useOptimizedAsync(
     async () => {
-      return await adminService.getAllAgents();
+      return await adminService.getLocalAgents();
     }
   );
 
@@ -99,7 +99,7 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
     execute: fetchAgents
   } = useOptimizedAsync(
     async () => {
-      return await adminService.getAllAgents();
+      return await adminService.getGlobalAgents();
     }
   );
 

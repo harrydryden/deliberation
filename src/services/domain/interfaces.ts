@@ -56,6 +56,8 @@ export interface IAdminService {
   getAllUsers(): Promise<User[]>;
   getAllUsersIncludingArchived(): Promise<User[]>;
   getAllAgents(): Promise<Agent[]>;
+  getLocalAgents(): Promise<Agent[]>;
+  getGlobalAgents(): Promise<Agent[]>;
   getAllDeliberations(): Promise<Deliberation[]>;
   // Access code management removed - Supabase Auth handles user creation
   // User management

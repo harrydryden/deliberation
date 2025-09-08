@@ -71,6 +71,24 @@ export class AdminService implements IAdminService {
     }
   }
 
+  async getLocalAgents(): Promise<Agent[]> {
+    try {
+      return await this.agentService.getLocalAgents();
+    } catch (error) {
+      logger.error('Admin service getLocalAgents failed', { error });
+      throw error;
+    }
+  }
+
+  async getGlobalAgents(): Promise<Agent[]> {
+    try {
+      return await this.agentService.getGlobalAgents();
+    } catch (error) {
+      logger.error('Admin service getGlobalAgents failed', { error });
+      throw error;
+    }
+  }
+
   async getAllDeliberations(): Promise<Deliberation[]> {
     // Use useDeliberationService hook directly in components instead
     throw new Error('Use useDeliberationService hook directly instead of calling getAllDeliberations');
