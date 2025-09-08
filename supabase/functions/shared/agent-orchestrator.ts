@@ -33,15 +33,15 @@ export interface ConversationContext {
   userEngagement?: any;
 }
 
-// Agent configuration cache with 5-minute TTL
+// Agent configuration cache with 15-minute TTL (increased from 5 minutes)
 interface AgentCacheEntry {
   agent: AgentConfig | null;
   timestamp: number;
 }
 
 const agentConfigCache = new Map<string, AgentCacheEntry>();
-const AGENT_CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
-const MAX_AGENT_CACHE_SIZE = 100;
+const AGENT_CACHE_DURATION = 1000 * 60 * 15; // 15 minutes (increased from 5)
+const MAX_AGENT_CACHE_SIZE = 200; // Increased cache size
 
 export class AgentOrchestrator {
   private supabase: any;
@@ -356,16 +356,18 @@ export class AgentOrchestrator {
     return selectedAgent;
   }
 
-  // UNIFIED MESSAGE ANALYSIS
+  // UNIFIED MESSAGE ANALYSIS with enhanced timeout and retry logic
   async analyzeMessage(content: string, openAIApiKey: string): Promise<AnalysisResult> {
-    const maxRetries = 3;
+    const maxRetries = 2; // Reduced retries from 3 to 2 for faster response
+    const timeoutMs = 8000; // 8 second timeout per attempt
     let lastError: any = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`🔍 Message analysis attempt ${attempt}/${maxRetries} for content: "${content.substring(0, 100)}..."`);
 
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        // Add timeout wrapper for each attempt
+        const analysisPromise = fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${openAIApiKey}`,
@@ -383,10 +385,18 @@ export class AgentOrchestrator {
                 content: content.trim()
               }
             ],
-            max_completion_tokens: 200,
+            max_completion_tokens: 150, // Reduced from 200 for faster response
             response_format: { type: "json_object" }
           }),
         });
+
+        // Apply timeout to the entire request
+        const response = await Promise.race([
+          analysisPromise,
+          new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error(`Analysis timeout after ${timeoutMs}ms`)), timeoutMs)
+          )
+        ]);
 
         console.log(`📡 OpenAI API response status: ${response.status}`);
 
@@ -430,8 +440,9 @@ export class AgentOrchestrator {
         console.error(`❌ Message analysis attempt ${attempt} failed:`, error);
         
         if (attempt < maxRetries) {
-          console.log(`🔄 Retrying in ${attempt * 1000}ms...`);
-          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+          const delay = attempt * 500; // Reduced delay from 1000ms to 500ms
+          console.log(`🔄 Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
     }

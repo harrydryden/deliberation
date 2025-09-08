@@ -29,6 +29,7 @@ export const useResponseStreaming = () => {
   const accumulatorRef = useRef<string>('');
   const rafIdRef = useRef<number | null>(null);
 
+  // Enhanced timeout detection in streaming state management
   const startStreaming = useCallback(async (
     messageId: string,
     deliberationId: string,
@@ -60,14 +61,48 @@ export const useResponseStreaming = () => {
 
     streamControllerRef.current = new AbortController();
     
-    // Add timeout for streaming operations to prevent hanging
+    // Enhanced timeout with progressive timeouts for different scenarios
+    const STREAMING_TIMEOUT = 30000; // 30 seconds as requested
+    const HEARTBEAT_INTERVAL = 5000; // 5 second heartbeat checks
+    
+    let lastActivity = Date.now();
+    let heartbeatCount = 0;
+    
     const timeoutId = setTimeout(() => {
-      console.log('⏰ Streaming timeout reached, aborting...');
+      console.log('⏰ Main streaming timeout reached (30s), aborting...');
       if (streamControllerRef.current) {
         streamControllerRef.current.abort();
       }
-      onError('Streaming request timed out');
-    }, 60000); // 60 second timeout
+      // CRITICAL FIX: Clear streaming state on timeout
+      setStreamingState({
+        isStreaming: false,
+        currentMessage: '',
+        messageId: null,
+        agentType: null,
+      });
+      onError('Request timed out after 30 seconds. The server may be experiencing delays.');
+    }, STREAMING_TIMEOUT);
+    
+    // Heartbeat monitoring to detect stalled connections
+    const heartbeatId = setInterval(() => {
+      const timeSinceActivity = Date.now() - lastActivity;
+      heartbeatCount++;
+      
+      if (timeSinceActivity > 15000) { // 15 seconds without activity
+        console.log(`💓 Heartbeat ${heartbeatCount}: No activity for ${timeSinceActivity}ms, checking connection...`);
+        
+        if (timeSinceActivity > 25000) { // 25 seconds = nearly timeout
+          console.warn('💔 Connection appears stalled, preparing for timeout...');
+          // Pre-emptively clear state to prevent hanging UI
+          setStreamingState(prev => ({
+            ...prev,
+            isStreaming: false
+          }));
+        }
+      } else {
+        console.log(`💓 Heartbeat ${heartbeatCount}: Active (${timeSinceActivity}ms since last activity)`);
+      }
+    }, HEARTBEAT_INTERVAL);
 
     try {
       console.log('🔍 Checking if streaming is already in progress...');
@@ -179,6 +214,7 @@ export const useResponseStreaming = () => {
 
         try {
           const chunk = decoder.decode(value, { stream: true });
+          lastActivity = Date.now(); // Update activity timestamp
           console.log('📦 Received chunk:', chunk.substring(0, 100) + '...');
 
           // Parse each line as a potential JSON object
@@ -201,6 +237,7 @@ export const useResponseStreaming = () => {
                 
                 if (parsed.content) {
                   accumulatorRef.current += parsed.content;
+                  lastActivity = Date.now(); // Update activity timestamp
                   
                   // Update agent type if provided
                   if (parsed.agentType && !streamingState.agentType) {
@@ -267,11 +304,16 @@ export const useResponseStreaming = () => {
       
       onError(errorMessage);
     } finally {
-      // Clear timeout to prevent memory leaks
+      // Enhanced cleanup to prevent hanging UI
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
       
+      if (heartbeatId) {
+        clearInterval(heartbeatId);
+      }
+      
+      // CRITICAL FIX: Always reset streaming state in finally block
       setStreamingState({
         isStreaming: false,
         currentMessage: '',
@@ -286,6 +328,8 @@ export const useResponseStreaming = () => {
       
       streamControllerRef.current = null;
       accumulatorRef.current = '';
+      
+      console.log('🧹 Streaming cleanup completed');
     }
   }, [streamingState.agentType, streamingState.isStreaming, streamingState.messageId]);
 

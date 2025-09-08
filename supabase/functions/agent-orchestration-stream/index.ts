@@ -17,6 +17,12 @@ import {
 import { responseCache, configCache, createCacheKey } from '../shared/cache-manager.ts';
 import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
+import { 
+  withTimeout, 
+  executeTieredOperations, 
+  DEFAULT_TIMEOUTS, 
+  OptimizedCache 
+} from '../shared/performance-optimizer.ts';
 
 // Re-export types from shared orchestrator
 import type { AgentConfig, AnalysisResult, ConversationContext } from '../shared/agent-orchestrator.ts';
@@ -166,27 +172,46 @@ async function generateFastResponse(
   }
 }
 
-// Helper function to get conversation state
+// Enhanced conversation state cache
+const conversationStateCache = new OptimizedCache<ConversationContext>(100, 300000); // 5 minutes
+
+// Optimized helper function to get conversation state with caching
 async function getConversationState(supabase: any, deliberationId: string, userId: string): Promise<ConversationContext> {
+  const cacheKey = `conv_state:${deliberationId}`;
+  
+  // Check cache first
+  const cached = conversationStateCache.get(cacheKey);
+  if (cached) {
+    console.log('🚀 Conversation state cache hit');
+    return cached;
+  }
+  
   try {
     const { data: recentMessages } = await supabase
       .from('messages')
       .select('message_type, created_at')
       .eq('deliberation_id', deliberationId)
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(10); // Reduced from 20 to 10 for faster queries
 
     const messageCount = recentMessages?.length || 0;
     const recentTypes = recentMessages?.map(m => m.message_type) || [];
     
-    return {
+    const result = {
       messageCount,
       recentAgentTypes: recentTypes,
       lastAgentType: recentTypes.find(t => t !== 'user') || null
     };
+    
+    // Cache the result
+    conversationStateCache.set(cacheKey, result);
+    
+    return result;
   } catch (error) {
     console.error('Error getting conversation state:', error);
-    return { messageCount: 0, recentAgentTypes: [], lastAgentType: null };
+    const fallback = { messageCount: 0, recentAgentTypes: [], lastAgentType: null };
+    conversationStateCache.set(cacheKey, fallback); // Cache fallback to prevent repeated failures
+    return fallback;
   }
 }
 
@@ -201,17 +226,33 @@ async function findSimilarNodes(supabase: any, content: string): Promise<any[]> 
   }
 }
 
-// Helper function to check available knowledge
+// Enhanced knowledge availability cache
+const knowledgeAvailabilityCache = new OptimizedCache<boolean>(50, 900000); // 15 minutes
+
+// Optimized helper function to check available knowledge with caching
 async function checkAvailableKnowledge(supabase: any, deliberationId: string): Promise<boolean> {
+  const cacheKey = `knowledge_avail:${deliberationId}`;
+  
+  // Check cache first
+  const cached = knowledgeAvailabilityCache.get(cacheKey);
+  if (cached !== null) {
+    console.log('🚀 Knowledge availability cache hit');
+    return cached;
+  }
+  
   try {
     const { data } = await supabase
       .from('agent_knowledge')
       .select('id')
       .limit(1);
     
-    return !!(data && data.length > 0);
+    const result = !!(data && data.length > 0);
+    knowledgeAvailabilityCache.set(cacheKey, result);
+    
+    return result;
   } catch (error) {
     console.error('Error checking available knowledge:', error);
+    knowledgeAvailabilityCache.set(cacheKey, false); // Cache failure result
     return false;
   }
 }
@@ -922,42 +963,79 @@ async function processStreamingOrchestration(
       similarNodes = [];
       availableKnowledge = false;
     } else {
-      console.log('🧠 Performing enhanced analysis');
+      console.log('🧠 Performing enhanced tiered analysis with timeouts');
       
-      // Parallel execution for better performance
-      const [analysisResult, conversationResult, similarNodesResult, knowledgeResult] = await Promise.all([
-        orchestrator.analyzeMessage(message.content, deliberationId).catch(e => {
-          console.warn('Analysis failed:', e.message);
-          return { intent: 'general', complexity: 0.5, requiresExpertise: false };
-        }),
-        getConversationState(serviceSupabase, deliberationId, message.user_id).catch(e => {
-          console.warn('Conversation state failed:', e.message);
-          return { messageCount: 1, recentAgentTypes: [], lastAgentType: null };
-        }),
-        findSimilarNodes(serviceSupabase, message.content).catch(e => {
-          console.warn('Similar nodes failed:', e.message);
-          return [];
-        }),
-        checkAvailableKnowledge(serviceSupabase, deliberationId).catch(e => {
-          console.warn('Knowledge check failed:', e.message);
-          return false;
-        })
-      ]);
+      // Enhanced tiered parallel processing with progressive timeouts
+      const tieredResults = await executeTieredOperations({
+        critical: [
+          {
+            name: 'message_analysis',
+            fn: () => orchestrator.analyzeMessage(message.content, openAIApiKey),
+            fallback: { intent: 'general', complexity: 0.5, topicRelevance: 0.5, requiresExpertise: false }
+          },
+          {
+            name: 'conversation_state',
+            fn: () => getConversationState(serviceSupabase, deliberationId, message.user_id),
+            fallback: { messageCount: 1, recentAgentTypes: [], lastAgentType: null }
+          }
+        ],
+        secondary: [
+          {
+            name: 'knowledge_availability',
+            fn: () => checkAvailableKnowledge(serviceSupabase, deliberationId),
+            fallback: false
+          }
+        ],
+        optional: [
+          {
+            name: 'similar_nodes',
+            fn: () => findSimilarNodes(serviceSupabase, message.content),
+            fallback: []
+          }
+        ]
+      }, DEFAULT_TIMEOUTS);
       
-      analysis = analysisResult;
-      conversationState = conversationResult;
-      similarNodes = similarNodesResult;
-      availableKnowledge = knowledgeResult;
-    }
-
-    // Enhanced agent selection with performance optimizations
-    try {
-      const selectedAgent = await orchestrator.selectOptimalAgent(
+      console.log(`📊 Tiered analysis completed in ${tieredResults.totalTime}ms`);
+      
+      // Extract results with fallbacks
+      analysis = tieredResults.critical.message_analysis || { 
+        intent: 'general', 
+        complexity: 0.5, 
+        topicRelevance: 0.5, 
+        requiresExpertise: false 
+      };
+      conversationState = tieredResults.critical.conversation_state || { 
+        messageCount: 1, 
+        recentAgentTypes: [], 
+        lastAgentType: null 
+      };
+      availableKnowledge = tieredResults.secondary.knowledge_availability || false;
+      similarNodes = tieredResults.optional.similar_nodes || [];
+      
+      console.log('✅ Enhanced analysis results:', {
         analysis,
         conversationState,
-        deliberationId,
-        availableKnowledge
-      );
+        availableKnowledge,
+        similarNodesCount: similarNodes.length,
+        totalProcessingTime: tieredResults.totalTime
+      });
+    }
+
+    // Enhanced agent selection with 20-second total timeout protection
+    try {
+      const selectedAgent = await withTimeout(
+        orchestrator.selectOptimalAgent(
+          analysis,
+          conversationState,
+          deliberationId,
+          availableKnowledge
+        ),
+        8000, // 8 seconds for agent selection
+        'Agent Selection'
+      ).catch(error => {
+        console.warn('⏰ Agent selection timed out, using flow_agent fallback:', error);
+        return 'flow_agent'; // Safe fallback
+      });
 
       console.log(`🤖 Selected agent: ${selectedAgent}`);
       sendData({ agentType: selectedAgent, content: '', done: false });
