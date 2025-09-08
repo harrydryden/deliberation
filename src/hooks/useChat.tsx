@@ -125,14 +125,22 @@ export const useChat = (deliberationId?: string) => {
         };
 
         setChatState(prev => {
-          // Avoid duplicates
-          if (prev.messages.some(msg => msg.id === chatMessage.id)) {
-            logger.info('🔄 Duplicate message ignored', { messageId: chatMessage.id });
+          // CRITICAL FIX: Better duplicate detection for queue/realtime coordination
+          const existingMessage = prev.messages.find(msg => msg.id === chatMessage.id);
+          const existingStreaming = prev.messages.find(msg => msg.id.startsWith(`streaming-${message.id}`));
+          const existingFinal = prev.messages.find(msg => msg.id.startsWith(`${message.id}-final`));
+          
+          if (existingMessage || existingStreaming || existingFinal) {
+            logger.debug('🔄 Realtime duplicate ignored', { 
+              messageId: chatMessage.id,
+              hasExisting: !!existingMessage,
+              hasStreaming: !!existingStreaming,
+              hasFinal: !!existingFinal
+            });
             return prev;
           }
           
-          // F002 Fix: Filter out messages scheduled for cleanup - simplified approach
-          logger.info('➕ Adding realtime message', { messageId: chatMessage.id });
+          logger.info('➕ Adding realtime message', { messageId: chatMessage.id, type: chatMessage.message_type });
           return {
             ...prev,
             messages: [...prev.messages, chatMessage]
@@ -199,25 +207,22 @@ export const useChat = (deliberationId?: string) => {
 
     const { id: queueId, content, parentMessageId } = queuedMessage;
     
-    console.log('🔧 DEBUG: Starting processQueuedMessage', { 
+    logger.debug('🔧 DEBUG: Starting processQueuedMessage', { 
       queueId, 
       content: content.substring(0, 50),
       timestamp: new Date().toISOString(),
       hasUser: !!user,
-      hasDeliberationId: !!deliberationId
-    });
-    
-    logger.debug('Starting to process queued message', { 
-      queueId, 
-      content: content.substring(0, 50),
-      timestamp: new Date().toISOString()
+      hasDeliberationId: !!deliberationId,
+      queueLength: messageQueue.queue.length,
+      processingCount: messageQueue.processing.size
     });
     
     try {
-      // Update status to processing ONLY when we actually start processing
+      // CRITICAL FIX: Update status to processing ONLY when we actually start processing
+      logger.debug('📋 Marking message as processing', { queueId });
       messageQueue.updateMessageStatus(queueId, 'processing');
       
-      logger.debug('Sending message to service', { queueId });
+      logger.debug('📤 Sending message to service', { queueId });
       
       // Clear cache when sending new messages
       cacheService.clearNamespace('chat-history');
@@ -230,7 +235,7 @@ export const useChat = (deliberationId?: string) => {
         user?.id
       );
       
-      logger.debug('Message saved to database', { 
+      logger.debug('✅ Message saved to database', { 
         queueId, 
         savedMessageId: saved.id,
         timestamp: new Date().toISOString()
@@ -261,7 +266,7 @@ export const useChat = (deliberationId?: string) => {
       });
 
       // Start streaming the agent response
-      logger.debug('About to start streaming agent response for queued message', { 
+      logger.debug('🚀 About to start streaming agent response', { 
         messageId: saved.id,
         queueId,
         deliberationId, 
