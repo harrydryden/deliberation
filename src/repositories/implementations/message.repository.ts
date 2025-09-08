@@ -171,29 +171,38 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
         submitted_to_ibis: data.submitted_to_ibis || false
       };
 
-      // Check for potential duplicates to prevent race conditions
+      // Check for potential duplicates to prevent race conditions (within 2 seconds only)
       if (dbData.deliberation_id) {
         const { data: recentMessages } = await supabase
           .from('messages')
           .select('id, content, created_at')
           .eq('user_id', dbData.user_id)
           .eq('deliberation_id', dbData.deliberation_id)
-          .gte('created_at', new Date(Date.now() - 5000).toISOString()) // Last 5 seconds
+          .gte('created_at', new Date(Date.now() - 2000).toISOString()) // Reduced from 5s to 2s
           .order('created_at', { ascending: false })
-          .limit(3);
+          .limit(2); // Reduced from 3 to 2
 
-        // Check for exact duplicate
-        const exactDuplicate = recentMessages?.find(msg => 
-          msg.content.trim() === sanitizedContent.trim()
-        );
+        // CRITICAL FIX: Only check for duplicates of longer messages to avoid blocking short responses
+        if (sanitizedContent.length > 10) {
+          const exactDuplicate = recentMessages?.find(msg => 
+            msg.content.trim() === sanitizedContent.trim()
+          );
 
-        if (exactDuplicate) {
-          logger.warn('Duplicate message detected', { 
-            messageId: exactDuplicate.id, 
-            userId: dbData.user_id,
-            deliberationId: dbData.deliberation_id 
+          if (exactDuplicate) {
+            logger.warn('Duplicate message detected', { 
+              messageId: exactDuplicate.id, 
+              userId: dbData.user_id,
+              deliberationId: dbData.deliberation_id,
+              content: sanitizedContent.substring(0, 50),
+              timeWindow: '2s'
+            });
+            throw new Error('Duplicate message detected - message not created');
+          }
+        } else {
+          logger.debug('Skipping duplicate check for short message', { 
+            contentLength: sanitizedContent.length,
+            content: sanitizedContent
           });
-          throw new Error('Duplicate message detected - message not created');
         }
       }
 
