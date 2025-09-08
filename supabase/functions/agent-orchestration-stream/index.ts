@@ -584,8 +584,8 @@ serve(async (req) => {
   }
 
   try {
-    // Use cached environment validation for better cold start performance  
-    const { supabaseUrl, supabaseServiceKey, openaiApiKey } = getCachedEnvironment();
+    // Revert to original working environment validation
+    const { supabase, userSupabase } = validateAndGetEnvironment();
     
     // Get authorization header for user authentication
     const authHeader = req.headers.get('authorization');
@@ -645,10 +645,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Streaming orchestration error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    // Ensure proper error response with status details
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return createErrorResponse(error, 500, 'agent-orchestration-stream');
   }
 });
 
