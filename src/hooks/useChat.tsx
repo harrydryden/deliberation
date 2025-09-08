@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useResponseStreaming } from '@/hooks/useResponseStreaming';
 import { cacheService } from '@/services/cache.service';
 import { useOptimizedMessageCleanup } from '@/hooks/useOptimizedMessageCleanup';
+import { useMessageQueue } from '@/hooks/useMessageQueue';
 
 export const useChat = (deliberationId?: string) => {
   const { user, isLoading: authLoading } = useSupabaseAuth();
@@ -43,6 +44,9 @@ export const useChat = (deliberationId?: string) => {
     cancelCleanup, 
     cancelAllCleanups
   } = useOptimizedMessageCleanup();
+
+  // Initialize message queue with max 5 concurrent messages
+  const messageQueue = useMessageQueue(5);
 
   // Memoize services to prevent recreating instances
   const services = useMemo(() => ({
@@ -169,184 +173,174 @@ export const useChat = (deliberationId?: string) => {
   }, [stableToast, setUiState]);
 
 
-  const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
-    if (!user || !content.trim()) return;
+  // Process queued messages automatically
+  const processQueuedMessage = useCallback(async (queuedMessage: any) => {
+    if (!user || !deliberationId) return;
 
-    const tempId = `temp-${crypto.randomUUID()}`;
-    const optimistic: ChatMessage = {
-      id: tempId,
-      local_id: tempId,
-      content: content.trim(),
-      message_type: 'user',
-      created_at: new Date().toISOString(),
-      user_id: user?.id,
-      status: 'pending',
-    };
-
-    // Optimistic append
-    setChatState(prev => ({
-      ...prev,
-      messages: [...prev.messages, optimistic]
-    }));
-    setUiState(prev => ({ ...prev, isTyping: true }));
-
+    const { id: queueId, content, parentMessageId } = queuedMessage;
+    
     try {
-      // const timer = performanceMonitor.startTimer('sendMessage');
+      messageQueue.updateMessageStatus(queueId, 'processing');
       
       // Clear relevant caches when sending new messages
       cacheService.clearNamespace('chat-history');
       
-      const saved = await services.messageService.sendMessage(content.trim(), 'user', deliberationId, mode, user?.id);
+      const saved = await services.messageService.sendMessage(
+        content.trim(), 
+        'user', 
+        deliberationId, 
+        'chat', 
+        user?.id
+      );
+      
       const savedChat = convertApiMessageToChatMessage(saved);
-      // timer();
-      logger.api.response('POST', '/messages', 200, { deliberationId, mode, contentLength: content.length });
-
-      // Replace optimistic with saved
+      
+      // Add user message to chat with parent_message_id if specified
+      const userMessage: ChatMessage = {
+        ...savedChat,
+        status: 'sent',
+        parent_message_id: parentMessageId
+      };
+      
       setChatState(prev => ({
         ...prev,
-        messages: prev.messages.map(m => (m.id === tempId ? { ...savedChat, status: 'sent' } : m))
+        messages: [...prev.messages, userMessage]
       }));
 
+      logger.api.response('POST', '/messages', 200, { 
+        deliberationId, 
+        mode: 'chat', 
+        contentLength: content.length,
+        queueId,
+        parentMessageId
+      });
+
       // Start streaming the agent response
-      console.log('🚀 About to start streaming agent response', { 
-        messageId: saved.id, 
+      console.log('🚀 About to start streaming agent response for queued message', { 
+        messageId: saved.id,
+        queueId,
         deliberationId, 
         hasStartStreamingFn: !!startStreaming 
       });
       
-      if (deliberationId) {
-        console.log('✅ Deliberation ID present, initiating streaming...');
-        try {
-          await startStreaming(
-            saved.id,
-            deliberationId,
-            // onUpdate callback - update streaming message in real-time
-            (streamContent: string, messageId: string, agentType: string | null) => {
-              console.log('🔄 Streaming update received', { 
-                messageId, 
-                contentLength: streamContent?.length || 0, 
-                agentType,
-                contentPreview: streamContent?.substring(0, 50) || '[empty]'
-              });
-            // Only create streaming UI messages when we have actual content to show
-            if (!streamContent.trim()) {
-              return;
-            }
-            
-            const streamingMessage: ChatMessage = {
-              id: `streaming-${saved.id}`,
-              content: streamContent,
-              message_type: agentType as ChatMessage['message_type'],
-              created_at: new Date().toISOString(),
-              user_id: 'agent',
-              status: 'streaming',
-              agent_context: { agentType }
-            };
+      await startStreaming(
+        saved.id,
+        deliberationId,
+        // onUpdate callback
+        (streamContent: string, messageId: string, agentType: string | null) => {
+          if (!streamContent.trim()) return;
+          
+          const streamingMessage: ChatMessage = {
+            id: `streaming-${saved.id}`,
+            content: streamContent,
+            message_type: agentType as ChatMessage['message_type'],
+            created_at: new Date().toISOString(),
+            user_id: 'agent',
+            status: 'streaming',
+            agent_context: { agentType },
+            parent_message_id: saved.id // Agent response is child of user message
+          };
 
-            setChatState(prev => {
-              const existingStreamingIndex = prev.messages.findIndex(m => m.id === `streaming-${saved.id}`);
-              if (existingStreamingIndex >= 0) {
-                // Update existing streaming message
-                return {
-                  ...prev,
-                  messages: prev.messages.map((msg, index) => 
-                    index === existingStreamingIndex ? streamingMessage : msg
-                  )
-                };
-              } else {
-                // Only add streaming message when we have actual content
-                return {
-                  ...prev,
-                  messages: [...prev.messages, streamingMessage]
-                };
-              }
-            });
-          },
-          // onComplete callback - replace with final message
-          async (finalContent: string, messageId: string, agentType: string | null) => {
-            console.log('✅ Streaming completed', { 
-              messageId, 
-              finalContentLength: finalContent?.length || 0, 
-              agentType,
-              contentPreview: finalContent?.substring(0, 50) || '[empty]'
-            });
-            // Don't create messages with empty content
-            if (!finalContent.trim()) {
-              setChatState(prev => ({ ...prev, isTyping: false }));
-              return;
+          setChatState(prev => {
+            const existingStreamingIndex = prev.messages.findIndex(m => m.id === `streaming-${saved.id}`);
+            if (existingStreamingIndex >= 0) {
+              return {
+                ...prev,
+                messages: prev.messages.map((msg, index) => 
+                  index === existingStreamingIndex ? streamingMessage : msg
+                )
+              };
+            } else {
+              return {
+                ...prev,
+                messages: [...prev.messages, streamingMessage]
+              };
             }
-            
-            try {
-              // Replace streaming placeholder with final agent message locally to avoid full reload
-            const finalMessage: ChatMessage = {
-              id: `${saved.id}-final` as string,
-              content: finalContent,
-              message_type: (agentType || 'agent') as ChatMessage['message_type'],
-              created_at: new Date().toISOString(),
-              user_id: 'agent',
-              status: 'sent',
-              agent_context: { agentType: agentType || 'agent' }
-            };
-
-              setChatState(prev => {
-                const withoutStreaming = prev.messages.filter(m => m.id !== `streaming-${saved.id}`);
-                return {
-                  ...prev,
-                  messages: [...withoutStreaming, finalMessage],
-                  isTyping: false
-                };
-              });
-            } catch (error) {
-              logger.error('Error applying final message', { error });
-              setUiState(prev => ({ ...prev, isTyping: false }));
-            }
-          },
-          // onError callback
-          (error: string) => {
-            console.error('❌ Streaming error occurred', { error });
-            logger.error('Streaming error', { error });
-            // Clean up any streaming messages on error
-            setChatState(prev => ({
-              ...prev,
-              messages: prev.messages.filter(m => m.id !== `streaming-${saved.id}` && !m.id.startsWith('streaming-'))
-            }));
-            setUiState(prev => ({ ...prev, isTyping: false }));
-            stableToast({
-              title: "Response Error",
-              description: "Failed to get agent response. Please try again.",
-              variant: "destructive"
-            });
+          });
+        },
+        // onComplete callback
+        async (finalContent: string, messageId: string, agentType: string | null) => {
+          if (!finalContent.trim()) {
+            messageQueue.updateMessageStatus(queueId, 'failed', 'Empty agent response');
+            return;
           }
-        );
-        console.log('🎯 Streaming initiated successfully');
-      } catch (streamingError) {
-        console.error('❌ Failed to start streaming', { streamingError });
-        setUiState(prev => ({ ...prev, isTyping: false }));
-        stableToast({
-          title: "Streaming Error",
-          description: "Failed to start agent response streaming. Please try again.",
-          variant: "destructive"
-        });
-      }
-      } else {
-        console.warn('⚠️ No deliberation ID, skipping streaming');
-        setUiState(prev => ({ ...prev, isTyping: false }));
-      }
+          
+          const finalMessage: ChatMessage = {
+            id: `${saved.id}-final`,
+            content: finalContent,
+            message_type: (agentType || 'agent') as ChatMessage['message_type'],
+            created_at: new Date().toISOString(),
+            user_id: 'agent',
+            status: 'sent',
+            agent_context: { agentType: agentType || 'agent' },
+            parent_message_id: saved.id // Agent response is child of user message
+          };
 
+          setChatState(prev => {
+            const withoutStreaming = prev.messages.filter(m => m.id !== `streaming-${saved.id}`);
+            return {
+              ...prev,
+              messages: [...withoutStreaming, finalMessage]
+            };
+          });
+          
+          messageQueue.updateMessageStatus(queueId, 'completed');
+        },
+        // onError callback
+        (error: string) => {
+          console.error('❌ Streaming error occurred for queued message', { error, queueId });
+          setChatState(prev => ({
+            ...prev,
+            messages: prev.messages.filter(m => m.id !== `streaming-${saved.id}` && !m.id.startsWith('streaming-'))
+          }));
+          messageQueue.updateMessageStatus(queueId, 'failed', error);
+        }
+      );
+      
     } catch (error) {
       const errMsg = getErrorMessage(error);
-      setChatState(prev => ({
-        ...prev,
-        messages: prev.messages.map(m => (m.id === tempId ? { ...m, status: 'failed', error: errMsg } : m))
-      }));
-      setUiState(prev => ({ ...prev, isTyping: false }));
-      
-      // F002 Fix: Use optimized cleanup instead of setTimeout
-      scheduleFailedMessageCleanup(tempId, (updater) => setChatState(prev => ({ ...prev, messages: updater(prev.messages) })), 30000);
-      
-      throw error;
+      messageQueue.updateMessageStatus(queueId, 'failed', errMsg);
+      logger.error('Failed to process queued message', { error: errMsg, queueId });
     }
-  }, [user, deliberationId, setChatState, services.messageService, startStreaming, stableToast]);
+  }, [user, deliberationId, services.messageService, startStreaming, setChatState, messageQueue]);
+
+  // Auto-process queue when messages are available
+  useEffect(() => {
+    const processNext = async () => {
+      const nextMessage = messageQueue.getNextQueuedMessage();
+      if (nextMessage && user && deliberationId) {
+        await processQueuedMessage(nextMessage);
+      }
+    };
+
+    // Check for next message every 500ms when queue has items
+    const queueStats = messageQueue.getQueueStats();
+    if (queueStats.queued > 0 && queueStats.canProcess) {
+      const timer = setTimeout(processNext, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [messageQueue, processQueuedMessage, user, deliberationId]);
+
+  const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
+    if (!user || !content.trim()) return;
+
+    // Add message to queue instead of processing immediately
+    const queueId = messageQueue.addToQueue(content.trim());
+    
+    logger.info('📤 Message queued for processing', { 
+      queueId, 
+      content: content.substring(0, 50),
+      queueStats: messageQueue.getQueueStats()
+    });
+
+    // Show immediate feedback that message was queued
+    stableToast({
+      title: "Message Queued",
+      description: `Your message has been added to the queue (position ${messageQueue.getQueueStats().total}).`,
+      variant: "default"
+    });
+
+  }, [user, messageQueue, stableToast]);
 
   const retryMessage = useCallback(async (id: string) => {
     const target = chatState.messages.find(m => m.id === id);
@@ -382,6 +376,14 @@ export const useChat = (deliberationId?: string) => {
     loadChatHistory: stableLoadChatHistory,
     retryMessage,
     streamingState,
-    stopStreaming
+    stopStreaming,
+    // Message queue functionality
+    messageQueue: {
+      queue: messageQueue.queue,
+      stats: messageQueue.getQueueStats(),
+      retryMessage: messageQueue.retryMessage,
+      removeMessage: messageQueue.removeFromQueue,
+      clearQueue: messageQueue.clearQueue
+    }
   };
 };

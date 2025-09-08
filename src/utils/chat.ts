@@ -10,6 +10,7 @@ export function convertApiMessageToChatMessage(apiMessage: any): ChatMessage {
     user_id: apiMessage.user_id || apiMessage.userId,
     agent_context: apiMessage.agent_context,
     submitted_to_ibis: apiMessage.submitted_to_ibis || false,
+    parent_message_id: apiMessage.parent_message_id || apiMessage.parentMessageId,
   };
 }
 
@@ -19,7 +20,8 @@ export function convertChatMessageToApiMessage(chatMessage: Partial<ChatMessage>
     message_type: chatMessage.message_type,
     user_id: chatMessage.user_id,
     deliberation_id: chatMessage.deliberation_id,
-    submitted_to_ibis: chatMessage.submitted_to_ibis
+    submitted_to_ibis: chatMessage.submitted_to_ibis,
+    parent_message_id: chatMessage.parent_message_id
   };
 }
 

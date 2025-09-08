@@ -13,6 +13,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { OptimizedMessageList } from "@/components/chat/OptimizedMessageList";
+import { MessageQueueIndicator } from "@/components/chat/MessageQueueIndicator";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useOptimizedDeliberationService } from "@/hooks/useOptimizedDeliberationService";
 import { useServices } from "@/hooks/useServices";
@@ -88,7 +89,8 @@ const OptimizedDeliberationChat = () => {
     isTyping,
     sendMessage: originalSendMessage,
     loadChatHistory,
-    retryMessage
+    retryMessage,
+    messageQueue
   } = useChat(deliberationId);
 
 
@@ -257,6 +259,18 @@ const OptimizedDeliberationChat = () => {
   const ChatPanel = useCallback(() => (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-hidden min-h-0">
+        {/* Message Queue Indicator */}
+        {messageQueue && messageQueue.queue.length > 0 && (
+          <div className="p-3 pb-0">
+            <MessageQueueIndicator
+              queuedMessages={messageQueue.queue}
+              processingCount={messageQueue.stats.processing}
+              onRetryMessage={messageQueue.retryMessage}
+              onRemoveMessage={messageQueue.removeMessage}
+            />
+          </div>
+        )}
+        
         <OptimizedMessageList 
           messages={messages} 
           isLoading={chatLoading} 
@@ -269,7 +283,7 @@ const OptimizedDeliberationChat = () => {
       </div>
       <MessageInput ref={messageInputRef} onSendMessage={sendMessage} disabled={chatLoading} />
     </div>
-  ), [messages, chatLoading, isTyping, handleAddToIbis, retryMessage, deliberationId, state.agentConfigs, sendMessage]);
+  ), [messages, chatLoading, isTyping, handleAddToIbis, retryMessage, deliberationId, state.agentConfigs, sendMessage, messageQueue]);
 
   if (isLoading || state.loading) {
     return (

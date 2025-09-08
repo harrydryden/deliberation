@@ -108,6 +108,7 @@ export interface ChatMessage {
   deliberation_id?: string;
   agent_context?: any;
   submitted_to_ibis?: boolean;
+  parent_message_id?: string;
   // Client-only transient fields for UX
   status?: 'pending' | 'failed' | 'sent' | 'streaming';
   error?: string;
@@ -221,6 +222,7 @@ export interface Message {
   user_id?: string;
   deliberation_id?: string;
   submitted_to_ibis?: boolean;
+  parent_message_id?: string;
   created_at: string;
   updated_at: string;
   status?: 'sent' | 'pending' | 'failed';

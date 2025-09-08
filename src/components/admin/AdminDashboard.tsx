@@ -11,7 +11,7 @@ import { KnowledgeManagement } from './KnowledgeManagement';
 import { SystemStats } from './SystemStats';
 import { PromptManagement } from './PromptManagement';
 import { AgentRatingDashboard } from './AgentRatingDashboard';
-import { BulkMessageImport } from './BulkMessageImport';
+
 
 // Import optimized components and hooks
 import { AdminHeader } from './components/AdminHeader';
@@ -110,9 +110,6 @@ export const AdminDashboard = () => {
             <AgentRatingDashboard />
           </AdminTabContent>
 
-          <AdminTabContent value="bulk-import">
-            <BulkMessageImport />
-          </AdminTabContent>
         </Tabs>
       </div>
     </AdminErrorBoundary>

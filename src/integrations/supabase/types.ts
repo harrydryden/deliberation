@@ -243,65 +243,6 @@ export type Database = {
         }
         Relationships: []
       }
-      bulk_import_batches: {
-        Row: {
-          created_at: string | null
-          created_by: string
-          deliberation_id: string
-          error_details: Json | null
-          failed_messages: number
-          filename: string
-          id: string
-          import_status: string
-          imported_messages: number
-          processed_messages: number
-          processing_log: Json | null
-          processing_status: string
-          total_messages: number
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by: string
-          deliberation_id: string
-          error_details?: Json | null
-          failed_messages?: number
-          filename: string
-          id?: string
-          import_status?: string
-          imported_messages?: number
-          processed_messages?: number
-          processing_log?: Json | null
-          processing_status?: string
-          total_messages?: number
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string
-          deliberation_id?: string
-          error_details?: Json | null
-          failed_messages?: number
-          filename?: string
-          id?: string
-          import_status?: string
-          imported_messages?: number
-          processed_messages?: number
-          processing_log?: Json | null
-          processing_status?: string
-          total_messages?: number
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bulk_import_batches_deliberation_id_fkey"
-            columns: ["deliberation_id"]
-            isOneToOne: false
-            referencedRelation: "deliberations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       deliberations: {
         Row: {
           created_at: string | null
@@ -601,7 +542,6 @@ export type Database = {
       messages: {
         Row: {
           agent_context: Json | null
-          bulk_import_status: string | null
           content: string
           created_at: string | null
           deliberation_id: string | null
@@ -614,7 +554,6 @@ export type Database = {
         }
         Insert: {
           agent_context?: Json | null
-          bulk_import_status?: string | null
           content: string
           created_at?: string | null
           deliberation_id?: string | null
@@ -627,7 +566,6 @@ export type Database = {
         }
         Update: {
           agent_context?: Json | null
-          bulk_import_status?: string | null
           content?: string
           created_at?: string | null
           deliberation_id?: string | null
