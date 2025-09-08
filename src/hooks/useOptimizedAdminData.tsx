@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useOptimizedAsync } from './useOptimizedAsync';
 import { serviceContainer } from '@/services/domain/container';
 import { supabase } from '@/integrations/supabase/client';
@@ -62,15 +62,17 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
     }
   );
 
-  // Handle users error
-  if (usersError) {
-    logger.error('Failed to fetch users', usersError);
-    toast({
-      title: "Error",
-      description: "Failed to fetch users",
-      variant: "destructive"
-    });
-  }
+  // Handle users error in useEffect to prevent infinite re-renders
+  useEffect(() => {
+    if (usersError) {
+      logger.error('Failed to fetch users', usersError);
+      toast({
+        title: "Error",
+        description: "Failed to fetch users",
+        variant: "destructive"
+      });
+    }
+  }, [usersError, toast]);
 
   const {
     data: deliberations = [],

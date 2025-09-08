@@ -42,40 +42,41 @@ serve(async (req) => {
     console.log('🎫 Extracting token from authorization header...');
     const token = authHeader.replace('Bearer ', '');
     
-    // Verify the token using service role admin method
-    console.log('👤 Verifying user token with admin method...');
-    const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(token);
-    
-    // If admin getUserById fails, try getUser with the token
-    let verifiedUser = user;
-    if (userError || !user) {
-      console.log('🔄 Retrying with getUser method...');
-      const { data: userData, error: getUserError } = await supabase.auth.getUser(token);
-      if (getUserError || !userData.user) {
-        console.error('❌ Invalid user token:', getUserError || userError);
-        return createErrorResponse('Invalid user token', 401);
+    // Create a temporary client with the user's token to verify
+    console.log('👤 Verifying user token...');
+    const { createClient: createUserClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const userSupabase = createUserClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       }
-      verifiedUser = userData.user;
+    });
+    
+    const { data: { user }, error: userError } = await userSupabase.auth.getUser();
+    if (userError || !user) {
+      console.error('❌ Invalid user token:', userError);
+      return createErrorResponse('Invalid user token', 401);
     }
 
-    console.log('✅ User verified:', verifiedUser.id);
+    console.log('✅ User verified:', user.id);
 
     // Check if user has admin role
-    console.log('🔍 Checking admin role for user:', verifiedUser.id);
+    console.log('🔍 Checking admin role for user:', user.id);
     const { data: userProfile, error: roleError } = await supabase
       .from('profiles')
       .select('user_role')
-      .eq('id', verifiedUser.id)
+      .eq('id', user.id)
       .single();
 
     console.log('📋 User profile query result:', { userProfile, roleError });
 
     if (roleError || !userProfile || userProfile.user_role !== 'admin') {
-      console.error('❌ Admin access check failed:', { roleError, userProfile, userId: verifiedUser.id });
+      console.error('❌ Admin access check failed:', { roleError, userProfile, userId: user.id });
       return createErrorResponse('Admin access required', 403);
     }
 
-    console.log('✅ Admin access verified for user:', verifiedUser.id);
+    console.log('✅ Admin access verified for user:', user.id);
 
     // Get profiles first
     const { data: profiles, error: profilesError } = await supabase
