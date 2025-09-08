@@ -99,26 +99,32 @@ export const useResponseStreaming = () => {
         headers['Authorization'] = `Bearer ${currentSession.access_token}`;
       }
       
-      const response = await supabase.functions.invoke('agent-orchestration-stream', {
+      // CRITICAL FIX: Use fetch for streaming instead of supabase.functions.invoke
+      // The supabase SDK doesn't properly handle streaming responses
+      const functionUrl = `https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/agent-orchestration-stream`;
+      
+      const response = await fetch(functionUrl, {
+        method: 'POST',
         headers,
-        body: {
+        body: JSON.stringify({
           messageId,
           deliberationId,
           mode: 'chat'
-        }
+        }),
+        signal: streamControllerRef.current.signal
       });
       
-      if (response.error) {
-        throw new Error(response.error.message || 'Streaming function failed');
+      if (!response.ok) {
+        throw new Error(`Edge function failed with status ${response.status}: ${response.statusText}`);
       }
 
       console.log('📡 Streaming response received successfully');
 
-      if (!response.data?.stream) {
-        throw new Error('No stream data received');
+      if (!response.body) {
+        throw new Error('No response body received');
       }
 
-      const reader = response.data.stream.getReader();
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
       console.log('📖 Starting to read stream...');

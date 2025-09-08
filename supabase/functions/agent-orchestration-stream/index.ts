@@ -722,13 +722,14 @@ async function processStreamingOrchestration(
     console.log(`📨 Fetching message details for messageId: ${messageId}`);
     console.log(`🔍 Using auth header: ${authHeader ? 'YES' : 'NO'}`);
     
-    const { data: message, error: messageError } = await authenticatedUserSupabase
+    let message: any = null;
+    const { data: messageData, error: messageError } = await authenticatedUserSupabase
       .from('messages')
       .select('*')
       .eq('id', messageId)
       .single();
 
-    if (messageError || !message) {
+    if (messageError || !messageData) {
       console.error(`❌ Error fetching message:`, messageError);
       console.error(`❌ Full message error details:`, JSON.stringify(messageError, null, 2));
       console.error(`❌ Message ID being searched: ${messageId}`);
@@ -757,6 +758,8 @@ async function processStreamingOrchestration(
         // Use the service message but continue processing
         message = serviceMessage;
       }
+    } else {
+      message = messageData;
     }
 
     console.log(`✅ Message fetched successfully:`, {
