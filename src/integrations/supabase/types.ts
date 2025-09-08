@@ -256,6 +256,7 @@ export type Database = {
           start_time: string | null
           status: Database["public"]["Enums"]["deliberation_status"] | null
           title: string
+          updated_at: string
         }
         Insert: {
           created_at?: string | null
@@ -269,6 +270,7 @@ export type Database = {
           start_time?: string | null
           status?: Database["public"]["Enums"]["deliberation_status"] | null
           title: string
+          updated_at?: string
         }
         Update: {
           created_at?: string | null
@@ -282,6 +284,7 @@ export type Database = {
           start_time?: string | null
           status?: Database["public"]["Enums"]["deliberation_status"] | null
           title?: string
+          updated_at?: string
         }
         Relationships: []
       }
