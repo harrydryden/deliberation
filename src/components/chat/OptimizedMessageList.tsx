@@ -14,6 +14,8 @@ import { MessageRating } from "@/components/chat/MessageRating";
 import { useSimplifiedPerformance } from "@/hooks/useSimplifiedState";
 import { useOptimizedMessageLoading } from "@/hooks/useOptimizedMessageLoading";
 import { useProgressiveFallback } from "@/hooks/useProgressiveFallback";
+import { useRenderPerformanceTracker } from "@/hooks/useRenderPerformanceTracker";
+import { useUIStateDebugger } from "@/hooks/useUIStateDebugger";
 
 interface MessageListProps {
   messages?: ChatMessage[]; // Made optional since we'll load internally
@@ -191,6 +193,10 @@ export const OptimizedMessageList = memo(({
   agentConfigs 
 }: MessageListProps) => {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+  
+  // Performance monitoring
+  const renderTracker = useRenderPerformanceTracker('OptimizedMessageList', 5);
+  const uiDebugger = useUIStateDebugger('MessageList');
   const [atBottom, setAtBottom] = useState(true);
   const [unreadIndex, setUnreadIndex] = useState<number | null>(null);
   const prevCountRef = useRef(0);

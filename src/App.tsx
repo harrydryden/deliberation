@@ -8,6 +8,7 @@ import { Suspense, lazy } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { ProductionOptimizedProvider } from "@/components/layout/ProductionOptimizedProvider";
+import { PerformanceDebugProvider } from "@/components/layout/PerformanceDebugProvider";
 
 // Authentication guard component
 const AuthGuard = ({ children }: { children: React.ReactNode }) => {
@@ -59,7 +60,8 @@ const App = () => (
   <ProductionErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <SupabaseAuthProvider>
-        <ProductionOptimizedProvider>
+        <PerformanceDebugProvider>
+          <ProductionOptimizedProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -78,7 +80,8 @@ const App = () => (
               </Suspense>
             </BrowserRouter>
           </TooltipProvider>
-        </ProductionOptimizedProvider>
+          </ProductionOptimizedProvider>
+        </PerformanceDebugProvider>
       </SupabaseAuthProvider>
     </QueryClientProvider>
   </ProductionErrorBoundary>

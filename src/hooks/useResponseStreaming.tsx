@@ -1,6 +1,9 @@
 import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+import { useStreamingPerformanceMonitor } from './useStreamingPerformanceMonitor';
+import { useUIStateDebugger } from './useUIStateDebugger';
+import { useNetworkPerformanceTracker } from './useNetworkPerformanceTracker';
 
 interface StreamingState {
   isStreaming: boolean;
@@ -28,6 +31,11 @@ export const useResponseStreaming = () => {
   const streamControllerRef = useRef<AbortController | null>(null);
   const accumulatorRef = useRef<string>('');
   const rafIdRef = useRef<number | null>(null);
+  
+  // Performance monitoring hooks
+  const perfMonitor = useStreamingPerformanceMonitor();
+  const uiDebugger = useUIStateDebugger('ResponseStreaming');
+  const networkTracker = useNetworkPerformanceTracker();
 
   // Enhanced timeout detection in streaming state management
   const startStreaming = useCallback(async (
@@ -38,6 +46,10 @@ export const useResponseStreaming = () => {
     onError: (error: string) => void
   ) => {
     console.log('🌊 Starting streaming for message:', messageId);
+    
+    // Start performance monitoring
+    perfMonitor.startTracking(messageId);
+    uiDebugger.trackStreamingStart('user-message-sent');
     
     // Cleanup any previous RAF callbacks to prevent memory leaks
     if (rafIdRef.current) {
@@ -53,6 +65,8 @@ export const useResponseStreaming = () => {
       messageId,
       agentType: null,
     });
+    
+    uiDebugger.trackTransition('streaming-ui-active', 'stream-state-set');
 
     // Cancel any existing stream
     if (streamControllerRef.current) {
@@ -154,6 +168,9 @@ export const useResponseStreaming = () => {
       console.log('🌐 Making request to:', functionUrl);
       console.log('📦 Request payload:', { messageId, deliberationId, mode: 'chat' });
       
+      // Track network request
+      const networkId = networkTracker.startTracking(functionUrl, 'POST', 'stream');
+      
       const response = await fetch(functionUrl, {
         method: 'POST',
         headers: requestHeaders,
@@ -181,6 +198,10 @@ export const useResponseStreaming = () => {
       }
 
       console.log('📡 Streaming response received successfully');
+      
+      // Record first response received
+      networkTracker.endTracking(networkId, response.status);
+      perfMonitor.recordFirstChunk();
 
       if (!response.body) {
         throw new Error('No response body received');
@@ -273,10 +294,18 @@ export const useResponseStreaming = () => {
       // Final update
       updateUI();
       onComplete(accumulatorRef.current, messageId, streamingState.agentType);
+      
+      // Record successful completion
+      perfMonitor.recordStreamComplete(true, accumulatorRef.current.length);
+      uiDebugger.trackStreamingEnd('stream-complete-success');
 
     } catch (error) {
       console.error('❌ Streaming error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
+      
+      // Record error for performance monitoring
+      perfMonitor.recordError(errorMessage);
+      uiDebugger.trackError(errorMessage);
       
       // F005 Fix: Enhanced structured logging for better observability
       logger.error('Streaming failed', error as Error, { 
