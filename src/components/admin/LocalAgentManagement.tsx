@@ -199,17 +199,11 @@ export const LocalAgentManagement = ({ localAgents, deliberations, loading, onLo
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          {agent.prompt_overrides?.system_prompt && (
+                          {agent.prompt_overrides?.system_prompt ? (
                             <Badge variant="secondary" className="text-xs">
                               System Override
                             </Badge>
-                          )}
-                          {agent.prompt_overrides?.classification_prompt && (
-                            <Badge variant="secondary" className="text-xs">
-                              Classification Override
-                            </Badge>
-                          )}
-                          {(!agent.prompt_overrides?.system_prompt && !agent.prompt_overrides?.classification_prompt) && (
+                          ) : (
                             <Badge variant="outline" className="text-xs">
                               Auto-Generated
                             </Badge>

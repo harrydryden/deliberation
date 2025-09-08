@@ -207,49 +207,6 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
             </div>
           </div>
 
-          {/* Classification Prompt Override */}
-          <div className="space-y-4 border-t pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="text-base font-semibold">Classification Prompt Override</Label>
-                <p className="text-sm text-muted-foreground">
-                  Override the default classification prompt for this specific agent
-                </p>
-              </div>
-              <Badge variant="outline" className="text-xs">
-                Template: {agent.agent_type} default
-              </Badge>
-            </div>
-
-            <div className="space-y-2">
-              <FormField
-                type="textarea"
-                label="Custom Classification Prompt"
-                value={form.formData.prompt_overrides.classification_prompt || ''}
-                onChange={(value) => form.updateField('prompt_overrides', {
-                  ...form.formData.prompt_overrides,
-                  classification_prompt: value
-                })}
-                placeholder="Leave empty to use template default, or enter custom classification prompt..."
-                rows={2}
-              />
-              {form.formData.prompt_overrides.classification_prompt && (
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => form.updateField('prompt_overrides', {
-                      ...form.formData.prompt_overrides,
-                      classification_prompt: ''
-                    })}
-                  >
-                    Clear Override
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* IBIS Facilitation Prompts (Peer Agent) */}
           {agent.agent_type === 'peer_agent' && (
