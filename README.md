@@ -1,287 +1,137 @@
 # Democratic Deliberation Platform
 
-A modern web application for facilitating democratic deliberations and structured conversations using AI agents.
+A web application that facilitates structured conversations and democratic deliberations using AI agents.
 
-## Table of Contents
+## What is this?
 
-- [Overview](#overview)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Quick Start](#quick-start)
-- [Development](#development)
-- [Testing](#testing)
-- [Deployment](#deployment)
-- [API Documentation](#api-documentation)
-- [Contributing](#contributing)
+This platform helps groups have better discussions by:
+- Providing AI agents that guide conversations
+- Organizing ideas using structured formats
+- Tracking participant contributions
+- Supporting real-time voice and text chat
 
-## Overview
+## Key Features
 
-The Democratic Deliberation Platform is a comprehensive web application designed to facilitate structured conversations and democratic deliberations using AI agents. Built with modern web technologies, it provides real-time collaboration, intelligent agent interactions, and comprehensive administrative controls.
-
-## Architecture
-
-The application follows **Clean Architecture** principles with a **Supabase-only backend**:
-
-### Frontend Stack
-- **React 18** with TypeScript for type safety
-- **Tailwind CSS** with custom design system
-- **Radix UI** components for accessibility
-- **React Router** for client-side routing
-- **React Query** for state management and caching
-
-### Backend Architecture
-- **Supabase** for authentication, database, and real-time features
-- **PostgreSQL** with vector extensions for semantic search
-- **Row Level Security (RLS)** for data protection
-- **Edge Functions** for serverless compute
-- **Real-time subscriptions** for live updates
-
-### Code Architecture
-- **Repository Pattern** for data access abstraction
-- **Dependency Injection** for service management
-- **Domain Services** for business logic
-- **Clean separation** of concerns across layers
-
-### Key Design Principles
-- **Single Responsibility**: Each module has one clear purpose
-- **Dependency Inversion**: High-level modules don't depend on low-level modules
-- **Interface Segregation**: Clients depend only on interfaces they use
-- **Testability**: Easy mocking and unit testing throughout
-
-## Features
-
-### Core Functionality
-- **Multi-agent AI System**: Bill Agent, Peer Agent, and Orchestration service
-- **Real-time Chat**: Live messaging with intelligent AI responses
-- **Democratic Deliberation**: Structured conversation flows
-- **Content Safety**: AI-powered content moderation and filtering
-- **Knowledge Management**: Vector-based semantic search
-- **IBIS Integration**: Issue-Based Information System support
-- **Admin Dashboard**: Agent configuration and system monitoring
-
-### Technical Features
-- **Real-time Updates**: WebSocket and Server-Sent Events for live updates
-- **Performance Optimization**: Intelligent caching, rate limiting, connection pooling
-- **Security**: Multi-layer content safety, authentication, and authorization
-- **Monitoring**: Structured logging, comprehensive health checks
-- **Scalability**: Designed for horizontal scaling and high availability
-
-## Quick Start
-
-### Prerequisites
-- Node.js 18+ and npm
-- Git for version control
-
-### Installation
-```bash
-# Clone the repository
-git clone <your-repository-url>
-cd democratic-deliberation-platform
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-### Environment Setup
-The application is configured to work with Supabase out of the box. For custom configurations:
-
-1. **Supabase Setup**: Create a new Supabase project
-2. **Database Schema**: Run the migrations in `supabase/migrations/`
-3. **Environment Variables**: Configure in your Supabase dashboard
-4. **Authentication**: Set up authentication providers as needed
-
-### Development Commands
-```bash
-# Start development server
-npm run dev
-
-# Run tests
-npm test
-
-# Run tests with UI
-npm run test:ui
-
-# Run E2E tests
-npm run test:e2e
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-```
-
-## Development
-
-### Project Structure
-```
-src/
-├── components/           # React components
-│   ├── ui/              # Reusable UI components
-│   ├── admin/           # Admin-specific components
-│   ├── auth/            # Authentication components
-│   └── chat/            # Chat-related components
-├── hooks/               # Custom React hooks
-├── services/            # Business logic services
-│   └── domain/          # Domain services and interfaces
-├── repositories/        # Data access layer
-├── types/               # TypeScript type definitions
-├── utils/               # Utility functions
-└── integrations/        # External service integrations
-```
-
-### Key Concepts
-
-#### Services and Repositories
-The application uses a clean architecture with:
-- **Domain Services**: Business logic implementation
-- **Repositories**: Data access abstraction
-- **Dependency Injection**: Service container for managing dependencies
-
-#### State Management
-- **React Query**: Server state management and caching
-- **React Context**: Authentication and global state
-- **Local State**: Component-specific state with hooks
-
-#### Testing Strategy
-- **Unit Tests**: Component and service testing with Vitest
-- **Integration Tests**: API and database testing
-- **E2E Tests**: User workflow testing with Playwright
-
-## How to Edit This Code
-
-### Local Development
-```bash
-# Clone the repository
-git clone <YOUR_GIT_URL>
-cd <YOUR_PROJECT_NAME>
-
-# Install dependencies
-npm install
-
-# Start development with Node.js backend
-docker-compose -f docker-compose.dev.yml up
-```
+- **AI-Powered Conversations**: Three specialized AI agents (Bill, Flo, and Pia) help facilitate discussions
+- **IBIS Structure**: Ideas are organized using Issue-Based Information System format
+- **Real-time Chat**: Voice and text messaging with live updates
+- **Admin Dashboard**: Manage users, agents, and deliberations
+- **User Analytics**: Track participation and helpfulness scores
 
 ## Technology Stack
 
 ### Frontend
-- **Vite** - Build tool and development server
-- **TypeScript** - Type-safe JavaScript
-- **React 18** - UI framework with hooks and context
-- **Tailwind CSS** - Utility-first styling with custom design system
-- **Radix UI** - Accessible UI primitives (shadcn-ui)
-- **React Router** - Client-side routing
+- React 18 with TypeScript
+- Tailwind CSS for styling
+- Radix UI components
+- React Router for navigation
+- Supabase for backend services
 
-### Backend (Supabase)
-- **PostgreSQL** - Primary database with vector extensions
-- **Row Level Security** - Built-in data protection
-- **Real-time** - Live subscriptions and updates
-- **Edge Functions** - Serverless compute with Deno
-- **Authentication** - Built-in auth with multiple providers
-- **Storage** - File storage with CDN
-- **API** - Auto-generated REST and GraphQL APIs
+### Backend
+- Supabase (PostgreSQL database)
+- Edge Functions for AI processing
+- Row Level Security for data protection
+- Real-time subscriptions
 
-### Development Tools
-- **Vite** - Fast build tool and dev server
-- **ESLint** - Code linting and formatting
-- **Prettier** - Code formatting
-- **Vitest** - Unit and integration testing
-- **Playwright** - End-to-end testing
-- **TypeScript** - Type safety across the stack
+## Getting Started
 
-## Testing
+### Prerequisites
+- Node.js 18 or higher
+- npm or yarn
 
-The project includes comprehensive testing at multiple levels:
+### Installation
 
-### Unit Tests
+1. Clone the repository
 ```bash
-# Run all unit tests
-npm test
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run tests in watch mode
-npm run test:watch
+git clone [repository-url]
+cd democratic-deliberation-platform
 ```
 
-### Integration Tests
-Integration tests verify the interaction between services and repositories:
+2. Install dependencies
 ```bash
-# Run integration tests
-npm run test:integration
+npm install
 ```
 
-### E2E Tests
-End-to-end tests verify complete user workflows:
+3. Set up environment variables
 ```bash
-# Run E2E tests
-npm run test:e2e
-
-# Run E2E tests in headed mode
-npm run test:e2e:headed
+cp .env.example .env
+# Edit .env with your Supabase credentials
 ```
 
-### Test Structure
-- **Component Tests**: In `src/components/**/__tests__/`
-- **Hook Tests**: In `src/hooks/**/__tests__/`
-- **Service Tests**: In `src/services/**/__tests__/`
-- **E2E Tests**: In `e2e/`
+4. Start the development server
+```bash
+npm run dev
+```
 
-## Deployment
+The application will be available at `http://localhost:8080`.
 
-### Custom Deployment
-The application can be deployed to any static hosting provider:
+### Database Setup
 
-1. **Build the application**:
-   ```bash
-   npm run build
-   ```
+1. Create a new Supabase project
+2. Run the migrations in the `supabase/migrations/` folder
+3. Set up your environment variables with the Supabase URL and keys
 
-2. **Deploy the `dist` folder** to your hosting provider
+## Project Structure
 
-3. **Configure environment variables** in your hosting platform
+```
+src/
+├── components/          # React components
+│   ├── admin/          # Admin dashboard components
+│   ├── chat/           # Chat and messaging components
+│   ├── common/         # Shared components
+│   └── ui/             # Basic UI components
+├── hooks/              # Custom React hooks
+├── pages/              # Main page components
+├── services/           # Business logic and API calls
+├── utils/              # Helper functions
+└── types/              # TypeScript type definitions
 
-## API Documentation
+supabase/
+├── functions/          # Edge functions for AI processing
+└── migrations/         # Database schema and migrations
+```
 
-Comprehensive API documentation is available in the `docs/api/` directory:
-- [API Overview](docs/api/README.md)
-- [Authentication](docs/api/README.md#authentication)
-- [Core Endpoints](docs/api/README.md#core-endpoints)
-- [Error Handling](docs/api/README.md#error-responses)
-- [Rate Limiting](docs/api/README.md#rate-limiting)
+## User Roles
 
-## Architecture Decision Records
+- **Admin**: Can create deliberations, manage users, and access all features
+- **User**: Can participate in deliberations and view their own statistics
 
-Important architectural decisions are documented in the `docs/architecture/` directory:
-- [ADR-001: Single Backend Architecture](docs/architecture/ADR-001-single-backend-architecture.md)
-- [ADR-002: Repository Pattern](docs/architecture/ADR-002-repository-pattern.md)
-- [ADR-003: Dependency Injection](docs/architecture/ADR-003-dependency-injection.md)
-- [ADR-004: Testing Strategy](docs/architecture/ADR-004-testing-strategy.md)
+## How Deliberations Work
+
+1. **Create**: Admins create new deliberation topics
+2. **Join**: Users join deliberations using access codes
+3. **Discuss**: Participants chat with AI agents that help structure the conversation
+4. **Organize**: Ideas are automatically organized into issues, positions, and arguments
+5. **Track**: The system tracks contributions and provides analytics
+
+## Development
+
+### Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run test` - Run tests
+- `npm run lint` - Check code quality
+
+### Key Concepts
+
+- **Agents**: AI helpers that facilitate different aspects of discussion
+- **IBIS Nodes**: Structured elements (Issues, Positions, Arguments) that organize ideas
+- **Message Queue**: System for handling AI responses reliably
+- **Realtime**: Live updates using Supabase subscriptions
 
 ## Contributing
 
-1. **Fork the repository**
-2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Write tests** for your changes
-4. **Ensure tests pass**: `npm test`
-5. **Commit your changes**: `git commit -m 'Add amazing feature'`
-6. **Push to the branch**: `git push origin feature/amazing-feature`
-7. **Open a Pull Request**
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if needed
+5. Submit a pull request
 
-### Code Style
-- Follow existing TypeScript and React patterns
-- Use JSDoc comments for public functions
-- Write comprehensive tests for new features
-- Follow the repository pattern for data access
-- Use the service container for dependency injection
+## License
 
-### Testing Requirements
-- Unit tests for all new components and services
-- Integration tests for complex workflows
-- E2E tests for critical user journeys
-- Maintain test coverage above 80%
+This project is licensed under the MIT License.
+
+## Support
+
+For questions or issues, please check the documentation or create an issue in the repository.
