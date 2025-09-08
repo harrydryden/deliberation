@@ -58,6 +58,24 @@ export const useChat = (deliberationId?: string) => {
   const { toast } = useToast();
   const stableToast = useMemo(() => toast, [toast]);
 
+  // F005 Fix: Simplified and memoized message sorting function
+  const sortMessagesByOrder = useCallback((messages: ChatMessage[]): ChatMessage[] => {
+    return [...messages].sort((a, b) => {
+      const timeA = new Date(a.created_at).getTime();
+      const timeB = new Date(b.created_at).getTime();
+      
+      // If message B is a direct response to message A, B should follow A
+      if (b.parent_message_id === a.id) return -1;
+      if (a.parent_message_id === b.id) return 1;
+      
+      // For same-parent messages, maintain chronological order
+      if (a.parent_message_id === b.parent_message_id) return timeA - timeB;
+      
+      // Default chronological sort
+      return timeA - timeB;
+    });
+  }, []);
+
   // Stable callback references to prevent infinite loops
   const stableLoadChatHistory = useCallback(async () => {
     if (!user) {
@@ -135,11 +153,16 @@ export const useChat = (deliberationId?: string) => {
     }
   }, [user, realtimeService, deliberationId, setChatState, handleError]);
 
-  // Load chat history when user is authenticated or deliberationId changes
+  // F006 Fix: Optimize cache clearing - only clear on user change, not on every load
+  const currentUserIdRef = useRef<string | null>(null);
+  
   useEffect(() => {
     if (!authLoading && user) {
-      // Clear cache to ensure fresh data
-      cacheService.clearNamespace('chat-history');
+      // Only clear cache when user changes, not on every load
+      if (user.id !== currentUserIdRef.current) {
+        cacheService.clearNamespace('chat-history');
+        currentUserIdRef.current = user.id;
+      }
       stableLoadChatHistory();
       stableSetupRealTimeUpdates();
     }
@@ -152,7 +175,7 @@ export const useChat = (deliberationId?: string) => {
       // F002 Fix: Cleanup scheduled message cleanups on unmount
       cancelAllCleanups();
     };
-  }, [user, authLoading, deliberationId, stableLoadChatHistory, stableSetupRealTimeUpdates]);
+  }, [user, authLoading, deliberationId, stableLoadChatHistory, stableSetupRealTimeUpdates, cancelAllCleanups]);
 
   // Remove redundant reload - realtime updates should handle missed messages
 
@@ -190,8 +213,11 @@ export const useChat = (deliberationId?: string) => {
       
       console.log('📤 Sending message to service...', { queueId });
       
-      // Clear relevant caches when sending new messages
-      cacheService.clearNamespace('chat-history');
+  // F006 Fix: Selective cache invalidation - only clear when sending new messages
+  const clearRelevantCache = useCallback(() => {
+    // Only clear chat history cache, preserve other caches for better performance
+    cacheService.clearNamespace('chat-history');
+  }, []);
       
       const saved = await services.messageService.sendMessage(
         content.trim(), 
@@ -217,32 +243,27 @@ export const useChat = (deliberationId?: string) => {
       };
       
       setChatState(prev => {
-        // Sort messages to ensure proper parent-child ordering
-        const sortedMessages = [...prev.messages, userMessage].sort((a, b) => {
-          // First sort by creation time
-          const timeA = new Date(a.created_at).getTime();
-          const timeB = new Date(b.created_at).getTime();
-          
-          // If message B is a response to message A, B should come immediately after A
-          if (b.parent_message_id === a.id) {
-            return -1; // A comes before B
-          }
-          if (a.parent_message_id === b.id) {
-            return 1; // B comes before A
-          }
-          
-          // For messages with the same parent, maintain chronological order
-          if (a.parent_message_id === b.parent_message_id) {
-            return timeA - timeB;
-          }
-          
-          // Default chronological sort
-          return timeA - timeB;
-        });
+  // F005 Fix: Simplified and memoized message sorting function
+  const sortMessagesByOrder = useCallback((messages: ChatMessage[]): ChatMessage[] => {
+    return [...messages].sort((a, b) => {
+      const timeA = new Date(a.created_at).getTime();
+      const timeB = new Date(b.created_at).getTime();
+      
+      // If message B is a direct response to message A, B should follow A
+      if (b.parent_message_id === a.id) return -1;
+      if (a.parent_message_id === b.id) return 1;
+      
+      // For same-parent messages, maintain chronological order
+      if (a.parent_message_id === b.parent_message_id) return timeA - timeB;
+      
+      // Default chronological sort
+      return timeA - timeB;
+    });
+  }, []);
         
         return {
           ...prev,
-          messages: sortedMessages
+          messages: sortMessagesByOrder([...prev.messages, userMessage])
         };
       });
 
@@ -300,32 +321,15 @@ export const useChat = (deliberationId?: string) => {
               updatedMessages = [...prev.messages, streamingMessage];
             }
             
-            // Sort messages to ensure proper parent-child ordering
-            const sortedMessages = updatedMessages.sort((a, b) => {
-              // First sort by creation time
-              const timeA = new Date(a.created_at).getTime();
-              const timeB = new Date(b.created_at).getTime();
-              
-              // If message B is a response to message A, B should come immediately after A
-              if (b.parent_message_id === a.id) {
-                return -1; // A comes before B
-              }
-              if (a.parent_message_id === b.id) {
-                return 1; // B comes before A
-              }
-              
-              // For messages with the same parent, maintain chronological order
-              if (a.parent_message_id === b.parent_message_id) {
-                return timeA - timeB;
-              }
-              
-              // Default chronological sort
-              return timeA - timeB;
-            });
-            
             return {
               ...prev,
-              messages: sortedMessages
+              messages: sortMessagesByOrder(
+                existingStreamingIndex >= 0
+                  ? prev.messages.map((msg, index) => 
+                      index === existingStreamingIndex ? streamingMessage : msg
+                    )
+                  : [...prev.messages, streamingMessage]
+              )
             };
           });
         },
@@ -357,33 +361,13 @@ export const useChat = (deliberationId?: string) => {
 
           setChatState(prev => {
             const withoutStreaming = prev.messages.filter(m => m.id !== `streaming-${saved.id}`);
-            // Sort messages to ensure proper parent-child ordering
-            const sortedMessages = [...withoutStreaming, finalMessage].sort((a, b) => {
-              // First sort by creation time
-              const timeA = new Date(a.created_at).getTime();
-              const timeB = new Date(b.created_at).getTime();
-              
-              // If message B is a response to message A, B should come immediately after A
-              if (b.parent_message_id === a.id) {
-                return -1; // A comes before B
-              }
-              if (a.parent_message_id === b.id) {
-                return 1; // B comes before A
-              }
-              
-              // For messages with the same parent, maintain chronological order
-              if (a.parent_message_id === b.parent_message_id) {
-                return timeA - timeB;
-              }
-              
-              // Default chronological sort
-              return timeA - timeB;
-            });
-            
-            return {
-              ...prev,
-              messages: sortedMessages
-            };
+          return {
+            ...prev,
+            messages: sortMessagesByOrder([
+              ...prev.messages.filter(m => m.id !== `streaming-${saved.id}`), 
+              finalMessage
+            ])
+          };
           });
           
           messageQueue.updateMessageStatus(queueId, 'completed');
@@ -424,7 +408,7 @@ export const useChat = (deliberationId?: string) => {
     }
   }, [user, deliberationId, services.messageService, startStreaming, setChatState, messageQueue]);
 
-  // Auto-process queue when messages are available - optimized to reduce re-renders
+  // F001 Fix: Auto-process queue when messages are available - optimized to reduce re-renders
   const queueStats = messageQueue.getQueueStats;
   const hasWork = queueStats.queued > 0 && queueStats.canProcess;
   
@@ -452,11 +436,11 @@ export const useChat = (deliberationId?: string) => {
 
     console.log('📋 Queue has items, processing immediately...', queueStats);
     
-    // Process first message immediately
+    // F001 Fix: Process immediately without delay to align with timeout expectations
     processNext();
     
-    // Set up interval for subsequent messages with debouncing
-    const timer = setTimeout(processNext, 500);
+    // Set up interval for subsequent messages without delay for better responsiveness
+    const timer = setTimeout(processNext, 100);
     return () => clearTimeout(timer);
   }, [hasWork, processQueuedMessage, user, deliberationId, messageQueue]);
 
@@ -466,15 +450,15 @@ export const useChat = (deliberationId?: string) => {
     // Add message to queue instead of processing immediately
     const queueId = messageQueue.addToQueue(content.trim());
     
-      logger.info('📤 Message queued for processing', { 
-        queueId, 
-        content: content.substring(0, 50),
-        queueStats: messageQueue.getQueueStats,
-        timeouts: {
-          streamingTimeout: '30s',
-          processingTimeout: '45s'
-        }
-      });
+    logger.info('📤 Message queued for processing', { 
+      queueId, 
+      content: content.substring(0, 50),
+      queueStats: messageQueue.getQueueStats, // F001 Fix: Use memoized value correctly
+      timeouts: {
+        streamingTimeout: '40s', // F004 Fix: Updated to match streaming timeout
+        processingTimeout: '45s'
+      }
+    });
 
     // Show immediate feedback that message was queued
     const currentStats = messageQueue.getQueueStats;

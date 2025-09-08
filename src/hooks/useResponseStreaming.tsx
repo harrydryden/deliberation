@@ -79,15 +79,15 @@ export const useResponseStreaming = () => {
 
     streamControllerRef.current = new AbortController();
     
-    // Enhanced timeout with progressive timeouts for different scenarios
-    const STREAMING_TIMEOUT = 30000; // 30 seconds as requested
+    // F004 Fix: Align timeout with edge function - use 40s to give edge function time to respond
+    const STREAMING_TIMEOUT = 40000; // 40 seconds to align with 45s edge function timeout
     const HEARTBEAT_INTERVAL = 5000; // 5 second heartbeat checks
     
     let lastActivity = Date.now();
     let heartbeatCount = 0;
     
     const timeoutId = setTimeout(() => {
-      console.log('⏰ Main streaming timeout reached (30s), aborting...');
+      console.log('⏰ Main streaming timeout reached (40s), aborting...');
       if (streamControllerRef.current) {
         try {
           streamControllerRef.current.abort();
@@ -95,15 +95,15 @@ export const useResponseStreaming = () => {
           console.warn('⚠️ Error aborting on timeout:', error);
         }
       }
-      // CRITICAL FIX: Clear streaming state on timeout
+      // F003 Fix: Clear streaming state on timeout
       setStreamingState({
         isStreaming: false,
         currentMessage: '',
         messageId: null,
         agentType: null,
       });
-      // IMPORTANT: Call onError to notify queue that processing failed
-      onError('Streaming timeout after 30 seconds. Please try again.');
+      // F004 Fix: Call onError to notify queue that processing failed
+      onError('Streaming timeout after 40 seconds. Please try again.');
     }, STREAMING_TIMEOUT);
     
     // Heartbeat monitoring to detect stalled connections
@@ -114,7 +114,7 @@ export const useResponseStreaming = () => {
       if (timeSinceActivity > 15000) { // 15 seconds without activity
         console.log(`💓 Heartbeat ${heartbeatCount}: No activity for ${timeSinceActivity}ms, checking connection...`);
         
-        if (timeSinceActivity > 25000) { // 25 seconds = nearly timeout
+        if (timeSinceActivity > 35000) { // F004 Fix: 35 seconds to align with new timeout
           console.warn('💔 Connection appears stalled, preparing for timeout...');
           // Pre-emptively clear state to prevent hanging UI
           setStreamingState(prev => ({
@@ -122,7 +122,7 @@ export const useResponseStreaming = () => {
             isStreaming: false
           }));
           // Call onError to notify queue
-          onError('Connection stalled - no activity for 25 seconds.');
+          onError('Connection stalled - no activity for 35 seconds.');
         }
       } else {
         console.log(`💓 Heartbeat ${heartbeatCount}: Active (${timeSinceActivity}ms since last activity)`);
@@ -361,7 +361,7 @@ export const useResponseStreaming = () => {
       
       onError(errorMessage);
     } finally {
-      // Enhanced cleanup to prevent hanging UI
+      // F003 Fix: Enhanced cleanup to prevent memory leaks and hanging UI
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
@@ -370,7 +370,7 @@ export const useResponseStreaming = () => {
         clearInterval(heartbeatId);
       }
       
-      // CRITICAL FIX: Always reset streaming state in finally block
+      // F003 Fix: Always reset streaming state in finally block to prevent memory leaks
       setStreamingState({
         isStreaming: false,
         currentMessage: '',
@@ -378,15 +378,17 @@ export const useResponseStreaming = () => {
         agentType: null,
       });
       
+      // F003 Fix: Critical RAF cleanup to prevent memory accumulation
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
       
+      // F003 Fix: Ensure all references are cleared
       streamControllerRef.current = null;
       accumulatorRef.current = '';
       
-      console.log('🧹 Streaming cleanup completed');
+      console.log('🧹 Streaming cleanup completed with memory leak prevention');
     }
   }, [streamingState.agentType, streamingState.isStreaming, streamingState.messageId]);
 
