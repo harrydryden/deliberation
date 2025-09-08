@@ -16,8 +16,6 @@ import {
 } from '../shared/edge-function-utils.ts';
 import { responseCache, configCache, createCacheKey } from '../shared/cache-manager.ts';
 import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
-import { ModelConfigManager } from '../shared/model-config.ts';
-import { getCachedEnvironment } from '../shared/environment-cache.ts';
 
 // Re-export types from shared orchestrator
 import type { AgentConfig, AnalysisResult, ConversationContext } from '../shared/agent-orchestrator.ts';
@@ -596,7 +594,12 @@ serve(async (req) => {
       });
     }
 
-    const { messageId, deliberationId, mode = 'stream' } = await req.json();
+    // Use proper JSON parsing with error handling
+    const { messageId, deliberationId, mode = 'stream' } = await parseAndValidateRequest<{
+      messageId: string;
+      deliberationId: string;
+      mode?: string;
+    }>(req, ['messageId', 'deliberationId']);
     
     console.log('🚀 Starting streaming agent orchestration', { messageId, deliberationId, mode });
     
