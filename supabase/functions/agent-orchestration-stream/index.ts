@@ -951,13 +951,11 @@ async function processStreamingOrchestration(
 
     // Enhanced agent selection with performance optimizations
     try {
-      const selectedAgent = await orchestrator.selectAgent(
-        message.content,
+      const selectedAgent = await orchestrator.selectOptimalAgent(
         analysis,
         conversationState,
-        similarNodes,
-        availableKnowledge,
-        deliberationId
+        deliberationId,
+        availableKnowledge
       );
 
       console.log(`🤖 Selected agent: ${selectedAgent}`);
