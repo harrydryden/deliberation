@@ -833,87 +833,90 @@ async function processStreamingOrchestration(
     }
 
     // Enhanced agent selection with performance optimizations
-    const selectedAgent = await orchestrator.selectAgent(
-      message.content,
-      analysis,
-      conversationState,
-      similarNodes,
-      availableKnowledge,
-      deliberationId
-    );
+    try {
+      const selectedAgent = await orchestrator.selectAgent(
+        message.content,
+        analysis,
+        conversationState,
+        similarNodes,
+        availableKnowledge,
+        deliberationId
+      );
 
-    console.log(`🤖 Selected agent: ${selectedAgent}`);
-    sendData({ agentType: selectedAgent, content: '', done: false });
+      console.log(`🤖 Selected agent: ${selectedAgent}`);
+      sendData({ agentType: selectedAgent, content: '', done: false });
 
-    // Generate streaming response with orchestrator
-    const response = await generateStreamingResponse(
-      message.content,
-      selectedAgent,
-      analysis,
-      conversationState,
-      similarNodes,
-      deliberationId,
-      openAIApiKey,
-      sendData,
-      orchestrator,
-      mode
-    );
+      // Generate streaming response with orchestrator
+      const response = await generateStreamingResponse(
+        message.content,
+        selectedAgent,
+        analysis,
+        conversationState,
+        similarNodes,
+        deliberationId,
+        openAIApiKey,
+        sendData,
+        orchestrator,
+        mode
+      );
 
-    console.log(`✅ Generated response length: ${response.length}`);
-    console.log(`✅ Response preview: ${response.substring(0, 200)}...`);
+      console.log(`✅ Generated response length: ${response.length}`);
+      console.log(`✅ Response preview: ${response.substring(0, 200)}...`);
 
-    // Cache the final response
-    cacheResponse(message.content, response, selectedAgent, deliberationId);
+      // Cache the final response
+      cacheResponse(message.content, response, selectedAgent, deliberationId);
 
-    // Store final response using service client
-    console.log('💾 Storing response in database...');
-    
-    const insertData = {
-      content: response,
-      message_type: selectedAgent,
-      user_id: message.user_id,
-      deliberation_id: deliberationId,
-      parent_message_id: messageId,
-      created_at: responseTimestamp,
-      agent_context: { 
-        agent_type: selectedAgent,
-        processing_method: 'full_orchestration',
-        analysis: analysis,
-        processing_mode: mode
+      // Store final response using service client
+      console.log('💾 Storing response in database...');
+      
+      const insertData = {
+        content: response,
+        message_type: selectedAgent,
+        user_id: message.user_id,
+        deliberation_id: deliberationId,
+        parent_message_id: messageId,
+        created_at: responseTimestamp,
+        agent_context: { 
+          agent_type: selectedAgent,
+          processing_method: 'full_orchestration',
+          analysis: analysis,
+          processing_mode: mode
+        }
+      };
+
+      const { data: insertResult, error: insertError } = await serviceSupabase
+        .from('messages')
+        .insert(insertData)
+        .select('id')
+        .single();
+
+      if (insertError) {
+        console.error('❌ Database insert error:', insertError);
+        sendData({ error: 'Failed to save response to database', insertError: insertError.message });
+        throw new Error(`Failed to save response: ${insertError.message}`);
+      } else {
+        console.log('✅ Response stored successfully in database');
       }
-    };
 
-    const { data: insertResult, error: insertError } = await serviceSupabase
-      .from('messages')
-      .insert(insertData)
-      .select('id')
-      .single();
+      sendData({ done: true });
+      console.log('🏁 Sent final completion signal');
 
-    if (insertError) {
-      console.error('❌ Database insert error:', insertError);
-      sendData({ error: 'Failed to save response to database', insertError: insertError.message });
-      throw new Error(`Failed to save response: ${insertError.message}`);
-    } else {
-      console.log('✅ Response stored successfully in database');
+    } catch (responseError) {
+      console.error('❌ Error generating response - FULL ERROR DETAILS:', {
+        error: responseError,
+        message: responseError.message,
+        stack: responseError.stack,
+        name: responseError.name
+      });
+      
+      sendData({ 
+        error: `Response generation failed: ${responseError.message}`,
+        content: `Error: ${responseError.message}. Please check the logs for details.`,
+        done: true 
+      });
+      return; // Exit early on error
     }
 
-    sendData({ done: true });
-    console.log('🏁 Sent final completion signal');
-
-  } catch (responseError) {
-    console.error('❌ Error generating response - FULL ERROR DETAILS:', {
-      error: responseError,
-      message: responseError.message,
-      stack: responseError.stack,
-      name: responseError.name
-    });
-    
-    sendData({ 
-      error: `Response generation failed: ${responseError.message}`,
-      content: `Error: ${responseError.message}. Please check the logs for details.`,
-      done: true 
-    });
-    return; // Exit early on error
   } catch (error) {
     console.error('❌ Streaming processing error:', error);
     sendData({ error: error.message, done: true });
