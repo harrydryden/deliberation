@@ -69,7 +69,7 @@ export class CacheService {
     }
     
     if (deletedCount > 0 && !isProduction) {
-      console.log(`Cache cleanup: removed ${deletedCount} expired entries`);
+      productionLogger.info('Cache cleanup completed', { deletedCount });
     }
   }
 

@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { productionLogger } from '@/utils/productionLogger';
 // Streaming performance monitoring consolidated into production logger
-import { useUIStateDebugger } from './useUIStateDebugger';
 import { useNetworkPerformanceTracker } from './useNetworkPerformanceTracker';
 
 interface StreamingState {
@@ -34,7 +33,6 @@ export const useResponseStreaming = () => {
   
   // Performance monitoring replaced with production logging
   const startTime = useRef<number>(0);
-  const uiDebugger = useUIStateDebugger('ResponseStreaming');
   const networkTracker = useNetworkPerformanceTracker();
 
   // Critical cleanup on component unmount to prevent memory leaks
@@ -75,7 +73,6 @@ export const useResponseStreaming = () => {
     
     // Start performance tracking
     startTime.current = Date.now();
-    uiDebugger.trackStreamingStart('user-message-sent');
     
     // Cleanup any previous RAF callbacks to prevent memory leaks
     if (rafIdRef.current) {
@@ -91,8 +88,6 @@ export const useResponseStreaming = () => {
       messageId,
       agentType: null,
     });
-    
-    uiDebugger.trackTransition('streaming-ui-active', 'stream-state-set');
 
     // Cancel any existing stream
     if (streamControllerRef.current) {
@@ -359,7 +354,6 @@ export const useResponseStreaming = () => {
         duration: completionTime, 
         finalLength: accumulatorRef.current.length 
       });
-      uiDebugger.trackStreamingEnd('stream-complete-success');
 
     } catch (error) {
       // Handle specific abort errors gracefully
@@ -377,7 +371,6 @@ export const useResponseStreaming = () => {
         errorMessage, 
         duration: Date.now() - startTime.current 
       });
-      uiDebugger.trackError(errorMessage);
       
       // F005 Fix: Enhanced structured logging for better observability
       productionLogger.error('Streaming failed', error as Error);

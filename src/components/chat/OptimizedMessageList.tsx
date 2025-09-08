@@ -14,7 +14,6 @@ import { MessageRating } from "@/components/chat/MessageRating";
 import { useSimplifiedPerformance } from '@/hooks/useOptimizedState';
 import { useOptimizedMessageLoading } from "@/hooks/useOptimizedMessageLoading";
 import { useProgressiveFallback } from "@/hooks/useProgressiveFallback";
-import { useUIStateDebugger } from "@/hooks/useUIStateDebugger";
 import { performanceMonitor } from "@/utils/performanceMonitor";
 import { productionLogger } from "@/utils/productionLogger";
 
@@ -202,7 +201,6 @@ export const OptimizedMessageList = memo(({
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   
   // UI state management
-  const uiDebugger = useUIStateDebugger('MessageList');
   const [atBottom, setAtBottom] = useState(true);
   const [unreadIndex, setUnreadIndex] = useState<number | null>(null);
   const prevCountRef = useRef(0);

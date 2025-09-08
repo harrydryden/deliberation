@@ -1,5 +1,6 @@
 // Production optimizations and cleanup utilities
 import { PRODUCTION_CONFIG, isProduction } from './productionConfig';
+import { productionLogger } from './productionLogger';
 
 // Memory management utilities
 export const optimizeMemory = () => {
@@ -26,22 +27,22 @@ export const optimizeMemory = () => {
 export const productionLog = {
   debug: (...args: any[]) => {
     if (!isProduction) {
-      console.log(...args);
+      productionLogger.info(args[0], args[1]);
     }
   },
   
   info: (...args: any[]) => {
     if (!isProduction) {
-      console.info(...args);
+      productionLogger.info(args[0], args[1]);
     }
   },
   
   warn: (...args: any[]) => {
-    console.warn(...args); // Always show warnings
+    productionLogger.warn(args[0], args[1]); // Always show warnings
   },
   
   error: (...args: any[]) => {
-    console.error(...args); // Always show errors
+    productionLogger.error(args[0], args[1]); // Always show errors
   }
 };
 
@@ -59,7 +60,7 @@ export const performanceMonitor = {
       performance.measure(label, `${label}-start`, `${label}-end`);
       const measure = performance.getEntriesByName(label)[0];
       if (measure.duration > 1000) { // Only warn if > 1 second
-        console.warn(`Slow operation detected: ${label} took ${measure.duration}ms`);
+        productionLogger.warn('Slow operation detected', { label, duration: measure.duration });
       }
     }
   }
@@ -69,16 +70,8 @@ export const performanceMonitor = {
 export const reportError = (error: Error, context?: any) => {
   if (isProduction) {
     // In a real app, you'd send this to your error reporting service
-    // For now, just log to console
-    console.error('Production Error:', {
-      message: error.message,
-      stack: error.stack,
-      context,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      url: window.location.href
-    });
+    productionLogger.error('Production Error', { error, context });
   } else {
-    console.error('Development Error:', error, context);
+    productionLogger.error('Development Error', { error, context });
   }
 };

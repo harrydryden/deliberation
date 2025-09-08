@@ -3,6 +3,8 @@
  * Ensures atomic operations for message creation and agent orchestration
  */
 
+import { productionLogger } from '@/utils/productionLogger';
+
 interface ProcessingLock {
   messageId: string;
   userId: string;
@@ -144,7 +146,7 @@ export class MessageProcessingLockManager {
     }
 
     if (cleanedCount > 0) {
-      console.log(`Cleaned up ${cleanedCount} expired message processing locks`);
+      productionLogger.info('Message processing locks cleaned up', { cleanedCount });
     }
   }
 

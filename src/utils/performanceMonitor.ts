@@ -2,6 +2,7 @@
  * Simple performance monitoring utility for chat UI optimization validation
  */
 import { useEffect } from 'react';
+import { productionLogger } from './productionLogger';
 
 interface PerformanceMetrics {
   renderCount: number;
@@ -36,7 +37,7 @@ class PerformanceMonitor {
 
     // Log excessive re-renders (more than 10 renders in 5 seconds)
     if (newCount > 10 && (endTime - existing.lastRender) < 5000) {
-      console.warn(`🚨 Excessive re-renders detected: ${componentName} rendered ${newCount} times`);
+      productionLogger.warn('Excessive re-renders detected', { componentName, renderCount: newCount });
     }
   }
 
@@ -58,11 +59,10 @@ class PerformanceMonitor {
   logSummary() {
     if (!this.enabled) return;
 
-    console.group('📊 Performance Summary');
+    productionLogger.info('Performance Summary');
     for (const [component, metrics] of this.metrics) {
-      console.log(`${component}: ${metrics.renderCount} renders, avg ${metrics.avgRenderTime.toFixed(2)}ms`);
+      productionLogger.info('Component performance', { component, metrics: { renderCount: metrics.renderCount, avgRenderTime: metrics.avgRenderTime.toFixed(2) }});
     }
-    console.groupEnd();
   }
 }
 

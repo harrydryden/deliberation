@@ -57,14 +57,12 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
     logger.info('Edit Nodes clicked for deliberation', { deliberationId: deliberation.id, title: deliberation.title });
     setSelectedDeliberation(deliberation);
     setEditMode('nodes');
-    logger.debug('State set, editMode should now be "nodes"');
   };
 
   const handleEditMap = (deliberation: Deliberation) => {
     logger.info('Edit Map clicked for deliberation', { deliberationId: deliberation.id, title: deliberation.title });
     setSelectedDeliberation(deliberation);
     setEditMode('map');
-    logger.debug('State set, editMode should now be "map"');
   };
 
   const handleBackFromEdit = () => {
@@ -146,40 +144,22 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
     }
   };
 
-  logger.debug('Render check', {
-    selectedDeliberation: selectedDeliberation?.id,
-    editMode,
-    shouldRenderNodes: selectedDeliberation && editMode === 'nodes',
-    shouldRenderMap: selectedDeliberation && editMode === 'map'
-  });
-
   if (selectedDeliberation && editMode === 'nodes') {
-    logger.debug('Rendering IbisNodeManagement');
-    try {
-      return (
-        <IbisNodeManagement
-          deliberationId={selectedDeliberation.id}
-          deliberationTitle={selectedDeliberation.title}
-          onBack={handleBackFromEdit}
-        />
-      );
-    } catch (error) {
-      logger.error('Error rendering IbisNodeManagement', error as Error);
-      return <div>Error loading node management</div>;
-    }
+    return (
+      <IbisNodeManagement 
+        deliberationId={selectedDeliberation.id}
+        deliberationTitle={selectedDeliberation.title}
+        onBack={handleBackFromEdit} 
+      />
+    );
   }
 
   if (selectedDeliberation && editMode === 'map') {
-    logger.debug('Rendering AdminIbisMapEditor', {
-      deliberationId: selectedDeliberation.id,
-      deliberationTitle: selectedDeliberation.title,
-      editMode
-    });
     return (
-      <AdminIbisMapEditor
-        deliberationId={selectedDeliberation.id}
-        deliberationTitle={selectedDeliberation.title}
+      <AdminIbisMapEditor 
+        deliberationId={selectedDeliberation.id} 
         onBack={handleBackFromEdit}
+        deliberationTitle={selectedDeliberation.title}
       />
     );
   }

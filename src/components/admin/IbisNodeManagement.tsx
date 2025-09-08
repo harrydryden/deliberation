@@ -53,19 +53,15 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
   const { toast } = useToast();
 
   const fetchNodes = async () => {
-    logger.debug('Starting fetchNodes', { deliberationId });
     setLoading(true);
     try {
       // Use the admin function instead of direct table access to bypass RLS
       const { data, error } = await supabase.rpc('admin_get_ibis_nodes', {
         target_deliberation_id: deliberationId
       });
-
-      logger.debug('Admin function result', { data, error, count: data?.length });
       
       if (error) throw error;
       setNodes(data || []);
-      logger.debug('Nodes set in state', { count: data?.length || 0 });
     } catch (error) {
       logger.error('Error fetching IBIS nodes', error as Error);
       toast({
@@ -75,7 +71,6 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
       });
     } finally {
       setLoading(false);
-      logger.debug('fetchNodes completed', { loading: false });
     }
   };
 

@@ -10,6 +10,7 @@ import { NotionEditor } from '../NotionEditor';
 import { serviceContainer } from '@/services/domain/container';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { productionLogger } from '@/utils/productionLogger';
 
 interface DeliberationActionsMenuProps {
   deliberation: Deliberation;
@@ -144,7 +145,7 @@ export const DeliberationActionsMenu = ({
                 // Handle notion update - could refresh deliberations or update local state
                 // Production-safe logging
                 if (process.env.NODE_ENV === 'development') {
-                  console.log('Notion updated:', newNotion);
+                  productionLogger.info('Notion updated successfully');
                 }
               }}
               deliberationTitle={deliberation.title}

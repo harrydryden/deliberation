@@ -1,5 +1,6 @@
 // Production error reporting and monitoring
 import { isProduction } from './productionConfig';
+import { productionLogger } from './productionLogger';
 
 interface ErrorReport {
   message: string;
@@ -35,7 +36,7 @@ class ProductionErrorReporter {
       this.processErrorQueue();
     } else {
       // In development, just log
-      console.error('Development Error:', report);
+      productionLogger.error('Development Error', { error });
     }
   }
 
@@ -48,7 +49,7 @@ class ProductionErrorReporter {
     try {
       // Here you would send to your error reporting service
       // For now, we'll just log critical errors
-      console.error('Production Error Batch:', errors.length, 'errors');
+      productionLogger.error('Production Error Batch', { count: errors.length });
       
       // You could integrate with services like:
       // - Sentry: await Sentry.captureException(error)
@@ -56,7 +57,7 @@ class ProductionErrorReporter {
       // - Custom API: await fetch('/api/errors', { method: 'POST', body: JSON.stringify(errors) })
       
     } catch (reportingError) {
-      console.error('Failed to report errors:', reportingError);
+      productionLogger.error('Failed to report errors', { reportingError });
       // Put errors back in queue for retry
       this.errorQueue.unshift(...errors);
     } finally {

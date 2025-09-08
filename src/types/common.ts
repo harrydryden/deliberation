@@ -161,7 +161,6 @@ export interface UserPreferences {
   language: string;
   notifications: boolean;
   autoSave: boolean;
-  debugMode: boolean;
 }
 
 // Security context

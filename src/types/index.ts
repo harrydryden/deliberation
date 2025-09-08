@@ -277,7 +277,6 @@ export interface PerformanceMetrics {
 export interface OptimizedStateConfig<T> {
   enableMemoryOptimization?: boolean;
   compareFunction?: (prev: T, next: T) => boolean;
-  debugMode?: boolean;
 }
 
 // Security context
@@ -306,7 +305,6 @@ export interface UserPreferences {
   language: string;
   notifications: boolean;
   autoSave: boolean;
-  debugMode: boolean;
 }
 
 // Request context for API calls
