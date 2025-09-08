@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { logger } from '@/utils/logger';
 
 export interface QueuedMessage {
@@ -202,6 +202,85 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
     logger.info('🧹 Message queue cleared');
   }, []);
 
+  // SMART QUEUE CLEARING: Auto-clear failed messages that can't be retried
+  const clearFailedMessages = useCallback(() => {
+    setQueueState(prev => {
+      const now = Date.now();
+      const failedToRemove = prev.queue.filter(msg => 
+        msg.status === 'failed' && 
+        msg.retries >= prev.maxRetries &&
+        (now - new Date(msg.timestamp).getTime()) > 30000 // Failed for 30+ seconds
+      );
+
+      if (failedToRemove.length > 0) {
+        logger.info('🧹 Auto-clearing failed messages', { 
+          count: failedToRemove.length,
+          messageIds: failedToRemove.map(m => m.id) 
+        });
+
+        // Clear timeouts for removed messages
+        failedToRemove.forEach(msg => {
+          const timeout = processingTimeouts.current.get(msg.id);
+          if (timeout) {
+            clearTimeout(timeout);
+            processingTimeouts.current.delete(msg.id);
+          }
+        });
+
+        return {
+          ...prev,
+          queue: prev.queue.filter(msg => !failedToRemove.includes(msg))
+        };
+      }
+      return prev;
+    });
+  }, []);
+
+  // SMART QUEUE CLEARING: Auto-clear very old messages (5+ minutes)
+  const clearStaleMessages = useCallback(() => {
+    setQueueState(prev => {
+      const now = Date.now();
+      const staleMessages = prev.queue.filter(msg => 
+        (now - new Date(msg.timestamp).getTime()) > 300000 // 5 minutes old
+      );
+
+      if (staleMessages.length > 0) {
+        logger.info('🧹 Auto-clearing stale messages', { 
+          count: staleMessages.length,
+          messageIds: staleMessages.map(m => m.id) 
+        });
+
+        // Clear timeouts for removed messages
+        staleMessages.forEach(msg => {
+          const timeout = processingTimeouts.current.get(msg.id);
+          if (timeout) {
+            clearTimeout(timeout);
+            processingTimeouts.current.delete(msg.id);
+          }
+        });
+
+        return {
+          ...prev,
+          queue: prev.queue.filter(msg => !staleMessages.includes(msg)),
+          processing: new Set([...prev.processing].filter(id => 
+            !staleMessages.some(stale => stale.id === id)
+          ))
+        };
+      }
+      return prev;
+    });
+  }, []);
+
+  // Auto-cleanup timer - runs every 30 seconds
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      clearFailedMessages();
+      clearStaleMessages();
+    }, 30000);
+
+    return () => clearInterval(cleanupInterval);
+  }, [clearFailedMessages, clearStaleMessages]);
+
   const getQueueStats = useMemo(() => {
     const { queue, processing } = queueState;
     return {
@@ -223,6 +302,8 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
     removeFromQueue,
     retryMessage,
     clearQueue,
+    clearFailedMessages,
+    clearStaleMessages,
     getQueueStats
   };
 };

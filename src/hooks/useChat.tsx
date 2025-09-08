@@ -576,7 +576,9 @@ export const useChat = (deliberationId?: string) => {
       stats: messageQueue.getQueueStats,
       retryMessage: messageQueue.retryMessage,
       removeMessage: messageQueue.removeFromQueue,
-      clearQueue: messageQueue.clearQueue
-    }), [messageQueue.queue, messageQueue.getQueueStats, messageQueue.retryMessage, messageQueue.removeFromQueue, messageQueue.clearQueue])
+      clearQueue: messageQueue.clearQueue,
+      clearFailedMessages: messageQueue.clearFailedMessages,
+      clearStaleMessages: messageQueue.clearStaleMessages
+    }), [messageQueue.queue, messageQueue.getQueueStats, messageQueue.retryMessage, messageQueue.removeFromQueue, messageQueue.clearQueue, messageQueue.clearFailedMessages, messageQueue.clearStaleMessages])
   };
 };
