@@ -577,23 +577,32 @@ function releaseProcessingLock(messageId: string, lockId: string): void {
 
 // Main streaming handler with distributed locking for race condition prevention
 serve(async (req) => {
+  console.log('🚀 Edge function invoked:', req.method, req.url);
+  console.log('📋 Request headers:', Object.fromEntries(req.headers.entries()));
+  
   if (req.method === 'OPTIONS') {
+    console.log('✅ Handling CORS preflight request');
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    console.log('🔧 Starting environment validation');
     // Revert to original working environment validation
     const { supabase, userSupabase } = validateAndGetEnvironment();
+    console.log('✅ Environment validation successful');
     
     // Get authorization header for user authentication
     const authHeader = req.headers.get('authorization');
+    console.log('🔑 Auth header present:', !!authHeader);
     if (!authHeader) {
+      console.error('❌ Missing authorization header');
       return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    console.log('📥 Parsing request body');
     // Use proper JSON parsing with error handling
     const { messageId, deliberationId, mode = 'stream' } = await parseAndValidateRequest<{
       messageId: string;
@@ -604,8 +613,10 @@ serve(async (req) => {
     console.log('🚀 Starting streaming agent orchestration', { messageId, deliberationId, mode });
     
     // F001 Fix: Acquire distributed lock to prevent duplicate processing
+    console.log('🔒 Attempting to acquire processing lock');
     const lockId = acquireProcessingLock(messageId);
     if (!lockId) {
+      console.log('⚠️ Message already being processed:', messageId);
       return new Response(JSON.stringify({ 
         error: 'Message is already being processed',
         messageId 
@@ -614,12 +625,14 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    console.log('✅ Processing lock acquired:', lockId);
     
     // Special handling for bulk processing mode
     if (mode === 'bulk_processing') {
       console.log(`🔄 Bulk processing mode enabled for message ${messageId}`);
     }
 
+    console.log('🌊 Creating streaming response transform');
     // Create streaming response
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
@@ -628,15 +641,20 @@ serve(async (req) => {
     // Send data function
     const sendData = (data: any) => {
       const message = `data: ${JSON.stringify(data)}\n\n`;
+      console.log('📤 Sending data chunk:', data.content?.substring(0, 50) || '[no content]');
       writer.write(encoder.encode(message));
     };
 
+    console.log('🚀 Starting background processing');
     // Start background processing with auth header and cleanup
     processStreamingOrchestration(messageId, deliberationId, mode, authHeader, sendData).finally(() => {
+      console.log('🔓 Releasing processing lock');
       releaseProcessingLock(messageId, lockId);
+      console.log('🔚 Closing writer');
       writer.close();
     });
 
+    console.log('✅ Returning streaming response');
     return new Response(readable, {
       headers: {
         ...corsHeaders,
@@ -648,6 +666,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('❌ Streaming orchestration error:', error);
+    console.error('❌ Error stack:', (error as Error)?.stack);
     // Ensure proper error response with status details
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return createErrorResponse(error, 500, 'agent-orchestration-stream');
@@ -665,11 +684,14 @@ async function processStreamingOrchestration(
   console.log(`🔐 Auth header present:`, !!authHeader);
   
   try {
+    console.log('🔧 Getting environment clients');
     // Use shared environment validation with caching
     const { supabase: serviceSupabase, userSupabase } = validateAndGetEnvironment();
     const openAIApiKey = getOpenAIKey();
+    console.log('✅ Environment clients ready');
 
     // Configure user client with auth header
+    console.log('🔐 Configuring authenticated user client');
     const authenticatedUserSupabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
