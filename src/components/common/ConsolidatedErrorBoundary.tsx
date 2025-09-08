@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, RefreshCw, Home, Zap } from 'lucide-react';
 import { productionLogger } from '@/utils/productionLogger';
+import { enhancedErrorReporter } from '@/utils/enhancedErrorReporting';
 
 interface Props {
   children: ReactNode;
@@ -69,7 +70,12 @@ export class ConsolidatedErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    productionLogger.error(`Error Boundary [${this.props.context || 'Unknown'}]`, error);
+    // Enhanced error reporting with structured context
+    enhancedErrorReporter.reportError(error, {
+      component: this.props.context || 'ConsolidatedErrorBoundary',
+      operation: 'error-boundary',
+      metadata: { errorInfo, props: this.props }
+    });
     
     // Log performance metrics in development
     if (process.env.NODE_ENV === 'development' && 'memory' in performance) {
@@ -88,9 +94,12 @@ export class ConsolidatedErrorBoundary extends Component<Props, State> {
         const memoryInfo = (performance as any).memory;
         const usedMB = memoryInfo.usedJSHeapSize / (1024 * 1024);
         
-        // Only warn if memory is significantly high
+        // Only warn if memory is significantly high and report as structured error
         if (usedMB > memoryThreshold) {
-          productionLogger.warn('High memory usage detected', { usedMB, threshold: memoryThreshold });
+          enhancedErrorReporter.reportMemoryIssue(usedMB, memoryThreshold, {
+            component: 'ConsolidatedErrorBoundary',
+            operation: 'memory-monitoring'
+          });
           this.setState({ isPerformanceIssue: true });
         }
       }
