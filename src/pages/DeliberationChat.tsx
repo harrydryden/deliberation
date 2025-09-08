@@ -1,5 +1,4 @@
-import React, { useEffect, useState, lazy, Suspense, useCallback, useRef, useMemo } from "react";
-import React from "react";
+import { useEffect, useState, lazy, Suspense, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { IbisSubmissionModal } from "@/components/chat/IbisSubmissionModal";
@@ -240,6 +239,9 @@ const OptimizedDeliberationChat = () => {
     messageQueue?.retryMessage, 
     messageQueue?.removeMessage
   ]);
+
+  // Load data on mount
+  useEffect(() => {
     if (!isLoading && !user) {
       navigate("/auth");
       return;

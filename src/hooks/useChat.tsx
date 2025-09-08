@@ -469,7 +469,7 @@ export const useChat = (deliberationId?: string) => {
       logger.info('📤 Message queued for processing', { 
         queueId, 
         content: content.substring(0, 50),
-        queueStats: messageQueue.getQueueStats(),
+        queueStats: messageQueue.getQueueStats,
         timeouts: {
           streamingTimeout: '30s',
           processingTimeout: '45s'
