@@ -1,39 +1,36 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
+
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest,
+  getOpenAIKey
+} from '../shared/edge-function-utils.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const { title, description } = await req.json();
+    const { title, description } = await parseAndValidateRequest(req, ['title']);
 
-    if (!title) {
-      throw new Error('Title is required');
-    }
-
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
-    }
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
+    const openAIApiKey = getOpenAIKey();
 
     console.log('Generating notion statement for:', { title, description });
 
     // Get notion statement prompt from template system
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const tempSupabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: templateData, error: templateError } = await tempSupabase
+    const { data: templateData, error: templateError } = await supabase
       .rpc('get_prompt_template', { 
         template_name: 'generate_notion_statement'
       });
@@ -74,14 +71,9 @@ serve(async (req) => {
 
     console.log('Generated notion statement:', generatedNotion);
 
-    return new Response(JSON.stringify({ notion: generatedNotion }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return createSuccessResponse({ notion: generatedNotion });
   } catch (error) {
     console.error('Error in generate-notion-statement function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return createErrorResponse(error, 500, 'generate-notion-statement');
   }
 });

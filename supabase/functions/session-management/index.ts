@@ -1,29 +1,27 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest
+} from '../shared/edge-function-utils.ts';
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'No authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createErrorResponse('No authorization header', 401);
     }
 
     // Verify user authentication
@@ -32,10 +30,7 @@ serve(async (req) => {
     );
 
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid authentication' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createErrorResponse('Invalid authentication', 401);
     }
 
     const { action, sessionData } = await req.json();
@@ -64,17 +59,11 @@ serve(async (req) => {
 
         if (error) {
           console.error('Session creation error:', error);
-          return new Response(
-            JSON.stringify({ error: 'Failed to create session' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          return createErrorResponse('Failed to create session', 500);
         }
 
         console.log('Session created:', { sessionId: data.id, userId: user.id });
-        return new Response(
-          JSON.stringify({ session: data }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return createSuccessResponse({ session: data });
       }
 
       case 'update': {
@@ -91,16 +80,10 @@ serve(async (req) => {
 
         if (error) {
           console.error('Session update error:', error);
-          return new Response(
-            JSON.stringify({ error: 'Failed to update session' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          return createErrorResponse('Failed to update session', 500);
         }
 
-        return new Response(
-          JSON.stringify({ success: true }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return createSuccessResponse({ success: true });
       }
 
       case 'end': {
@@ -117,17 +100,11 @@ serve(async (req) => {
 
         if (error) {
           console.error('Session end error:', error);
-          return new Response(
-            JSON.stringify({ error: 'Failed to end session' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          return createErrorResponse('Failed to end session', 500);
         }
 
         console.log('Session ended:', { sessionId, userId: user.id });
-        return new Response(
-          JSON.stringify({ success: true }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return createSuccessResponse({ success: true });
       }
 
       case 'cleanup': {
@@ -141,32 +118,20 @@ serve(async (req) => {
 
         if (error) {
           console.error('Session cleanup error:', error);
-          return new Response(
-            JSON.stringify({ error: 'Failed to cleanup sessions' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          return createErrorResponse('Failed to cleanup sessions', 500);
         }
 
         const cleanedCount = data?.length || 0;
         console.log('Sessions cleaned up:', { count: cleanedCount });
         
-        return new Response(
-          JSON.stringify({ cleanedCount }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return createSuccessResponse({ cleanedCount });
       }
 
       default:
-        return new Response(
-          JSON.stringify({ error: 'Invalid action' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return createErrorResponse('Invalid action', 400);
     }
   } catch (error) {
     console.error('Session management error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createErrorResponse(error, 500, 'session-management');
   }
 });

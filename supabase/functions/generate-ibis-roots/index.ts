@@ -1,6 +1,16 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
+
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest,
+  getOpenAIKey
+} from '../shared/edge-function-utils.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
 
 // Helper function to get system message from template
@@ -26,10 +36,6 @@ async function getSystemMessage(supabase: any, templateName: string): Promise<st
   return fallbacks[templateName as keyof typeof fallbacks] || 'You are a helpful AI assistant specialising in democratic deliberation. Use British English spelling and grammar throughout.';
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 // Helper function to get IBIS generation prompt from template system
 async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string, deliberationDescription: string, notion: string): Promise<string> {
@@ -60,32 +66,16 @@ async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string,
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const { deliberationId, deliberationTitle, deliberationDescription, notion } = await req.json();
+    const { deliberationId, deliberationTitle, deliberationDescription, notion } = await parseAndValidateRequest(req, ['deliberationId', 'deliberationTitle']);
 
-    if (!deliberationId || !deliberationTitle) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required parameters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      return new Response(
-        JSON.stringify({ error: 'OPENAI_API_KEY not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
+    const openAIApiKey = getOpenAIKey();
 
     // Get IBIS generation prompt from template system
     const prompt = await getIbisGenerationPrompt(supabase, deliberationTitle, deliberationDescription, notion);
@@ -97,7 +87,7 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiApiKey}`
+        'Authorization': `Bearer ${openAIApiKey}`
       },
       body: JSON.stringify({
         model: 'gpt-5-2025-08-07',
@@ -188,20 +178,14 @@ serve(async (req) => {
 
     console.log(`Generated ${createdNodes.length} root issues for deliberation ${deliberationId}`);
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        nodes: createdNodes,
-        count: createdNodes.length 
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createSuccessResponse({ 
+      success: true, 
+      nodes: createdNodes,
+      count: createdNodes.length 
+    });
 
   } catch (error) {
     console.error('Error in generate-ibis-roots function:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createErrorResponse(error, 500, 'generate-ibis-roots');
   }
 });
