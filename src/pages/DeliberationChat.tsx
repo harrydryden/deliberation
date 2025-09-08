@@ -285,6 +285,7 @@ const OptimizedDeliberationChat = () => {
     </div>
   ), [messages, chatLoading, isTyping, handleAddToIbis, retryMessage, deliberationId, state.agentConfigs, sendMessage]);
 
+  // Render loading state
   if (isLoading || state.loading) {
     return (
       <Layout>
@@ -298,228 +299,230 @@ const OptimizedDeliberationChat = () => {
     );
   }
 
+  // Early return for missing data
   if (!user || !state.deliberation) return null;
 
-  // Render admin view for admins
-  if (isAdmin) {
-    return <AdminDeliberationView />;
-  }
-
+  // CRITICAL FIX: Move admin check to JSX render instead of early return
+  // This prevents hooks inconsistency errors
   return (
     <Layout>
-      <div className="flex flex-col bg-background rounded-lg border h-[calc(100vh-120px)] min-h-0">
-        {/* Header */}
-        <div className="border-b bg-card backdrop-blur-sm sticky top-16 z-40">
-          {/* Mobile Header */}
-          <div className="lg:hidden">
-              <div className="p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <h1 className="text-lg font-semibold text-democratic-blue truncate">
-                    {state.deliberation.title}
-                  </h1>
-                  <Badge className={`${getStatusColor(state.deliberation.status)} text-white text-xs shrink-0`}>
-                    {state.deliberation.status}
-                  </Badge>
+      {isAdmin ? (
+        <AdminDeliberationView />
+      ) : (
+        <div className="flex flex-col bg-background rounded-lg border h-[calc(100vh-120px)] min-h-0">
+          {/* Header */}
+          <div className="border-b bg-card backdrop-blur-sm sticky top-16 z-40">
+            {/* Mobile Header */}
+            <div className="lg:hidden">
+                <div className="p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <h1 className="text-lg font-semibold text-democratic-blue truncate">
+                      {state.deliberation.title}
+                    </h1>
+                    <Badge className={`${getStatusColor(state.deliberation.status)} text-white text-xs shrink-0`}>
+                      {state.deliberation.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {messageQueue && messageQueue.queue.length > 0 && (
+                      <MessageQueueStatus {...queueStatusProps} />
+                    )}
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setState(prev => ({ ...prev, isHeaderCollapsed: !prev.isHeaderCollapsed }))}
+                      className="shrink-0"
+                    >
+                      {state.isHeaderCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {messageQueue && messageQueue.queue.length > 0 && (
-                    <MessageQueueStatus {...queueStatusProps} />
-                  )}
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => setState(prev => ({ ...prev, isHeaderCollapsed: !prev.isHeaderCollapsed }))}
-                    className="shrink-0"
-                  >
-                    {state.isHeaderCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
 
-            {!state.isHeaderCollapsed && (
-              <div className="px-3 pb-3 space-y-3">
-                {/* Description and Notion - Mobile */}
-                <div className="space-y-2">
-                  {state.deliberation.description && (
-                    <div>
-                      <p className="text-sm text-muted-foreground cursor-pointer" 
-                         onClick={() => setState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
-                         title="Click to view full description">
-                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description.length > 100 ? `${state.deliberation.description.slice(0, 100)}...` : state.deliberation.description}
-                      </p>
-                    </div>
-                  )}
+              {!state.isHeaderCollapsed && (
+                <div className="px-3 pb-3 space-y-3">
+                  {/* Description and Notion - Mobile */}
+                  <div className="space-y-2">
+                    {state.deliberation.description && (
+                      <div>
+                        <p className="text-sm text-muted-foreground cursor-pointer" 
+                           onClick={() => setState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
+                           title="Click to view full description">
+                          <span className="font-bold text-foreground">Description:</span> {state.deliberation.description.length > 100 ? `${state.deliberation.description.slice(0, 100)}...` : state.deliberation.description}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {state.deliberation.notion && (
+                      <div>
+                        <p className="text-sm text-muted-foreground cursor-pointer" 
+                           onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
+                           title="Click to view full notion statement">
+                          <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion.length > 100 ? `${state.deliberation.notion.slice(0, 100)}...` : state.deliberation.notion}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                   
-                  {state.deliberation.notion && (
-                    <div>
-                      <p className="text-sm text-muted-foreground cursor-pointer" 
-                         onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
-                         title="Click to view full notion statement">
-                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion.length > 100 ? `${state.deliberation.notion.slice(0, 100)}...` : state.deliberation.notion}
-                      </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg border bg-muted/40 p-2">
+                      <ChatModeSelector 
+                        mode={state.chatMode} 
+                        onModeChange={(mode) => setState(prev => ({ ...prev, chatMode: mode }))} 
+                        variant="bare" 
+                      />
                     </div>
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border bg-muted/40 p-2">
-                    <ChatModeSelector 
-                      mode={state.chatMode} 
-                      onModeChange={(mode) => setState(prev => ({ ...prev, chatMode: mode }))} 
-                      variant="bare" 
-                    />
+                    <div className="rounded-lg border bg-muted/40 p-2">
+                      <ViewModeSelector 
+                        mode={state.viewMode} 
+                        onModeChange={(v) => v && setState(prev => ({ ...prev, viewMode: v }))} 
+                      />
+                    </div>
                   </div>
-                  <div className="rounded-lg border bg-muted/40 p-2">
-                    <ViewModeSelector 
-                      mode={state.viewMode} 
-                      onModeChange={(v) => v && setState(prev => ({ ...prev, viewMode: v }))} 
-                    />
+                  
+                  <div className="flex gap-3">
+                    <div className="rounded-lg border bg-muted/40 p-2 flex-1">
+                      <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
+                        <VoiceInterfaceLazy 
+                          deliberationId={state.deliberation.id} 
+                          variant="panel" 
+                          sendMessage={sendMessage}
+                          setMessageText={setMessageText}
+                        />
+                      </Suspense>
+                    </div>
+                    <div className="rounded-lg border bg-muted/40 px-3 py-2 flex flex-col justify-center">
+                      <ParticipantScoring {...state.userScores} />
+                    </div>
                   </div>
                 </div>
-                
-                <div className="flex gap-3">
-                  <div className="rounded-lg border bg-muted/40 p-2 flex-1">
+              )}
+            </div>
+
+            {/* Desktop Header */}
+            <div className="hidden lg:block p-4">
+              <div className="flex items-stretch gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="rounded-lg border bg-muted/40 p-3 h-32 flex flex-col justify-center">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <h1 className="text-lg font-semibold text-democratic-blue truncate">
+                          {state.deliberation.title}
+                        </h1>
+                        <Badge className="bg-blue-500 text-white text-sm shrink-0">
+                          {state.deliberation.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Users className="h-4 w-4" />
+                          <span>{state.deliberation.participants?.length || state.deliberation.participant_count || 0}</span>
+                        </div>
+                        {messageQueue && messageQueue.queue.length > 0 && (
+                          <MessageQueueStatus {...queueStatusProps} />
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Description and Notion - Desktop */}
+                    <div className="space-y-1 flex-1 overflow-hidden">
+                      {state.deliberation.description && (
+                        <p className="text-xs text-muted-foreground cursor-pointer" 
+                           onClick={() => setState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
+                           title="Click to view full description">
+                          <span className="font-bold text-foreground">Description:</span> {state.deliberation.description.length > 100 ? `${state.deliberation.description.slice(0, 100)}...` : state.deliberation.description}
+                        </p>
+                      )}
+                      
+                      {state.deliberation.notion && (
+                        <p className="text-xs text-muted-foreground cursor-pointer" 
+                           onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
+                           title="Click to view full notion statement">
+                          <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion.length > 100 ? `${state.deliberation.notion.slice(0, 100)}...` : state.deliberation.notion}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="shrink-0">
+                  <div className="rounded-lg border bg-muted/40 px-3 py-2 h-32 flex flex-col justify-center space-y-2">
+                    <div>
+                      <div className="text-xs font-medium text-muted-foreground mb-1">Text Mode</div>
+                      <ChatModeSelector 
+                        mode={state.chatMode} 
+                        onModeChange={(mode) => setState(prev => ({ ...prev, chatMode: mode }))} 
+                        variant="bare" 
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-muted-foreground mb-1">View Mode</div>
+                      <ViewModeSelector 
+                        mode={state.viewMode} 
+                        onModeChange={(v) => v && setState(prev => ({ ...prev, viewMode: v }))} 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="shrink-0">
+                  <div className="rounded-lg border bg-muted/40 px-3 py-2 h-32 flex flex-col justify-center">
                     <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
                       <VoiceInterfaceLazy 
-                        deliberationId={state.deliberation.id} 
+                        deliberationId={state.deliberation.id}
                         variant="panel" 
                         sendMessage={sendMessage}
                         setMessageText={setMessageText}
                       />
                     </Suspense>
                   </div>
-                  <div className="rounded-lg border bg-muted/40 px-3 py-2 flex flex-col justify-center">
+                </div>
+
+                <div className="shrink-0">
+                  <div className="rounded-lg border bg-muted/40 px-3 py-2 h-32 flex flex-col justify-center">
                     <ParticipantScoring {...state.userScores} />
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Content Modal */}
+            {(state.deliberation.description || state.deliberation.notion) && (
+              <Dialog open={state.isDescriptionOpen} onOpenChange={(open) => setState(prev => ({ ...prev, isDescriptionOpen: open }))}>
+                <DialogContent className="max-w-none w-screen h-screen p-6 sm:p-10 overflow-hidden">
+                  <div className="w-full h-full flex items-center justify-center">
+                    <article className="max-w-3xl text-center text-foreground whitespace-pre-wrap break-words">
+                      {state.modalContent === 'description' ? state.deliberation.description : state.deliberation.notion}
+                    </article>
+                  </div>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
-
-          {/* Desktop Header */}
-          <div className="hidden lg:block p-4">
-            <div className="flex items-stretch gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="rounded-lg border bg-muted/40 p-3 h-32 flex flex-col justify-center">
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <h1 className="text-lg font-semibold text-democratic-blue truncate">
-                        {state.deliberation.title}
-                      </h1>
-                      <Badge className="bg-blue-500 text-white text-sm shrink-0">
-                        {state.deliberation.status}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Users className="h-4 w-4" />
-                        <span>{state.deliberation.participants?.length || state.deliberation.participant_count || 0}</span>
-                      </div>
-                      {messageQueue && messageQueue.queue.length > 0 && (
-                        <MessageQueueStatus {...queueStatusProps} />
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Description and Notion - Desktop */}
-                  <div className="space-y-1 flex-1 overflow-hidden">
-                    {state.deliberation.description && (
-                      <p className="text-xs text-muted-foreground cursor-pointer" 
-                         onClick={() => setState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
-                         title="Click to view full description">
-                        <span className="font-bold text-foreground">Description:</span> {state.deliberation.description.length > 100 ? `${state.deliberation.description.slice(0, 100)}...` : state.deliberation.description}
-                      </p>
-                    )}
-                    
-                    {state.deliberation.notion && (
-                      <p className="text-xs text-muted-foreground cursor-pointer" 
-                         onClick={() => setState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
-                         title="Click to view full notion statement">
-                        <span className="font-bold text-foreground">Notion:</span> {state.deliberation.notion.length > 100 ? `${state.deliberation.notion.slice(0, 100)}...` : state.deliberation.notion}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="shrink-0">
-                <div className="rounded-lg border bg-muted/40 px-3 py-2 h-32 flex flex-col justify-center space-y-2">
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">Text Mode</div>
-                    <ChatModeSelector 
-                      mode={state.chatMode} 
-                      onModeChange={(mode) => setState(prev => ({ ...prev, chatMode: mode }))} 
-                      variant="bare" 
-                    />
-                  </div>
-                  <div>
-                    <div className="text-xs font-medium text-muted-foreground mb-1">View Mode</div>
-                    <ViewModeSelector 
-                      mode={state.viewMode} 
-                      onModeChange={(v) => v && setState(prev => ({ ...prev, viewMode: v }))} 
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="shrink-0">
-                <div className="rounded-lg border bg-muted/40 px-3 py-2 h-32 flex flex-col justify-center">
-                  <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
-                    <VoiceInterfaceLazy 
-                      deliberationId={state.deliberation.id}
-                      variant="panel" 
-                      sendMessage={sendMessage}
-                      setMessageText={setMessageText}
-                    />
-                  </Suspense>
-                </div>
-              </div>
-
-              <div className="shrink-0">
-                <div className="rounded-lg border bg-muted/40 px-3 py-2 h-32 flex flex-col justify-center">
-                  <ParticipantScoring {...state.userScores} />
-                </div>
-              </div>
-            </div>
+          
+          {/* Main Content */}
+          <div className="flex-1 flex flex-col min-h-0">
+            {state.viewMode === 'chat' ? (
+              <ChatPanel />
+            ) : (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading map…</div></div>}>
+                <IbisMapVisualizationLazy deliberationId={state.deliberation.id} />
+              </Suspense>
+            )}
           </div>
-
-          {/* Content Modal */}
-          {(state.deliberation.description || state.deliberation.notion) && (
-            <Dialog open={state.isDescriptionOpen} onOpenChange={(open) => setState(prev => ({ ...prev, isDescriptionOpen: open }))}>
-              <DialogContent className="max-w-none w-screen h-screen p-6 sm:p-10 overflow-hidden">
-                <div className="w-full h-full flex items-center justify-center">
-                  <article className="max-w-3xl text-center text-foreground whitespace-pre-wrap break-words">
-                    {state.modalContent === 'description' ? state.deliberation.description : state.deliberation.notion}
-                  </article>
-                </div>
-              </DialogContent>
-            </Dialog>
+          
+          {/* IBIS Submission Modal */}
+          {state.deliberation && (
+            <IbisSubmissionModal 
+              isOpen={state.ibisModal.isOpen} 
+              onClose={handleIbisModalClose} 
+              messageId={state.ibisModal.messageId} 
+              messageContent={state.ibisModal.messageContent} 
+              deliberationId={state.deliberation.id} 
+              onSuccess={handleIbisSuccess} 
+            />
           )}
         </div>
-        
-        {/* Main Content */}
-        <div className="flex-1 flex flex-col min-h-0">
-          {state.viewMode === 'chat' ? (
-            <ChatPanel />
-          ) : (
-            <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading map…</div></div>}>
-              <IbisMapVisualizationLazy deliberationId={state.deliberation.id} />
-            </Suspense>
-          )}
-        </div>
-        
-        {/* IBIS Submission Modal */}
-        {state.deliberation && (
-          <IbisSubmissionModal 
-            isOpen={state.ibisModal.isOpen} 
-            onClose={handleIbisModalClose} 
-            messageId={state.ibisModal.messageId} 
-            messageContent={state.ibisModal.messageContent} 
-            deliberationId={state.deliberation.id} 
-            onSuccess={handleIbisSuccess} 
-          />
-        )}
-      </div>
+      )}
     </Layout>
   );
 };
