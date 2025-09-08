@@ -4,6 +4,7 @@ import { serviceContainer } from '@/services/domain/container';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
 import { logger } from '@/utils/logger';
+import { useDeliberationService } from './useDeliberationService';
 
 export interface OptimizedAdminData {
   users: any[];
@@ -33,6 +34,7 @@ export interface OptimizedAdminData {
 export const useOptimizedAdminData = (): OptimizedAdminData => {
   const { toast } = useToast();
   const adminService = serviceContainer.adminService;
+  const deliberationService = useDeliberationService();
 
   // Optimized async operations with caching and error handling
   const {
@@ -77,7 +79,7 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
   } = useOptimizedAsync(
     async () => {
       logger.info('Fetching deliberations');
-      return await adminService.getAllDeliberations();
+      return await deliberationService.getDeliberations();
     },
     {
       cacheKey: 'admin-deliberations',
