@@ -62,14 +62,17 @@ export const useIbisSubmission = (
       const allRelationships = submissionData.smartConnections;
 
       if (submissionData.isLinkingMode && submissionData.selectedIssueId) {
-        // Link to existing issue
-        nodeId = submissionData.selectedIssueId;
-        await ibisService.linkMessageToIssue(
+        // Link to existing issue - creates a new node and links it
+        const linkedNodeId = await ibisService.linkMessageToIssue(
           messageId,
           submissionData.selectedIssueId,
           user.id,
-          deliberationId
+          deliberationId,
+          messageContent,
+          submissionData.title,
+          submissionData.nodeType
         );
+        nodeId = linkedNodeId;
       } else {
         // Create new node
         const nodeData = {

@@ -140,28 +140,77 @@ export class IBISService {
   }
 
   /**
-   * Link message to existing issue
+   * Link message to existing issue - Creates a node for the message and links it to the issue
    */
-  async linkMessageToIssue(messageId: string, issueId: string, userId: string, deliberationId: string): Promise<void> {
+  async linkMessageToIssue(messageId: string, issueId: string, userId: string, deliberationId: string, messageContent?: string, nodeTitle?: string, nodeType?: string): Promise<string> {
     try {
       logger.info('[IBISService] Linking message to existing issue', { messageId, issueId });
 
+      // Verify the target issue exists
+      const { data: targetIssue, error: issueError } = await supabase
+        .from('ibis_nodes')
+        .select('id, title, node_type')
+        .eq('id', issueId)
+        .eq('deliberation_id', deliberationId)
+        .single();
+
+      if (issueError || !targetIssue) {
+        logger.error('[IBISService] Target issue not found', { issueId, error: issueError });
+        throw new Error('Target issue not found or not accessible');
+      }
+
+      // Get message content if not provided
+      let content = messageContent;
+      if (!content) {
+        const { data: message, error: msgError } = await supabase
+          .from('messages')
+          .select('content')
+          .eq('id', messageId)
+          .single();
+        
+        if (msgError || !message) {
+          logger.error('[IBISService] Message not found', { messageId, error: msgError });
+          throw new Error('Message not found');
+        }
+        content = message.content;
+      }
+
+      // Create a new node for the message content
+      const nodeData: IBISNode = {
+        title: nodeTitle || `Response to: ${targetIssue.title}`,
+        description: content?.substring(0, 500), // Truncate long content
+        node_type: nodeType || 'position', // Default to position when linking to issue
+        deliberation_id: deliberationId,
+        message_id: messageId,
+        created_by: userId
+      };
+
+      const newNode = await this.createNode(nodeData);
+
+      // Create relationship between new node and target issue
       const { error: relError } = await supabase
         .from('ibis_relationships')
         .insert({
-          source_node_id: issueId,
-          target_node_id: issueId, // Self-reference for position linking
-          relationship_type: 'supports', // Default relationship type
+          source_node_id: newNode.id,
+          target_node_id: issueId,
+          relationship_type: nodeType === 'argument' ? 'supports' : 'addresses',
           created_by: userId,
           deliberation_id: deliberationId
         });
 
       if (relError) {
-        logger.error('[IBISService] Error linking message to issue', { error: relError });
+        logger.error('[IBISService] Error creating relationship', { error: relError });
+        // Try to clean up the created node
+        await supabase.from('ibis_nodes').delete().eq('id', newNode.id);
         throw relError;
       }
 
-      logger.info('[IBISService] Message linked to issue successfully');
+      logger.info('[IBISService] Message linked to issue successfully', { 
+        newNodeId: newNode.id, 
+        targetIssueId: issueId 
+      });
+      
+      return newNode.id;
     } catch (error) {
       logger.error('[IBISService] Error in linkMessageToIssue', { error });
       throw error;
