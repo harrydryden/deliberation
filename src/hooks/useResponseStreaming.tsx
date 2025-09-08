@@ -229,73 +229,84 @@ export const useResponseStreaming = () => {
       };
 
       while (true) {
-        const { done, value } = await reader.read();
-        
-        if (streamControllerRef.current?.signal?.aborted) {
-          console.log('🛑 Stream aborted by user');
-          break;
-        }
-
-        if (done) {
-          console.log('✅ Stream completed');
-          break;
-        }
-
         try {
-          const chunk = decoder.decode(value, { stream: true });
-          lastActivity = Date.now(); // Update activity timestamp
-          console.log('📦 Received chunk:', chunk.substring(0, 100) + '...');
-
-          // Parse each line as a potential JSON object
-          const lines = chunk.split('\n').filter(line => line.trim());
+          const { done, value } = await reader.read();
           
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const jsonStr = line.slice(6);
-              if (jsonStr === '[DONE]') {
-                console.log('🏁 Received [DONE] signal');
-                break;
-              }
-              
-              try {
-                const parsed: StreamingResponse = JSON.parse(jsonStr);
-                
-                if (parsed.error) {
-                  throw new Error(parsed.error);
-                }
-                
-                if (parsed.content) {
-                  accumulatorRef.current += parsed.content;
-                  lastActivity = Date.now(); // Update activity timestamp
-                  
-                  // Update agent type if provided
-                  if (parsed.agentType && !streamingState.agentType) {
-                    setStreamingState(prev => ({
-                      ...prev,
-                      agentType: parsed.agentType || null,
-                    }));
-                  }
-                  
-                  // Throttle UI updates using requestAnimationFrame
-                  if (rafIdRef.current) {
-                    cancelAnimationFrame(rafIdRef.current);
-                  }
-                  rafIdRef.current = requestAnimationFrame(updateUI);
-                }
-                
-                if (parsed.done) {
-                  console.log('✅ Received done signal from parsed data');
+          if (streamControllerRef.current?.signal?.aborted) {
+            console.log('🛑 Stream aborted by user');
+            await reader.cancel();
+            break;
+          }
+
+          if (done) {
+            console.log('✅ Stream completed');
+            break;
+          }
+
+          try {
+            const chunk = decoder.decode(value, { stream: true });
+            lastActivity = Date.now(); // Update activity timestamp
+            console.log('📦 Received chunk:', chunk.substring(0, 100) + '...');
+
+            // Parse each line as a potential JSON object
+            const lines = chunk.split('\n').filter(line => line.trim());
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const jsonStr = line.slice(6);
+                if (jsonStr === '[DONE]') {
+                  console.log('🏁 Received [DONE] signal');
                   break;
                 }
-              } catch (parseError) {
-                console.warn('⚠️ Failed to parse streaming chunk:', parseError);
-                // Continue processing other lines
+                
+                try {
+                  const parsed: StreamingResponse = JSON.parse(jsonStr);
+                  
+                  if (parsed.error) {
+                    throw new Error(parsed.error);
+                  }
+                  
+                  if (parsed.content) {
+                    accumulatorRef.current += parsed.content;
+                    lastActivity = Date.now(); // Update activity timestamp
+                    
+                    // Update agent type if provided
+                    if (parsed.agentType && !streamingState.agentType) {
+                      setStreamingState(prev => ({
+                        ...prev,
+                        agentType: parsed.agentType || null,
+                      }));
+                    }
+                    
+                    // Throttle UI updates using requestAnimationFrame
+                    if (rafIdRef.current) {
+                      cancelAnimationFrame(rafIdRef.current);
+                    }
+                    rafIdRef.current = requestAnimationFrame(updateUI);
+                  }
+                  
+                  if (parsed.done) {
+                    console.log('✅ Received done signal from parsed data');
+                    break;
+                  }
+                } catch (parseError) {
+                  console.warn('⚠️ Failed to parse streaming chunk:', parseError);
+                  // Continue processing other lines
+                }
               }
             }
+          } catch (chunkError) {
+            console.error('❌ Error processing chunk:', chunkError);
+            // Continue processing stream
           }
-        } catch (chunkError) {
-          console.error('❌ Error processing chunk:', chunkError);
-          // Continue processing stream
+        } catch (readError) {
+          // Handle specific abort errors gracefully
+          if (readError instanceof DOMException && readError.name === 'AbortError') {
+            console.log('🛑 Stream reading aborted intentionally');
+            await reader.cancel();
+            return; // Exit early without calling onError
+          }
+          throw readError; // Re-throw other errors
         }
       }
 
@@ -308,6 +319,12 @@ export const useResponseStreaming = () => {
       uiDebugger.trackStreamingEnd('stream-complete-success');
 
     } catch (error) {
+      // Handle specific abort errors gracefully
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        console.log('🛑 Request aborted intentionally');
+        return; // Exit gracefully without calling onError
+      }
+      
       console.error('❌ Streaming error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
       

@@ -288,6 +288,13 @@ export const useChat = (deliberationId?: string) => {
         },
         // onError callback
         (error: string) => {
+          // Don't mark as failed if it was intentionally aborted
+          if (error.includes('aborted') || error.includes('AbortError')) {
+            console.log('🛑 Message processing was aborted intentionally', { queueId });
+            messageQueue.removeFromQueue(queueId);
+            return;
+          }
+          
           console.error('❌ Streaming error occurred for queued message', { error, queueId });
           setChatState(prev => ({
             ...prev,
