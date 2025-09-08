@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown, Type, AudioLines, Clock } from 'lucide-react';
 import { RealtimeRTC } from '@/utils/realtimeRtc';
 import { SessionManager } from '@/utils/sessionManager';
+import { isProduction } from '@/utils/productionConfig';
 import { logger } from '@/utils/logger';
 // Local interface for voice events
 interface VoiceEvent {
@@ -345,9 +346,12 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     setMode('idle');
     setSttBusy(false);
     
+    // Optimized cleanup timing for production
+    const cleanupDelay = isProduction ? 500 : 1500;
+    
     // Wait for complete cleanup to handle session expiration
     logger.debug('Waiting for complete cleanup...');
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, cleanupDelay));
     logger.debug('Cleanup complete, ready for new session');
   };
 
