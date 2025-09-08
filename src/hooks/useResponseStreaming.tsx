@@ -111,18 +111,29 @@ export const useResponseStreaming = () => {
       const timeSinceActivity = Date.now() - lastActivity;
       heartbeatCount++;
       
+      // Only check for stalls if we've received at least one chunk
+      // This prevents premature timeout during initial processing
+      const hasReceivedData = accumulatorRef.current.length > 0;
+      
       if (timeSinceActivity > 15000) { // 15 seconds without activity
-        productionLogger.debug('Heartbeat: No activity detected', { heartbeatCount, timeSinceActivity });
+        productionLogger.debug('Heartbeat: No activity detected', { 
+          heartbeatCount, 
+          timeSinceActivity, 
+          hasReceivedData,
+          accumulatedLength: accumulatorRef.current.length 
+        });
         
-        if (timeSinceActivity > 35000) { // F004 Fix: 35 seconds to align with new timeout
-          productionLogger.warn('Connection appears stalled, preparing for timeout'); 
+        // Only trigger stall detection if we've already received data and then stopped
+        // This prevents false positives during initial AI processing time
+        if (hasReceivedData && timeSinceActivity > 25000) { // Increased to 25 seconds after first data
+          productionLogger.warn('Connection appears stalled after receiving data, preparing for timeout'); 
           // Pre-emptively clear state to prevent hanging UI
           setStreamingState(prev => ({
             ...prev,
             isStreaming: false
           }));
           // Call onError to notify queue
-          onError('Connection stalled - no activity for 35 seconds.');
+          onError('Connection stalled - no activity for 25 seconds after receiving data.');
         }
       } else {
         productionLogger.debug('Heartbeat: Connection active', { heartbeatCount, timeSinceActivity });
