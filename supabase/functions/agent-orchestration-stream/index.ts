@@ -257,110 +257,162 @@ async function checkAvailableKnowledge(supabase: any, deliberationId: string): P
   }
 }
 
-// Retrieve knowledge for bill agent responses using LangChain RAG
+// Enhanced knowledge retrieval with timeout and caching
 async function retrieveBillAgentKnowledge(query: string, deliberationId: string): Promise<string> {
   try {
+    const cacheKey = `knowledge_${deliberationId}_${query.substring(0, 50).replace(/\s+/g, '_')}`;
+    
+    // Check cache first for faster response
+    const cached = responseCache.get(cacheKey);
+    if (cached) {
+      console.log('🚀 Knowledge retrieval cache hit');
+      return cached;
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get bill agent for this deliberation
-    const { data: billAgents } = await supabase
-      .from('agent_configurations')
-      .select('id')
-      .eq('agent_type', 'bill_agent')
-      .eq('deliberation_id', deliberationId)
-      .eq('is_active', true)
-      .limit(1);
+    // Enhanced agent lookup with timeout
+    const agentLookupPromise = withTimeout(
+      (async () => {
+        // Get bill agent for this deliberation
+        const { data: billAgents } = await supabase
+          .from('agent_configurations')
+          .select('id')
+          .eq('agent_type', 'bill_agent')
+          .eq('deliberation_id', deliberationId)
+          .eq('is_active', true)
+          .limit(1);
 
-    if (!billAgents || billAgents.length === 0) {
-      console.log('📚 No bill agent found for deliberation, checking global agents...');
-      
-      // Fallback to global bill agent
-      const { data: globalAgents } = await supabase
-        .from('agent_configurations')
-        .select('id')
-        .eq('agent_type', 'bill_agent')
-        .is('deliberation_id', null)
-        .eq('is_active', true)
-        .limit(1);
-        
-      if (!globalAgents || globalAgents.length === 0) {
-        console.log('📚 No bill agent found at all');
-        return '';
-      }
-      
-      billAgents.push(globalAgents[0]);
-    }
-
-    const agentId = billAgents[0].id;
-    console.log(`📚 Using LangChain RAG for agent: ${agentId} with query: "${query.substring(0, 100)}..."`);
-
-  // Check if agent has any knowledge first with parallel execution optimization
-  const knowledgePromises = [
-    supabase
-      .from('agent_knowledge')
-      .select('id')
-      .eq('agent_id', agentId)
-      .limit(1),
-    // Pre-fetch some knowledge chunks in parallel for faster response  
-    supabase
-      .from('agent_knowledge')
-      .select('content, metadata')
-      .eq('agent_id', agentId)
-      .limit(3)
-  ];
-
-  const [knowledgeCheck, fallbackKnowledge] = await Promise.all(knowledgePromises);
-
-  if (!knowledgeCheck.data || knowledgeCheck.data.length === 0) {
-    console.log('📚 No knowledge available for agent, skipping RAG retrieval');
-    return '';
-  }
-
-    // Use LangChain RAG system for semantic knowledge retrieval
-    try {
-      console.log('🧠 Calling LangChain RAG system...');
-      const { data: ragResult, error: ragError } = await supabase.functions.invoke('langchain-query-knowledge', {
-        body: {
-          query: query,
-          agentId: agentId,
-          maxResults: 5 // Get more results than the basic approach for better context
+        if (!billAgents || billAgents.length === 0) {
+          console.log('📚 No bill agent found for deliberation, checking global agents...');
+          
+          // Fallback to global bill agent
+          const { data: globalAgents } = await supabase
+            .from('agent_configurations')
+            .select('id')
+            .eq('agent_type', 'bill_agent')
+            .is('deliberation_id', null)
+            .eq('is_active', true)
+            .limit(1);
+            
+          if (!globalAgents || globalAgents.length === 0) {
+            console.log('📚 No bill agent found at all');
+            return null;
+          }
+          
+          return globalAgents[0];
         }
-      });
-
-      if (ragError) {
-        console.error('❌ LangChain RAG error:', ragError);
-        throw new Error(`RAG query failed: ${ragError.message}`);
-      }
-
-      if (ragResult?.success && ragResult?.relevantKnowledge?.length > 0) {
-        // Extract content from relevant knowledge chunks
-        const contextChunks = ragResult.relevantKnowledge
-          .map((chunk: any) => chunk.content)
-          .join('\n\n');
         
-        console.log(`✅ LangChain RAG retrieved ${ragResult.relevantKnowledge.length} semantically relevant chunks`);
-        console.log(`📄 Sources: ${ragResult.sources?.join(', ') || 'Unknown'}`);
-        
-        return contextChunks;
-      } else {
-        console.log('📚 LangChain RAG returned no relevant results');
-        return '';
-      }
+        return billAgents[0];
+      })(),
+      5000,
+      'Agent Lookup',
+      null
+    );
 
-    } catch (ragError) {
-      console.error('❌ LangChain RAG system failed, falling back to pre-fetched knowledge:', ragError);
-      
-      // Use pre-fetched fallback knowledge for better performance
-      if (fallbackKnowledge.data && fallbackKnowledge.data.length > 0) {
-        const contextChunks = fallbackKnowledge.data.map((item: any) => item.content).join('\n\n');
-        console.log(`📚 Fallback: Using ${fallbackKnowledge.data.length} pre-fetched knowledge chunks`);
-        return contextChunks;
-      }
-
+    const agent = await agentLookupPromise;
+    if (!agent) {
       return '';
     }
+
+    const agentId = agent.id;
+    console.log(`📚 Using optimized knowledge retrieval for agent: ${agentId} with query: "${query.substring(0, 100)}..."`);
+
+    // Enhanced parallel knowledge operations with tiered approach
+    const knowledgeResults = await executeTieredOperations({
+      critical: [
+        {
+          name: 'knowledge_check',
+          fn: async () => {
+            const { data } = await supabase
+              .from('agent_knowledge')
+              .select('id')
+              .eq('agent_id', agentId)
+              .limit(1);
+            return !!(data && data.length > 0);
+          },
+          fallback: false
+        }
+      ],
+      secondary: [
+        {
+          name: 'fallback_knowledge',
+          fn: async () => {
+            const { data } = await supabase
+              .from('agent_knowledge')
+              .select('content, metadata')
+              .eq('agent_id', agentId)
+              .limit(3);
+            return data || [];
+          },
+          fallback: []
+        }
+      ],
+      optional: [
+        {
+          name: 'langchain_rag',
+          fn: async () => {
+            console.log('🧠 Calling optimized LangChain RAG system...');
+            const { data: ragResult, error: ragError } = await supabase.functions.invoke('langchain-query-knowledge', {
+              body: {
+                query: query,
+                agentId: agentId,
+                maxResults: 3 // Reduced from 5 for faster response
+              }
+            });
+
+            if (ragError) {
+              console.error('❌ LangChain RAG error:', ragError);
+              throw new Error(`RAG query failed: ${ragError.message}`);
+            }
+
+            return ragResult;
+          },
+          fallback: null
+        }
+      ]
+    }, { individual: 8000, total: 15000, retryDelay: 500 }); // Optimized timeouts
+
+    console.log(`📊 Knowledge retrieval completed in ${knowledgeResults.totalTime}ms`);
+
+    // Check if we have any knowledge available
+    const hasKnowledge = knowledgeResults.critical.knowledge_check;
+    if (!hasKnowledge) {
+      console.log('📚 No knowledge available for agent, skipping RAG retrieval');
+      return '';
+    }
+
+    // Process results with fallback strategy
+    const ragResult = knowledgeResults.optional.langchain_rag;
+    const fallbackKnowledge = knowledgeResults.secondary.fallback_knowledge || [];
+
+    let contextChunks = '';
+
+    // Try LangChain RAG first
+    if (ragResult?.success && ragResult?.relevantKnowledge?.length > 0) {
+      contextChunks = ragResult.relevantKnowledge
+        .map((chunk: any) => chunk.content)
+        .join('\n\n');
+      
+      console.log(`✅ LangChain RAG retrieved ${ragResult.relevantKnowledge.length} semantically relevant chunks`);
+      console.log(`📄 Sources: ${ragResult.sources?.join(', ') || 'Unknown'}`);
+    } else if (fallbackKnowledge.length > 0) {
+      // Fall back to pre-fetched knowledge
+      contextChunks = fallbackKnowledge.map((item: any) => item.content).join('\n\n');
+      console.log(`📚 Fallback: Using ${fallbackKnowledge.length} pre-fetched knowledge chunks`);
+    } else {
+      console.log('📚 No relevant knowledge found');
+      return '';
+    }
+
+    // Cache successful results for 10 minutes
+    if (contextChunks) {
+      responseCache.set(cacheKey, contextChunks);
+    }
+
+    return contextChunks;
 
   } catch (error) {
     console.error('📚 Knowledge retrieval error:', error);
@@ -368,7 +420,7 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
   }
 }
 
-// Generate streaming response using orchestrator
+// Enhanced streaming response generation with conditional knowledge loading
 async function generateStreamingResponse(
   content: string,
   agentType: string,
@@ -389,9 +441,14 @@ async function generateStreamingResponse(
     hasOpenAIKey: !!openAIApiKey
   });
 
-  // Get agent configuration through orchestrator
+  // Get agent configuration through orchestrator with timeout
   console.log(`🔧 Getting agent config for ${agentType}...`);
-  const agentConfig = await orchestrator.getAgentConfig(agentType, deliberationId);
+  const agentConfig = await withTimeout(
+    orchestrator.getAgentConfig(agentType, deliberationId),
+    5000,
+    `Agent Config: ${agentType}`,
+    null
+  );
   console.log(`✅ Agent config retrieved:`, { hasConfig: !!agentConfig, configName: agentConfig?.name });
   
   // Select standardized model (using gpt-5 for best performance)
@@ -399,20 +456,37 @@ async function generateStreamingResponse(
   
   console.log(`🧠 Using ${model} for ${agentType} response (config: ${agentConfig ? 'custom' : 'default'})`);
 
-  // For bill agent, retrieve relevant knowledge first
+  // For bill agent, retrieve relevant knowledge with conditional loading
   let knowledgeContext = '';
   if (agentType === 'bill_agent') {
-    console.log('📚 Retrieving knowledge for bill agent...');
+    console.log('📚 Retrieving knowledge for bill agent with timeout...');
     try {
-      knowledgeContext = await retrieveBillAgentKnowledge(content, deliberationId);
-      console.log(`📚 Knowledge context retrieved: ${knowledgeContext.length} characters`);
+      // Only retrieve knowledge for complex queries or when specifically needed
+      const shouldRetrieveKnowledge = 
+        analysis.complexity > 0.3 || 
+        analysis.requiresExpertise || 
+        content.toLowerCase().includes('bill') ||
+        content.toLowerCase().includes('policy') ||
+        content.toLowerCase().includes('legislation');
+        
+      if (shouldRetrieveKnowledge) {
+        knowledgeContext = await withTimeout(
+          retrieveBillAgentKnowledge(content, deliberationId),
+          10000, // 10 seconds for knowledge retrieval
+          'Knowledge Retrieval',
+          '' // Empty fallback to continue without knowledge
+        );
+        console.log(`📚 Knowledge context retrieved: ${knowledgeContext.length} characters`);
+      } else {
+        console.log('📚 Skipping knowledge retrieval for simple query');
+      }
     } catch (knowledgeError) {
       console.error('❌ Knowledge retrieval error:', knowledgeError);
       knowledgeContext = '';
     }
   }
 
-  // Generate system prompt using orchestrator
+  // Generate system prompt using orchestrator with timeout
   const enhancementContext = {
     complexity: analysis.complexity,
     similarNodes,
@@ -422,7 +496,11 @@ async function generateStreamingResponse(
   console.log('🔧 Enhancement context:', JSON.stringify(enhancementContext, null, 2));
   
   try {
-    const systemPrompt = await orchestrator.generateSystemPrompt(agentConfig, agentType, enhancementContext);
+    const systemPrompt = await withTimeout(
+      orchestrator.generateSystemPrompt(agentConfig, agentType, enhancementContext),
+      5000,
+      'System Prompt Generation'
+    );
     
     console.log('📝 Generated system prompt length:', systemPrompt?.length || 0);
     console.log('📝 System prompt preview:', systemPrompt?.substring(0, 200) + '...');
@@ -439,7 +517,7 @@ async function generateStreamingResponse(
       { role: 'user', content: content }
     ];
     
-    const requestBody: any = ModelConfigManager.generateAPIParams(model, messages, { maxTokens: 3000, stream: useStreaming });
+    const requestBody: any = ModelConfigManager.generateAPIParams(model, messages, { maxTokens: 2500, stream: useStreaming }); // Reduced from 3000
 
     console.log('🔧 Request body preview:', JSON.stringify({
       model: requestBody.model,
@@ -455,14 +533,19 @@ async function generateStreamingResponse(
     console.log('📏 User content length:', content?.length || 0);
     console.log('📝 User content preview:', content?.substring(0, 200) + '...');
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
+    // Enhanced OpenAI API call with timeout
+    const response = await withTimeout(
+      fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      }),
+      25000, // 25 second timeout for OpenAI API call
+      'OpenAI API Call'
+    );
 
     console.log('📡 Response status:', response.status);
     console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));

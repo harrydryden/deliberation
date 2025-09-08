@@ -1,105 +1,287 @@
-// Optimized message loading hook with batching and pagination
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { useServices } from '@/hooks/useServices';
-import { cacheService } from '@/services/cache.service';
+// Optimized message loading hook with enhanced caching and performance
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
-import type { Message } from '@/types/index';
 
-interface UseOptimizedMessageLoadingOptions {
-  deliberationId?: string;
-  pageSize?: number;
-  enablePagination?: boolean;
-  cacheTimeout?: number;
+interface Message {
+  id: string;
+  content: string;
+  message_type: string;
+  user_id: string;
+  created_at: string;
+  parent_message_id?: string;
+  deliberation_id: string;
+  agent_context?: any;
 }
 
-export const useOptimizedMessageLoading = (options: UseOptimizedMessageLoadingOptions = {}) => {
-  const { 
-    deliberationId, 
-    pageSize = 50, 
-    enablePagination = true,
-    cacheTimeout = 300000 // 5 minutes
-  } = options;
+interface LoadingState {
+  messages: Message[];
+  loading: boolean;
+  error: string | null;
+  hasMore: boolean;
+  lastLoadTime: number;
+}
 
-  const { messageService } = useServices();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const currentPageRef = useRef(0);
-  const totalLoadedRef = useRef(0);
+// Enhanced message cache with TTL and size limits
+class MessageCache {
+  private cache = new Map<string, { 
+    messages: Message[], 
+    timestamp: number, 
+    hasMore: boolean,
+    totalCount: number 
+  }>();
+  private readonly TTL = 5 * 60 * 1000; // 5 minutes
+  private readonly MAX_SIZE = 50;
 
-  // Batch load messages with pagination
-  const loadMessages = useCallback(async (page = 0, append = false) => {
-    if (isLoading) return;
+  get(deliberationId: string, page: number = 0): { messages: Message[], hasMore: boolean, totalCount: number } | null {
+    const key = `${deliberationId}_${page}`;
+    const entry = this.cache.get(key);
+    
+    if (!entry) return null;
+    
+    // Check TTL
+    if (Date.now() - entry.timestamp > this.TTL) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return {
+      messages: entry.messages,
+      hasMore: entry.hasMore,
+      totalCount: entry.totalCount
+    };
+  }
 
-    setIsLoading(true);
-    setError(null);
+  set(deliberationId: string, page: number, messages: Message[], hasMore: boolean, totalCount: number): void {
+    const key = `${deliberationId}_${page}`;
+    
+    // Clean up expired entries
+    this.cleanup();
+    
+    // Evict oldest if at capacity
+    if (this.cache.size >= this.MAX_SIZE) {
+      const oldestKey = Array.from(this.cache.entries())
+        .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
+      this.cache.delete(oldestKey);
+    }
+    
+    this.cache.set(key, {
+      messages,
+      hasMore,
+      totalCount,
+      timestamp: Date.now()
+    });
+  }
+
+  invalidate(deliberationId: string): void {
+    const keysToDelete = Array.from(this.cache.keys())
+      .filter(key => key.startsWith(deliberationId));
+    
+    keysToDelete.forEach(key => this.cache.delete(key));
+  }
+
+  private cleanup(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp > this.TTL) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  getStats() {
+    return {
+      size: this.cache.size,
+      maxSize: this.MAX_SIZE,
+      keys: Array.from(this.cache.keys())
+    };
+  }
+}
+
+// Global message cache instance
+const messageCache = new MessageCache();
+
+export const useOptimizedMessageLoading = (deliberationId: string) => {
+  const [state, setState] = useState<LoadingState>({
+    messages: [],
+    loading: false,
+    error: null,
+    hasMore: true,
+    lastLoadTime: 0
+  });
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isLoadingRef = useRef(false);
+
+  // Load messages with enhanced caching and optimizations
+  const loadMessages = useCallback(async (page: number = 0, append: boolean = false) => {
+    if (isLoadingRef.current && !append) {
+      console.log('📦 Message loading already in progress, skipping...');
+      return;
+    }
+
+    const startTime = Date.now();
+    console.log(`📨 Loading messages for deliberation ${deliberationId}, page ${page}`);
+
+    // Check cache first
+    const cached = messageCache.get(deliberationId, page);
+    if (cached && !append) {
+      console.log(`🚀 Message cache hit for deliberation ${deliberationId}, page ${page}`);
+      setState(prev => ({
+        ...prev,
+        messages: cached.messages,
+        hasMore: cached.hasMore,
+        loading: false,
+        error: null,
+        lastLoadTime: Date.now()
+      }));
+      return;
+    }
+
+    // Cancel any ongoing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    abortControllerRef.current = new AbortController();
+    isLoadingRef.current = true;
+
+    setState(prev => ({
+      ...prev,
+      loading: true,
+      error: null
+    }));
 
     try {
-      // const timer = performanceMonitor.startTimer('loadMessages');
+      const MESSAGES_PER_PAGE = 20;
+      const offset = page * MESSAGES_PER_PAGE;
 
-      // Use caching for message requests
-      const cacheKey = enablePagination 
-        ? `messages-${deliberationId}-${page}-${pageSize}`
-        : `messages-${deliberationId}`;
+      // Optimized query with reduced data transfer
+      const { data: messages, error, count } = await supabase
+        .from('messages')
+        .select(`
+          id,
+          content,
+          message_type,
+          user_id,
+          created_at,
+          parent_message_id,
+          deliberation_id,
+          agent_context
+        `, { count: 'exact' })
+        .eq('deliberation_id', deliberationId)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + MESSAGES_PER_PAGE - 1)
+        .abortSignal(abortControllerRef.current.signal);
 
-      const loadFunction = enablePagination 
-        ? () => messageService.getMessagesPaginated(deliberationId, page, pageSize)
-        : () => messageService.getMessages(deliberationId);
-
-      const data = await cacheService.memoizeAsync(
-        'messages',
-        [cacheKey],
-        loadFunction,
-        { ttl: cacheTimeout }
-      );
-
-      if (append) {
-        setMessages(prev => [...prev, ...(data || [])]);
-      } else {
-        setMessages(data || []);
+      if (error) {
+        throw error;
       }
 
-      // Update pagination state
-      if (enablePagination) {
-        const newTotal = totalLoadedRef.current + (data?.length || 0);
-        totalLoadedRef.current = newTotal;
-        setHasMore((data?.length || 0) >= pageSize);
-        currentPageRef.current = page;
-      }
+      const loadTime = Date.now() - startTime;
+      const messageCount = messages?.length || 0;
+      const totalCount = count || 0;
+      const hasMore = totalCount > offset + messageCount;
 
-      // timer();
-      logger.performance.mark('Messages loaded', { 
-        page, 
-        count: data?.length || 0,
+      console.log(`📨 GET /messages - 200`, {
         deliberationId,
-        cached: true 
+        messageCount,
+        totalCount,
+        hasMore,
+        loadTime: `${loadTime}ms`,
+        page
       });
 
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load messages';
-      setError(errorMessage);
-      logger.error('Failed to load messages', err as Error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [deliberationId, pageSize, enablePagination, cacheTimeout, messageService, isLoading]);
+      // Sort messages chronologically for display
+      const sortedMessages = messages ? [...messages].reverse() : [];
 
-  // Load next page
-  const loadMore = useCallback(() => {
-    if (hasMore && !isLoading && enablePagination) {
-      loadMessages(currentPageRef.current + 1, true);
+      // Cache the results
+      messageCache.set(deliberationId, page, sortedMessages, hasMore, totalCount);
+
+      setState(prev => ({
+        ...prev,
+        messages: append ? [...prev.messages, ...sortedMessages] : sortedMessages,
+        hasMore,
+        loading: false,
+        error: null,
+        lastLoadTime: Date.now()
+      }));
+
+      // Log performance metrics
+      logger.info('Message loading completed', {
+        deliberationId,
+        messageCount,
+        loadTime,
+        page,
+        cached: false
+      });
+
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('📨 Message loading aborted');
+        return;
+      }
+
+      console.error('❌ Error loading messages:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load messages';
+      
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: errorMessage
+      }));
+
+      logger.error('Message loading failed', error as Error, {
+        deliberationId,
+        page,
+        loadTime: Date.now() - startTime
+      });
+    } finally {
+      isLoadingRef.current = false;
+      abortControllerRef.current = null;
     }
-  }, [hasMore, isLoading, enablePagination, loadMessages]);
+  }, [deliberationId]);
 
   // Refresh messages (clear cache and reload)
-  const refresh = useCallback(() => {
-    cacheService.clearNamespace('messages');
-    currentPageRef.current = 0;
-    totalLoadedRef.current = 0;
-    setHasMore(true);
+  const refreshMessages = useCallback(() => {
+    console.log(`🔄 Refreshing messages for deliberation ${deliberationId}`);
+    messageCache.invalidate(deliberationId);
     loadMessages(0, false);
-  }, [loadMessages]);
+  }, [deliberationId, loadMessages]);
+
+  // Load more messages (pagination)
+  const loadMoreMessages = useCallback(() => {
+    if (state.loading || !state.hasMore) {
+      return;
+    }
+
+    const currentPage = Math.floor(state.messages.length / 20);
+    loadMessages(currentPage, true);
+  }, [loadMessages, state.loading, state.hasMore, state.messages.length]);
+
+  // Add new message to state (for real-time updates)
+  const addMessage = useCallback((message: Message) => {
+    setState(prev => ({
+      ...prev,
+      messages: [...prev.messages, message]
+    }));
+    
+    // Invalidate cache since we have new data
+    messageCache.invalidate(deliberationId);
+  }, [deliberationId]);
+
+  // Update existing message in state
+  const updateMessage = useCallback((messageId: string, updates: Partial<Message>) => {
+    setState(prev => ({
+      ...prev,
+      messages: prev.messages.map(msg => 
+        msg.id === messageId ? { ...msg, ...updates } : msg
+      )
+    }));
+    
+    // Invalidate cache since we have updated data
+    messageCache.invalidate(deliberationId);
+  }, [deliberationId]);
 
   // Initial load
   useEffect(() => {
@@ -108,20 +290,25 @@ export const useOptimizedMessageLoading = (options: UseOptimizedMessageLoadingOp
     }
   }, [deliberationId, loadMessages]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   return {
-    messages,
-    isLoading,
-    hasMore,
-    error,
-    loadMore,
-    refresh,
-    totalLoaded: totalLoadedRef.current
+    messages: state.messages,
+    loading: state.loading,
+    error: state.error,
+    hasMore: state.hasMore,
+    loadMessages,
+    refreshMessages,
+    loadMoreMessages,
+    addMessage,
+    updateMessage,
+    cacheStats: messageCache.getStats()
   };
 };
-
-// Extension to MessageService for pagination (would need to be implemented)
-declare module '@/services/domain/implementations/message.service' {
-  interface MessageService {
-    getMessagesPaginated(deliberationId?: string, page?: number, limit?: number): Promise<Message[]>;
-  }
-}

@@ -12,14 +12,16 @@ import { AgentConfig } from "@/types/common";
 import SimilarIbisNodes from "@/components/chat/SimilarIbisNodes";
 import { MessageRating } from "@/components/chat/MessageRating";
 import { useSimplifiedPerformance } from "@/hooks/useSimplifiedState";
+import { useOptimizedMessageLoading } from "@/hooks/useOptimizedMessageLoading";
+import { useProgressiveFallback } from "@/hooks/useProgressiveFallback";
 
 interface MessageListProps {
-  messages: ChatMessage[];
-  isLoading: boolean;
+  messages?: ChatMessage[]; // Made optional since we'll load internally
+  isLoading?: boolean; // Made optional
   isTyping: boolean;
   onAddToIbis?: (messageId: string, content: string) => void;
   onRetry?: (id: string, content: string) => void;
-  deliberationId?: string;
+  deliberationId: string; // Required for optimized loading
   agentConfigs?: AgentConfig[];
 }
 

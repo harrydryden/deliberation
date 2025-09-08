@@ -49,7 +49,7 @@ describe('Component Performance Tests', () => {
     
     const startTime = performance.now();
     
-    render(<OptimizedMessageList messages={largeMessageList} isLoading={false} isTyping={false} />);
+    render(<OptimizedMessageList messages={largeMessageList} isLoading={false} isTyping={false} deliberationId="test-deliberation-id" />);
     
     const endTime = performance.now();
     const renderTime = endTime - startTime;
