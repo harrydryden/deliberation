@@ -103,17 +103,14 @@ export const useResponseStreaming = () => {
       // The supabase SDK doesn't properly handle streaming responses
       const functionUrl = `https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/agent-orchestration-stream`;
       
-      // Add debugging headers for better traceability
-      const debugHeaders: Record<string, string> = {
+      // Simplified, robust headers for edge function calls
+      const requestHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'X-Client-Info': 'streaming-client',
         'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM'
       };
       
       if (currentSession?.access_token) {
-        debugHeaders['Authorization'] = `Bearer ${currentSession.access_token}`;
+        requestHeaders['Authorization'] = `Bearer ${currentSession.access_token}`;
         console.log('🔑 Added authorization header to request');
       } else {
         console.warn('⚠️ No access token available for request');
@@ -124,7 +121,7 @@ export const useResponseStreaming = () => {
       
       const response = await fetch(functionUrl, {
         method: 'POST',
-        headers: debugHeaders,
+        headers: requestHeaders,
         body: JSON.stringify({
           messageId,
           deliberationId,

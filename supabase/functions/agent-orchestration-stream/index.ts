@@ -580,9 +580,16 @@ serve(async (req) => {
   console.log('🚀 Edge function invoked:', req.method, req.url);
   console.log('📋 Request headers:', Object.fromEntries(req.headers.entries()));
   
+  // CRITICAL: Handle CORS preflight first
   if (req.method === 'OPTIONS') {
     console.log('✅ Handling CORS preflight request');
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Max-Age': '86400'
+      } 
+    });
   }
 
   try {
@@ -591,12 +598,14 @@ serve(async (req) => {
     const { supabase, userSupabase } = validateAndGetEnvironment();
     console.log('✅ Environment validation successful');
     
-    // Get authorization header for user authentication
+    // Get authorization header for user authentication  
     const authHeader = req.headers.get('authorization');
     console.log('🔑 Auth header present:', !!authHeader);
-    if (!authHeader) {
-      console.error('❌ Missing authorization header');
-      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+    
+    // Since verify_jwt is disabled, we handle auth manually for security
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('❌ Missing or invalid authorization header');
+      return new Response(JSON.stringify({ error: 'Missing or invalid authorization header' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
