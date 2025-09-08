@@ -312,36 +312,32 @@ const OptimizedDeliberationChat = () => {
         <AdminDeliberationView />
       ) : (
         <div className="flex flex-col bg-background rounded-lg border h-[calc(100vh-120px)] min-h-0">
-          {/* Deliberation Info Panel */}
-          <div className="border-b bg-card">
-            {/* Mobile Header */}
+          {/* Controls Panel */}
+          <div className="border-b bg-card p-3">
+            {/* Mobile Controls */}
             <div className="lg:hidden">
-                <div className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <h1 className="text-lg font-semibold text-democratic-blue truncate">
-                      {dataState.deliberation.title}
-                    </h1>
-                    <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white text-xs shrink-0`}>
-                      {dataState.deliberation.status}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {messageQueue && messageQueue.queue.length > 0 && (
-                      <MessageQueueStatus {...queueStatusProps} />
-                    )}
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => setUiState(prev => ({ ...prev, isHeaderCollapsed: !prev.isHeaderCollapsed }))}
-                      className="shrink-0"
-                    >
-                      {uiState.isHeaderCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                    </Button>
-                  </div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white text-xs`}>
+                    {dataState.deliberation.status}
+                  </Badge>
                 </div>
+                <div className="flex items-center gap-2">
+                  {messageQueue && messageQueue.queue.length > 0 && (
+                    <MessageQueueStatus {...queueStatusProps} />
+                  )}
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setUiState(prev => ({ ...prev, isHeaderCollapsed: !prev.isHeaderCollapsed }))}
+                  >
+                    {uiState.isHeaderCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
 
               {!uiState.isHeaderCollapsed && (
-                <div className="px-3 pb-3 space-y-3">
+                <div className="space-y-3">
                   {/* Description and Notion - Mobile */}
                   <div className="space-y-2">
                     {dataState.deliberation.description && (
@@ -400,18 +396,13 @@ const OptimizedDeliberationChat = () => {
               )}
             </div>
 
-            {/* Desktop Header */}
-            <div className="hidden lg:block p-4">
-              <div className="flex items-start justify-between gap-4">
+            {/* Desktop Controls */}
+            <div className="hidden lg:block">
+              <div className="flex items-start justify-between gap-4 mb-4">
                 <div className="flex-1 min-w-0 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-democratic-blue truncate">
-                      {dataState.deliberation.title}
-                    </h1>
-                    <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white shrink-0`}>
-                      {dataState.deliberation.status}
-                    </Badge>
-                  </div>
+                  <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white w-fit`}>
+                    {dataState.deliberation.status}
+                  </Badge>
                   
                   {(dataState.deliberation.description || dataState.deliberation.notion) && (
                     <div className="space-y-1">
@@ -440,7 +431,7 @@ const OptimizedDeliberationChat = () => {
                 </div>
               </div>
               
-              <div className="flex flex-wrap gap-3 mt-4">
+              <div className="flex flex-wrap gap-3">
                 <div className="rounded-lg border bg-muted/40 p-2">
                   <ChatModeSelector 
                     mode={uiState.chatMode} 
