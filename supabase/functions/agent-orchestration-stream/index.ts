@@ -18,6 +18,7 @@ import { responseCache, configCache, createCacheKey } from '../shared/cache-mana
 import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
 import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
+import { OptimizedCache, executeTieredOperations, DEFAULT_TIMEOUTS } from '../shared/performance-optimizer.ts';
 
 // Re-export types from shared orchestrator
 import type { AgentConfig, AnalysisResult, ConversationContext } from '../shared/agent-orchestrator.ts';
@@ -700,21 +701,37 @@ serve(async (req) => {
   console.log('🚀 Edge function invoked:', req.method, req.url);
   console.log('📋 Request headers:', Object.fromEntries(req.headers.entries()));
   
-  // CRITICAL: Handle CORS preflight first
+  // CRITICAL: Handle CORS preflight first with comprehensive error handling
   if (req.method === 'OPTIONS') {
-    console.log('✅ Handling CORS preflight request');
-    return new Response(null, { 
-      headers: {
-        ...corsHeaders,
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Max-Age': '86400'
-      } 
-    });
+    try {
+      console.log('✅ Handling CORS preflight request');
+      return new Response(null, { 
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Max-Age': '86400'
+        } 
+      });
+    } catch (corsError) {
+      console.error('❌ CORS preflight error:', corsError);
+      // NEVER let CORS preflight fail - always return 200 OK
+      return new Response(null, { 
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Max-Age': '86400'
+        } 
+      });
+    }
   }
 
+  // Comprehensive error boundary for all non-OPTIONS requests
   try {
     console.log('🔧 Starting environment validation');
-    // Revert to original working environment validation
+    // Environment validation only for POST requests
     const { supabase, userSupabase } = validateAndGetEnvironment();
     console.log('✅ Environment validation successful');
     
@@ -796,9 +813,34 @@ serve(async (req) => {
   } catch (error) {
     console.error('❌ Streaming orchestration error:', error);
     console.error('❌ Error stack:', (error as Error)?.stack);
-    // Ensure proper error response with status details
+    console.error('❌ Error details:', JSON.stringify(error, null, 2));
+    
+    // Detailed error logging for debugging
+    if (error instanceof Error) {
+      console.error('❌ Error name:', error.name);
+      console.error('❌ Error message:', error.message);
+      if (error.cause) {
+        console.error('❌ Error cause:', error.cause);
+      }
+    }
+    
+    // CRITICAL: Always return proper JSON response with CORS headers
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return createErrorResponse(error, 500, 'agent-orchestration-stream');
+    const errorResponse = {
+      error: errorMessage,
+      timestamp: new Date().toISOString(),
+      context: 'agent-orchestration-stream',
+      method: req.method,
+      url: req.url
+    };
+    
+    return new Response(JSON.stringify(errorResponse), {
+      status: 500,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
   }
 });
 
