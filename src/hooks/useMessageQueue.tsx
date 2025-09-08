@@ -291,7 +291,7 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
       failed: queue.filter(msg => msg.status === 'failed').length,
       canProcess: processing.size < queueState.maxConcurrent
     };
-  }, [queueState.queue.length, queueState.processing.size, queueState.maxConcurrent]);
+  }, [queueState]); // CRITICAL FIX: Watch entire queueState, not just individual properties
 
   return {
     queue: queueState.queue,
