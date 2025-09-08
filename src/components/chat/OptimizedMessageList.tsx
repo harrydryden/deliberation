@@ -11,7 +11,7 @@ import type { ChatMessage } from "@/types/index";
 import { AgentConfig } from "@/types/common";
 import SimilarIbisNodes from "@/components/chat/SimilarIbisNodes";
 import { MessageRating } from "@/components/chat/MessageRating";
-import { useSimplifiedPerformance } from "@/hooks/useSimplifiedState";
+import { useSimplifiedPerformance } from '@/hooks/useOptimizedState';
 import { useOptimizedMessageLoading } from "@/hooks/useOptimizedMessageLoading";
 import { useProgressiveFallback } from "@/hooks/useProgressiveFallback";
 import { useUIStateDebugger } from "@/hooks/useUIStateDebugger";

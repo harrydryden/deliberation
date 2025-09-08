@@ -8,7 +8,7 @@ import { Suspense, lazy } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { ProductionOptimizedProvider } from "@/components/layout/ProductionOptimizedProvider";
-import { PerformanceDebugProvider } from "@/components/layout/PerformanceDebugProvider";
+// Performance debug provider removed - using consolidated error boundaries
 
 // Authentication guard component
 const AuthGuard = ({ children }: { children: React.ReactNode }) => {
@@ -60,28 +60,26 @@ const App = () => (
   <ProductionErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <SupabaseAuthProvider>
-        <PerformanceDebugProvider>
-          <ProductionOptimizedProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-              <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-center space-y-4"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" /><p className="text-muted-foreground">Loading...</p></div></div>}>
-                <Routes>
-                  <Route path="/" element={<AuthGuard><Index /></AuthGuard>} />
-                  <Route path="/auth" element={<Auth />} />
-                  
-                  <Route path="/admin" element={<AuthGuard><AdminGuard><Admin /></AdminGuard></AuthGuard>} />
-                  <Route path="/deliberations" element={<AuthGuard><Deliberations /></AuthGuard>} />
-                  <Route path="/deliberations/:deliberationId" element={<AuthGuard><DeliberationChat /></AuthGuard>} />
-                  <Route path="/metrics" element={<AuthGuard><UserMetrics /></AuthGuard>} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Suspense>
-            </BrowserRouter>
-          </TooltipProvider>
-          </ProductionOptimizedProvider>
-        </PerformanceDebugProvider>
+      <ProductionOptimizedProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-center space-y-4"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" /><p className="text-muted-foreground">Loading...</p></div></div>}>
+              <Routes>
+                <Route path="/" element={<AuthGuard><Index /></AuthGuard>} />
+                <Route path="/auth" element={<Auth />} />
+                
+                <Route path="/admin" element={<AuthGuard><AdminGuard><Admin /></AdminGuard></AuthGuard>} />
+                <Route path="/deliberations" element={<AuthGuard><Deliberations /></AuthGuard>} />
+                <Route path="/deliberations/:deliberationId" element={<AuthGuard><DeliberationChat /></AuthGuard>} />
+                <Route path="/metrics" element={<AuthGuard><UserMetrics /></AuthGuard>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ProductionOptimizedProvider>
       </SupabaseAuthProvider>
     </QueryClientProvider>
   </ProductionErrorBoundary>

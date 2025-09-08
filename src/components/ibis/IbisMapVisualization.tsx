@@ -36,7 +36,7 @@ import { calculateSemanticSimilarity, calculateRelationshipStrength, applyForceD
 import { resolveCollisions, findNonOverlappingPosition } from './collision-detection';
 import { applyConcentricLayout, constrainToZone, type ConcentricZones } from './zone-layout';
 import { logger } from '@/utils/logger';
-import { usePerformanceOptimization, useComponentMetrics } from '@/hooks/usePerformanceOptimization';
+import { useSimplifiedPerformance, useSimplifiedMemo } from '@/hooks/useOptimizedState';
 
 interface IbisNode {
   id: string;

@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { productionLogger } from '@/utils/productionLogger';
-import { useStreamingPerformanceMonitor } from './useStreamingPerformanceMonitor';
+// Streaming performance monitoring consolidated into production logger
 import { useUIStateDebugger } from './useUIStateDebugger';
 import { useNetworkPerformanceTracker } from './useNetworkPerformanceTracker';
 
@@ -32,8 +32,8 @@ export const useResponseStreaming = () => {
   const accumulatorRef = useRef<string>('');
   const rafIdRef = useRef<number | null>(null);
   
-  // Performance monitoring hooks
-  const perfMonitor = useStreamingPerformanceMonitor();
+  // Performance monitoring replaced with production logging
+  const startTime = useRef<number>(0);
   const uiDebugger = useUIStateDebugger('ResponseStreaming');
   const networkTracker = useNetworkPerformanceTracker();
 
@@ -47,8 +47,8 @@ export const useResponseStreaming = () => {
   ) => {
     productionLogger.debug('Starting streaming for message', { messageId });
     
-    // Start performance monitoring
-    perfMonitor.startTracking(messageId);
+    // Start performance tracking
+    startTime.current = Date.now();
     uiDebugger.trackStreamingStart('user-message-sent');
     
     // Cleanup any previous RAF callbacks to prevent memory leaks
@@ -210,7 +210,7 @@ export const useResponseStreaming = () => {
       
       // Record first response received
       networkTracker.endTracking(networkId, response.status);
-      perfMonitor.recordFirstChunk();
+      productionLogger.debug('First chunk received', { messageId });
 
       if (!response.body) {
         throw new Error('No response body received');
@@ -316,7 +316,12 @@ export const useResponseStreaming = () => {
       onComplete(accumulatorRef.current, messageId, streamingState.agentType);
       
       // Record successful completion
-      perfMonitor.recordStreamComplete(true, accumulatorRef.current.length);
+      const completionTime = Date.now() - startTime.current;
+      productionLogger.debug('Stream completed successfully', { 
+        messageId, 
+        duration: completionTime, 
+        finalLength: accumulatorRef.current.length 
+      });
       uiDebugger.trackStreamingEnd('stream-complete-success');
 
     } catch (error) {
@@ -329,8 +334,12 @@ export const useResponseStreaming = () => {
       productionLogger.error('Streaming error occurred', error);
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
       
-      // Record error for performance monitoring
-      perfMonitor.recordError(errorMessage);
+      // Record streaming error  
+      productionLogger.error('Streaming error details', { 
+        messageId, 
+        errorMessage, 
+        duration: Date.now() - startTime.current 
+      });
       uiDebugger.trackError(errorMessage);
       
       // F005 Fix: Enhanced structured logging for better observability

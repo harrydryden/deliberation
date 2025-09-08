@@ -1,4 +1,4 @@
-// Optimized state management hook to reduce re-renders
+// Consolidated optimized state management - production ready
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 
 interface StateConfig<T> {
@@ -7,7 +7,7 @@ interface StateConfig<T> {
   debounceMs?: number;
 }
 
-// Deep equality check for objects
+// Lightweight equality check optimized for production
 const deepEqual = (a: any, b: any): boolean => {
   if (a === b) return true;
   if (a == null || b == null) return false;
@@ -28,7 +28,13 @@ const deepEqual = (a: any, b: any): boolean => {
   return false;
 };
 
-export function useOptimizedState<T>(config: StateConfig<T>) {
+// Main optimized state hook - supports both simple and complex use cases
+export function useOptimizedState<T>(configOrInitialValue: StateConfig<T> | T) {
+  // Support both simple and complex usage patterns
+  const config = (typeof configOrInitialValue === 'object' && 'initialValue' in configOrInitialValue) 
+    ? configOrInitialValue 
+    : { initialValue: configOrInitialValue as T };
+    
   const { initialValue, compare = deepEqual, debounceMs = 0 } = config;
   const [state, setState] = useState<T>(initialValue);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
@@ -57,7 +63,6 @@ export function useOptimizedState<T>(config: StateConfig<T>) {
     }
   }, [compare, debounceMs]);
 
-  // Memoized return to prevent unnecessary re-renders
   useEffect(() => {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -65,6 +70,23 @@ export function useOptimizedState<T>(config: StateConfig<T>) {
   }, []);
 
   return useMemo(() => [state, setOptimizedState] as const, [state, setOptimizedState]);
+}
+
+// Lightweight performance hook for production use
+export function useSimplifiedPerformance() {
+  const createOptimizedCallback = useCallback(
+    (fn: (...args: any[]) => any, deps: React.DependencyList) => {
+      return useCallback(fn, deps);
+    },
+    []
+  );
+
+  return { createOptimizedCallback };
+}
+
+// Simplified memo hook
+export function useSimplifiedMemo<T>(factory: () => T, deps: React.DependencyList): T {
+  return useMemo(factory, deps);
 }
 
 // Specialized hooks for common patterns
