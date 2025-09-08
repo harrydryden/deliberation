@@ -82,6 +82,18 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
 
   const updateMessageStatus = useCallback((messageId: string, status: QueuedMessage['status'], error?: string) => {
     setQueueState(prev => {
+      const message = prev.queue.find(msg => msg.id === messageId);
+      if (!message) {
+        logger.warn('Message not found for status update', { messageId, status });
+        return prev;
+      }
+
+      // Prevent invalid state transitions
+      if ((message.status === 'completed' || message.status === 'failed') && status === 'processing') {
+        logger.warn('Invalid state transition attempted', { messageId, from: message.status, to: status });
+        return prev;
+      }
+
       const updatedQueue = prev.queue.map(msg => 
         msg.id === messageId 
           ? { ...msg, status, error, retries: error ? msg.retries + 1 : msg.retries }
@@ -100,9 +112,11 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
       } else if (status === 'processing') {
         newProcessing.add(messageId);
         // Set a timeout to mark as failed if processing takes too long
+        // PHASE 1 FIX: Align with streaming timeout (60s) + buffer (15s) = 75s
         const timeout = setTimeout(() => {
-          updateMessageStatus(messageId, 'failed', 'Processing timeout');
-        }, 45000); // 45 second timeout - 15 seconds buffer over streaming timeout
+          logger.warn('Queue processing timeout', { messageId, timeoutSeconds: 75 });
+          updateMessageStatus(messageId, 'failed', 'Queue processing timeout after 75 seconds');
+        }, 75000);
         processingTimeouts.current.set(messageId, timeout);
       }
 
@@ -121,8 +135,8 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
       completionTimeouts.current.set(messageId, completionTimeout);
     }
 
-    logger.info('🔄 Queue message status updated', { messageId, status, error });
-  }, [removeFromQueue]);
+    logger.info('🔄 Queue message status updated', { messageId, status, error, transition: `${queueState.queue.find(m => m.id === messageId)?.status} → ${status}` });
+  }, [removeFromQueue, queueState.queue]);
 
   const getNextQueuedMessage = useCallback((): QueuedMessage | null => {
     if (queueState.processing.size >= queueState.maxConcurrent) {

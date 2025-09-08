@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useResponseStreaming } from '@/hooks/useResponseStreaming';
 import { cacheService } from '@/services/cache.service';
 import { useOptimizedMessageCleanup } from '@/hooks/useOptimizedMessageCleanup';
-import { useMessageQueue } from '@/hooks/useMessageQueue';
+import { useMessageQueue, QueuedMessage } from '@/hooks/useMessageQueue';
 
 export const useChat = (deliberationId?: string) => {
   const { user, isLoading: authLoading } = useSupabaseAuth();
@@ -34,6 +34,7 @@ export const useChat = (deliberationId?: string) => {
   const { streamingState, startStreaming, stopStreaming } = useResponseStreaming();
   const streamingContentRef = useRef<string>('');
   const streamingUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastUpdateTimeRef = useRef<number>(0); // PHASE 3 FIX: Track last update time for smart throttling
   
   // F002 Fix: Initialize message cleanup handler
   const { 
@@ -271,7 +272,7 @@ export const useChat = (deliberationId?: string) => {
       await startStreaming(
         saved.id,
         deliberationId,
-        // onUpdate callback - THROTTLED to reduce re-renders
+        // PHASE 3 FIX: Smart throttling for streaming updates to prevent state desync
         (streamContent: string, messageId: string, agentType: string | null) => {
           if (!streamContent.trim()) return;
           
@@ -282,13 +283,6 @@ export const useChat = (deliberationId?: string) => {
             agentType 
           });
           
-          console.log('🚨 STREAMING UPDATE - Throttling to prevent draft clearing!', {
-            queueId,
-            messageId,
-            contentLength: streamContent.length,
-            timestamp: Date.now()
-          });
-          
           // Store streaming content in ref to avoid frequent state updates
           streamingContentRef.current = streamContent;
           
@@ -297,8 +291,16 @@ export const useChat = (deliberationId?: string) => {
             clearTimeout(streamingUpdateTimeoutRef.current);
           }
           
-          // Throttle updates to every 200ms to reduce re-renders
-          streamingUpdateTimeoutRef.current = setTimeout(() => {
+          // PHASE 3 FIX: Smart throttling - reduce from 200ms to 100ms for better responsiveness
+          // Only throttle if updates are coming rapidly (within 50ms window)
+          const now = Date.now();
+          const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
+          lastUpdateTimeRef.current = now;
+          
+          const shouldThrottle = timeSinceLastUpdate < 50; // Smart batching window
+          const delay = shouldThrottle ? 100 : 0; // Reduced throttle delay
+          
+          const updateUI = () => {
             const streamingMessage: ChatMessage = {
               id: `streaming-${saved.id}`,
               content: streamingContentRef.current,
@@ -307,37 +309,42 @@ export const useChat = (deliberationId?: string) => {
               user_id: 'agent',
               status: 'streaming',
               agent_context: { agentType },
-              parent_message_id: saved.id // Agent response is child of user message
+              parent_message_id: saved.id
             };
 
             setChatState(prev => {
-              const existingStreamingIndex = prev.messages.findIndex(m => m.id === `streaming-${saved.id}`);
+              // PHASE 2 FIX: Better duplicate detection using message ID
+              const existingIndex = prev.messages.findIndex(m => m.id === `streaming-${saved.id}`);
               
-              console.log('🔄 Throttled streaming update - UI will re-render now', { 
+              logger.debug('🔄 Smart streaming update', { 
                 queueId, 
                 messageId, 
                 contentLength: streamingContentRef.current.length,
-                existingStreamingIndex,
-                totalMessages: prev.messages.length 
+                existingIndex,
+                wasThrottled: shouldThrottle,
+                delay
               });
               
-              let updatedMessages;
-              if (existingStreamingIndex >= 0) {
-                updatedMessages = prev.messages.map((msg, index) => 
-                  index === existingStreamingIndex ? streamingMessage : msg
-                );
+              if (existingIndex >= 0) {
+                const updatedMessages = [...prev.messages];
+                updatedMessages[existingIndex] = streamingMessage;
+                return { ...prev, messages: updatedMessages };
               } else {
-                updatedMessages = [...prev.messages, streamingMessage];
+                return {
+                  ...prev,
+                  messages: sortMessagesByOrder([...prev.messages, streamingMessage])
+                };
               }
-              
-              return {
-                ...prev,
-                messages: sortMessagesByOrder(updatedMessages)
-              };
             });
-          }, 200); // Update UI every 200ms instead of every chunk
+          };
+          
+          if (delay > 0) {
+            streamingUpdateTimeoutRef.current = setTimeout(updateUI, delay);
+          } else {
+            updateUI();
+          }
         },
-        // onComplete callback
+        // PHASE 3 FIX: Enhanced onComplete callback with proper cleanup
         async (finalContent: string, messageId: string, agentType: string | null) => {
           logger.debug('Streaming completed for queued message', { 
             queueId, 
@@ -347,7 +354,7 @@ export const useChat = (deliberationId?: string) => {
             timestamp: new Date().toISOString()
           });
           
-          // Clear throttling timeout since we're completing
+          // PHASE 3 FIX: Clear throttling timeout with proper cleanup
           if (streamingUpdateTimeoutRef.current) {
             clearTimeout(streamingUpdateTimeoutRef.current);
             streamingUpdateTimeoutRef.current = null;
@@ -366,30 +373,34 @@ export const useChat = (deliberationId?: string) => {
             user_id: 'agent',
             status: 'sent',
             agent_context: { agentType: agentType || 'agent' },
-            parent_message_id: saved.id // Agent response is child of user message
+            parent_message_id: saved.id
           };
 
+          // PHASE 2 FIX: Final content update with better state management
           setChatState(prev => {
             const withoutStreaming = prev.messages.filter(m => m.id !== `streaming-${saved.id}`);
-          return {
-            ...prev,
-            messages: sortMessagesByOrder([
-              ...prev.messages.filter(m => m.id !== `streaming-${saved.id}`), 
-              finalMessage
-            ])
-          };
+            return {
+              ...prev,
+              messages: sortMessagesByOrder([...withoutStreaming, finalMessage])
+            };
           });
           
           messageQueue.updateMessageStatus(queueId, 'completed');
           logger.debug('Queue message marked as completed', { queueId, timestamp: new Date().toISOString() });
         },
-        // onError callback
+        // PHASE 3 FIX: Enhanced onError callback with comprehensive cleanup
         (error: string) => {
           logger.error('Streaming error occurred for queued message', { 
             error, 
             queueId, 
             timestamp: new Date().toISOString() 
           });
+          
+          // PHASE 3 FIX: Clear any pending updates on error
+          if (streamingUpdateTimeoutRef.current) {
+            clearTimeout(streamingUpdateTimeoutRef.current);
+            streamingUpdateTimeoutRef.current = null;
+          }
           
           // Don't mark as failed if it was intentionally aborted
           if (error.includes('aborted') || error.includes('AbortError')) {
@@ -398,64 +409,88 @@ export const useChat = (deliberationId?: string) => {
             return;
           }
           
+          // PHASE 2 FIX: Better cleanup of streaming state
           setChatState(prev => ({
             ...prev,
-            messages: prev.messages.filter(m => m.id !== `streaming-${saved.id}` && !m.id.startsWith('streaming-'))
+            messages: prev.messages.filter(m => !m.id.startsWith(`streaming-${saved.id}`))
           }));
+          
           messageQueue.updateMessageStatus(queueId, 'failed', error);
         }
       );
       
     } catch (error) {
       const errMsg = getErrorMessage(error);
-      console.log('🚨 DEBUG: processQueuedMessage failed', { 
-        queueId, 
-        error: errMsg,
-        timestamp: new Date().toISOString()
-      });
       logger.error('Failed to process queued message', new Error(errMsg), { 
         queueId, 
         timestamp: new Date().toISOString() 
       });
+      
+      // PHASE 3 FIX: Cleanup on exception
+      if (streamingUpdateTimeoutRef.current) {
+        clearTimeout(streamingUpdateTimeoutRef.current);
+        streamingUpdateTimeoutRef.current = null;
+      }
+      
       messageQueue.updateMessageStatus(queueId, 'failed', errMsg);
     }
   }, [user, deliberationId, services.messageService, startStreaming, setChatState, messageQueue]);
 
-  // F001 Fix: Auto-process queue when messages are available - optimized to reduce re-renders
+  // PHASE 1 FIX: Stable queue processing with proper dependency management
   const queueStats = messageQueue.getQueueStats;
   const hasWork = queueStats.queued > 0 && queueStats.canProcess;
+  
+  // PHASE 1 FIX: Use stable references to prevent stale closures
+  const stableProcessQueuedMessage = useCallback((message: QueuedMessage) => {
+    return processQueuedMessage(message);
+  }, [processQueuedMessage]);
+  
+  const stableGetNextMessage = useCallback(() => {
+    return messageQueue.getNextQueuedMessage();
+  }, [messageQueue]);
   
   useEffect(() => {
     if (!hasWork || !user || !deliberationId) return;
     
     const processNext = async () => {
-      logger.debug('Checking queue for next message');
-      const nextMessage = messageQueue.getNextQueuedMessage();
+      logger.debug('🔄 Queue processor: Checking for next message', { 
+        hasWork, 
+        queueStats,
+        userId: user?.id.substring(0, 8),
+        deliberationId: deliberationId.substring(0, 8)
+      });
+      
+      const nextMessage = stableGetNextMessage();
       if (nextMessage && user && deliberationId) {
-        logger.debug('Processing next queued message', { 
+        logger.info('📤 Queue processor: Processing message', { 
           messageId: nextMessage.id, 
-          content: nextMessage.content.substring(0, 50) 
+          content: nextMessage.content.substring(0, 50),
+          queuePosition: nextMessage.queuePosition,
+          retries: nextMessage.retries
         });
-        await processQueuedMessage(nextMessage);
+        
+        try {
+          await stableProcessQueuedMessage(nextMessage);
+          logger.info('✅ Queue processor: Message processed successfully', { messageId: nextMessage.id });
+        } catch (error) {
+          logger.error('❌ Queue processor: Message processing failed', { 
+            messageId: nextMessage.id, 
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
       } else {
-        logger.debug('No messages to process', { 
+        logger.debug('⏸️ Queue processor: No messages to process', { 
           hasNextMessage: !!nextMessage, 
           hasUser: !!user, 
           hasDeliberationId: !!deliberationId,
-          queueStats: queueStats
+          queueStats
         });
       }
     };
 
-    logger.debug('Queue has items, processing immediately', queueStats);
-    
-    // F001 Fix: Process immediately without delay to align with timeout expectations
+    // PHASE 1 FIX: Process immediately for better responsiveness
     processNext();
-    
-    // Set up interval for subsequent messages without delay for better responsiveness
-    const timer = setTimeout(processNext, 100);
-    return () => clearTimeout(timer);
-  }, [hasWork, processQueuedMessage, user, deliberationId, messageQueue]);
+  }, [hasWork, user, deliberationId, stableProcessQueuedMessage, stableGetNextMessage, queueStats]);
 
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!user || !content.trim()) return;
@@ -509,13 +544,15 @@ export const useChat = (deliberationId?: string) => {
     }
   }, [chatState.messages, deliberationId, setChatState, services.messageService]);
 
-  // Cleanup throttling timeout on unmount
+  // PHASE 3 FIX: Enhanced cleanup with proper timeout reference clearing
   useEffect(() => {
     return () => {
       if (streamingUpdateTimeoutRef.current) {
         clearTimeout(streamingUpdateTimeoutRef.current);
         streamingUpdateTimeoutRef.current = null;
       }
+      // Reset timing references
+      lastUpdateTimeRef.current = 0;
     };
   }, []);
 

@@ -79,15 +79,15 @@ export const useResponseStreaming = () => {
 
     streamControllerRef.current = new AbortController();
     
-    // F004 Fix: Align timeout with edge function - use 40s to give edge function time to respond
-    const STREAMING_TIMEOUT = 40000; // 40 seconds to align with 45s edge function timeout
+    // PHASE 1 FIX: Align timeout with queue expectations - use 60s timeout 
+    const STREAMING_TIMEOUT = 60000; // 60 seconds to align with 75s queue timeout
     const HEARTBEAT_INTERVAL = 5000; // 5 second heartbeat checks
     
     let lastActivity = Date.now();
     let heartbeatCount = 0;
     
     const timeoutId = setTimeout(() => {
-      productionLogger.warn('Main streaming timeout reached (40s), aborting');
+      productionLogger.warn('Main streaming timeout reached (60s), aborting');
       if (streamControllerRef.current) {
         try {
           streamControllerRef.current.abort();
@@ -102,8 +102,8 @@ export const useResponseStreaming = () => {
         messageId: null,
         agentType: null,
       });
-      // F004 Fix: Call onError to notify queue that processing failed
-      onError('Streaming timeout after 40 seconds. Please try again.');
+      // PHASE 1 FIX: Updated timeout message
+      onError('Streaming timeout after 60 seconds. Please try again.');
     }, STREAMING_TIMEOUT);
     
     // Heartbeat monitoring to detect stalled connections
