@@ -11,12 +11,19 @@ export const PerformanceDebugProvider: React.FC<PerformanceDebugProviderProps> =
   const networkTracker = useNetworkPerformanceTracker();
 
   useEffect(() => {
-    // Log performance summary every 30 seconds in development
+    // F009 Fix: Only log performance summary when there's activity, reduce frequency
     if (process.env.NODE_ENV === 'development') {
       const interval = setInterval(() => {
-        console.log('📊 [PERF-DEBUG] Performance Summary');
-        networkTracker.logSummary();
-      }, 30000);
+        const metrics = networkTracker.getAllMetrics();
+        const recentActivity = metrics.filter(m => 
+          m.endTime && Date.now() - m.endTime < 120000 // Activity in last 2 minutes
+        );
+        
+        if (recentActivity.length > 0) {
+          console.log('📊 [PERF-DEBUG] Performance Summary');
+          networkTracker.logSummary();
+        }
+      }, 60000); // Reduced to every 60 seconds
 
       return () => clearInterval(interval);
     }
