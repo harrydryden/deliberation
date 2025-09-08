@@ -1,9 +1,9 @@
-// Request deduplication and caching service
-import { createMemoCache } from '@/utils/performanceUtils';
-import { logger } from '@/utils/logger';
+// Lightweight request deduplication service - production optimized
+import { isProduction } from '@/utils/productionConfig';
+import { productionLogger } from '@/utils/productionLogger';
 
 export interface CacheOptions {
-  ttl?: number; // Time to live in milliseconds
+  ttl?: number;
   maxSize?: number;
 }
 
@@ -13,7 +13,8 @@ export class CacheService {
   private maxSize: number;
 
   constructor(options: CacheOptions = {}) {
-    this.maxSize = options.maxSize || 100;
+    // Smaller cache size in production to reduce memory usage
+    this.maxSize = isProduction ? 50 : (options.maxSize || 100);
   }
 
   // Generate cache key from function name and arguments
@@ -49,14 +50,18 @@ export class CacheService {
     // Check cache first
     const cached = this.cache.get(key);
     if (cached && this.isValid(cached)) {
-      logger.performance.mark(`Cache hit: ${namespace}`);
+      if (!isProduction) {
+        productionLogger.debug(`Cache hit: ${namespace}`);
+      }
       return cached.data;
     }
 
     // Check if request is already pending (deduplication)
     const pending = this.pendingRequests.get(key);
     if (pending) {
-      logger.performance.mark(`Request deduplicated: ${namespace}`);
+      if (!isProduction) {
+        productionLogger.debug(`Request deduplicated: ${namespace}`);
+      }
       return pending;
     }
 
@@ -71,7 +76,9 @@ export class CacheService {
         this.cleanup();
       }
       
-      logger.performance.mark(`Cache miss: ${namespace}`);
+      if (!isProduction) {
+        productionLogger.debug(`Cache miss: ${namespace}`);
+      }
       return data;
     }).catch(error => {
       // Remove failed request from pending
@@ -108,5 +115,7 @@ export class CacheService {
   }
 }
 
-// Global cache instance
-export const cacheService = new CacheService({ maxSize: 200 });
+// Global cache instance - smaller in production
+export const cacheService = new CacheService({ 
+  maxSize: isProduction ? 50 : 200 
+});

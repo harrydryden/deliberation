@@ -5,32 +5,18 @@ import { useToast } from './use-toast';
 import { logger } from '@/utils/logger';
 
 /**
- * Optimized hook to replace direct API calls throughout the app
- * Provides caching, error handling, and performance optimization
+ * Simplified API calls hook without heavy caching
  */
 export const useOptimizedApiCalls = () => {
   const { toast } = useToast();
 
-  // Optimized Supabase function invocation with retry and caching
+  // Simplified Supabase function invocation
   const invokeFunction = useCallback((
     functionName: string, 
-    body?: any, 
-    options: {
-      cacheKey?: string;
-      cacheTTL?: number;
-      retries?: number;
-    } = {}
+    body?: any
   ) => {
-    const {
-      cacheKey,
-      cacheTTL = 30000,
-      retries = 2
-    } = options;
-
     return useOptimizedAsync(
       async () => {
-        logger.info(`Invoking function: ${functionName}`, { body });
-        
         // Consistent session-based auth for API calls
         const session = await supabase.auth.getSession();
         const headers: Record<string, string> = {
@@ -51,17 +37,11 @@ export const useOptimizedApiCalls = () => {
         }
         
         return response.data;
-      },
-      {
-        retries,
-        cacheKey,
-        cacheTTL,
-        enableCaching: !!cacheKey
       }
     );
   }, []);
 
-  // Optimized database query with caching
+  // Simplified database query
   const queryTable = useCallback((
     table: string,
     query: {
@@ -69,18 +49,10 @@ export const useOptimizedApiCalls = () => {
       filters?: Record<string, any>;
       orderBy?: { column: string; ascending?: boolean };
       limit?: number;
-    } = {},
-    options: {
-      cacheKey?: string;
-      cacheTTL?: number;
     } = {}
   ) => {
-    const { cacheKey, cacheTTL = 45000 } = options;
-
     return useOptimizedAsync(
       async () => {
-        logger.info(`Querying table: ${table}`, query);
-        
         let queryBuilder = supabase.from(table).select(query.select || '*');
         
         if (query.filters) {
@@ -106,11 +78,6 @@ export const useOptimizedApiCalls = () => {
         }
         
         return data;
-      },
-      {
-        cacheKey: cacheKey || `${table}_${JSON.stringify(query)}`,
-        cacheTTL,
-        enableCaching: true
       }
     );
   }, []);

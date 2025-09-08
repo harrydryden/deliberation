@@ -11,7 +11,7 @@ import type { ChatMessage } from "@/types/index";
 import { AgentConfig } from "@/types/common";
 import SimilarIbisNodes from "@/components/chat/SimilarIbisNodes";
 import { MessageRating } from "@/components/chat/MessageRating";
-import { usePerformanceOptimization } from "@/hooks/usePerformanceOptimization";
+import { useSimplifiedPerformance } from "@/hooks/useSimplifiedState";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -187,12 +187,8 @@ export const OptimizedMessageList = memo(({
   const prevCountRef = useRef(0);
   const didAutoScrollRef = useRef(false);
   
-  // Simplified performance optimization - keep only essential optimizations
-  const { createOptimizedCallback } = usePerformanceOptimization({
-    componentName: 'OptimizedMessageList',
-    enableLogging: false,
-    memoryThreshold: 200 // Increased threshold to reduce overhead
-  });
+  // Use simplified performance hook without overhead
+  const { createOptimizedCallback } = useSimplifiedPerformance();
 
   // Optimized agent configs map with proper typing and stability check
   const agentConfigsMap = useMemo(() => {
@@ -203,7 +199,7 @@ export const OptimizedMessageList = memo(({
     return map;
   }, [agentConfigs?.length, agentConfigs?.map(c => c.agent_type).join(',')]);  // More stable dependencies
 
-  // Optimize renderItem with stable dependencies
+  // Simplified render item function
   const renderItem = createOptimizedCallback(
     (index: number, message: ChatMessage) => {
       return (
@@ -218,8 +214,7 @@ export const OptimizedMessageList = memo(({
         />
       );
     },
-    [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId],
-    'renderItem'
+    [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId]
   );
 
   // Auto-scroll optimization

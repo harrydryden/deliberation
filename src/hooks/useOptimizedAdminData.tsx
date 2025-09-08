@@ -20,12 +20,12 @@ export interface OptimizedAdminData {
   loadingAgents: boolean;
   loadingStats: boolean;
 
-  // Actions
-  fetchUsers: () => Promise<void>;
-  fetchDeliberations: () => Promise<void>;
-  fetchLocalAgents: () => Promise<void>;
-  fetchAgents: () => Promise<void>;
-  fetchStats: () => Promise<void>;
+  // Actions with simplified types
+  fetchUsers: () => Promise<any[]>;
+  fetchDeliberations: () => Promise<any[]>;
+  fetchLocalAgents: () => Promise<any[]>;
+  fetchAgents: () => Promise<any[]>;
+  fetchStats: () => Promise<any>;
   archiveUser: (userId: string, reason: string) => Promise<void>;
   unarchiveUser: (userId: string) => Promise<void>;
   updateDeliberationStatus: (id: string, status: string) => Promise<void>;
@@ -36,7 +36,7 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
   const adminService = serviceContainer.adminService;
   const deliberationService = useDeliberationService();
 
-  // Optimized async operations with caching and error handling
+  // Simplified async operations without heavy caching
   const {
     data: users = [],
     loading: loadingUsers,
@@ -44,7 +44,6 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
     error: usersError
   } = useOptimizedAsync(
     async () => {
-      logger.info('Fetching admin users');
       // Consistent session-based auth for admin API calls  
       const session = await supabase.auth.getSession();
       const headers = {
@@ -59,10 +58,6 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
       
       if (response.error) throw new Error(response.error.message);
       return response.data?.users || [];
-    },
-    {
-      cacheKey: 'admin-users',
-      cacheTTL: 30000 // 30 seconds
     }
   );
 
@@ -84,12 +79,7 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
     execute: fetchDeliberations
   } = useOptimizedAsync(
     async () => {
-      logger.info('Fetching deliberations');
       return await deliberationService.getDeliberations();
-    },
-    {
-      cacheKey: 'admin-deliberations',
-      cacheTTL: 60000 // 1 minute
     }
   );
 
@@ -99,12 +89,7 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
     execute: fetchLocalAgents
   } = useOptimizedAsync(
     async () => {
-      logger.info('Fetching local agents');
       return await adminService.getAllAgents();
-    },
-    {
-      cacheKey: 'admin-local-agents',
-      cacheTTL: 45000 // 45 seconds
     }
   );
 
@@ -114,12 +99,7 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
     execute: fetchAgents
   } = useOptimizedAsync(
     async () => {
-      logger.info('Fetching agents');
       return await adminService.getAllAgents();
-    },
-    {
-      cacheKey: 'admin-agents',
-      cacheTTL: 45000 // 45 seconds  
     }
   );
 
@@ -129,12 +109,7 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
     execute: fetchStats
   } = useOptimizedAsync(
     async () => {
-      logger.info('Fetching admin stats');
       return await adminService.getSystemStats();
-    },
-    {
-      cacheKey: 'admin-stats',
-      cacheTTL: 20000 // 20 seconds
     }
   );
 

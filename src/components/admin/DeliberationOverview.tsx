@@ -126,9 +126,6 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
         deliberationTitle: deliberation.title,
         deliberationDescription: deliberation.description,
         notion: deliberation.notion
-      }, {
-        cacheKey: `ibis-roots-${deliberation.id}`,
-        cacheTTL: 60000
       });
 
       const rootsData = await execute();
