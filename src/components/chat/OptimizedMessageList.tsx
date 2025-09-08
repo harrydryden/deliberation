@@ -75,16 +75,30 @@ const OptimizedMessageItem = memo(({
   
   const fallbackAgentInfo = useMemo(() => {
     const agentKey = message.message_type as keyof typeof AGENTS;
-    return AGENTS[agentKey];
+    return AGENTS[agentKey] || null;
   }, [message.message_type]);
   
-  const agentInfo = useMemo(() => isUser ? null : {
-    ...fallbackAgentInfo,
-    name: agentConfig?.name || fallbackAgentInfo.name,
-    description: agentConfig?.description || fallbackAgentInfo.description
+  const agentInfo = useMemo(() => {
+    if (isUser) return null;
+    
+    if (!fallbackAgentInfo) {
+      console.warn(`Unknown agent type: ${message.message_type}`);
+      return null;
+    }
+    
+    return {
+      ...fallbackAgentInfo,
+      name: agentConfig?.name || fallbackAgentInfo.name,
+      description: agentConfig?.description || fallbackAgentInfo.description
+    };
   }, [isUser, agentConfig, fallbackAgentInfo]);
   
-  const AgentIcon = (agentInfo?.icon) || Bot;
+  // Don't render messages from unknown agent types
+  if (!isUser && !agentInfo) {
+    return null;
+  }
+
+  const AgentIcon = agentInfo?.icon || Bot;
 
   const handleAddToIbis = useCallback(() => {
     onAddToIbis?.(message.id, message.content);
@@ -118,7 +132,7 @@ const OptimizedMessageItem = memo(({
           <div className="flex-1 min-w-0">
             <div className={`flex items-center gap-2 mb-1 ${isUser ? 'justify-end' : ''}`}>
               <span className="text-sm font-medium">
-                {isUser ? 'You' : (agentInfo?.name || 'Unknown Agent')}
+                {isUser ? 'You' : (agentInfo?.name || 'Agent')}
               </span>
               <span className="text-xs text-muted-foreground">
                 {formatMessageTime(message.created_at)}
