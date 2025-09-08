@@ -32,6 +32,8 @@ export const useChat = (deliberationId?: string) => {
   
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const { streamingState, startStreaming, stopStreaming } = useResponseStreaming();
+  const streamingContentRef = useRef<string>('');
+  const streamingUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // F002 Fix: Initialize message cleanup handler
   const { 
@@ -269,7 +271,7 @@ export const useChat = (deliberationId?: string) => {
       await startStreaming(
         saved.id,
         deliberationId,
-        // onUpdate callback
+        // onUpdate callback - THROTTLED to reduce re-renders
         (streamContent: string, messageId: string, agentType: string | null) => {
           if (!streamContent.trim()) return;
           
@@ -280,40 +282,60 @@ export const useChat = (deliberationId?: string) => {
             agentType 
           });
           
-          const streamingMessage: ChatMessage = {
-            id: `streaming-${saved.id}`,
-            content: streamContent,
-            message_type: agentType as ChatMessage['message_type'],
-            created_at: new Date().toISOString(),
-            user_id: 'agent',
-            status: 'streaming',
-            agent_context: { agentType },
-            parent_message_id: saved.id // Agent response is child of user message
-          };
-
-          setChatState(prev => {
-            const existingStreamingIndex = prev.messages.findIndex(m => m.id === `streaming-${saved.id}`);
-            let updatedMessages;
-            
-            if (existingStreamingIndex >= 0) {
-              updatedMessages = prev.messages.map((msg, index) => 
-                index === existingStreamingIndex ? streamingMessage : msg
-              );
-            } else {
-              updatedMessages = [...prev.messages, streamingMessage];
-            }
-            
-            return {
-              ...prev,
-              messages: sortMessagesByOrder(
-                existingStreamingIndex >= 0
-                  ? prev.messages.map((msg, index) => 
-                      index === existingStreamingIndex ? streamingMessage : msg
-                    )
-                  : [...prev.messages, streamingMessage]
-              )
-            };
+          console.log('🚨 STREAMING UPDATE - Throttling to prevent draft clearing!', {
+            queueId,
+            messageId,
+            contentLength: streamContent.length,
+            timestamp: Date.now()
           });
+          
+          // Store streaming content in ref to avoid frequent state updates
+          streamingContentRef.current = streamContent;
+          
+          // Clear existing timeout
+          if (streamingUpdateTimeoutRef.current) {
+            clearTimeout(streamingUpdateTimeoutRef.current);
+          }
+          
+          // Throttle updates to every 200ms to reduce re-renders
+          streamingUpdateTimeoutRef.current = setTimeout(() => {
+            const streamingMessage: ChatMessage = {
+              id: `streaming-${saved.id}`,
+              content: streamingContentRef.current,
+              message_type: agentType as ChatMessage['message_type'],
+              created_at: new Date().toISOString(),
+              user_id: 'agent',
+              status: 'streaming',
+              agent_context: { agentType },
+              parent_message_id: saved.id // Agent response is child of user message
+            };
+
+            setChatState(prev => {
+              const existingStreamingIndex = prev.messages.findIndex(m => m.id === `streaming-${saved.id}`);
+              
+              console.log('🔄 Throttled streaming update - UI will re-render now', { 
+                queueId, 
+                messageId, 
+                contentLength: streamingContentRef.current.length,
+                existingStreamingIndex,
+                totalMessages: prev.messages.length 
+              });
+              
+              let updatedMessages;
+              if (existingStreamingIndex >= 0) {
+                updatedMessages = prev.messages.map((msg, index) => 
+                  index === existingStreamingIndex ? streamingMessage : msg
+                );
+              } else {
+                updatedMessages = [...prev.messages, streamingMessage];
+              }
+              
+              return {
+                ...prev,
+                messages: sortMessagesByOrder(updatedMessages)
+              };
+            });
+          }, 200); // Update UI every 200ms instead of every chunk
         },
         // onComplete callback
         async (finalContent: string, messageId: string, agentType: string | null) => {
@@ -324,6 +346,12 @@ export const useChat = (deliberationId?: string) => {
             agentType,
             timestamp: new Date().toISOString()
           });
+          
+          // Clear throttling timeout since we're completing
+          if (streamingUpdateTimeoutRef.current) {
+            clearTimeout(streamingUpdateTimeoutRef.current);
+            streamingUpdateTimeoutRef.current = null;
+          }
           
           if (!finalContent.trim()) {
             messageQueue.updateMessageStatus(queueId, 'failed', 'Empty agent response');
@@ -480,6 +508,16 @@ export const useChat = (deliberationId?: string) => {
       setUiState(prev => ({ ...prev, isTyping: false }));
     }
   }, [chatState.messages, deliberationId, setChatState, services.messageService]);
+
+  // Cleanup throttling timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (streamingUpdateTimeoutRef.current) {
+        clearTimeout(streamingUpdateTimeoutRef.current);
+        streamingUpdateTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   return {
     messages: chatState.messages,
