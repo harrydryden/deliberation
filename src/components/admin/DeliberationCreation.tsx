@@ -22,7 +22,7 @@ type DeliberationForm = {
   is_public: boolean;
   max_participants: number;
   generate_ibis_roots: boolean;
-  status: 'draft' | 'active' | 'completed';
+  status: 'draft' | 'active' | 'concluded';
   facilitator_id?: string;
 };
 

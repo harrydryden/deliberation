@@ -28,7 +28,7 @@ export const DeliberationStats = ({ deliberations }: DeliberationStatsProps) => 
       </div>
       <div className="text-center">
         <div className="text-2xl font-bold text-gray-600">
-          {safeDeliberations.filter(d => d.status === 'completed').length}
+          {safeDeliberations.filter(d => d.status === 'concluded').length}
         </div>
         <div className="text-sm text-muted-foreground">Completed</div>
       </div>

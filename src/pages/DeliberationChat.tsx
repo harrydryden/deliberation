@@ -33,7 +33,7 @@ interface Deliberation {
   title: string;
   description?: string;
   notion?: string;
-  status: 'draft' | 'active' | 'completed';
+  status: 'draft' | 'active' | 'concluded';
   facilitator_id?: string;
   is_public: boolean;
   max_participants: number;

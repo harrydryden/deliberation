@@ -16,7 +16,7 @@ interface Deliberation {
   id: string;
   title: string;
   description?: string;
-  status: 'draft' | 'active' | 'completed';
+  status: 'draft' | 'active' | 'concluded';
   facilitator_id?: string;
   is_public: boolean;
   max_participants: number;

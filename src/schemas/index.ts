@@ -64,7 +64,7 @@ export const MessageSchema = z.object({
 });
 
 // Deliberation schemas
-export const DeliberationStatusSchema = z.enum(['draft', 'active', 'completed', 'archived']);
+export const DeliberationStatusSchema = z.enum(['draft', 'active', 'concluded', 'archived']);
 
 export const DeliberationSchema = z.object({
   id: UUIDSchema,

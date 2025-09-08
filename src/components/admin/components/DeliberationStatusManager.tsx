@@ -32,7 +32,7 @@ export const DeliberationStatusManager = ({
     const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
       'draft': 'secondary',
       'active': 'default',
-      'completed': 'destructive',
+      'concluded': 'destructive',
       'archived': 'secondary'
     };
     return <Badge variant={variants[status] || 'secondary'}>{status}</Badge>;
@@ -57,7 +57,7 @@ export const DeliberationStatusManager = ({
         <SelectContent>
           <SelectItem value="draft">Draft</SelectItem>
           <SelectItem value="active">Active</SelectItem>
-          <SelectItem value="completed">Completed</SelectItem>
+          <SelectItem value="concluded">Concluded</SelectItem>
           <SelectItem value="archived">Archived</SelectItem>
         </SelectContent>
       </Select>
