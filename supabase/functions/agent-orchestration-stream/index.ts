@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 // Import shared utilities for performance and consistency
 import { 
@@ -711,7 +712,7 @@ async function processStreamingOrchestration(
       const response = await generateFastResponse(
         message.content,
         fastPath,
-        openAIApiKey,
+        serviceSupabase,
         sendData
       );
 
@@ -798,118 +799,122 @@ async function processStreamingOrchestration(
     
     if (mode === 'bulk_processing') {
       console.log('📦 Bulk mode: Using simplified analysis');
-      analysis = {
-        intent: 'general',
-        complexity: 0.5,
-        topicRelevance: 0.5,
-        requiresExpertise: false
-      };
-      conversationState = await getConversationState(userSupabase, deliberationId, message.user_id);
+      analysis = { intent: 'general', complexity: 0.5, requiresExpertise: false };
+      conversationState = { messageCount: 1, recentAgentTypes: [], lastAgentType: null };
       similarNodes = [];
-      availableKnowledge = await checkAvailableKnowledge(serviceSupabase, deliberationId);
+      availableKnowledge = false;
     } else {
-      console.log('🔄 Full analysis mode');
-      const analysisPromise = orchestrator.analyzeMessage(message.content, openAIApiKey);
-      const conversationPromise = getConversationState(userSupabase, deliberationId, message.user_id);
-      const similarNodesPromise = findSimilarNodes(userSupabase, message.content);
-      const knowledgePromise = checkAvailableKnowledge(serviceSupabase, deliberationId);
-
-      [analysis, conversationState, similarNodes, availableKnowledge] = await Promise.all([
-        analysisPromise,
-        conversationPromise,
-        similarNodesPromise,
-        knowledgePromise
+      console.log('🧠 Performing enhanced analysis');
+      
+      // Parallel execution for better performance
+      const [analysisResult, conversationResult, similarNodesResult, knowledgeResult] = await Promise.all([
+        orchestrator.analyzeMessage(message.content, deliberationId).catch(e => {
+          console.warn('Analysis failed:', e.message);
+          return { intent: 'general', complexity: 0.5, requiresExpertise: false };
+        }),
+        getConversationState(serviceSupabase, deliberationId, message.user_id).catch(e => {
+          console.warn('Conversation state failed:', e.message);
+          return { messageCount: 1, recentAgentTypes: [], lastAgentType: null };
+        }),
+        findSimilarNodes(serviceSupabase, message.content).catch(e => {
+          console.warn('Similar nodes failed:', e.message);
+          return [];
+        }),
+        checkAvailableKnowledge(serviceSupabase, deliberationId).catch(e => {
+          console.warn('Knowledge check failed:', e.message);
+          return false;
+        })
       ]);
+      
+      analysis = analysisResult;
+      conversationState = conversationResult;
+      similarNodes = similarNodesResult;
+      availableKnowledge = knowledgeResult;
     }
 
-    console.log('📊 Analysis complete, selecting optimal agent...');
-
-    // Enhanced agent selection using orchestrator
-    const selectedAgent = await orchestrator.selectOptimalAgent(
-      analysis, 
-      conversationState, 
-      deliberationId, 
-      availableKnowledge
+    // Enhanced agent selection with performance optimizations
+    const selectedAgent = await orchestrator.selectAgent(
+      message.content,
+      analysis,
+      conversationState,
+      similarNodes,
+      availableKnowledge,
+      deliberationId
     );
+
+    console.log(`🤖 Selected agent: ${selectedAgent}`);
+    sendData({ agentType: selectedAgent, content: '', done: false });
+
+    // Generate streaming response with orchestrator
+    const response = await generateStreamingResponse(
+      message.content,
+      selectedAgent,
+      analysis,
+      conversationState,
+      similarNodes,
+      deliberationId,
+      openAIApiKey,
+      sendData,
+      orchestrator,
+      mode
+    );
+
+    console.log(`✅ Generated response length: ${response.length}`);
+    console.log(`✅ Response preview: ${response.substring(0, 200)}...`);
+
+    // Cache the final response
+    cacheResponse(message.content, response, selectedAgent, deliberationId);
+
+    // Store final response using service client
+    console.log('💾 Storing response in database...');
+    
+    const insertData = {
+      content: response,
+      message_type: selectedAgent,
+      user_id: message.user_id,
+      deliberation_id: deliberationId,
+      parent_message_id: messageId,
+      created_at: responseTimestamp,
+      agent_context: { 
+        agent_type: selectedAgent,
+        processing_method: 'full_orchestration',
+        analysis: analysis,
+        processing_mode: mode
+      }
+    };
+
+    const { data: insertResult, error: insertError } = await serviceSupabase
+      .from('messages')
+      .insert(insertData)
+      .select('id')
+      .single();
+
+    if (insertError) {
+      console.error('❌ Database insert error:', insertError);
+      sendData({ error: 'Failed to save response to database', insertError: insertError.message });
+      throw new Error(`Failed to save response: ${insertError.message}`);
+    } else {
+      console.log('✅ Response stored successfully in database');
+    }
+
+  } catch (responseError) {
+    console.error('❌ Error generating response - FULL ERROR DETAILS:', {
+      error: responseError,
+      message: responseError.message,
+      stack: responseError.stack,
+      name: responseError.name
+    });
     
     sendData({ 
-      agentType: selectedAgent,
-      content: '',
-      done: false
+      error: `Response generation failed: ${responseError.message}`,
+      content: `Error: ${responseError.message}. Please check the logs for details.`,
+      done: true 
     });
+    return; // Exit early on error
+  }
 
-    // Generate streaming response using orchestrator
-    try {
-      console.log(`🎯 Starting generateStreamingResponse for ${selectedAgent}...`);
-      const response = await generateStreamingResponse(
-        message.content,
-        selectedAgent,
-        analysis,
-        conversationState,
-        similarNodes,
-        deliberationId,
-        openAIApiKey,
-        sendData,
-        orchestrator,
-        mode
-      );
-
-      console.log(`✅ Generated response length: ${response.length}`);
-      console.log(`✅ Response preview: ${response.substring(0, 200)}...`);
-
-      // Cache the final response
-      cacheResponse(message.content, response, selectedAgent, deliberationId);
-
-      // Store final response using service client
-      console.log('💾 Storing response in database...');
-      
-      const insertData = {
-        content: response,
-        message_type: selectedAgent,
-        user_id: message.user_id,
-        deliberation_id: deliberationId,
-        parent_message_id: messageId,
-        created_at: responseTimestamp,
-        agent_context: { 
-          agent_type: selectedAgent,
-          processing_method: 'full_orchestration',
-          analysis: analysis,
-          processing_mode: mode
-        }
-      };
-
-      const { data: insertResult, error: insertError } = await serviceSupabase
-        .from('messages')
-        .insert(insertData)
-        .select('id')
-        .single();
-
-      if (insertError) {
-        console.error('❌ Database insert error:', insertError);
-        sendData({ error: 'Failed to save response to database', insertError: insertError.message });
-        throw new Error(`Failed to save response: ${insertError.message}`);
-      } else {
-        console.log('✅ Response stored successfully in database');
-      }
-
-    } catch (responseError) {
-      console.error('❌ Error generating response - FULL ERROR DETAILS:', {
-        error: responseError,
-        message: responseError.message,
-        stack: responseError.stack,
-        name: responseError.name
-      });
-      
-      sendData({ 
-        error: `Response generation failed: ${responseError.message}`,
-        content: `Error: ${responseError.message}. Please check the logs for details.`,
-        done: true 
-      });
-      return; // Exit early on error
-    }
-
-    sendData({ done: true });
-    console.log('🏁 Sent final completion signal');
+  sendData({ done: true });
+  console.log('🏁 Sent final completion signal');
 
   } catch (error) {
     console.error('❌ Streaming processing error:', error);
