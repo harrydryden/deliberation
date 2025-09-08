@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { productionLogger } from '@/utils/productionLogger';
 // Streaming performance monitoring consolidated into production logger
@@ -36,6 +36,32 @@ export const useResponseStreaming = () => {
   const startTime = useRef<number>(0);
   const uiDebugger = useUIStateDebugger('ResponseStreaming');
   const networkTracker = useNetworkPerformanceTracker();
+
+  // Critical cleanup on component unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      productionLogger.debug('ResponseStreaming component unmounting - cleaning up');
+      
+      // Abort any active streaming
+      if (streamControllerRef.current) {
+        try {
+          streamControllerRef.current.abort();
+        } catch (error) {
+          productionLogger.warn('Error aborting stream on unmount', error);
+        }
+        streamControllerRef.current = null;
+      }
+      
+      // Clear RAF callbacks
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      
+      // Clear refs
+      accumulatorRef.current = '';
+    };
+  }, []);
 
   // Enhanced timeout detection in streaming state management
   const startStreaming = useCallback(async (

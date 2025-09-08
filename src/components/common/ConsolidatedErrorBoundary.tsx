@@ -81,19 +81,20 @@ export class ConsolidatedErrorBoundary extends Component<Props, State> {
   }
 
   startLightweightMonitoring = () => {
-    const memoryThreshold = this.props.memoryThreshold || 150;
+    const memoryThreshold = this.props.memoryThreshold || 200; // Increased threshold to reduce noise
     
     this.memoryCheckInterval = setInterval(() => {
       if ('memory' in performance) {
         const memoryInfo = (performance as any).memory;
         const usedMB = memoryInfo.usedJSHeapSize / (1024 * 1024);
         
+        // Only warn if memory is significantly high
         if (usedMB > memoryThreshold) {
-          productionLogger.warn('High memory usage', { usedMB });
+          productionLogger.warn('High memory usage detected', { usedMB, threshold: memoryThreshold });
           this.setState({ isPerformanceIssue: true });
         }
       }
-    }, 60000); // Check every minute
+    }, 300000); // Reduced frequency: Check every 5 minutes instead of every minute
   };
 
   handleRetry = () => {

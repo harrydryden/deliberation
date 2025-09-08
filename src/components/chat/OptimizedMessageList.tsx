@@ -16,6 +16,7 @@ import { useOptimizedMessageLoading } from "@/hooks/useOptimizedMessageLoading";
 import { useProgressiveFallback } from "@/hooks/useProgressiveFallback";
 import { useUIStateDebugger } from "@/hooks/useUIStateDebugger";
 import { performanceMonitor } from "@/utils/performanceMonitor";
+import { productionLogger } from "@/utils/productionLogger";
 
 interface MessageListProps {
   messages?: ChatMessage[]; // Made optional since we'll load internally
@@ -86,7 +87,7 @@ const OptimizedMessageItem = memo(({
     if (isUser) return null;
     
     if (!fallbackAgentInfo) {
-      console.warn(`Unknown agent type: ${message.message_type}`);
+      productionLogger.warn(`Unknown agent type: ${message.message_type}`, { messageType: message.message_type, messageId: message.id });
       return null;
     }
     

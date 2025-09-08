@@ -11,6 +11,7 @@ import { formatToUKDate, formatToUKTime } from '@/utils/timeUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { MarkdownMessage } from '@/components/common/MarkdownMessage';
 import { logger } from '@/utils/logger';
+import { productionLogger } from '@/utils/productionLogger';
 import type { ChatMessage } from '@/types/index';
 interface Deliberation {
   id: string;
@@ -292,7 +293,7 @@ export const AdminDeliberationView = () => {
                         {group.agentResponses.map(response => {
                   const agentInfo = (AGENTS as any)[response.message_type];
                   if (!agentInfo) {
-                    console.warn(`Unknown agent type: ${response.message_type}`);
+                    productionLogger.warn(`Unknown agent type: ${response.message_type}`, { messageType: response.message_type, responseId: response.id });
                     return null; // Skip unknown agent types
                   }
                   const AgentIcon = agentInfo.icon;

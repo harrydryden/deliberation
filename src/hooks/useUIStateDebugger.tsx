@@ -2,6 +2,9 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { logger } from '@/utils/logger';
 
+// Disable in production for performance and memory optimization
+const isProduction = process.env.NODE_ENV === 'production';
+
 interface UIStateTransition {
   timestamp: number;
   state: string;
@@ -17,6 +20,9 @@ export const useUIStateDebugger = (componentName: string) => {
 
   // Track state transition
   const trackTransition = useCallback((newState: string, trigger: string) => {
+    // Completely disabled in production
+    if (isProduction) return;
+    
     const now = Date.now();
     const previousState = currentStateRef.current;
     const duration = now - stateStartTimeRef.current;
@@ -110,8 +116,10 @@ export const useUIStateDebugger = (componentName: string) => {
     };
   }, []);
 
-  // Periodic state monitoring
+  // Periodic state monitoring - disabled in production
   useEffect(() => {
+    if (isProduction) return;
+    
     const interval = setInterval(() => {
       const analytics = getStateAnalytics();
       
