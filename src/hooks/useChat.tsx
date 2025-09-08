@@ -5,7 +5,6 @@ import type { ChatMessage } from "@/types/index";
 import { convertApiMessagesToChatMessages, convertApiMessageToChatMessage } from "@/utils/chat";
 import { getErrorMessage } from "@/utils/errors";
 import { useErrorHandler } from './useErrorHandler';
-import { useOptimizedState } from './useOptimizedState';
 import { logger } from '@/utils/logger';
 import { useToast } from '@/hooks/use-toast';
 import { useResponseStreaming } from '@/hooks/useResponseStreaming';
@@ -18,21 +17,17 @@ export const useChat = (deliberationId?: string) => {
   const { messageService, realtimeService } = useServices();
   const { handleError, handleAsyncError } = useErrorHandler();
   
-  // Optimized state management to reduce re-renders
-  const [chatState, setChatState] = useOptimizedState({
-    initialValue: {
-      messages: [] as ChatMessage[],
-      isLoading: false,
-      isTyping: false
-    }
+  // Standard React state management for stability
+  const [chatState, setChatState] = useState({
+    messages: [] as ChatMessage[],
+    isLoading: false,
+    isTyping: false
   });
   
-  // Separate message state updates to prevent unnecessary re-renders of UI state
-  const [uiState, setUiState] = useOptimizedState({
-    initialValue: {
-      isLoading: false,
-      isTyping: false
-    }
+  // UI state for loading and typing indicators
+  const [uiState, setUiState] = useState({
+    isLoading: false,
+    isTyping: false
   });
   
   const unsubscribeRef = useRef<(() => void) | null>(null);
