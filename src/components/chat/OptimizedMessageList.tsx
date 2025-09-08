@@ -44,13 +44,6 @@ const AGENTS = {
     color: 'bg-peer-agent',
     bgColor: 'bg-peer-agent-bg',
     description: 'Peer Review & Analysis'
-  },
-  default: {
-    name: 'AI Assistant',
-    icon: Bot,
-    color: 'bg-muted-foreground',
-    bgColor: 'bg-muted',
-    description: 'General Assistant'
   }
 } as const;
 
@@ -82,7 +75,7 @@ const OptimizedMessageItem = memo(({
   
   const fallbackAgentInfo = useMemo(() => {
     const agentKey = message.message_type as keyof typeof AGENTS;
-    return AGENTS[agentKey] ?? AGENTS.default;
+    return AGENTS[agentKey];
   }, [message.message_type]);
   
   const agentInfo = useMemo(() => isUser ? null : {
@@ -125,7 +118,7 @@ const OptimizedMessageItem = memo(({
           <div className="flex-1 min-w-0">
             <div className={`flex items-center gap-2 mb-1 ${isUser ? 'justify-end' : ''}`}>
               <span className="text-sm font-medium">
-                {isUser ? 'You' : (agentInfo?.name || 'Assistant')}
+                {isUser ? 'You' : (agentInfo?.name || 'Unknown Agent')}
               </span>
               <span className="text-xs text-muted-foreground">
                 {formatMessageTime(message.created_at)}

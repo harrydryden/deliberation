@@ -40,11 +40,6 @@ const AGENTS = {
     name: 'Pia',
     icon: Users,
     color: 'bg-purple-500'
-  },
-  default: {
-    name: 'AI Assistant',
-    icon: Bot,
-    color: 'bg-gray-500'
   }
 } as const;
 export const AdminDeliberationView = () => {
@@ -295,7 +290,11 @@ export const AdminDeliberationView = () => {
                     {/* Agent Responses (expandable) */}
                     {isExpanded && hasAgentResponses && <div className="ml-11 space-y-3">
                         {group.agentResponses.map(response => {
-                  const agentInfo = (AGENTS as any)[response.message_type] ?? AGENTS.default;
+                  const agentInfo = (AGENTS as any)[response.message_type];
+                  if (!agentInfo) {
+                    console.warn(`Unknown agent type: ${response.message_type}`);
+                    return null; // Skip unknown agent types
+                  }
                   const AgentIcon = agentInfo.icon;
                   return <div key={response.id} className="flex gap-3">
                               <Avatar className="h-6 w-6 flex-shrink-0">
@@ -319,7 +318,7 @@ export const AdminDeliberationView = () => {
                                 </Card>
                               </div>
                             </div>;
-                })}
+                }).filter(Boolean)}
                       </div>}
                   </div>;
           })}
