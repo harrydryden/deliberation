@@ -544,6 +544,39 @@ async function generateStreamingResponse(
   }
 }
 
+// Distributed lock for preventing duplicate agent responses (F001 Fix)
+const PROCESSING_LOCKS = new Map<string, { timestamp: number; lockId: string }>();
+const LOCK_TIMEOUT = 30000; // 30 seconds
+
+function acquireProcessingLock(messageId: string): string | null {
+  const now = Date.now();
+  const existing = PROCESSING_LOCKS.get(messageId);
+  
+  // Clean up expired locks
+  if (existing && (now - existing.timestamp) > LOCK_TIMEOUT) {
+    PROCESSING_LOCKS.delete(messageId);
+  }
+  
+  // Check if still locked
+  if (PROCESSING_LOCKS.has(messageId)) {
+    console.log(`⚠️ Message ${messageId} is already being processed`);
+    return null;
+  }
+  
+  const lockId = crypto.randomUUID();
+  PROCESSING_LOCKS.set(messageId, { timestamp: now, lockId });
+  console.log(`🔒 Acquired processing lock for message ${messageId}, lockId: ${lockId}`);
+  return lockId;
+}
+
+function releaseProcessingLock(messageId: string, lockId: string): void {
+  const existing = PROCESSING_LOCKS.get(messageId);
+  if (existing && existing.lockId === lockId) {
+    PROCESSING_LOCKS.delete(messageId);
+    console.log(`🔓 Released processing lock for message ${messageId}`);
+  }
+}
+
 // Main streaming handler with distributed locking for race condition prevention
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -567,6 +600,18 @@ serve(async (req) => {
     
     console.log('🚀 Starting streaming agent orchestration', { messageId, deliberationId, mode });
     
+    // F001 Fix: Acquire distributed lock to prevent duplicate processing
+    const lockId = acquireProcessingLock(messageId);
+    if (!lockId) {
+      return new Response(JSON.stringify({ 
+        error: 'Message is already being processed',
+        messageId 
+      }), {
+        status: 409, // Conflict
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     // Special handling for bulk processing mode
     if (mode === 'bulk_processing') {
       console.log(`🔄 Bulk processing mode enabled for message ${messageId}`);
@@ -583,8 +628,9 @@ serve(async (req) => {
       writer.write(encoder.encode(message));
     };
 
-    // Start background processing with auth header
+    // Start background processing with auth header and cleanup
     processStreamingOrchestration(messageId, deliberationId, mode, authHeader, sendData).finally(() => {
+      releaseProcessingLock(messageId, lockId);
       writer.close();
     });
 

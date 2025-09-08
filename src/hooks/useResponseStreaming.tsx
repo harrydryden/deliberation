@@ -207,17 +207,31 @@ export const useResponseStreaming = () => {
     } catch (error) {
       console.error('❌ Streaming error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
+      
+      // F005 Fix: Enhanced structured logging for better observability
       logger.error('Streaming failed', error as Error, { 
         messageId, 
         deliberationId,
         streamingState: {
           isStreaming: streamingState.isStreaming,
           currentMessageLength: accumulatorRef.current.length,
-          agentType: streamingState.agentType
+          agentType: streamingState.agentType,
+          messageId: streamingState.messageId
         },
         errorType: error instanceof Error ? error.constructor.name : 'Unknown',
-        timestamp: new Date().toISOString()
+        errorStack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+        requestInfo: {
+          userAgent: typeof window !== 'undefined' ? window.navigator.userAgent : 'Unknown',
+          url: typeof window !== 'undefined' ? window.location.href : 'Unknown'
+        },
+        performanceMetrics: {
+          streamDuration: Date.now() - performance.now(),
+          accumulatedBytes: accumulatorRef.current.length,
+          rafCallsScheduled: rafIdRef.current ? 1 : 0
+        }
       });
+      
       onError(errorMessage);
     } finally {
       // Clear timeout to prevent memory leaks

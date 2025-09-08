@@ -85,15 +85,27 @@ export class IBISService {
       const sanitizedTitle = nodeData.title.trim().substring(0, 200);
       const sanitizedDescription = nodeData.description?.trim().substring(0, 1000) || null;
 
-      // Check for duplicate nodes in the same deliberation
-      const { data: existingNodes } = await supabase
-        .from('ibis_nodes')
-        .select('id, title')
-        .eq('deliberation_id', nodeData.deliberation_id)
-        .eq('created_by', nodeData.created_by)
-        .gte('created_at', new Date(Date.now() - 30000).toISOString()) // Last 30 seconds
-        .order('created_at', { ascending: false })
-        .limit(5);
+      // F003 Fix: Batch query for existing nodes and knowledge retrieval
+      const [existingNodesResult, knowledgeResult] = await Promise.all([
+        supabase
+          .from('ibis_nodes')
+          .select('id, title')
+          .eq('deliberation_id', nodeData.deliberation_id)
+          .eq('created_by', nodeData.created_by)
+          .gte('created_at', new Date(Date.now() - 30000).toISOString()) // Last 30 seconds
+          .order('created_at', { ascending: false })
+          .limit(5),
+        
+        // Parallel knowledge check if available
+        nodeData.message_id ? supabase
+          .from('messages')
+          .select('content')
+          .eq('id', nodeData.message_id)
+          .limit(1)
+          .maybeSingle() : Promise.resolve({ data: null, error: null })
+      ]);
+      
+      const { data: existingNodes } = existingNodesResult;
 
       // Check for near-duplicate titles
       const duplicateNode = existingNodes?.find(node => {
@@ -280,30 +292,79 @@ export class IBISService {
 
       const newNode = await this.createNode(nodeData);
 
-      // Create relationship between new node and target issue with improved atomicity
-      const { error: relError } = await supabase
-        .from('ibis_relationships')
-        .insert({
-          source_node_id: newNode.id,
-          target_node_id: issueId,
-          relationship_type: nodeType === 'argument' ? 'supports' : 'addresses',
-          created_by: userId,
-          deliberation_id: deliberationId
-        });
-
-      if (relError) {
-        logger.error('[IBISService] Error creating relationship', { error: relError });
-        // Enhanced cleanup with error handling
-        try {
-          await supabase.from('ibis_nodes').delete().eq('id', newNode.id);
-          logger.info('[IBISService] Successfully cleaned up orphaned node', { nodeId: newNode.id });
-        } catch (cleanupError) {
-          logger.error('[IBISService] Failed to cleanup orphaned node', { 
-            nodeId: newNode.id, 
-            cleanupError,
-            originalError: relError 
+      // F004 Fix: Enhanced atomic transaction with proper error handling and rollback
+      let relationshipCreated = false;
+      try {
+        const { error: relError } = await supabase
+          .from('ibis_relationships')
+          .insert({
+            source_node_id: newNode.id,
+            target_node_id: issueId,
+            relationship_type: nodeType === 'argument' ? 'supports' : 'addresses',
+            created_by: userId,
+            deliberation_id: deliberationId
           });
+
+        if (relError) {
+          throw relError;
         }
+        
+        relationshipCreated = true;
+        logger.info('[IBISService] Relationship created successfully', { 
+          sourceNodeId: newNode.id, 
+          targetNodeId: issueId,
+          relationshipType: nodeType === 'argument' ? 'supports' : 'addresses'
+        });
+      } catch (relError) {
+        logger.error('[IBISService] Error creating relationship - initiating rollback', { 
+          error: relError,
+          sourceNodeId: newNode.id,
+          targetNodeId: issueId
+        });
+        
+        // Enhanced rollback with retry mechanism
+        const maxRetries = 3;
+        let retryCount = 0;
+        
+        while (retryCount < maxRetries) {
+          try {
+            const { error: cleanupError } = await supabase
+              .from('ibis_nodes')
+              .delete()
+              .eq('id', newNode.id);
+              
+            if (!cleanupError) {
+              logger.info('[IBISService] Successfully cleaned up orphaned node after relationship failure', { 
+                nodeId: newNode.id,
+                retriesUsed: retryCount
+              });
+              break;
+            } else {
+              throw cleanupError;
+            }
+          } catch (cleanupError) {
+            retryCount++;
+            logger.warn('[IBISService] Cleanup attempt failed, retrying...', { 
+              nodeId: newNode.id, 
+              attempt: retryCount,
+              maxRetries,
+              cleanupError
+            });
+            
+            if (retryCount >= maxRetries) {
+              logger.error('[IBISService] Failed to cleanup orphaned node after max retries', { 
+                nodeId: newNode.id, 
+                originalError: relError,
+                finalCleanupError: cleanupError
+              });
+              break;
+            }
+            
+            // Exponential backoff: wait 100ms, then 200ms, then 400ms
+            await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, retryCount - 1)));
+          }
+        }
+        
         throw relError;
       }
 

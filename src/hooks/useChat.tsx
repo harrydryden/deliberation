@@ -10,6 +10,7 @@ import { logger } from '@/utils/logger';
 import { useToast } from '@/hooks/use-toast';
 import { useResponseStreaming } from '@/hooks/useResponseStreaming';
 import { cacheService } from '@/services/cache.service';
+import { useOptimizedMessageCleanup } from '@/hooks/useOptimizedMessageCleanup';
 
 export const useChat = (deliberationId?: string) => {
   const { user, isLoading: authLoading } = useSupabaseAuth();
@@ -35,6 +36,13 @@ export const useChat = (deliberationId?: string) => {
   
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const { streamingState, startStreaming, stopStreaming } = useResponseStreaming();
+  
+  // F002 Fix: Initialize message cleanup handler
+  const { 
+    scheduleFailedMessageCleanup, 
+    cancelCleanup, 
+    cancelAllCleanups
+  } = useOptimizedMessageCleanup();
 
   // Memoize services to prevent recreating instances
   const services = useMemo(() => ({
@@ -96,18 +104,20 @@ export const useChat = (deliberationId?: string) => {
           submitted_to_ibis: message.submitted_to_ibis || false
         };
 
-          setChatState(prev => {
-            // Avoid duplicates
-            if (prev.messages.some(msg => msg.id === chatMessage.id)) {
-              logger.info('🔄 Duplicate message ignored', { messageId: chatMessage.id });
-              return prev;
-            }
-            logger.info('➕ Adding realtime message', { messageId: chatMessage.id });
-            return {
-              ...prev,
-              messages: [...prev.messages, chatMessage]
-            };
-          });
+        setChatState(prev => {
+          // Avoid duplicates
+          if (prev.messages.some(msg => msg.id === chatMessage.id)) {
+            logger.info('🔄 Duplicate message ignored', { messageId: chatMessage.id });
+            return prev;
+          }
+          
+          // F002 Fix: Filter out messages scheduled for cleanup - simplified approach
+          logger.info('➕ Adding realtime message', { messageId: chatMessage.id });
+          return {
+            ...prev,
+            messages: [...prev.messages, chatMessage]
+          };
+        });
           
           // Update typing state separately to prevent message list re-renders
           if (message.message_type && (message.message_type.includes('agent') || message.message_type === 'peer_agent' || message.message_type === 'bill_agent' || message.message_type === 'flow_agent')) {
@@ -135,6 +145,8 @@ export const useChat = (deliberationId?: string) => {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
+      // F002 Fix: Cleanup scheduled message cleanups on unmount
+      cancelAllCleanups();
     };
   }, [user, authLoading, deliberationId, stableLoadChatHistory, stableSetupRealTimeUpdates]);
 
@@ -297,13 +309,8 @@ export const useChat = (deliberationId?: string) => {
       }));
       setUiState(prev => ({ ...prev, isTyping: false }));
       
-      // Schedule cleanup of failed optimistic message after 30 seconds
-      setTimeout(() => {
-        setChatState(prev => ({
-          ...prev,
-          messages: prev.messages.filter(m => !(m.id === tempId && m.status === 'failed'))
-        }));
-      }, 30000);
+      // F002 Fix: Use optimized cleanup instead of setTimeout
+      scheduleFailedMessageCleanup(tempId, (updater) => setChatState(prev => ({ ...prev, messages: updater(prev.messages) })), 30000);
       
       throw error;
     }

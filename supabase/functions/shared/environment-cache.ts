@@ -1,51 +1,50 @@
-/**
- * Environment validation caching to reduce cold start overhead
- */
-
+// F006 Fix: Environment caching to improve cold start performance
 interface CachedEnvironment {
   supabaseUrl: string;
-  supabaseAnonKey: string;
   supabaseServiceKey: string;
   openaiApiKey: string;
   timestamp: number;
 }
 
-let envCache: CachedEnvironment | null = null;
-const CACHE_TTL = 300000; // 5 minutes
+let environmentCache: CachedEnvironment | null = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-export function getCachedEnvironment() {
-  // Return cached environment if valid
-  if (envCache && (Date.now() - envCache.timestamp) < CACHE_TTL) {
-    return {
-      supabaseUrl: envCache.supabaseUrl,
-      supabaseAnonKey: envCache.supabaseAnonKey,
-      supabaseServiceKey: envCache.supabaseServiceKey,
-      openaiApiKey: envCache.openaiApiKey
-    };
+export function getCachedEnvironment(): CachedEnvironment {
+  const now = Date.now();
+  
+  // Return cached environment if valid and recent
+  if (environmentCache && (now - environmentCache.timestamp) < CACHE_DURATION) {
+    console.log('🚀 Using cached environment variables');
+    return environmentCache;
   }
-
-  // Validate and cache environment
+  
+  console.log('🔄 Refreshing environment cache...');
+  
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY'); 
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-
-  if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey || !openaiApiKey) {
-    throw new Error('Missing required environment variables');
+  
+  if (!supabaseUrl || !supabaseServiceKey || !openaiApiKey) {
+    const missing = [];
+    if (!supabaseUrl) missing.push('SUPABASE_URL');
+    if (!supabaseServiceKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+    if (!openaiApiKey) missing.push('OPENAI_API_KEY');
+    
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
-
-  envCache = {
+  
+  environmentCache = {
     supabaseUrl,
-    supabaseAnonKey, 
     supabaseServiceKey,
     openaiApiKey,
-    timestamp: Date.now()
+    timestamp: now
   };
+  
+  console.log('✅ Environment cache refreshed');
+  return environmentCache;
+}
 
-  return {
-    supabaseUrl: envCache.supabaseUrl,
-    supabaseAnonKey: envCache.supabaseAnonKey,
-    supabaseServiceKey: envCache.supabaseServiceKey,
-    openaiApiKey: envCache.openaiApiKey
-  };
+export function invalidateEnvironmentCache(): void {
+  environmentCache = null;
+  console.log('🗑️ Environment cache invalidated');
 }
