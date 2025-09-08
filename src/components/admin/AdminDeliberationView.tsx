@@ -182,7 +182,7 @@ export const AdminDeliberationView = () => {
     active: 'default',
     completed: 'outline'
   } as const;
-  return <Layout>
+  return (
     <div className="container mx-auto px-4 py-6 max-w-4xl">
       {/* Header */}
       <Card className="mb-4">
@@ -327,5 +327,5 @@ export const AdminDeliberationView = () => {
         </CardContent>
       </Card>
     </div>
-  </Layout>;
+  );
 };
