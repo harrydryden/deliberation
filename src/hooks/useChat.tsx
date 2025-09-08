@@ -406,11 +406,15 @@ export const useChat = (deliberationId?: string) => {
     // Add message to queue instead of processing immediately
     const queueId = messageQueue.addToQueue(content.trim());
     
-    logger.info('📤 Message queued for processing', { 
-      queueId, 
-      content: content.substring(0, 50),
-      queueStats: messageQueue.getQueueStats()
-    });
+      logger.info('📤 Message queued for processing', { 
+        queueId, 
+        content: content.substring(0, 50),
+        queueStats: messageQueue.getQueueStats(),
+        timeouts: {
+          streamingTimeout: '30s',
+          processingTimeout: '45s'
+        }
+      });
 
     // Show immediate feedback that message was queued
     stableToast({

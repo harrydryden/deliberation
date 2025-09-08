@@ -102,7 +102,7 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
         // Set a timeout to mark as failed if processing takes too long
         const timeout = setTimeout(() => {
           updateMessageStatus(messageId, 'failed', 'Processing timeout');
-        }, 60000); // Increased to 60 second timeout to match streaming timeouts
+        }, 45000); // 45 second timeout - 15 seconds buffer over streaming timeout
         processingTimeouts.current.set(messageId, timeout);
       }
 

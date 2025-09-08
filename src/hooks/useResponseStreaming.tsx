@@ -102,7 +102,8 @@ export const useResponseStreaming = () => {
         messageId: null,
         agentType: null,
       });
-      onError('Request timed out after 30 seconds. The server may be experiencing delays.');
+      // IMPORTANT: Call onError to notify queue that processing failed
+      onError('Streaming timeout after 30 seconds. Please try again.');
     }, STREAMING_TIMEOUT);
     
     // Heartbeat monitoring to detect stalled connections
@@ -120,6 +121,8 @@ export const useResponseStreaming = () => {
             ...prev,
             isStreaming: false
           }));
+          // Call onError to notify queue
+          onError('Connection stalled - no activity for 25 seconds.');
         }
       } else {
         console.log(`💓 Heartbeat ${heartbeatCount}: Active (${timeSinceActivity}ms since last activity)`);
