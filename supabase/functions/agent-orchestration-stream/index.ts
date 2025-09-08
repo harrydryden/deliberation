@@ -88,7 +88,7 @@ function cacheResponse(content: string, response: string, agentType: string, del
   responseCache.set(cacheKey, response);
 }
 
-// Generate fast response using templates and simple AI with improved error handling
+// Generate fast response using templates and simple AI with improved error handling and timeout
 async function generateFastResponse(
   content: string,
   fastPath: any,
@@ -97,62 +97,72 @@ async function generateFastResponse(
 ): Promise<string> {
   const openAIApiKey = getOpenAIKey();
   
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-5-2025-08-07',
-      messages: [
-        {
-          role: 'system',
-          content: await getFastPathSystemPrompt(supabase, fastPath.agent)
-        },
-        { role: 'user', content: content }
-      ],
-      max_completion_tokens: 1000,
-      stream: true
-    }),
-  });
+  // Add timeout for OpenAI requests to prevent hanging
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, 45000); // 45 second timeout to leave buffer for edge function limit
+  
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-2025-08-07',
+        messages: [
+          {
+            role: 'system',
+            content: await getFastPathSystemPrompt(supabase, fastPath.agent)
+          },
+          { role: 'user', content: content }
+        ],
+        max_completion_tokens: 1000,
+        stream: true
+      }),
+      signal: controller.signal
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-  }
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
 
-  const reader = response.body?.getReader();
-  const decoder = new TextDecoder();
-  let fullResponse = '';
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let fullResponse = '';
 
-  if (reader) {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
-      
-      for (const line of lines) {
-        if (line.includes('[DONE]')) continue;
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
         
-        try {
-          const data = JSON.parse(line.slice(6));
-          const content = data.choices?.[0]?.delta?.content || '';
-          if (content) {
-            fullResponse += content;
-            sendData({ content, done: false });
+        for (const line of lines) {
+          if (line.includes('[DONE]')) continue;
+          
+          try {
+            const data = JSON.parse(line.slice(6));
+            const content = data.choices?.[0]?.delta?.content || '';
+            if (content) {
+              fullResponse += content;
+              sendData({ content, done: false });
+            }
+          } catch (e) {
+            // Ignore parse errors for streaming
           }
-        } catch (e) {
-          // Ignore parse errors for streaming
         }
       }
     }
-  }
 
-  return fullResponse;
-}
+    return fullResponse;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
 // Helper function to get conversation state
 async function getConversationState(supabase: any, deliberationId: string, userId: string): Promise<ConversationContext> {

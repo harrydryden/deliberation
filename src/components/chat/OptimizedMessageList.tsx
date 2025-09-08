@@ -190,14 +190,16 @@ export const OptimizedMessageList = memo(({
   // Use simplified performance hook without overhead
   const { createOptimizedCallback } = useSimplifiedPerformance();
 
-  // Optimized agent configs map with proper typing and stability check
+  // Optimized agent configs map with stable dependencies to prevent unnecessary recalculations
   const agentConfigsMap = useMemo(() => {
+    if (!agentConfigs) return new Map<string, AgentConfig>();
+    
     const map = new Map<string, AgentConfig>();
-    agentConfigs?.forEach(config => {
+    agentConfigs.forEach(config => {
       map.set(config.agent_type, config);
     });
     return map;
-  }, [agentConfigs?.length, agentConfigs?.map(c => c.agent_type).join(',')]);  // More stable dependencies
+  }, [agentConfigs]); // Simple dependency - React will handle the array comparison efficiently
 
   // Simplified render item function
   const renderItem = createOptimizedCallback(
@@ -217,34 +219,46 @@ export const OptimizedMessageList = memo(({
     [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId]
   );
 
-  // Auto-scroll optimization
+  // Auto-scroll optimization with proper cleanup
   const scrollToBottom = useCallback(() => {
-    virtuosoRef.current?.scrollToIndex({ 
-      index: messages.length - 1, 
-      align: 'end', 
-      behavior: 'smooth' 
-    });
-    setUnreadIndex(null);
+    if (virtuosoRef.current) {
+      virtuosoRef.current.scrollToIndex({ 
+        index: messages.length - 1, 
+        align: 'end', 
+        behavior: 'smooth' 
+      });
+      setUnreadIndex(null);
+    }
   }, [messages.length]);
 
+  // Batch state updates to prevent excessive re-renders
   useEffect(() => {
-    if (!atBottom && messages.length > prevCountRef.current) {
+    const hasNewMessages = messages.length > prevCountRef.current;
+    if (!atBottom && hasNewMessages) {
       setUnreadIndex(prevCountRef.current);
     }
     prevCountRef.current = messages.length;
   }, [messages.length, atBottom]);
 
+  // Initial scroll with proper RAF cleanup
   useEffect(() => {
     if (!didAutoScrollRef.current && messages.length > 0) {
-      requestAnimationFrame(() => {
-        virtuosoRef.current?.scrollToIndex({ 
-          index: messages.length - 1, 
-          align: 'end', 
-          behavior: 'auto' 
-        });
-        setAtBottom(true);
-        didAutoScrollRef.current = true;
+      const rafId = requestAnimationFrame(() => {
+        if (virtuosoRef.current) {
+          virtuosoRef.current.scrollToIndex({ 
+            index: messages.length - 1, 
+            align: 'end', 
+            behavior: 'auto' 
+          });
+          setAtBottom(true);
+          didAutoScrollRef.current = true;
+        }
       });
+      
+      // Cleanup RAF on unmount or dependency change
+      return () => {
+        cancelAnimationFrame(rafId);
+      };
     }
   }, [messages.length]);
 

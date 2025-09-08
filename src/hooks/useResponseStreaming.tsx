@@ -38,6 +38,12 @@ export const useResponseStreaming = () => {
   ) => {
     console.log('🌊 Starting streaming for message:', messageId);
     
+    // Cleanup any previous RAF callbacks to prevent memory leaks
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    
     // Reset previous state
     accumulatorRef.current = '';
     setStreamingState({
@@ -53,6 +59,15 @@ export const useResponseStreaming = () => {
     }
 
     streamControllerRef.current = new AbortController();
+    
+    // Add timeout for streaming operations to prevent hanging
+    const timeoutId = setTimeout(() => {
+      console.log('⏰ Streaming timeout reached, aborting...');
+      if (streamControllerRef.current) {
+        streamControllerRef.current.abort();
+      }
+      onError('Streaming request timed out');
+    }, 60000); // 60 second timeout
 
     try {
       console.log('🔍 Checking if streaming is already in progress...');
@@ -195,6 +210,11 @@ export const useResponseStreaming = () => {
       logger.error('Streaming failed', error as Error, { messageId, deliberationId });
       onError(errorMessage);
     } finally {
+      // Clear timeout to prevent memory leaks
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
       setStreamingState({
         isStreaming: false,
         currentMessage: '',

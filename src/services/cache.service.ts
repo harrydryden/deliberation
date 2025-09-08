@@ -11,10 +11,33 @@ export class CacheService {
   private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
   private pendingRequests = new Map<string, Promise<any>>();
   private maxSize: number;
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(options: CacheOptions = {}) {
     // Smaller cache size in production to reduce memory usage
     this.maxSize = isProduction ? 50 : (options.maxSize || 100);
+    
+    // Start automatic cleanup timer to prevent memory leaks
+    this.startPeriodicCleanup();
+  }
+  
+  // Periodic cleanup to prevent unbounded memory growth
+  private startPeriodicCleanup(): void {
+    // More frequent cleanup in production to manage memory better
+    const interval = isProduction ? 60000 : 120000; // 1min in prod, 2min in dev
+    
+    this.cleanupInterval = setInterval(() => {
+      this.cleanup();
+    }, interval);
+  }
+  
+  // Cleanup on service destruction
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    this.clear();
   }
 
   // Generate cache key from function name and arguments
@@ -27,13 +50,26 @@ export class CacheService {
     return Date.now() - entry.timestamp < entry.ttl;
   }
 
-  // Clean up expired entries
+  // Clean up expired entries with batching to prevent performance issues
   private cleanup(): void {
     const now = Date.now();
+    let deletedCount = 0;
+    const maxDeletions = 20; // Batch delete to prevent blocking
+    
     for (const [key, entry] of this.cache.entries()) {
       if (!this.isValid(entry)) {
         this.cache.delete(key);
+        deletedCount++;
+        
+        // Prevent excessive deletions in one cleanup cycle
+        if (deletedCount >= maxDeletions) {
+          break;
+        }
       }
+    }
+    
+    if (deletedCount > 0 && !isProduction) {
+      console.log(`Cache cleanup: removed ${deletedCount} expired entries`);
     }
   }
 

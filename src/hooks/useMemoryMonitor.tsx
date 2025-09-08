@@ -23,14 +23,9 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
     sampleInterval = 10000 // 10 seconds
   } = options;
 
-  // Disable memory monitoring in production
-  if (process.env.NODE_ENV === 'production') {
-    return {
-      getMemoryStats: () => ({}),
-      checkMemoryUsage: () => null,
-      forceGarbageCollection: () => false
-    };
-  }
+  // Provide basic monitoring even in production, but with reduced frequency
+  const isProduction = process.env.NODE_ENV === 'production';
+  const effectiveSampleInterval = isProduction ? sampleInterval * 6 : sampleInterval; // 6x less frequent in prod
 
   const initialMemoryRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout>();
@@ -112,47 +107,46 @@ export const useMemoryMonitor = (options: UseMemoryMonitorOptions) => {
     return false;
   }, [componentName]);
 
-  // Start monitoring (only in development)
+  // Start monitoring with production-safe configuration
   useEffect(() => {
-    // Skip monitoring in production
-    if (process.env.NODE_ENV === 'production') {
-      return;
-    }
-
     const stats = getMemoryStats();
     if (stats.usedJSHeapSize) {
       initialMemoryRef.current = stats.usedJSHeapSize;
     }
 
-    // Set up periodic monitoring
+    // Set up periodic monitoring (less frequent in production)
     intervalRef.current = setInterval(() => {
       checkMemoryUsage();
-    }, sampleInterval);
+    }, effectiveSampleInterval);
 
-    // Monitor component lifecycle (only in development)
-    logger.component.mount(componentName);
+    // Monitor component lifecycle
+    if (!isProduction) {
+      logger.component.mount(componentName);
+    }
 
     return () => {
       // Final memory check on unmount
       const finalStats = checkMemoryUsage();
       const lifespan = Date.now() - mountTimeRef.current;
       
-      logger.component.unmount(componentName, {
-        lifespan: `${lifespan}ms`,
-        finalMemory: finalStats ? `${finalStats.currentUsage.toFixed(2)}MB` : 'unknown'
-      });
+      if (!isProduction) {
+        logger.component.unmount(componentName, {
+          lifespan: `${lifespan}ms`,
+          finalMemory: finalStats ? `${finalStats.currentUsage.toFixed(2)}MB` : 'unknown'
+        });
+      }
       
       // Cleanup interval
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
       
-      // Warn about long-lived components
-      if (lifespan > 300000) { // 5 minutes
-        logger.warn(`Long-lived component: ${componentName}`, { lifespan });
+      // Warn about long-lived components (production-safe)
+      if (lifespan > 300000 && finalStats && finalStats.increase > criticalThreshold) { 
+        console.warn(`Memory leak detected in ${componentName}: ${finalStats.increase.toFixed(2)}MB increase over ${lifespan}ms`);
       }
     };
-  }, [componentName, sampleInterval, getMemoryStats, checkMemoryUsage]);
+  }, [componentName, effectiveSampleInterval, getMemoryStats, checkMemoryUsage, isProduction, criticalThreshold]);
 
   return {
     getMemoryStats,

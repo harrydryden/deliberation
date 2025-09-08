@@ -16,10 +16,18 @@ export const useChat = (deliberationId?: string) => {
   const { messageService, realtimeService } = useServices();
   const { handleError, handleAsyncError } = useErrorHandler();
   
-  // Combine related state to reduce re-renders
+  // Optimized state management to reduce re-renders
   const [chatState, setChatState] = useOptimizedState({
     initialValue: {
       messages: [] as ChatMessage[],
+      isLoading: false,
+      isTyping: false
+    }
+  });
+  
+  // Separate message state updates to prevent unnecessary re-renders of UI state
+  const [uiState, setUiState] = useOptimizedState({
+    initialValue: {
       isLoading: false,
       isTyping: false
     }
@@ -44,7 +52,7 @@ export const useChat = (deliberationId?: string) => {
       return;
     }
 
-    setChatState(prev => ({ ...prev, isLoading: true }));
+    setUiState(prev => ({ ...prev, isLoading: true }));
     
     await handleAsyncError(async () => {
       const data = await cacheService.memoizeAsync(
@@ -60,12 +68,12 @@ export const useChat = (deliberationId?: string) => {
       
       setChatState(prev => ({ 
         ...prev, 
-        messages: convertedMessages,
-        isLoading: false
+        messages: convertedMessages
       }));
+      setUiState(prev => ({ ...prev, isLoading: false }));
       logger.api.response('GET', '/messages', 200, { deliberationId, messageCount: data?.length || 0 });
     }, 'loading chat history');
-  }, [user, deliberationId, handleAsyncError, setChatState, services.messageService]);
+  }, [user, deliberationId, handleAsyncError, setChatState, setUiState, services.messageService]);
 
   const stableSetupRealTimeUpdates = useCallback(() => {
     if (!user) return;
@@ -88,19 +96,23 @@ export const useChat = (deliberationId?: string) => {
           submitted_to_ibis: message.submitted_to_ibis || false
         };
 
-        setChatState(prev => {
-          // Avoid duplicates
-          if (prev.messages.some(msg => msg.id === chatMessage.id)) {
-            logger.info('🔄 Duplicate message ignored', { messageId: chatMessage.id });
-            return prev;
+          setChatState(prev => {
+            // Avoid duplicates
+            if (prev.messages.some(msg => msg.id === chatMessage.id)) {
+              logger.info('🔄 Duplicate message ignored', { messageId: chatMessage.id });
+              return prev;
+            }
+            logger.info('➕ Adding realtime message', { messageId: chatMessage.id });
+            return {
+              ...prev,
+              messages: [...prev.messages, chatMessage]
+            };
+          });
+          
+          // Update typing state separately to prevent message list re-renders
+          if (message.message_type && (message.message_type.includes('agent') || message.message_type === 'peer_agent' || message.message_type === 'bill_agent' || message.message_type === 'flow_agent')) {
+            setUiState(prev => ({ ...prev, isTyping: false }));
           }
-          logger.info('➕ Adding realtime message', { messageId: chatMessage.id });
-          return {
-            ...prev,
-            messages: [...prev.messages, chatMessage],
-            isTyping: message.message_type && (message.message_type.includes('agent') || message.message_type === 'peer_agent' || message.message_type === 'bill_agent' || message.message_type === 'flow_agent') ? false : prev.isTyping
-          };
-        });
       }, deliberationId);
 
       unsubscribeRef.current = unsubscribe;
@@ -131,7 +143,7 @@ export const useChat = (deliberationId?: string) => {
   // Listen for agent failure events (e.g., OpenAI quota exceeded)
   useEffect(() => {
     const handler = () => {
-      setChatState(prev => ({ ...prev, isTyping: false }));
+      setUiState(prev => ({ ...prev, isTyping: false }));
       stableToast({ title: 'Contact Platform Admin', description: 'AI responses are temporarily unavailable.', variant: 'destructive' });
     };
     if (typeof window !== 'undefined') {
@@ -142,7 +154,7 @@ export const useChat = (deliberationId?: string) => {
         window.removeEventListener('agent-error', handler);
       }
     };
-  }, [stableToast, setChatState]);
+  }, [stableToast, setUiState]);
 
 
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
@@ -162,9 +174,9 @@ export const useChat = (deliberationId?: string) => {
     // Optimistic append
     setChatState(prev => ({
       ...prev,
-      messages: [...prev.messages, optimistic],
-      isTyping: true
+      messages: [...prev.messages, optimistic]
     }));
+    setUiState(prev => ({ ...prev, isTyping: true }));
 
     try {
       // const timer = performanceMonitor.startTimer('sendMessage');
@@ -254,7 +266,7 @@ export const useChat = (deliberationId?: string) => {
               });
             } catch (error) {
               logger.error('Error applying final message', { error });
-              setChatState(prev => ({ ...prev, isTyping: false }));
+              setUiState(prev => ({ ...prev, isTyping: false }));
             }
           },
           // onError callback
@@ -263,9 +275,9 @@ export const useChat = (deliberationId?: string) => {
             // Clean up any streaming messages on error
             setChatState(prev => ({
               ...prev,
-              messages: prev.messages.filter(m => m.id !== `streaming-${saved.id}` && !m.id.startsWith('streaming-')),
-              isTyping: false
+              messages: prev.messages.filter(m => m.id !== `streaming-${saved.id}` && !m.id.startsWith('streaming-'))
             }));
+            setUiState(prev => ({ ...prev, isTyping: false }));
             stableToast({
               title: "Response Error",
               description: "Failed to get agent response. Please try again.",
@@ -274,16 +286,16 @@ export const useChat = (deliberationId?: string) => {
           }
         );
       } else {
-        setChatState(prev => ({ ...prev, isTyping: false }));
+        setUiState(prev => ({ ...prev, isTyping: false }));
       }
 
     } catch (error) {
       const errMsg = getErrorMessage(error);
       setChatState(prev => ({
         ...prev,
-        messages: prev.messages.map(m => (m.id === tempId ? { ...m, status: 'failed', error: errMsg } : m)),
-        isTyping: false
+        messages: prev.messages.map(m => (m.id === tempId ? { ...m, status: 'failed', error: errMsg } : m))
       }));
+      setUiState(prev => ({ ...prev, isTyping: false }));
       throw error;
     }
   }, [user, deliberationId, setChatState, services.messageService, startStreaming, stableToast]);
@@ -301,23 +313,23 @@ export const useChat = (deliberationId?: string) => {
       const savedChat = convertApiMessageToChatMessage(saved);
       setChatState(prev => ({
         ...prev,
-        messages: prev.messages.map(m => (m.id === id ? { ...savedChat, status: 'sent' } : m)),
-        isTyping: true
+        messages: prev.messages.map(m => (m.id === id ? { ...savedChat, status: 'sent' } : m))
       }));
+      setUiState(prev => ({ ...prev, isTyping: true }));
     } catch (error) {
       const errMsg = getErrorMessage(error);
       setChatState(prev => ({
         ...prev,
-        messages: prev.messages.map(m => (m.id === id ? { ...m, status: 'failed', error: errMsg } : m)),
-        isTyping: false
+        messages: prev.messages.map(m => (m.id === id ? { ...m, status: 'failed', error: errMsg } : m))
       }));
+      setUiState(prev => ({ ...prev, isTyping: false }));
     }
   }, [chatState.messages, deliberationId, setChatState, services.messageService]);
 
   return {
     messages: chatState.messages,
-    isLoading: chatState.isLoading,
-    isTyping: chatState.isTyping || streamingState.isStreaming,
+    isLoading: uiState.isLoading,
+    isTyping: uiState.isTyping || streamingState.isStreaming,
     sendMessage,
     loadChatHistory: stableLoadChatHistory,
     retryMessage,
