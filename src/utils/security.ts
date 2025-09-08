@@ -178,8 +178,7 @@ export const isValidRedirectURL = (url: string): boolean => {
   try {
     const parsed = new URL(url);
     const allowedOrigins = [
-      window.location.origin,
-      'https://95847591-350e-48fd-8530-0c2bb5de6650.lovableproject.com'
+      window.location.origin
     ];
     
     return allowedOrigins.includes(parsed.origin);
