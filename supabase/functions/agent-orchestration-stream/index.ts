@@ -164,6 +164,7 @@ async function generateFastResponse(
   } finally {
     clearTimeout(timeoutId);
   }
+}
 
 // Helper function to get conversation state
 async function getConversationState(supabase: any, deliberationId: string, userId: string): Promise<ConversationContext> {
