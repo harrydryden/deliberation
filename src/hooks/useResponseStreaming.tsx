@@ -79,8 +79,8 @@ export const useResponseStreaming = () => {
 
     streamControllerRef.current = new AbortController();
     
-    // PHASE 1 FIX: Align timeout with queue expectations - use 60s timeout 
-    const STREAMING_TIMEOUT = 60000; // 60 seconds to align with 75s queue timeout
+    // ALIGNED TIMEOUTS: Match with queue processing timeout for consistency
+    const STREAMING_TIMEOUT = 75000; // 75 seconds to align with queue timeout
     const HEARTBEAT_INTERVAL = 5000; // 5 second heartbeat checks
     
     let lastActivity = Date.now();
@@ -95,15 +95,15 @@ export const useResponseStreaming = () => {
           productionLogger.warn('Error aborting on timeout', error);
         }
       }
-      // F003 Fix: Clear streaming state on timeout
+      // ALIGNED FIX: Clear streaming state on timeout
       setStreamingState({
         isStreaming: false,
         currentMessage: '',
         messageId: null,
         agentType: null,
       });
-      // PHASE 1 FIX: Updated timeout message
-      onError('Streaming timeout after 60 seconds. Please try again.');
+      // ALIGNED TIMEOUT: Updated message to match new timeout
+      onError('Streaming timeout after 75 seconds. Please try again.');
     }, STREAMING_TIMEOUT);
     
     // Heartbeat monitoring to detect stalled connections

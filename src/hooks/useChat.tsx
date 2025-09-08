@@ -454,52 +454,92 @@ export const useChat = (deliberationId?: string) => {
     return messageQueue.getNextQueuedMessage();
   }, [messageQueue]);
   
+  // ENHANCED FIX: Debounced queue processing to prevent race conditions
+  const processingRef = useRef(false);
+  const queueProcessingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   useEffect(() => {
-    if (!hasWork || !user || !deliberationId) return;
+    if (!hasWork || !user || !deliberationId || processingRef.current) return;
+    
+    // Clear any existing timeout to prevent duplicate processing
+    if (queueProcessingTimeoutRef.current) {
+      clearTimeout(queueProcessingTimeoutRef.current);
+    }
     
     const processNext = async () => {
-      logger.debug('🔄 Queue processor: Checking for next message', { 
-        hasWork, 
-        queueStats,
-        userId: user?.id.substring(0, 8),
-        deliberationId: deliberationId.substring(0, 8)
-      });
+      // RACE CONDITION FIX: Prevent concurrent processing
+      if (processingRef.current) {
+        logger.debug('Queue processor already running, skipping', { timestamp: new Date().toISOString() });
+        return;
+      }
       
-      const nextMessage = stableGetNextMessage();
-      if (nextMessage && user && deliberationId) {
-        logger.info('📤 Queue processor: Processing message', { 
-          messageId: nextMessage.id, 
-          content: nextMessage.content.substring(0, 50),
-          queuePosition: nextMessage.queuePosition,
-          retries: nextMessage.retries
+      processingRef.current = true;
+      
+      try {
+        logger.debug('🔄 Queue processor: Starting processing cycle', { 
+          hasWork, 
+          queueStats,
+          userId: user?.id.substring(0, 8),
+          deliberationId: deliberationId.substring(0, 8),
+          timestamp: new Date().toISOString()
         });
         
-        try {
-          await stableProcessQueuedMessage(nextMessage);
-          logger.info('✅ Queue processor: Message processed successfully', { messageId: nextMessage.id });
-        } catch (error) {
-          logger.error('❌ Queue processor: Message processing failed', { 
+        const nextMessage = stableGetNextMessage();
+        if (nextMessage && user && deliberationId) {
+          logger.info('📤 Queue processor: Processing message', { 
             messageId: nextMessage.id, 
-            error: error instanceof Error ? error.message : String(error)
+            content: nextMessage.content.substring(0, 50),
+            queuePosition: nextMessage.queuePosition,
+            retries: nextMessage.retries,
+            status: nextMessage.status,
+            timestamp: new Date().toISOString()
+          });
+          
+          try {
+            await stableProcessQueuedMessage(nextMessage);
+            logger.info('✅ Queue processor: Message processed successfully', { 
+              messageId: nextMessage.id,
+              timestamp: new Date().toISOString()
+            });
+          } catch (error) {
+            logger.error('❌ Queue processor: Message processing failed', { 
+              messageId: nextMessage.id, 
+              error: error instanceof Error ? error.message : String(error),
+              timestamp: new Date().toISOString()
+            });
+          }
+        } else {
+          logger.debug('⏸️ Queue processor: No messages to process', { 
+            hasNextMessage: !!nextMessage, 
+            hasUser: !!user, 
+            hasDeliberationId: !!deliberationId,
+            queueStats,
+            timestamp: new Date().toISOString()
           });
         }
-      } else {
-        logger.debug('⏸️ Queue processor: No messages to process', { 
-          hasNextMessage: !!nextMessage, 
-          hasUser: !!user, 
-          hasDeliberationId: !!deliberationId,
-          queueStats
-        });
+      } finally {
+        processingRef.current = false;
       }
     };
 
-    // CRITICAL FIX: Only process when there's actual work (new messages or failed retries)
-    // Don't retrigger on status changes of existing messages
+    // DEBOUNCED PROCESSING: Add small delay to prevent rapid re-triggering
     const { queued, failed, canProcess } = queueStats;
     if ((queued > 0 || failed > 0) && canProcess) {
-      processNext();
+      queueProcessingTimeoutRef.current = setTimeout(() => {
+        processNext();
+      }, 100); // 100ms debounce to prevent race conditions
     }
   }, [hasWork, user, deliberationId, stableProcessQueuedMessage, stableGetNextMessage]);
+  
+  // Cleanup processing timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (queueProcessingTimeoutRef.current) {
+        clearTimeout(queueProcessingTimeoutRef.current);
+      }
+      processingRef.current = false;
+    };
+  }, []);
 
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!user || !content.trim()) return;
