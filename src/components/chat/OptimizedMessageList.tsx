@@ -15,6 +15,7 @@ import { useSimplifiedPerformance } from '@/hooks/useOptimizedState';
 import { useOptimizedMessageLoading } from "@/hooks/useOptimizedMessageLoading";
 import { useProgressiveFallback } from "@/hooks/useProgressiveFallback";
 import { useUIStateDebugger } from "@/hooks/useUIStateDebugger";
+import { performanceMonitor } from "@/utils/performanceMonitor";
 
 interface MessageListProps {
   messages?: ChatMessage[]; // Made optional since we'll load internally
@@ -191,6 +192,12 @@ export const OptimizedMessageList = memo(({
   deliberationId, 
   agentConfigs 
 }: MessageListProps) => {
+  // Performance tracking
+  const startTime = performance.now();
+  React.useEffect(() => {
+    performanceMonitor.trackRender('OptimizedMessageList', startTime);
+  });
+
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   
   // UI state management
@@ -203,16 +210,16 @@ export const OptimizedMessageList = memo(({
   // Use simplified performance hook without overhead
   const { createOptimizedCallback } = useSimplifiedPerformance();
 
-  // Optimized agent configs map with stable dependencies to prevent unnecessary recalculations
+  // Optimized agent configs map with stable reference
   const agentConfigsMap = useMemo(() => {
-    if (!agentConfigs) return new Map<string, AgentConfig>();
+    if (!agentConfigs?.length) return new Map<string, AgentConfig>();
     
     const map = new Map<string, AgentConfig>();
     agentConfigs.forEach(config => {
       map.set(config.agent_type, config);
     });
     return map;
-  }, [agentConfigs]); // Simple dependency - React will handle the array comparison efficiently
+  }, [agentConfigs?.length, agentConfigs?.map(c => c.agent_type + c.name).join(',')]); // Stable comparison
 
   // Simplified render item function
   const renderItem = createOptimizedCallback(

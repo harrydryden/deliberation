@@ -1,52 +1,75 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Send, HelpCircle, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { performanceMonitor } from "@/utils/performanceMonitor";
 
 interface EnhancedMessageInputProps {
   onSendMessage: (message: string, type: 'QUESTION' | 'STATEMENT' | 'OTHER') => void;
   disabled?: boolean;
 }
 
-export const EnhancedMessageInput = ({ onSendMessage, disabled }: EnhancedMessageInputProps) => {
+export const EnhancedMessageInput = memo(({ onSendMessage, disabled }: EnhancedMessageInputProps) => {
+  // Performance tracking
+  const startTime = performance.now();
+  useEffect(() => {
+    performanceMonitor.trackRender('EnhancedMessageInput', startTime);
+  });
+
   const [message, setMessage] = useState("");
   const [inputType, setInputType] = useState<'QUESTION' | 'STATEMENT' | 'OTHER'>('OTHER');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const detectInputType = (text: string): 'QUESTION' | 'STATEMENT' | 'OTHER' => {
+  // Memoized input type detection
+  const detectInputType = useCallback((text: string): 'QUESTION' | 'STATEMENT' | 'OTHER' => {
     const trimmed = text.trim();
-    if (trimmed.endsWith('?') || trimmed.toLowerCase().startsWith('what') || 
-        trimmed.toLowerCase().startsWith('how') || trimmed.toLowerCase().startsWith('why') ||
-        trimmed.toLowerCase().startsWith('when') || trimmed.toLowerCase().startsWith('where')) {
+    if (trimmed.endsWith('?') || /^(what|how|why|when|where)\b/i.test(trimmed)) {
       return 'QUESTION';
     }
     if (trimmed.length > 10) {
       return 'STATEMENT';
     }
     return 'OTHER';
-  };
+  }, []);
+
+  // Throttled input type detection to reduce updates during typing
+  const throttledDetectInputType = useMemo(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    return (text: string) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setInputType(detectInputType(text));
+      }, 150); // 150ms throttle
+    };
+  }, [detectInputType]);
 
   useEffect(() => {
-    setInputType(detectInputType(message));
-  }, [message]);
+    throttledDetectInputType(message);
+  }, [message, throttledDetectInputType]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Memoized event handlers
+  const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
       onSendMessage(message, inputType);
       setMessage("");
       textareaRef.current?.focus();
     }
-  };
+  }, [message, disabled, onSendMessage, inputType]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
-  };
+  }, [handleSubmit]);
+
+  const handleMessageChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value.slice(0, 2000); // maxChars limit
+    setMessage(newValue);
+  }, []);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -55,24 +78,37 @@ export const EnhancedMessageInput = ({ onSendMessage, disabled }: EnhancedMessag
     }
   }, [message]);
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'QUESTION': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'STATEMENT': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-600 border-gray-200';
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'QUESTION': return <HelpCircle className="h-3 w-3" />;
-      case 'STATEMENT': return <MessageSquare className="h-3 w-3" />;
-      default: return null;
-    }
-  };
+  // Memoized UI helpers
+  const typeConfig = useMemo(() => {
+    const configs = {
+      QUESTION: { 
+        color: 'bg-blue-100 text-blue-800 border-blue-200', 
+        icon: <HelpCircle className="h-3 w-3" /> 
+      },
+      STATEMENT: { 
+        color: 'bg-green-100 text-green-800 border-green-200', 
+        icon: <MessageSquare className="h-3 w-3" /> 
+      },
+      OTHER: { 
+        color: 'bg-gray-100 text-gray-600 border-gray-200', 
+        icon: null 
+      }
+    };
+    return configs[inputType];
+  }, [inputType]);
 
   const charCount = message.length;
   const maxChars = 2000;
+  
+  const charCountColor = useMemo(() => 
+    charCount > maxChars * 0.9 ? "text-destructive" : "text-muted-foreground",
+    [charCount, maxChars]
+  );
+
+  const isSubmitDisabled = useMemo(() => 
+    !message.trim() || disabled || charCount > maxChars,
+    [message, disabled, charCount, maxChars]
+  );
 
   return (
     <div className="border-t bg-background p-4">
@@ -80,15 +116,12 @@ export const EnhancedMessageInput = ({ onSendMessage, disabled }: EnhancedMessag
         <div className="flex items-center justify-between">
           <Badge 
             variant="outline" 
-            className={cn("text-xs", getTypeColor(inputType))}
+            className={cn("text-xs", typeConfig.color)}
           >
-            {getTypeIcon(inputType)}
+            {typeConfig.icon}
             <span className="ml-1">{inputType}</span>
           </Badge>
-          <div className={cn(
-            "text-xs",
-            charCount > maxChars * 0.9 ? "text-destructive" : "text-muted-foreground"
-          )}>
+          <div className={cn("text-xs", charCountColor)}>
             {charCount}/{maxChars}
           </div>
         </div>
@@ -98,7 +131,7 @@ export const EnhancedMessageInput = ({ onSendMessage, disabled }: EnhancedMessag
             <Textarea
               ref={textareaRef}
               value={message}
-              onChange={(e) => setMessage(e.target.value.slice(0, maxChars))}
+              onChange={handleMessageChange}
               onKeyDown={handleKeyDown}
               placeholder="Share your thoughts or ask a question... (Press Enter to send, Shift+Enter for new line)"
               disabled={disabled}
@@ -108,7 +141,7 @@ export const EnhancedMessageInput = ({ onSendMessage, disabled }: EnhancedMessag
           </div>
           <Button 
             type="submit" 
-            disabled={!message.trim() || disabled || charCount > maxChars}
+            disabled={isSubmitDisabled}
             className="bg-democratic-blue hover:bg-democratic-blue/90"
             size="icon"
           >
@@ -118,4 +151,6 @@ export const EnhancedMessageInput = ({ onSendMessage, disabled }: EnhancedMessag
       </form>
     </div>
   );
-};
+});
+
+EnhancedMessageInput.displayName = 'EnhancedMessageInput';

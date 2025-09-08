@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Clock, AlertCircle, RotateCcw } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { QueuedMessage } from '@/hooks/useMessageQueue';
+import { performanceMonitor } from "@/utils/performanceMonitor";
 
 interface MessageQueueStatusProps {
   queuedMessages: QueuedMessage[];
@@ -18,16 +19,30 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(
   onRetryMessage,
   onRemoveMessage
 }) => {
-  // Memoize expensive computations to prevent re-renders
-  const { queuedCount, failedCount, totalActive } = useMemo(() => {
-    const queued = queuedMessages.filter(msg => msg.status === 'queued').length;
-    const failed = queuedMessages.filter(msg => msg.status === 'failed').length;
+  // Performance tracking
+  const startTime = performance.now();
+  React.useEffect(() => {
+    performanceMonitor.trackRender('MessageQueueStatus', startTime);
+  });
+
+  // Memoize expensive computations with optimized dependencies
+  const queueStats = useMemo(() => {
+    let queued = 0;
+    let failed = 0;
+    
+    for (const msg of queuedMessages) {
+      if (msg.status === 'queued') queued++;
+      else if (msg.status === 'failed') failed++;
+    }
+    
     return {
       queuedCount: queued,
       failedCount: failed,
       totalActive: queued + processingCount
     };
-  }, [queuedMessages, processingCount]);
+  }, [queuedMessages.length, processingCount, queuedMessages.map(m => m.status).join(',')]);
+
+  const { queuedCount, failedCount, totalActive } = queueStats;
 
   const getBadgeVariant = useMemo(() => {
     if (failedCount > 0) return 'destructive';
