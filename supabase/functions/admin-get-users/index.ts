@@ -19,7 +19,7 @@ serve(async (req) => {
     console.log('📋 Admin get users function called');
     
     // Get environment and clients with caching
-    const { supabase } = validateAndGetEnvironment();
+    const { userSupabase } = validateAndGetEnvironment();
 
     // Verify the requesting user is an admin
     console.log('🔐 Checking authorization header...');
@@ -33,9 +33,9 @@ serve(async (req) => {
     console.log('🎫 Extracting token from authorization header...');
     const token = authHeader.replace('Bearer ', '');
     
-    // Verify the token and get user
+    // Verify the token and get user using user client
     console.log('👤 Verifying user token...');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: userError } = await userSupabase.auth.getUser(token);
     if (userError || !user) {
       console.error('❌ Invalid user token:', userError);
       return createErrorResponse('Invalid user token', 401);
@@ -43,8 +43,9 @@ serve(async (req) => {
 
     console.log('✅ User verified:', user.id);
 
-    // Check if user has admin role
+    // Check if user has admin role using service client
     console.log('🔍 Checking admin role for user:', user.id);
+    const { supabase } = validateAndGetEnvironment();
     const { data: userProfile, error: roleError } = await supabase
       .from('profiles')
       .select('user_role')
@@ -64,36 +65,53 @@ serve(async (req) => {
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('is_archived', false)
+      .eq('is_archived', false);
 
     if (profilesError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to fetch profiles' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.error('❌ Failed to fetch profiles:', profilesError);
+      return createErrorResponse('Failed to fetch profiles', 500);
     }
 
     if (!profiles || profiles.length === 0) {
-      return new Response(
-        JSON.stringify({ users: [] }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      console.log('📋 No profiles found, returning empty array');
+      return createSuccessResponse({ users: [] });
     }
+
+    console.log(`📋 Found ${profiles.length} profiles`);
+
+    // Create service role client for admin operations  
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!serviceRoleKey) {
+      console.error('❌ Service role key not found');
+      return createErrorResponse('Service configuration error', 500);
+    }
+
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const serviceSupabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      serviceRoleKey
+    );
 
     // Get auth users with service role to access metadata
-    const { data: authData, error: authError } = await supabase.auth.admin.listUsers()
+    console.log('🔐 Fetching auth users with service role...');
+    const { data: authData, error: authError } = await serviceSupabase.auth.admin.listUsers();
+    
+    if (authError) {
+      console.error('❌ Failed to fetch auth users:', authError);
+    }
     
     // Create a map of auth user data
-    const authUsersMap = new Map()
+    const authUsersMap = new Map();
     if (authData?.users) {
       authData.users.forEach((authUser) => {
-        authUsersMap.set(authUser.id, authUser)
-      })
+        authUsersMap.set(authUser.id, authUser);
+      });
     }
 
-    // User roles are now stored directly in profiles table
+    console.log(`🔐 Found ${authUsersMap.size} auth users`);
 
     // Get participants with deliberations
+    console.log('🔍 Fetching participants and deliberations...');
     const userIds = profiles.map(p => p.id);
     const { data: participants } = await supabase
       .from('participants')
@@ -105,43 +123,48 @@ serve(async (req) => {
           title
         )
       `)
-      .in('user_id', userIds.map(id => id.toString()))
+      .in('user_id', userIds.map(id => id.toString()));
+
+    console.log(`👥 Found ${participants?.length || 0} participant entries`);
 
     // Create map for efficient lookups
-    const deliberationsMap = new Map()
+    const deliberationsMap = new Map();
     
     // Initialize deliberations map
     profiles.forEach(profile => {
-      deliberationsMap.set(profile.id, [])
-    })
+      deliberationsMap.set(profile.id, []);
+    });
 
     // Populate deliberations map
     participants?.forEach((p) => {
-      const userId = p.user_id
+      const userId = p.user_id;
       if (deliberationsMap.has(userId) && p.deliberations) {
         deliberationsMap.get(userId).push({
           id: p.deliberations.id,
           title: p.deliberations.title,
           role: p.role || 'participant'
-        })
+        });
       }
-    })
+    });
 
     // Map profiles to user data
+    console.log('🏗️ Building user data...');
     const users = profiles.map(profile => {
-      const role = profile.user_role || 'user'
-      const deliberations = deliberationsMap.get(profile.id) || []
-      const authUser = authUsersMap.get(profile.id)
+      const role = profile.user_role || 'user';
+      const deliberations = deliberationsMap.get(profile.id) || [];
+      const authUser = authUsersMap.get(profile.id);
       
       return {
         id: profile.id,
-        email: authUser?.email || `user-${profile.id.slice(0, 8)}@example.com`,
+        email: authUser?.email || profile.access_code_1 || `user-${profile.id.slice(0, 8)}@example.com`,
         emailConfirmedAt: profile.created_at,
         createdAt: profile.created_at,
         lastSignInAt: profile.updated_at,
         role: role,
+        accessCode1: profile.access_code_1,
+        accessCode2: profile.access_code_2,
         profile: {
-          displayName: `User ${profile.id.slice(0, 8)}`,
+          displayName: profile.access_code_1 || `User ${profile.id.slice(0, 8)}`,
           avatarUrl: '',
           bio: '',
           expertiseAreas: [],
@@ -151,18 +174,14 @@ serve(async (req) => {
         archivedAt: profile.archived_at,
         archivedBy: profile.archived_by,
         archiveReason: profile.archive_reason,
-      }
-    })
+      };
+    });
 
-    return new Response(
-      JSON.stringify({ users }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.log(`✅ Successfully processed ${users.length} users`);
+    return createSuccessResponse({ users });
 
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error('💥 Unexpected error in admin-get-users:', error);
+    return createErrorResponse(`Internal server error: ${error.message}`, 500);
   }
 })
