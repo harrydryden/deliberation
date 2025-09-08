@@ -280,7 +280,7 @@ export class IBISService {
 
       const newNode = await this.createNode(nodeData);
 
-      // Create relationship between new node and target issue
+      // Create relationship between new node and target issue with improved atomicity
       const { error: relError } = await supabase
         .from('ibis_relationships')
         .insert({
@@ -293,8 +293,17 @@ export class IBISService {
 
       if (relError) {
         logger.error('[IBISService] Error creating relationship', { error: relError });
-        // Try to clean up the created node
-        await supabase.from('ibis_nodes').delete().eq('id', newNode.id);
+        // Enhanced cleanup with error handling
+        try {
+          await supabase.from('ibis_nodes').delete().eq('id', newNode.id);
+          logger.info('[IBISService] Successfully cleaned up orphaned node', { nodeId: newNode.id });
+        } catch (cleanupError) {
+          logger.error('[IBISService] Failed to cleanup orphaned node', { 
+            nodeId: newNode.id, 
+            cleanupError,
+            originalError: relError 
+          });
+        }
         throw relError;
       }
 

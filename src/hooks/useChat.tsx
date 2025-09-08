@@ -296,6 +296,15 @@ export const useChat = (deliberationId?: string) => {
         messages: prev.messages.map(m => (m.id === tempId ? { ...m, status: 'failed', error: errMsg } : m))
       }));
       setUiState(prev => ({ ...prev, isTyping: false }));
+      
+      // Schedule cleanup of failed optimistic message after 30 seconds
+      setTimeout(() => {
+        setChatState(prev => ({
+          ...prev,
+          messages: prev.messages.filter(m => !(m.id === tempId && m.status === 'failed'))
+        }));
+      }, 30000);
+      
       throw error;
     }
   }, [user, deliberationId, setChatState, services.messageService, startStreaming, stableToast]);

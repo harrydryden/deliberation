@@ -207,7 +207,17 @@ export const useResponseStreaming = () => {
     } catch (error) {
       console.error('❌ Streaming error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
-      logger.error('Streaming failed', error as Error, { messageId, deliberationId });
+      logger.error('Streaming failed', error as Error, { 
+        messageId, 
+        deliberationId,
+        streamingState: {
+          isStreaming: streamingState.isStreaming,
+          currentMessageLength: accumulatorRef.current.length,
+          agentType: streamingState.agentType
+        },
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+        timestamp: new Date().toISOString()
+      });
       onError(errorMessage);
     } finally {
       // Clear timeout to prevent memory leaks

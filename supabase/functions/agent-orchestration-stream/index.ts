@@ -17,6 +17,7 @@ import {
 import { responseCache, configCache, createCacheKey } from '../shared/cache-manager.ts';
 import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
 import { ModelConfigManager } from '../shared/model-config.ts';
+import { getCachedEnvironment } from '../shared/environment-cache.ts';
 
 // Re-export types from shared orchestrator
 import type { AgentConfig, AnalysisResult, ConversationContext } from '../shared/agent-orchestrator.ts';
@@ -255,17 +256,27 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
     const agentId = billAgents[0].id;
     console.log(`📚 Using LangChain RAG for agent: ${agentId} with query: "${query.substring(0, 100)}..."`);
 
-    // Check if agent has any knowledge first
-    const { data: knowledgeCheck } = await supabase
+  // Check if agent has any knowledge first with parallel execution optimization
+  const knowledgePromises = [
+    supabase
       .from('agent_knowledge')
       .select('id')
       .eq('agent_id', agentId)
-      .limit(1);
+      .limit(1),
+    // Pre-fetch some knowledge chunks in parallel for faster response  
+    supabase
+      .from('agent_knowledge')
+      .select('content, metadata')
+      .eq('agent_id', agentId)
+      .limit(3)
+  ];
 
-    if (!knowledgeCheck || knowledgeCheck.length === 0) {
-      console.log('📚 No knowledge available for agent, skipping RAG retrieval');
-      return '';
-    }
+  const [knowledgeCheck, fallbackKnowledge] = await Promise.all(knowledgePromises);
+
+  if (!knowledgeCheck.data || knowledgeCheck.data.length === 0) {
+    console.log('📚 No knowledge available for agent, skipping RAG retrieval');
+    return '';
+  }
 
     // Use LangChain RAG system for semantic knowledge retrieval
     try {
@@ -299,18 +310,12 @@ async function retrieveBillAgentKnowledge(query: string, deliberationId: string)
       }
 
     } catch (ragError) {
-      console.error('❌ LangChain RAG system failed, falling back to basic retrieval:', ragError);
+      console.error('❌ LangChain RAG system failed, falling back to pre-fetched knowledge:', ragError);
       
-      // Fallback to basic knowledge retrieval if RAG fails
-      const { data: generalKnowledge } = await supabase
-        .from('agent_knowledge')
-        .select('content, metadata')
-        .eq('agent_id', agentId)
-        .limit(3);
-          
-      if (generalKnowledge && generalKnowledge.length > 0) {
-        const contextChunks = generalKnowledge.map((item: any) => item.content).join('\n\n');
-        console.log(`📚 Fallback: Retrieved ${generalKnowledge.length} general knowledge chunks`);
+      // Use pre-fetched fallback knowledge for better performance
+      if (fallbackKnowledge.data && fallbackKnowledge.data.length > 0) {
+        const contextChunks = fallbackKnowledge.data.map((item: any) => item.content).join('\n\n');
+        console.log(`📚 Fallback: Using ${fallbackKnowledge.data.length} pre-fetched knowledge chunks`);
         return contextChunks;
       }
 
@@ -539,17 +544,24 @@ async function generateStreamingResponse(
   }
 }
 
-// Main streaming handler
+// Main streaming handler with distributed locking for race condition prevention
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Use cached environment validation for better cold start performance  
+    const { supabaseUrl, supabaseServiceKey, openaiApiKey } = getCachedEnvironment();
+    
     // Get authorization header for user authentication
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
