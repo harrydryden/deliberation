@@ -312,8 +312,8 @@ const OptimizedDeliberationChat = () => {
         <AdminDeliberationView />
       ) : (
         <div className="flex flex-col bg-background rounded-lg border h-[calc(100vh-120px)] min-h-0">
-          {/* Header */}
-          <div className="border-b bg-card backdrop-blur-sm sticky top-16 z-40">
+          {/* Deliberation Info Panel */}
+          <div className="border-b bg-card">
             {/* Mobile Header */}
             <div className="lg:hidden">
                 <div className="p-3 flex items-center justify-between">
