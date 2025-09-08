@@ -265,7 +265,7 @@ export const AdminDeliberationView = () => {
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-medium">User</span>
                           <span className="text-xs text-muted-foreground">
-                            {formatToUKTime(group.userMessage.created_at)}
+                            {formatToUKTime(group.userMessage.created_at, 'HH:mm')}
                           </span>
                           {group.userMessage.submitted_to_ibis && <Badge variant="default" className="text-xs bg-blue-500 hover:bg-blue-600">
                               Submitted to IBIS
@@ -306,9 +306,9 @@ export const AdminDeliberationView = () => {
                               <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="text-xs font-medium">{agentInfo.name}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatToUKTime(response.created_at)}
-                                  </span>
+                                   <span className="text-xs text-muted-foreground">
+                                     {formatToUKTime(response.created_at, 'HH:mm')}
+                                   </span>
                                 </div>
 
                                 <Card className="p-2 bg-card text-xs">
