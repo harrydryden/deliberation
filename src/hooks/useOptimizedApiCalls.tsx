@@ -17,10 +17,17 @@ export const useOptimizedApiCalls = () => {
     return {
       execute: async () => {
         try {
+          console.log(`🔧 Invoking function: ${functionName}`);
+          console.log('🔧 Function body:', body);
+          console.log('🔧 Body type:', typeof body);
+          console.log('🔧 Body JSON:', JSON.stringify(body));
+          
           // Let Supabase handle authentication automatically
           const response = await supabase.functions.invoke(functionName, {
             body: body || {}
           });
+          
+          console.log('🔧 Function response:', response);
           
           if (response.error) {
             throw new Error(response.error.message || 'Function call failed');
