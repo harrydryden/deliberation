@@ -169,6 +169,17 @@ const OptimizedMessageItem = memo(({
                   </Button>
                 </div>
               )}
+
+              {/* Rating buttons for agent messages */}
+              {!isUser && (
+                <div className="mt-3 pt-2 border-t border-muted/50">
+                  <MessageRating 
+                    messageId={message.id}
+                    messageType={message.message_type}
+                    className="text-xs"
+                  />
+                </div>
+              )}
             </Card>
           </div>
         </div>
