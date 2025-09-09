@@ -24,6 +24,7 @@ interface DeliberationMetrics {
   totalMessages: number;
   ibisSubmissions: number;
   contributionRate: number;
+  ratings: RatingMetrics;
 }
 
 interface RatingMetrics {
@@ -37,7 +38,6 @@ interface UserMetrics {
   currentDeliberation: DeliberationMetrics | null;
   participatingDeliberations: Array<{ id: string; title: string }>;
   joinDate: string;
-  ratings: RatingMetrics;
 }
 
 export const UserMetricsDashboard: React.FC = () => {
@@ -87,24 +87,6 @@ export const UserMetricsDashboard: React.FC = () => {
       const userMessages = messages || [];
       const userParticipations = participations || [];
 
-      // All deliberations metrics
-      const allIbisSubmissions = userMessages.filter(m => m.submitted_to_ibis).length;
-      const allContributionRate = userMessages.length > 0 ? (allIbisSubmissions / userMessages.length) * 100 : 0;
-
-      // Current deliberation metrics (if selected)
-      let currentDeliberationMetrics: DeliberationMetrics | null = null;
-      if (selectedDeliberationId) {
-        const currentMessages = userMessages.filter(m => m.deliberation_id === selectedDeliberationId);
-        const currentIbisSubmissions = currentMessages.filter(m => m.submitted_to_ibis).length;
-        const currentContributionRate = currentMessages.length > 0 ? (currentIbisSubmissions / currentMessages.length) * 100 : 0;
-        
-        currentDeliberationMetrics = {
-          totalMessages: currentMessages.length,
-          ibisSubmissions: currentIbisSubmissions,
-          contributionRate: currentContributionRate
-        };
-      }
-
       // Get user ratings
       const { data: userRatings, error: ratingsError } = await supabase
         .from('agent_ratings')
@@ -118,6 +100,39 @@ export const UserMetricsDashboard: React.FC = () => {
       const helpfulRatings = ratings.filter(r => r.rating === 1).length;
       const unhelpfulRatings = ratings.filter(r => r.rating === -1).length;
 
+      // All deliberations metrics
+      const allIbisSubmissions = userMessages.filter(m => m.submitted_to_ibis).length;
+      const allContributionRate = userMessages.length > 0 ? (allIbisSubmissions / userMessages.length) * 100 : 0;
+
+      // Current deliberation metrics (if selected)
+      let currentDeliberationMetrics: DeliberationMetrics | null = null;
+      if (selectedDeliberationId) {
+        const currentMessages = userMessages.filter(m => m.deliberation_id === selectedDeliberationId);
+        const currentIbisSubmissions = currentMessages.filter(m => m.submitted_to_ibis).length;
+        const currentContributionRate = currentMessages.length > 0 ? (currentIbisSubmissions / currentMessages.length) * 100 : 0;
+        
+        // Get ratings for messages in current deliberation
+        const { data: currentDeliberationRatings, error: currentRatingsError } = await supabase
+          .from('agent_ratings')
+          .select('rating')
+          .eq('user_id', user.id)
+          .in('message_id', currentMessages.map(m => m.id));
+
+        const currentHelpfulRatings = (currentDeliberationRatings || []).filter(r => r.rating === 1).length;
+        const currentUnhelpfulRatings = (currentDeliberationRatings || []).filter(r => r.rating === -1).length;
+        
+        currentDeliberationMetrics = {
+          totalMessages: currentMessages.length,
+          ibisSubmissions: currentIbisSubmissions,
+          contributionRate: currentContributionRate,
+          ratings: {
+            helpfulRatings: currentHelpfulRatings,
+            unhelpfulRatings: currentUnhelpfulRatings,
+            totalRatings: currentHelpfulRatings + currentUnhelpfulRatings
+          }
+        };
+      }
+
       // Prepare deliberation list
       const deliberationList = userParticipations.map(p => ({
         id: p.deliberation_id || '',
@@ -128,16 +143,16 @@ export const UserMetricsDashboard: React.FC = () => {
         allDeliberations: {
           totalMessages: userMessages.length,
           ibisSubmissions: allIbisSubmissions,
-          contributionRate: allContributionRate
+          contributionRate: allContributionRate,
+          ratings: {
+            helpfulRatings,
+            unhelpfulRatings,
+            totalRatings: helpfulRatings + unhelpfulRatings
+          }
         },
         currentDeliberation: currentDeliberationMetrics,
         participatingDeliberations: deliberationList,
-        joinDate: profile?.created_at || '',
-        ratings: {
-          helpfulRatings,
-          unhelpfulRatings,
-          totalRatings: helpfulRatings + unhelpfulRatings
-        }
+        joinDate: profile?.created_at || ''
       });
 
       // Auto-select first deliberation if none selected and deliberations exist
@@ -202,45 +217,89 @@ export const UserMetricsDashboard: React.FC = () => {
   }
 
   const renderMetricsCards = (metricsData: DeliberationMetrics, title: string) => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Messages Sent</CardTitle>
-          <MessageSquare className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{metricsData.totalMessages}</div>
-          <span className="text-xs text-muted-foreground">
-            Total messages in {title.toLowerCase()}
-          </span>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Messages Sent</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metricsData.totalMessages}</div>
+            <span className="text-xs text-muted-foreground">
+              Total messages in {title.toLowerCase()}
+            </span>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">IBIS Contributions</CardTitle>
-          <Share2 className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{metricsData.ibisSubmissions}</div>
-          <span className="text-xs text-muted-foreground">
-            Messages shared to knowledge map
-          </span>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">IBIS Contributions</CardTitle>
+            <Share2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metricsData.ibisSubmissions}</div>
+            <span className="text-xs text-muted-foreground">
+              Messages shared to knowledge map
+            </span>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Contribution Rate</CardTitle>
-          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{metricsData.contributionRate.toFixed(0)}%</div>
-          <span className="text-xs text-muted-foreground">
-            Messages shared to IBIS
-          </span>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Contribution Rate</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metricsData.contributionRate.toFixed(0)}%</div>
+            <span className="text-xs text-muted-foreground">
+              Messages shared to IBIS
+            </span>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Ratings Section */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Helpful Ratings</CardTitle>
+            <ThumbsUp className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{metricsData.ratings.helpfulRatings}</div>
+            <span className="text-xs text-muted-foreground">
+              Positive ratings given
+            </span>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unhelpful Ratings</CardTitle>
+            <ThumbsDown className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{metricsData.ratings.unhelpfulRatings}</div>
+            <span className="text-xs text-muted-foreground">
+              Negative ratings given
+            </span>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Ratings</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metricsData.ratings.totalRatings}</div>
+            <span className="text-xs text-muted-foreground">
+              Agent responses rated
+            </span>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 
@@ -307,49 +366,12 @@ export const UserMetricsDashboard: React.FC = () => {
 
         <TabsContent value="all" className="space-y-4">
           <h3 className="text-lg font-semibold">All Deliberations Summary</h3>
-          {renderMetricsCards(metrics?.allDeliberations || { totalMessages: 0, ibisSubmissions: 0, contributionRate: 0 }, "All Deliberations")}
-          
-          {/* Ratings Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Helpful Ratings</CardTitle>
-                <ThumbsUp className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{metrics?.ratings.helpfulRatings || 0}</div>
-                <span className="text-xs text-muted-foreground">
-                  Positive ratings given
-                </span>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Unhelpful Ratings</CardTitle>
-                <ThumbsDown className="h-4 w-4 text-red-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">{metrics?.ratings.unhelpfulRatings || 0}</div>
-                <span className="text-xs text-muted-foreground">
-                  Negative ratings given
-                </span>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Ratings</CardTitle>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metrics?.ratings.totalRatings || 0}</div>
-                <span className="text-xs text-muted-foreground">
-                  Agent responses rated
-                </span>
-              </CardContent>
-            </Card>
-          </div>
+          {renderMetricsCards(metrics?.allDeliberations || { 
+            totalMessages: 0, 
+            ibisSubmissions: 0, 
+            contributionRate: 0, 
+            ratings: { helpfulRatings: 0, unhelpfulRatings: 0, totalRatings: 0 }
+          }, "All Deliberations")}
           
           {/* Additional Summary Info */}
           <Card>
