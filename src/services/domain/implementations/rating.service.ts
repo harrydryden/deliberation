@@ -52,7 +52,7 @@ export class RatingService {
         userId: data.user_id,
         rating: data.rating,
         createdAt: data.created_at,
-        updatedAt: data.updated_at,
+        updatedAt: data.created_at, // Use created_at since there's no updated_at field
       };
     } catch (error) {
       logger.error('[RatingService] Unexpected error rating message', { error, messageId, userId, rating });
@@ -137,19 +137,19 @@ export class RatingService {
         throw new Error(`Failed to get all ratings: ${error.message}`);
       }
 
-      return data.map(rating => ({
-        id: rating.id,
-        messageId: rating.message_id,
-        userId: rating.user_id,
-        rating: rating.rating,
-        createdAt: rating.created_at,
-        updatedAt: rating.updated_at,
-        message: {
-          content: rating.message?.content || '',
-          message_type: rating.message?.message_type || '',
-          deliberation_id: rating.message?.deliberation_id || '',
-        },
-      }));
+        return data.map(rating => ({
+          id: rating.id,
+          messageId: rating.message_id,
+          userId: rating.user_id,
+          rating: rating.rating,
+          createdAt: rating.created_at,
+          updatedAt: rating.created_at, // Use created_at since there's no updated_at field
+          message: {
+            content: rating.message?.content || '',
+            message_type: rating.message?.message_type || '',
+            deliberation_id: rating.message?.deliberation_id || '',
+          },
+        }));
     } catch (error) {
       logger.error('[RatingService] Unexpected error getting all ratings', { error });
       throw error;

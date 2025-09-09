@@ -59,7 +59,7 @@ const MessageRatingComponent: React.FC<MessageRatingProps> = ({
 
     try {
       // If user clicks the same rating again, remove it (set to neutral)
-      if (userRating === rating) {
+      if (ratingSummary?.userRating === rating) {
         await ratingService.removeRating(messageId, user.id);
       } else {
         await ratingService.rateMessage(messageId, user.id, rating);
