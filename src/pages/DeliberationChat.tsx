@@ -317,8 +317,11 @@ const OptimizedDeliberationChat = () => {
             {/* Mobile Controls */}
             <div className="lg:hidden">
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white text-xs`}>
+                <div className="flex flex-col gap-2 flex-1 min-w-0">
+                  <h1 className="text-lg font-semibold text-foreground truncate">
+                    {dataState.deliberation.title}
+                  </h1>
+                  <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white text-xs w-fit`}>
                     {dataState.deliberation.status}
                   </Badge>
                 </div>
@@ -400,9 +403,14 @@ const OptimizedDeliberationChat = () => {
             <div className="hidden lg:block">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div className="flex-1 min-w-0 space-y-3">
-                  <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white w-fit`}>
-                    {dataState.deliberation.status}
-                  </Badge>
+                  <div className="space-y-2">
+                    <h1 className="text-2xl font-bold text-foreground truncate">
+                      {dataState.deliberation.title}
+                    </h1>
+                    <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white w-fit`}>
+                      {dataState.deliberation.status}
+                    </Badge>
+                  </div>
                   
                   {(dataState.deliberation.description || dataState.deliberation.notion) && (
                     <div className="space-y-1">
