@@ -149,7 +149,7 @@ Respond with ONLY a valid JSON array:
         continue;
       }
 
-      const { data: nodes, error } = await supabase
+      const { data: node, error } = await supabase
         .rpc('admin_create_ai_ibis_node', {
           p_deliberation_id: deliberationId,
           p_node_type: 'issue',
@@ -164,8 +164,7 @@ Respond with ONLY a valid JSON array:
         continue;
       }
 
-      if (nodes && nodes.length > 0) {
-        const node = nodes[0]; // The function returns a single row in an array
+      if (node) {
         console.log('✅ Created IBIS node:', node.id);
         createdNodes.push(node);
       }
