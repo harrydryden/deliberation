@@ -113,59 +113,17 @@ serve(async (req) => {
   try {
     console.log('Starting generate-ibis-roots function');
     
-    // Read and parse request body directly
-    const rawBody = await req.text();
-    console.log('Raw request body:', rawBody);
-    console.log('Raw body length:', rawBody.length);
-    
-    let requestData;
-    try {
-      requestData = JSON.parse(rawBody);
-      console.log('Parsed request data:', requestData);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      return createErrorResponse(new Error('Invalid JSON in request body'), 400, 'generate-ibis-roots');
-    }
-    
-    const { deliberationId, deliberationTitle, deliberationDescription, notion } = requestData;
-    
-    if (!deliberationId || !deliberationTitle) {
-      console.error('Missing required fields:', { deliberationId: !!deliberationId, deliberationTitle: !!deliberationTitle });
-      return createErrorResponse(new Error('Missing required fields: deliberationId, deliberationTitle'), 400, 'generate-ibis-roots');
-    }
-    
+    // Parse and validate the request properly
+    const { deliberationId, deliberationTitle, deliberationDescription, notion } = await parseAndValidateRequest(req, ['deliberationId', 'deliberationTitle']);
     console.log('Request validated successfully', { deliberationId, deliberationTitle });
 
     // Get environment and clients with caching
-    console.log('Validating environment...');
-    let supabase, openAIApiKey;
-    try {
-      const env = validateAndGetEnvironment();
-      supabase = env.supabase;
-      console.log('Supabase client initialized');
-    } catch (envError) {
-      console.error('Environment validation failed:', envError);
-      return createErrorResponse(envError, 500, 'generate-ibis-roots');
-    }
-    
-    try {
-      openAIApiKey = getOpenAIKey();
-      console.log('OpenAI API key retrieved');
-    } catch (keyError) {
-      console.error('OpenAI key retrieval failed:', keyError);
-      return createErrorResponse(keyError, 500, 'generate-ibis-roots');
-    }
+    const { supabase } = validateAndGetEnvironment();
+    const openAIApiKey = getOpenAIKey();
+    console.log('Environment validated and API key retrieved');
 
     // Get IBIS generation prompt from template system
-    console.log('Fetching template...');
-    let prompt;
-    try {
-      prompt = await getIbisGenerationPrompt(supabase, deliberationTitle, deliberationDescription, notion);
-      console.log('Template fetched successfully, prompt length:', prompt.length);
-    } catch (templateError) {
-      console.error('Template fetch failed:', templateError);
-      return createErrorResponse(templateError, 500, 'generate-ibis-roots');
-    }
+    const prompt = await getIbisGenerationPrompt(supabase, deliberationTitle, deliberationDescription, notion);
     
     console.log('Final prompt being sent to AI:', prompt);
 
