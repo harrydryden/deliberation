@@ -362,7 +362,7 @@ const OptimizedDeliberationChat = () => {
                     )}
                   </div>
                   
-                  <div className="rounded-lg border bg-muted/40 p-2 flex flex-col gap-3">
+                  <div className="rounded-lg border bg-muted/40 p-2 flex flex-col gap-3 justify-center">
                     <ChatModeSelector 
                       mode={uiState.chatMode} 
                       onModeChange={(mode) => setUiState(prev => ({ ...prev, chatMode: mode }))} 
@@ -434,7 +434,7 @@ const OptimizedDeliberationChat = () => {
               </div>
               
               <div className="flex flex-wrap gap-3">
-                <div className="rounded-lg border bg-muted/40 p-2 flex flex-col gap-3">
+                <div className="rounded-lg border bg-muted/40 p-2 flex flex-col gap-3 justify-center">
                   <ChatModeSelector 
                     mode={uiState.chatMode} 
                     onModeChange={(mode) => setUiState(prev => ({ ...prev, chatMode: mode }))} 
