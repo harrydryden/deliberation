@@ -1,4 +1,4 @@
-import { MessageSquare, Share2, Clock, Star, ThumbsUp, Minus } from "lucide-react";
+import { MessageSquare, Share2, Clock, Star, Minus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -6,14 +6,12 @@ interface ParticipantScoringProps {
   engagement: number;
   shares: number;
   sessions: number;
-  helpfulness: number;
   stanceScore?: number; // -1.0 to 1.0 (negative to positive stance)
 }
 export const ParticipantScoring = ({
   engagement,
   shares,
   sessions,
-  helpfulness,
   stanceScore,
 }: ParticipantScoringProps) => {
   // Convert raw values to star ratings (1-5)
@@ -28,19 +26,6 @@ export const ParticipantScoring = ({
         className={`h-3 w-3 ${
           i < filledStars 
             ? 'fill-civic-gold text-civic-gold' 
-            : 'text-muted-foreground'
-        }`}
-      />
-    ));
-  };
-
-  const renderThumbs = (filledThumbs: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <ThumbsUp
-        key={i}
-        className={`h-3 w-3 ${
-          i < filledThumbs 
-            ? 'fill-civic-blue text-civic-blue' 
             : 'text-muted-foreground'
         }`}
       />
@@ -73,15 +58,6 @@ export const ParticipantScoring = ({
     description: 'How often you participate',
     tooltip: `${sessions} login session${sessions !== 1 ? 's' : ''} recorded`,
     renderMethod: 'stars',
-    customIconColor: undefined
-  }, {
-    label: 'Helping',
-    rawValue: helpfulness,
-    stars: Math.min(5, helpfulness), // Direct mapping for thumbs up (max 5)
-    icon: ThumbsUp,
-    description: 'Quality of your contributions rated by others',
-    tooltip: `${helpfulness} net positive rating${helpfulness !== 1 ? 's' : ''} received`,
-    renderMethod: 'thumbs',
     customIconColor: undefined
   }];
 
@@ -147,9 +123,7 @@ export const ParticipantScoring = ({
             </Popover>
           </div>
           <div className="flex items-center gap-1">
-            {score.renderMethod === 'thumbs' ? renderThumbs(score.stars) : 
-             score.renderMethod === 'stance' ? renderStanceLine() :
-             renderStars(score.stars)}
+            {score.renderMethod === 'stance' ? renderStanceLine() : renderStars(score.stars)}
           </div>
         </div>
       ))}

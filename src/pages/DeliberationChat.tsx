@@ -73,7 +73,6 @@ const OptimizedDeliberationChat = () => {
     engagement: 0,
     shares: 0,
     sessions: 1,
-    helpfulness: 0,
     stanceScore: 0
   });
 
@@ -173,7 +172,6 @@ const OptimizedDeliberationChat = () => {
             engagement: deliberationMessages.length,
             shares: ibisSubmissions.length,
             sessions: 1,
-            helpfulness: 0,
             stanceScore: stanceData?.stance_score || 0
           });
         } catch (error) {
