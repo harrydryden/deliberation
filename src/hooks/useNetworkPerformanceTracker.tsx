@@ -1,7 +1,7 @@
-// Track network performance for API calls and streaming
+// Production-safe network performance tracker with graceful degradation
 import { useCallback, useRef } from 'react';
 import { productionLogger } from '@/utils/productionLogger';
-import { networkTracker, NetworkPerformanceTracker } from '@/utils/networkTracker';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 interface NetworkRequest {
   id: string;
@@ -16,20 +16,94 @@ interface NetworkRequest {
   type: 'api' | 'stream' | 'resource';
 }
 
+// Lightweight network tracking without external dependencies
+class SimpleNetworkTracker {
+  private requests = new Map<string, NetworkRequest>();
+  
+  startRequest(id: string, url: string, method: string, type: 'api' | 'stream' | 'resource'): void {
+    this.requests.set(id, {
+      id,
+      url,
+      method,
+      type,
+      startTime: Date.now()
+    });
+  }
+  
+  endRequest(id: string, status?: number, size?: number, error?: string): NetworkRequest | null {
+    const request = this.requests.get(id);
+    if (!request) return null;
+    
+    const endTime = Date.now();
+    const updatedRequest = {
+      ...request,
+      endTime,
+      duration: endTime - request.startTime,
+      status,
+      size,
+      error
+    };
+    
+    this.requests.set(id, updatedRequest);
+    
+    // Clean up old requests (keep only last 100)
+    if (this.requests.size > 100) {
+      const oldest = Array.from(this.requests.keys())[0];
+      this.requests.delete(oldest);
+    }
+    
+    return updatedRequest;
+  }
+  
+  getRequestMetrics(id: string): NetworkRequest | null {
+    return this.requests.get(id) || null;
+  }
+  
+  getAllMetrics(): NetworkRequest[] {
+    return Array.from(this.requests.values());
+  }
+  
+  logSummary(): void {
+    if (process.env.NODE_ENV === 'development') {
+      const requests = this.getAllMetrics();
+      const avgDuration = requests.length > 0 
+        ? requests.reduce((sum, r) => sum + (r.duration || 0), 0) / requests.length 
+        : 0;
+      productionLogger.info('Network performance summary', {
+        totalRequests: requests.length,
+        averageDuration: avgDuration
+      });
+    }
+  }
+}
+
+const simpleTracker = new SimpleNetworkTracker();
+
 export const useNetworkPerformanceTracker = () => {
   const activeRequestsRef = useRef<Set<string>>(new Set());
+  const { handleError } = useErrorHandler();
 
   const startTracking = useCallback((url: string, method: string = 'GET', type: 'api' | 'stream' | 'resource' = 'api'): string => {
-    const id = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    activeRequestsRef.current.add(id);
-    networkTracker.startRequest(id, url, method, type);
-    return id;
-  }, []);
+    try {
+      const id = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      activeRequestsRef.current.add(id);
+      simpleTracker.startRequest(id, url, method, type);
+      return id;
+    } catch (error) {
+      handleError(error, 'network tracking start');
+      return 'fallback_id';
+    }
+  }, [handleError]);
 
   const endTracking = useCallback((id: string, status?: number, size?: number, error?: string): NetworkRequest | null => {
-    activeRequestsRef.current.delete(id);
-    return networkTracker.endRequest(id, status, size, error);
-  }, []);
+    try {
+      activeRequestsRef.current.delete(id);
+      return simpleTracker.endRequest(id, status, size, error);
+    } catch (err) {
+      handleError(err, 'network tracking end');
+      return null;
+    }
+  }, [handleError]);
 
   const trackFetch = useCallback(async (
     url: string,
@@ -41,9 +115,14 @@ export const useNetworkPerformanceTracker = () => {
     try {
       const response = await fetch(url, options);
       
-      // Try to get response size
-      const contentLength = response.headers.get('content-length');
-      const size = contentLength ? parseInt(contentLength, 10) : undefined;
+      // Safely try to get response size
+      let size: number | undefined;
+      try {
+        const contentLength = response.headers.get('content-length');
+        size = contentLength ? parseInt(contentLength, 10) : undefined;
+      } catch {
+        // Ignore content length parsing errors
+      }
       
       endTracking(trackingId, response.status, size);
       
@@ -53,23 +132,37 @@ export const useNetworkPerformanceTracker = () => {
       
       return response;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Network error';
       endTracking(trackingId, undefined, undefined, errorMessage);
       throw error;
     }
   }, [startTracking, endTracking]);
 
   const getMetrics = useCallback((id: string) => {
-    return networkTracker.getRequestMetrics(id);
-  }, []);
+    try {
+      return simpleTracker.getRequestMetrics(id);
+    } catch (error) {
+      handleError(error, 'metrics retrieval');
+      return null;
+    }
+  }, [handleError]);
 
   const getAllMetrics = useCallback(() => {
-    return networkTracker.getAllMetrics();
-  }, []);
+    try {
+      return simpleTracker.getAllMetrics();
+    } catch (error) {
+      handleError(error, 'all metrics retrieval');
+      return [];
+    }
+  }, [handleError]);
 
   const logSummary = useCallback(() => {
-    networkTracker.logSummary();
-  }, []);
+    try {
+      simpleTracker.logSummary();
+    } catch (error) {
+      handleError(error, 'summary logging');
+    }
+  }, [handleError]);
 
   return {
     startTracking,

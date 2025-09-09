@@ -14,7 +14,6 @@ export class AudioRecorder {
 
   async start() {
     try {
-      console.log('[AudioRecorder] Requesting microphone');
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 24000,
@@ -33,15 +32,12 @@ export class AudioRecorder {
       };
       this.source.connect(this.processor);
       // Do not connect to destination to avoid unnecessary playback load
-      console.log('[AudioRecorder] Started at 24kHz mono');
     } catch (error) {
-      console.error('[AudioRecorder] Error accessing microphone:', error);
       throw error;
     }
   }
 
   stop() {
-    console.log('[AudioRecorder] Stopping');
     if (this.source) {
       this.source.disconnect();
       this.source = null;
@@ -146,7 +142,6 @@ class AudioQueue {
       source.onended = () => this.playNext();
       source.start(0);
     } catch (err) {
-      console.error('[AudioQueue] Error playing audio chunk:', err);
       // Continue with next chunk even if this one fails
       this.playNext();
     }
@@ -158,7 +153,6 @@ export const ensureAudioQueue = () => {
   if (!audioQueueInstance) {
     const ctx = new AudioContext();
     audioQueueInstance = { queue: new AudioQueue(ctx), ctx };
-    console.log('[AudioQueue] Initialized');
   }
   return audioQueueInstance;
 };

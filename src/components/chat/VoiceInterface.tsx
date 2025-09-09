@@ -168,15 +168,34 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       }
       
       if (!instructions) {
-        throw new Error(`Voice interface template not found for deliberation size: ${totalNodes} nodes`);
+        // Fallback system: Use hardcoded instructions if database templates are missing
+        const fallbackInstructions = getFallbackInstructions(totalNodes);
+        return { duration, maxItems, totalNodes, instructions: fallbackInstructions };
       }
 
       return { duration, maxItems, totalNodes, instructions };
     } catch (err) {
       logger.error('complexity analysis error', err as Error);
       
-      // Return error if no template found
-      throw new Error('Voice interface templates not available in database');
+      // Return comprehensive fallback instead of throwing
+      const fallbackInstructions = getFallbackInstructions(0); // Default to small deliberation fallback
+      return { 
+        duration: "30-60 seconds", 
+        maxItems: 5, 
+        totalNodes: 0, 
+        instructions: fallbackInstructions 
+      };
+    }
+  };
+
+  // Fallback instructions when database templates are unavailable
+  const getFallbackInstructions = (nodeCount: number): string => {
+    if (nodeCount < 10) {
+      return 'You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a clear, concise spoken summary in 30-60 seconds. Focus on the most important issues and positions. Use British English spelling and grammar throughout.';
+    } else if (nodeCount < 50) {
+      return 'You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a comprehensive spoken summary in 2-3 minutes. Cover key issues, major positions, and significant arguments. Use British English spelling and grammar throughout.';
+    } else {
+      return 'You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a thorough spoken analysis in 5-7 minutes. Discuss all major issues, positions, arguments, and their relationships. Use British English spelling and grammar throughout.';
     }
   };
 

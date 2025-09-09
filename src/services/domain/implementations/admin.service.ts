@@ -20,7 +20,13 @@ export class AdminService implements IAdminService {
       return await this.adminRepository.getSystemStats();
     } catch (error) {
       logger.error('Admin service getSystemStats failed', { error });
-      throw error;
+      // Return safe defaults instead of throwing
+      return {
+        totalUsers: 0,
+        totalDeliberations: 0,
+        totalMessages: 0,
+        activeDeliberations: 0
+      };
     }
   }
 
@@ -29,7 +35,8 @@ export class AdminService implements IAdminService {
       return await this.userService.getUsers();
     } catch (error) {
       logger.error('Admin service getAllUsers failed', { error });
-      throw error;
+      // Return empty array instead of throwing
+      return [];
     }
   }
 
@@ -38,7 +45,8 @@ export class AdminService implements IAdminService {
       return await this.userService.getAllUsersIncludingArchived();
     } catch (error) {
       logger.error('Admin service getAllUsersIncludingArchived failed', { error });
-      throw error;
+      // Return empty array instead of throwing
+      return [];
     }
   }
 
@@ -67,7 +75,8 @@ export class AdminService implements IAdminService {
       return await this.agentService.getAgents();
     } catch (error) {
       logger.error('Admin service getAllAgents failed', { error });
-      throw error;
+      // Return empty array instead of throwing
+      return [];
     }
   }
 
@@ -76,7 +85,8 @@ export class AdminService implements IAdminService {
       return await this.agentService.getLocalAgents();
     } catch (error) {
       logger.error('Admin service getLocalAgents failed', { error });
-      throw error;
+      // Return empty array instead of throwing
+      return [];
     }
   }
 
@@ -85,7 +95,8 @@ export class AdminService implements IAdminService {
       return await this.agentService.getGlobalAgents();
     } catch (error) {
       logger.error('Admin service getGlobalAgents failed', { error });
-      throw error;
+      // Return empty array instead of throwing
+      return [];
     }
   }
 

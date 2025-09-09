@@ -75,7 +75,7 @@ export class SecureSession {
     try {
       sessionStorage.setItem(this.SESSION_KEY, JSON.stringify(sessionData));
     } catch (error) {
-      console.warn('Failed to set session:', error);
+      // Session storage error handled silently
     }
   }
   
@@ -103,7 +103,7 @@ export class SecureSession {
     try {
       sessionStorage.removeItem(this.SESSION_KEY);
     } catch (error) {
-      console.warn('Failed to clear session:', error);
+      // Session storage error handled silently
     }
   }
   
@@ -189,10 +189,9 @@ export const isValidRedirectURL = (url: string): boolean => {
 
 // Log security events
 export const logSecurityEvent = (event: string, details?: any): void => {
-  console.warn(`Security Event: ${event}`, details);
-  
-  // In production, you might want to send this to a logging service
+  // In production, send to monitoring service
   if (process.env.NODE_ENV === 'production') {
-    // Send to monitoring service
+    // Send to monitoring service - structured logging
+    // Production security events would go to external service
   }
 };

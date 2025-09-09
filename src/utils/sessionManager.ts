@@ -53,12 +53,6 @@ export class SessionManager {
     };
 
     this.startHealthCheck();
-    
-    console.log('[SessionManager] Session started:', {
-      sessionId: this.currentSession.sessionId,
-      maxAge: this.config.maxSessionAge,
-      renewalThreshold: this.config.renewalThreshold
-    });
 
     return this.currentSession;
   }
@@ -74,10 +68,6 @@ export class SessionManager {
   recordError(): void {
     if (this.currentSession) {
       this.currentSession.errorCount++;
-      console.warn('[SessionManager] Error recorded:', {
-        sessionId: this.currentSession.sessionId,
-        errorCount: this.currentSession.errorCount
-      });
     }
   }
 
@@ -128,12 +118,6 @@ export class SessionManager {
   attemptRenewal(): void {
     if (this.currentSession && this.currentSession.renewalAttempts < this.config.maxRenewalAttempts) {
       this.currentSession.renewalAttempts++;
-      
-      console.log('[SessionManager] Attempting session renewal:', {
-        sessionId: this.currentSession.sessionId,
-        attempt: this.currentSession.renewalAttempts,
-        maxAttempts: this.config.maxRenewalAttempts
-      });
 
       // Signal that renewal is needed
       if (this.onSessionRenewed) {
@@ -149,12 +133,6 @@ export class SessionManager {
     }
 
     if (this.currentSession) {
-      const finalMetrics = {
-        ...this.currentSession,
-        conversationDuration: Date.now() - this.currentSession.createdAt
-      };
-      
-      console.log('[SessionManager] Session stopped:', finalMetrics);
       this.currentSession = null;
     }
   }
@@ -168,27 +146,13 @@ export class SessionManager {
       const status = this.getSessionStatus();
       
       if (!status.isActive) {
-        console.log('[SessionManager] Session expired during health check');
         this.onSessionExpired?.();
         this.stopSession();
         return;
       }
 
       if (status.needsRenewal) {
-        console.log('[SessionManager] Session needs renewal during health check');
         this.attemptRenewal();
-      }
-
-      // Log status every few checks for debugging
-      if (this.currentSession) {
-        const minutesRemaining = Math.floor(status.remainingTime / 60000);
-        if (minutesRemaining <= 5) {
-          console.log('[SessionManager] Health check:', {
-            sessionId: this.currentSession.sessionId,
-            minutesRemaining,
-            errorCount: this.currentSession.errorCount
-          });
-        }
       }
     }, this.config.healthCheckInterval);
   }

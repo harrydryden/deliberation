@@ -105,7 +105,6 @@ export const useChat = (deliberationId?: string) => {
         logger.info('📨 Realtime message received', { 
           id: message.id, 
           type: message.message_type, 
-          content: message.content?.substring(0, 50) || '[empty]',
           user_id: message.user_id
         });
         
@@ -125,12 +124,6 @@ export const useChat = (deliberationId?: string) => {
           const existingFinal = prev.messages.find(msg => msg.id.startsWith(`${message.id}-final`));
           
           if (existingMessage || existingStreaming || existingFinal) {
-            logger.debug('🔄 Realtime duplicate ignored', { 
-              messageId: chatMessage.id,
-              hasExisting: !!existingMessage,
-              hasStreaming: !!existingStreaming,
-              hasFinal: !!existingFinal
-            });
             return prev;
           }
           
@@ -201,22 +194,9 @@ export const useChat = (deliberationId?: string) => {
 
     const { id: queueId, content, parentMessageId } = queuedMessage;
     
-    logger.debug('🔧 DEBUG: Starting processQueuedMessage', { 
-      queueId, 
-      content: content.substring(0, 50),
-      timestamp: new Date().toISOString(),
-      hasUser: !!user,
-      hasDeliberationId: !!deliberationId,
-      queueLength: messageQueue.queue.length,
-      processingCount: messageQueue.processing.size
-    });
-    
     try {
-      // CRITICAL FIX: Update status to processing ONLY when we actually start processing
-      logger.debug('📋 Marking message as processing', { queueId });
+      // Update status to processing when we start processing
       messageQueue.updateMessageStatus(queueId, 'processing');
-      
-      logger.debug('📤 Sending message to service', { queueId });
       
       // Clear cache when sending new messages
       cacheService.clearNamespace('chat-history');
@@ -228,12 +208,6 @@ export const useChat = (deliberationId?: string) => {
         queuedMessage.mode, 
         user?.id
       );
-      
-      logger.debug('✅ Message saved to database', { 
-        queueId, 
-        savedMessageId: saved.id,
-        timestamp: new Date().toISOString()
-      });
       
       const savedChat = convertApiMessageToChatMessage(saved);
       
@@ -260,27 +234,11 @@ export const useChat = (deliberationId?: string) => {
       });
 
       // Start streaming the agent response
-      logger.debug('🚀 About to start streaming agent response', { 
-        messageId: saved.id,
-        queueId,
-        deliberationId, 
-        hasStartStreamingFn: !!startStreaming,
-        timestamp: new Date().toISOString()
-      });
-      
       await startStreaming(
         saved.id,
         deliberationId,
-        // PHASE 3 FIX: Smart throttling for streaming updates to prevent state desync
         (streamContent: string, messageId: string, agentType: string | null) => {
           if (!streamContent.trim()) return;
-          
-          logger.debug('Streaming update received', { 
-            queueId, 
-            messageId, 
-            contentLength: streamContent.length,
-            agentType 
-          });
           
           // Store streaming content in ref to avoid frequent state updates
           streamingContentRef.current = streamContent;
@@ -312,17 +270,7 @@ export const useChat = (deliberationId?: string) => {
             };
 
             setChatState(prev => {
-              // PHASE 2 FIX: Better duplicate detection using message ID
               const existingIndex = prev.messages.findIndex(m => m.id === `streaming-${saved.id}`);
-              
-              logger.debug('🔄 Smart streaming update', { 
-                queueId, 
-                messageId, 
-                contentLength: streamingContentRef.current.length,
-                existingIndex,
-                wasThrottled: shouldThrottle,
-                delay
-              });
               
               if (existingIndex >= 0) {
                 const updatedMessages = [...prev.messages];
@@ -343,15 +291,7 @@ export const useChat = (deliberationId?: string) => {
             updateUI();
           }
         },
-        // PHASE 3 FIX: Enhanced onComplete callback with proper cleanup
         async (finalContent: string, messageId: string, agentType: string | null) => {
-          logger.debug('Streaming completed for queued message', { 
-            queueId, 
-            messageId, 
-            contentLength: finalContent.length,
-            agentType,
-            timestamp: new Date().toISOString()
-          });
           
           // PHASE 3 FIX: Clear throttling timeout with proper cleanup
           if (streamingUpdateTimeoutRef.current) {
@@ -385,15 +325,8 @@ export const useChat = (deliberationId?: string) => {
           });
           
           messageQueue.updateMessageStatus(queueId, 'completed');
-          logger.debug('Queue message marked as completed', { queueId, timestamp: new Date().toISOString() });
         },
-        // PHASE 3 FIX: Enhanced onError callback with comprehensive cleanup
         (error: string) => {
-          logger.error('Streaming error occurred for queued message', { 
-            error, 
-            queueId, 
-            timestamp: new Date().toISOString() 
-          });
           
           // PHASE 3 FIX: Clear any pending updates on error
           if (streamingUpdateTimeoutRef.current) {
@@ -403,7 +336,6 @@ export const useChat = (deliberationId?: string) => {
           
           // Don't mark as failed if it was intentionally aborted
           if (error.includes('aborted') || error.includes('AbortError')) {
-            logger.debug('Message processing was aborted intentionally', { queueId });
             messageQueue.removeFromQueue(queueId);
             return;
           }
@@ -422,8 +354,7 @@ export const useChat = (deliberationId?: string) => {
     } catch (error) {
       const errMsg = getErrorMessage(error);
       logger.error('Failed to process queued message', new Error(errMsg), { 
-        queueId, 
-        timestamp: new Date().toISOString() 
+        queueId
       });
       
       // PHASE 3 FIX: Cleanup on exception

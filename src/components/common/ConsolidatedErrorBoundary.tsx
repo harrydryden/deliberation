@@ -42,7 +42,7 @@ export class ConsolidatedErrorBoundary extends Component<Props, State> {
   }
 
   componentDidMount() {
-    // Lightweight performance monitoring in development only
+    // Production-optimized: No memory monitoring in production
     if (process.env.NODE_ENV === 'development') {
       this.startLightweightMonitoring();
     }
@@ -87,6 +87,9 @@ export class ConsolidatedErrorBoundary extends Component<Props, State> {
   }
 
   startLightweightMonitoring = () => {
+    // Production-safe: Completely disabled in production
+    if (process.env.NODE_ENV === 'production') return;
+    
     const memoryThreshold = this.props.memoryThreshold || 200; // Increased threshold to reduce noise
     
     this.memoryCheckInterval = setInterval(() => {

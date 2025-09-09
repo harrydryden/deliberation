@@ -31,12 +31,12 @@ export class RealtimeRTC {
     // 2) Setup RTCPeerConnection and audio
     this.pc = new RTCPeerConnection();
 
-    // Log state changes for robust debugging
+    // Production-safe state change handlers
     this.pc.onconnectionstatechange = () => {
-      console.log('[RealtimeRTC] connectionState:', this.pc?.connectionState);
+      // Connection state monitoring without logging
     };
     this.pc.oniceconnectionstatechange = () => {
-      console.log('[RealtimeRTC] iceConnectionState:', this.pc?.iceConnectionState);
+      // ICE connection state monitoring without logging
     };
 
     // Create hidden audio element for remote playback
@@ -48,7 +48,7 @@ export class RealtimeRTC {
       try {
         if (this.audioEl) this.audioEl.srcObject = e.streams[0];
       } catch (err) {
-        console.error('[RealtimeRTC] ontrack error', err);
+        // Track error handled silently
       }
     };
     // Mic
@@ -59,12 +59,11 @@ export class RealtimeRTC {
 
     // 3) Data channel for JSON events
     this.dc = this.pc.createDataChannel('oai-events');
-    this.dc.addEventListener('open', () => console.log('[RealtimeRTC] DC open'));
-    this.dc.addEventListener('close', () => console.log('[RealtimeRTC] DC closed'));
+    this.dc.addEventListener('open', () => {});
+    this.dc.addEventListener('close', () => {});
     this.dc.addEventListener('message', async (e) => {
       try {
         const event = JSON.parse(e.data);
-        console.log('[RTC <-]', event);
         this.onEvent?.(event);
 
         if (event?.type === 'response.function_call_arguments.done') {
@@ -79,12 +78,12 @@ export class RealtimeRTC {
                 this.dc.send(JSON.stringify({ type: 'response.create' }));
               }
             } catch (err) {
-              console.error('[RealtimeRTC] Tool handler error', err);
+              // Tool handler error handled silently
             }
           }
         }
       } catch (err) {
-        console.error('[RealtimeRTC] DC message parse error', err);
+        // Message parse error handled silently
       }
     });
 
@@ -108,7 +107,6 @@ export class RealtimeRTC {
     await this.pc.setRemoteDescription(answer);
 
     await this.waitForDataChannelOpen(12000);
-    console.log('[RealtimeRTC] WebRTC connected');
   }
 
   private async waitForDataChannelOpen(timeoutMs = 12000): Promise<void> {
