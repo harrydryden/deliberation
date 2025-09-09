@@ -114,7 +114,7 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl text-center">Sign In</CardTitle>
+          <CardTitle className="text-2xl text-center text-democratic-blue">Deliberation</CardTitle>
           <CardDescription className="text-center">
             Enter your access codes to continue
           </CardDescription>
