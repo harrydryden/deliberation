@@ -341,25 +341,33 @@ const OptimizedDeliberationChat = () => {
                 <div className="space-y-3">
                   {/* Description and Notion - Mobile */}
                   <div className="space-y-2">
-                    {dataState.deliberation.description && (
-                      <div>
-                        <p className="text-sm text-muted-foreground cursor-pointer" 
+                     {dataState.deliberation.description && (
+                       <div>
+                         <button 
+                           className="w-full text-left p-3 rounded-lg border border-border bg-card hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-primary/50" 
                            onClick={() => setUiState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
                            title="Click to view full description">
-                          <span className="font-bold text-foreground">Description:</span> {dataState.deliberation.description.length > 100 ? `${dataState.deliberation.description.slice(0, 100)}...` : dataState.deliberation.description}
-                        </p>
-                      </div>
-                    )}
+                           <p className="text-sm text-card-foreground">
+                             <span className="font-semibold text-primary group-hover:text-accent-foreground">Description:</span> 
+                             <span className="ml-1 group-hover:text-accent-foreground">{dataState.deliberation.description.length > 100 ? `${dataState.deliberation.description.slice(0, 100)}...` : dataState.deliberation.description}</span>
+                           </p>
+                         </button>
+                       </div>
+                     )}
                     
-                    {dataState.deliberation.notion && (
-                      <div>
-                        <p className="text-sm text-muted-foreground cursor-pointer" 
+                     {dataState.deliberation.notion && (
+                       <div>
+                         <button 
+                           className="w-full text-left p-3 rounded-lg border border-border bg-card hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-primary/50" 
                            onClick={() => setUiState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
                            title="Click to view full notion statement">
-                          <span className="font-bold text-foreground">Notion:</span> {dataState.deliberation.notion.length > 100 ? `${dataState.deliberation.notion.slice(0, 100)}...` : dataState.deliberation.notion}
-                        </p>
-                      </div>
-                    )}
+                           <p className="text-sm text-card-foreground">
+                             <span className="font-semibold text-primary group-hover:text-accent-foreground">Notion:</span> 
+                             <span className="ml-1 group-hover:text-accent-foreground">{dataState.deliberation.notion.length > 100 ? `${dataState.deliberation.notion.slice(0, 100)}...` : dataState.deliberation.notion}</span>
+                           </p>
+                         </button>
+                       </div>
+                     )}
                   </div>
                   
                   <div className="rounded-lg border bg-muted/40 p-2 flex flex-col gap-3 justify-center">
