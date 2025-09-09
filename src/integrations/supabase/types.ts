@@ -976,7 +976,9 @@ export type Database = {
         }[]
       }
       get_prompt_template: {
-        Args: { template_name: string; template_variables?: Json }
+        Args:
+          | { template_name: string }
+          | { template_name: string; template_variables?: Json }
         Returns: {
           category: string
           template_text: string
