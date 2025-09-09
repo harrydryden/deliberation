@@ -225,7 +225,7 @@ export const useChat = (deliberationId?: string) => {
         content.trim(), 
         'user', 
         deliberationId, 
-        'chat', 
+        queuedMessage.mode, 
         user?.id
       );
       
@@ -415,7 +415,8 @@ export const useChat = (deliberationId?: string) => {
           }));
           
           messageQueue.updateMessageStatus(queueId, 'failed', error);
-        }
+        },
+        queuedMessage.mode
       );
       
     } catch (error) {
@@ -539,7 +540,7 @@ export const useChat = (deliberationId?: string) => {
     if (!user || !content.trim()) return;
 
     // Add message to queue instead of processing immediately
-    const queueId = messageQueue.addToQueue(content.trim());
+    const queueId = messageQueue.addToQueue(content.trim(), undefined, mode);
     
     logger.info('📤 Message queued for processing', { 
       queueId, 

@@ -10,6 +10,7 @@ export interface QueuedMessage {
   timestamp: Date;
   retries: number;
   error?: string;
+  mode: 'chat' | 'learn';
 }
 
 export interface MessageQueueState {
@@ -54,7 +55,7 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
     logger.info('🗑️ Message removed from queue', { messageId });
   }, []);
 
-  const addToQueue = useCallback((content: string, parentMessageId?: string): string => {
+  const addToQueue = useCallback((content: string, parentMessageId?: string, mode: 'chat' | 'learn' = 'chat'): string => {
     const messageId = `queue-${crypto.randomUUID()}`;
     const queuedMessage: QueuedMessage = {
       id: messageId,
@@ -63,7 +64,8 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
       queuePosition: queueState.queue.length,
       parentMessageId,
       timestamp: new Date(),
-      retries: 0
+      retries: 0,
+      mode
     };
 
     setQueueState(prev => ({

@@ -67,7 +67,8 @@ export const useResponseStreaming = () => {
     deliberationId: string,
     onUpdate: (content: string, messageId: string, agentType: string | null) => void,
     onComplete: (finalContent: string, messageId: string, agentType: string | null) => void,
-    onError: (error: string) => void
+    onError: (error: string) => void,
+    mode: 'chat' | 'learn' = 'chat'
   ) => {
     productionLogger.debug('Starting streaming for message', { messageId });
     
@@ -219,7 +220,7 @@ export const useResponseStreaming = () => {
         body: JSON.stringify({
           messageId,
           deliberationId,
-          mode: 'chat'
+          mode
         }),
         signal: streamControllerRef.current?.signal
       });

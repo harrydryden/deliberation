@@ -46,7 +46,8 @@ const createMockQueuedMessages = (count: number): QueuedMessage[] => {
     parentMessageId: undefined,
     timestamp: new Date(Date.now() - i * 1000),
     retries: i % 3 === 0 ? 1 : 0,
-    error: i % 3 === 0 ? 'Network error' : undefined
+    error: i % 3 === 0 ? 'Network error' : undefined,
+    mode: 'chat' as const
   }));
 };
 
