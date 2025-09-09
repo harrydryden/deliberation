@@ -11,12 +11,12 @@ import {
   parseAndValidateRequest,
   getOpenAIKey
 } from '../shared/edge-function-utils.ts';
-import { OpenAIEmbeddings } from 'https://esm.sh/@langchain/openai@0.6.0?no-check';
-import { ChatOpenAI } from 'https://esm.sh/@langchain/openai@0.6.0?no-check';
-import { SupabaseVectorStore } from 'https://esm.sh/@langchain/community@0.3.0/vectorstores/supabase?no-check';
-import { createRetrievalChain } from 'https://esm.sh/langchain@0.3.0/chains/retrieval?no-check';
-import { createStuffDocumentsChain } from 'https://esm.sh/langchain@0.3.0/chains/combine_documents?no-check';
-import { PromptTemplate } from 'https://esm.sh/@langchain/core@0.3.0/prompts?no-check';
+import { OpenAIEmbeddings } from 'https://esm.sh/@langchain/openai@0.6.3';
+import { ChatOpenAI } from 'https://esm.sh/@langchain/openai@0.6.3';
+import { SupabaseVectorStore } from 'https://esm.sh/@langchain/community@0.3.49/vectorstores/supabase';
+import { createRetrievalChain } from 'https://esm.sh/langchain@0.3.30/chains/retrieval';
+import { createStuffDocumentsChain } from 'https://esm.sh/langchain@0.3.30/chains/combine_documents';
+import { PromptTemplate } from 'https://esm.sh/@langchain/core@0.3.12/prompts';
 import { ModelConfigManager } from "../shared/model-config.ts";
 import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 

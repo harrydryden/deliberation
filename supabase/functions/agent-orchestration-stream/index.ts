@@ -539,7 +539,7 @@ async function generateStreamingResponse(
         },
         body: JSON.stringify(requestBody),
       }),
-      25000, // 25 second timeout for OpenAI API call
+      45000, // 45 second timeout for OpenAI API call
       'OpenAI API Call'
     );
 
