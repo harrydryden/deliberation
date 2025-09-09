@@ -119,7 +119,7 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
   const handleGenerateIbisRoots = async (deliberation: Deliberation) => {
     setGeneratingRoots(deliberation.id);
     try {
-      const { execute } = invokeFunction('generate-ibis-roots', {
+      const { execute } = invokeFunction('test-generate-ibis-roots', {
         deliberationId: deliberation.id,
         deliberationTitle: deliberation.title,
         deliberationDescription: deliberation.description,
@@ -127,16 +127,17 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
       });
 
       const rootsData = await execute();
+      console.log('Test function result:', rootsData);
 
       toast({
-        title: "IBIS Roots Generated",
-        description: `Generated ${rootsData?.count || 0} root issues for "${deliberation.title}"`
+        title: "Test Completed",
+        description: `Test result: ${rootsData?.success ? 'SUCCESS' : 'FAILED'}`
       });
     } catch (error) {
-      logger.error('Failed to generate IBIS roots', error as Error, { deliberationId: deliberation.id });
+      logger.error('Failed to run test', error as Error, { deliberationId: deliberation.id });
       toast({
-        title: "Error",
-        description: "Failed to generate IBIS roots. Please try again.",
+        title: "Test Failed",
+        description: "Check console for details",
         variant: "destructive"
       });
     } finally {
