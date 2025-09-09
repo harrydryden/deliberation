@@ -14,24 +14,44 @@ import {
 import { configCache, createCacheKey } from '../shared/cache-manager.ts';
 import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
+// Helper function to get system message from template system
+async function getSystemMessage(supabase: any): Promise<string> {
+  try {
+    const { data: template } = await supabase
+      .from('prompt_templates')
+      .select('template_text')
+      .eq('name', 'classification_system_message')
+      .eq('is_active', true)
+      .single();
+
+    if (template && template.template_text) {
+      return template.template_text;
+    }
+  } catch (error) {
+    EdgeLogger.error('Failed to fetch system message template', error);
+  }
+  
+  // Fallback system message
+  return 'You are an AI that classifies messages for democratic deliberation. Respond only with valid JSON.';
+}
+
 // Helper function to get classification prompt from template system
 async function getClassificationPrompt(supabase: any, content: string, deliberationContext: string, deliberationNotion: string): Promise<string> {
   try {
     // Try to get classification_prompt template
     const { data: template } = await supabase
       .from('prompt_templates')
-      .select('template')
-      .eq('prompt_type', 'classification_prompt')
+      .select('template_text')
+      .eq('name', 'classification_prompt')
       .eq('is_active', true)
-      .eq('is_default', true)
-      .single()
+      .single();
 
-    if (template && template.template) {
+    if (template && template.template_text) {
       // Replace template variables
-      return template.template
+      return template.template_text
         .replace('{content}', content)
         .replace('{deliberationContext}', deliberationContext)
-        .replace('{deliberationNotion}', deliberationNotion)
+        .replace('{deliberationNotion}', deliberationNotion);
     }
   } catch (error) {
     EdgeLogger.error('Failed to fetch classification prompt template', error);
@@ -79,6 +99,7 @@ serve(async (req) => {
     }
 
     const prompt = await getClassificationPrompt(supabase, content, deliberationContext, deliberationNotion);
+    const systemMessage = await getSystemMessage(supabase);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -91,7 +112,7 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: 'You are an AI that classifies messages for democratic deliberation. Respond only with valid JSON.' 
+            content: systemMessage
           },
           { role: 'user', content: prompt }
         ],
