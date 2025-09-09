@@ -123,44 +123,66 @@ serve(async (req) => {
     console.log('Environment validated and API key retrieved');
 
     // Get IBIS generation prompt from template system
-    const prompt = await getIbisGenerationPrompt(supabase, deliberationTitle, deliberationDescription, notion);
+    console.log('About to fetch template for generate_ibis_roots...');
+    let prompt;
+    try {
+      prompt = await getIbisGenerationPrompt(supabase, deliberationTitle, deliberationDescription, notion);
+      console.log('✅ Template fetched successfully, prompt length:', prompt.length);
+    } catch (templateError) {
+      console.error('❌ Template fetch failed:', templateError);
+      return createErrorResponse(templateError, 500, 'generate-ibis-roots');
+    }
     
-    console.log('Final prompt being sent to AI:', prompt);
+    console.log('Final prompt being sent to AI (first 200 chars):', prompt.substring(0, 200));
 
     // Call OpenAI API with error handling
-    console.log('Making OpenAI API call...');
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openAIApiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
-        max_completion_tokens: 1000,
-        messages: [
-          {
-            role: 'system',
-            content: await getSystemMessage(supabase, 'ibis_root_generation_system_message')
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
-      })
-    });
-
-    console.log('OpenAI response status:', openaiResponse.status);
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
+    console.log('🚀 Making OpenAI API call...');
+    let openaiResponse;
+    try {
+      openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openAIApiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-5-2025-08-07',
+          max_completion_tokens: 1000,
+          messages: [
+            {
+              role: 'system',
+              content: await getSystemMessage(supabase, 'ibis_root_generation_system_message')
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ]
+        })
+      });
+      console.log('✅ OpenAI response received, status:', openaiResponse.status);
+    } catch (fetchError) {
+      console.error('❌ OpenAI fetch failed:', fetchError);
+      return createErrorResponse(fetchError, 500, 'generate-ibis-roots');
     }
 
-    const openaiData = await openaiResponse.json();
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text();
+      console.error('❌ OpenAI API error:', errorText);
+      return createErrorResponse(new Error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`), 500, 'generate-ibis-roots');
+    }
+
+    let openaiData;
+    try {
+      openaiData = await openaiResponse.json();
+      console.log('✅ OpenAI JSON parsed successfully');
+    } catch (jsonError) {
+      console.error('❌ OpenAI JSON parse failed:', jsonError);
+      return createErrorResponse(jsonError, 500, 'generate-ibis-roots');
+    }
+
     const aiResponse = openaiData.choices[0].message.content;
-    console.log('OpenAI response received successfully');
+    console.log('✅ AI response extracted, length:', aiResponse?.length);
 
     // Parse AI response
     let suggestedIssues;
