@@ -52,8 +52,7 @@ async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string,
 
     if (templateError) {
       console.error('Template fetch error:', templateError);
-      console.warn('Using fallback prompt due to template error');
-      return getFallbackPrompt(deliberationTitle, deliberationDescription, notion);
+      throw new Error(`Failed to fetch template: ${templateError.message}`);
     }
 
     if (templateData && templateData.length > 0) {
@@ -78,13 +77,11 @@ async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string,
       
       return template;
     } else {
-      console.warn('No template data found, using fallback');
-      return getFallbackPrompt(deliberationTitle, deliberationDescription, notion);
+      throw new Error('No template found in database');
     }
   } catch (error) {
     console.error('Failed to fetch IBIS generation prompt template:', error);
-    console.warn('Using fallback prompt due to error');
-    return getFallbackPrompt(deliberationTitle, deliberationDescription, notion);
+    throw error; // Don't use fallback - throw the actual error
   }
 }
 
@@ -118,33 +115,8 @@ serve(async (req) => {
     console.log('Request method:', req.method);
     console.log('Request headers:', Object.fromEntries(req.headers.entries()));
     
-    // Log raw request info for debugging
-    const contentType = req.headers.get('content-type');
-    console.log('Content-Type header:', contentType);
-    
-    // Try to read the raw text first to see what we're actually getting
-    const requestText = await req.text();
-    console.log('Raw request body:', requestText);
-    
-    // Try to parse it as JSON
-    let requestData;
-    try {
-      requestData = JSON.parse(requestText);
-      console.log('Parsed request data:', requestData);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      console.error('Request text that failed to parse:', requestText);
-      throw new Error(`Invalid JSON in request body: ${parseError.message}`);
-    }
-    
-    // Validate required fields manually since we already parsed the JSON
-    const requiredFields = ['deliberationId', 'deliberationTitle'];
-    const missing = requiredFields.filter(field => !(field in requestData));
-    if (missing.length > 0) {
-      throw new Error(`Missing required fields: ${missing.join(', ')}`);
-    }
-    
-    const { deliberationId, deliberationTitle, deliberationDescription, notion } = requestData;
+    // Parse and validate the request properly
+    const { deliberationId, deliberationTitle, deliberationDescription, notion } = await parseAndValidateRequest(req, ['deliberationId', 'deliberationTitle']);
     console.log('Request validated successfully', { deliberationId, deliberationTitle });
 
     // Get environment and clients with caching
