@@ -321,9 +321,9 @@ const OptimizedDeliberationChat = () => {
                   <h1 className="text-lg font-semibold text-foreground truncate">
                     {dataState.deliberation.title}
                   </h1>
-                  <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white text-xs w-fit`}>
-                    {dataState.deliberation.status}
-                  </Badge>
+                   <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white text-xs w-fit`}>
+                     {dataState.deliberation.status}
+                   </Badge>
                 </div>
                 <div className="flex items-center gap-2">
                   {messageQueue && messageQueue.queue.length > 0 && (
@@ -407,9 +407,9 @@ const OptimizedDeliberationChat = () => {
                     <h1 className="text-2xl font-bold text-foreground truncate">
                       {dataState.deliberation.title}
                     </h1>
-                    <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white w-fit`}>
-                      {dataState.deliberation.status}
-                    </Badge>
+                     <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white w-fit`}>
+                       {dataState.deliberation.status}
+                     </Badge>
                   </div>
                   
                   {(dataState.deliberation.description || dataState.deliberation.notion) && (
