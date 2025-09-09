@@ -1,47 +1,51 @@
 import { useCallback } from 'react';
-import { useOptimizedAsync } from './useOptimizedAsync';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from './use-toast';
 import { logger } from '@/utils/logger';
 
 /**
- * Simplified API calls hook without heavy caching
+ * Simplified API calls hook without hooks violations
  */
 export const useOptimizedApiCalls = () => {
   const { toast } = useToast();
 
-  // Simplified Supabase function invocation
+  // Simplified Supabase function invocation without nested hooks
   const invokeFunction = useCallback((
     functionName: string, 
     body?: any
   ) => {
-    return useOptimizedAsync(
-      async () => {
-        // Consistent session-based auth for API calls
-        const session = await supabase.auth.getSession();
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json'
-        };
-        
-        if (session.data.session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.data.session.access_token}`;
-        }
+    return {
+      execute: async () => {
+        try {
+          // Consistent session-based auth for API calls
+          const session = await supabase.auth.getSession();
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json'
+          };
+          
+          if (session.data.session?.access_token) {
+            headers['Authorization'] = `Bearer ${session.data.session.access_token}`;
+          }
 
-        const response = await supabase.functions.invoke(functionName, {
-          headers,
-          body: body || {}
-        });
-        
-        if (response.error) {
-          throw new Error(response.error.message || 'Function call failed');
+          const response = await supabase.functions.invoke(functionName, {
+            headers,
+            body: body || {}
+          });
+          
+          if (response.error) {
+            throw new Error(response.error.message || 'Function call failed');
+          }
+          
+          return response.data;
+        } catch (error) {
+          logger.error(`Function invocation error for ${functionName}:`, error);
+          throw error;
         }
-        
-        return response.data;
       }
-    );
+    };
   }, []);
 
-  // Simplified database query
+  // Simplified database query without nested hooks
   const queryTable = useCallback((
     table: string,
     query: {
@@ -51,35 +55,40 @@ export const useOptimizedApiCalls = () => {
       limit?: number;
     } = {}
   ) => {
-    return useOptimizedAsync(
-      async () => {
-        let queryBuilder = supabase.from(table).select(query.select || '*');
-        
-        if (query.filters) {
-          Object.entries(query.filters).forEach(([key, value]) => {
-            queryBuilder = queryBuilder.eq(key, value);
-          });
-        }
-        
-        if (query.orderBy) {
-          queryBuilder = queryBuilder.order(query.orderBy.column, { 
-            ascending: query.orderBy.ascending ?? true 
-          });
-        }
-        
-        if (query.limit) {
-          queryBuilder = queryBuilder.limit(query.limit);
-        }
-        
-        const { data, error } = await queryBuilder;
-        
-        if (error) {
+    return {
+      execute: async () => {
+        try {
+          let queryBuilder = supabase.from(table).select(query.select || '*');
+          
+          if (query.filters) {
+            Object.entries(query.filters).forEach(([key, value]) => {
+              queryBuilder = queryBuilder.eq(key, value);
+            });
+          }
+          
+          if (query.orderBy) {
+            queryBuilder = queryBuilder.order(query.orderBy.column, { 
+              ascending: query.orderBy.ascending ?? true 
+            });
+          }
+          
+          if (query.limit) {
+            queryBuilder = queryBuilder.limit(query.limit);
+          }
+          
+          const { data, error } = await queryBuilder;
+          
+          if (error) {
+            throw error;
+          }
+          
+          return data;
+        } catch (error) {
+          logger.error(`Query error for table ${table}:`, error);
           throw error;
         }
-        
-        return data;
       }
-    );
+    };
   }, []);
 
   // Optimized mutation operations
