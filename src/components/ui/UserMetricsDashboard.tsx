@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   MessageSquare, 
   Share2, 
@@ -16,16 +17,23 @@ import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { logger } from '@/utils/logger';
 
-interface UserMetrics {
+interface DeliberationMetrics {
   totalMessages: number;
   ibisSubmissions: number;
-  participatingDeliberations: number;
+  contributionRate: number;
+}
+
+interface UserMetrics {
+  allDeliberations: DeliberationMetrics;
+  currentDeliberation: DeliberationMetrics | null;
+  participatingDeliberations: Array<{ id: string; title: string }>;
   joinDate: string;
 }
 
 export const UserMetricsDashboard: React.FC = () => {
   const { user } = useSupabaseAuth();
   const [metrics, setMetrics] = useState<UserMetrics | null>(null);
+  const [selectedDeliberationId, setSelectedDeliberationId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,10 +52,13 @@ export const UserMetricsDashboard: React.FC = () => {
 
       if (messagesError) throw messagesError;
 
-      // Get user's participations
+      // Get user's participations with deliberation titles
       const { data: participations, error: participationsError } = await supabase
         .from('participants')
-        .select('deliberation_id')
+        .select(`
+          deliberation_id,
+          deliberations!inner(id, title)
+        `)
         .eq('user_id', user.id);
 
       if (participationsError) throw participationsError;
@@ -57,25 +68,58 @@ export const UserMetricsDashboard: React.FC = () => {
         .from('profiles')
         .select('created_at')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw profileError;
 
       // Calculate metrics
       const userMessages = messages || [];
-      const ibisSubmissions = userMessages.filter(m => m.submitted_to_ibis).length;
+      const userParticipations = participations || [];
+
+      // All deliberations metrics
+      const allIbisSubmissions = userMessages.filter(m => m.submitted_to_ibis).length;
+      const allContributionRate = userMessages.length > 0 ? (allIbisSubmissions / userMessages.length) * 100 : 0;
+
+      // Current deliberation metrics (if selected)
+      let currentDeliberationMetrics: DeliberationMetrics | null = null;
+      if (selectedDeliberationId) {
+        const currentMessages = userMessages.filter(m => m.deliberation_id === selectedDeliberationId);
+        const currentIbisSubmissions = currentMessages.filter(m => m.submitted_to_ibis).length;
+        const currentContributionRate = currentMessages.length > 0 ? (currentIbisSubmissions / currentMessages.length) * 100 : 0;
+        
+        currentDeliberationMetrics = {
+          totalMessages: currentMessages.length,
+          ibisSubmissions: currentIbisSubmissions,
+          contributionRate: currentContributionRate
+        };
+      }
+
+      // Prepare deliberation list
+      const deliberationList = userParticipations.map(p => ({
+        id: p.deliberation_id || '',
+        title: (p.deliberations as any)?.title || 'Unknown Deliberation'
+      }));
 
       setMetrics({
-        totalMessages: userMessages.length,
-        ibisSubmissions,
-        participatingDeliberations: participations?.length || 0,
+        allDeliberations: {
+          totalMessages: userMessages.length,
+          ibisSubmissions: allIbisSubmissions,
+          contributionRate: allContributionRate
+        },
+        currentDeliberation: currentDeliberationMetrics,
+        participatingDeliberations: deliberationList,
         joinDate: profile?.created_at || ''
       });
 
+      // Auto-select first deliberation if none selected and deliberations exist
+      if (!selectedDeliberationId && deliberationList.length > 0) {
+        setSelectedDeliberationId(deliberationList[0].id);
+      }
+
       logger.info('[UserMetricsDashboard] Metrics loaded successfully', {
         totalMessages: userMessages.length,
-        ibisSubmissions,
-        participatingDeliberations: participations?.length || 0
+        allIbisSubmissions,
+        participatingDeliberations: deliberationList.length
       });
 
     } catch (err) {
@@ -90,7 +134,7 @@ export const UserMetricsDashboard: React.FC = () => {
     if (user?.id) {
       fetchUserMetrics();
     }
-  }, [user?.id]);
+  }, [user?.id, selectedDeliberationId]);
 
   if (!user) return null;
 
@@ -128,6 +172,49 @@ export const UserMetricsDashboard: React.FC = () => {
     );
   }
 
+  const renderMetricsCards = (metricsData: DeliberationMetrics, title: string) => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Messages Sent</CardTitle>
+          <MessageSquare className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{metricsData.totalMessages}</div>
+          <span className="text-xs text-muted-foreground">
+            Total messages in {title.toLowerCase()}
+          </span>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">IBIS Contributions</CardTitle>
+          <Share2 className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{metricsData.ibisSubmissions}</div>
+          <span className="text-xs text-muted-foreground">
+            Messages shared to knowledge map
+          </span>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Contribution Rate</CardTitle>
+          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{metricsData.contributionRate.toFixed(0)}%</div>
+          <span className="text-xs text-muted-foreground">
+            Messages shared to IBIS
+          </span>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -142,86 +229,83 @@ export const UserMetricsDashboard: React.FC = () => {
         </Button>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Deliberation Selector */}
+      {metrics && metrics.participatingDeliberations.length > 0 && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Messages Sent</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+          <CardHeader>
+            <CardTitle className="text-lg">Select Current Deliberation</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalMessages}</div>
-            <span className="text-xs text-muted-foreground">
-              Total messages across all deliberations
-            </span>
+            <Select value={selectedDeliberationId} onValueChange={setSelectedDeliberationId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Choose a deliberation to view detailed metrics" />
+              </SelectTrigger>
+              <SelectContent>
+                {metrics.participatingDeliberations.map((deliberation) => (
+                  <SelectItem key={deliberation.id} value={deliberation.id}>
+                    {deliberation.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
+      )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">IBIS Contributions</CardTitle>
-            <Share2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.ibisSubmissions}</div>
-            <span className="text-xs text-muted-foreground">
-              Messages shared to knowledge map
-            </span>
-          </CardContent>
-        </Card>
+      {/* Metrics Tabs */}
+      <Tabs defaultValue="current" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="current">Current Deliberation</TabsTrigger>
+          <TabsTrigger value="all">All Deliberations</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Deliberations</CardTitle>
-            <User className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.participatingDeliberations}</div>
-            <span className="text-xs text-muted-foreground">
-              Deliberations participated in
-            </span>
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="current" className="space-y-4">
+          {metrics?.currentDeliberation ? (
+            <>
+              <h3 className="text-lg font-semibold">Current Deliberation Metrics</h3>
+              {renderMetricsCards(metrics.currentDeliberation, "Current Deliberation")}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="p-6">
+                <p className="text-center text-muted-foreground">
+                  {selectedDeliberationId ? 'No data available for selected deliberation' : 'Select a deliberation to view detailed metrics'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
 
-      {/* Detailed Engagement Metrics */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Engagement Summary
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-muted/50 rounded-lg">
-              <div className="text-2xl font-bold text-primary">{metrics.totalMessages}</div>
-              <span className="text-sm text-muted-foreground">Total Messages</span>
-            </div>
-            
-            <div className="text-center p-4 bg-muted/50 rounded-lg">
-              <div className="text-2xl font-bold text-primary">
-                {metrics.totalMessages > 0 ? ((metrics.ibisSubmissions / metrics.totalMessages) * 100).toFixed(0) : 0}%
+        <TabsContent value="all" className="space-y-4">
+          <h3 className="text-lg font-semibold">All Deliberations Summary</h3>
+          {renderMetricsCards(metrics?.allDeliberations || { totalMessages: 0, ibisSubmissions: 0, contributionRate: 0 }, "All Deliberations")}
+          
+          {/* Additional Summary Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Overall Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="text-center p-4 bg-muted/50 rounded-lg">
+                  <div className="text-2xl font-bold text-primary">{metrics?.participatingDeliberations.length || 0}</div>
+                  <span className="text-sm text-muted-foreground">Total Deliberations</span>
+                </div>
+
+                <div className="text-center p-4 bg-muted/50 rounded-lg">
+                  <div className="text-2xl font-bold text-primary">
+                    {metrics?.joinDate ? new Date(metrics.joinDate).toLocaleDateString() : 'Unknown'}
+                  </div>
+                  <span className="text-sm text-muted-foreground">Member Since</span>
+                </div>
               </div>
-              <span className="text-sm text-muted-foreground">Contribution Rate</span>
-            </div>
-
-            <div className="text-center p-4 bg-muted/50 rounded-lg">
-              <div className="text-2xl font-bold text-primary">{metrics.participatingDeliberations}</div>
-              <span className="text-sm text-muted-foreground">Active Deliberations</span>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Member since</span>
-              <span className="font-medium">
-                {metrics.joinDate ? new Date(metrics.joinDate).toLocaleDateString() : 'Unknown'}
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
