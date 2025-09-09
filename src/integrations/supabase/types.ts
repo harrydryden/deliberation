@@ -412,6 +412,7 @@ export type Database = {
           position_x: number | null
           position_y: number | null
           title: string
+          updated_at: string | null
         }
         Insert: {
           created_at?: string | null
@@ -426,6 +427,7 @@ export type Database = {
           position_x?: number | null
           position_y?: number | null
           title: string
+          updated_at?: string | null
         }
         Update: {
           created_at?: string | null
@@ -440,6 +442,7 @@ export type Database = {
           position_x?: number | null
           position_y?: number | null
           title?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -918,11 +921,10 @@ export type Database = {
         }[]
       }
       admin_update_ibis_node_position: {
-        Args: { p_node_id: string; p_position_x: number; p_position_y: number }
-        Returns: {
-          id: string
-          updated_at: string
-        }[]
+        Args:
+          | { p_node_id: string; p_position_x: number; p_position_y: number }
+          | { p_node_id: string; p_position_x: number; p_position_y: number }
+        Returns: undefined
       }
       admin_update_ibis_relationship: {
         Args: { p_relationship_id: string; p_relationship_type: string }
