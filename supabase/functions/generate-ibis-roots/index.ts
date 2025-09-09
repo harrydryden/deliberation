@@ -1,93 +1,47 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 
-// Import shared utilities for performance and consistency
-import { 
-  corsHeaders, 
-  validateAndGetEnvironment, 
-  createErrorResponse, 
-  createSuccessResponse,
-  handleCORSPreflight,
-  parseAndValidateRequest,
-  getOpenAIKey
-} from '../shared/edge-function-utils.ts';
-import { ModelConfigManager } from '../shared/model-config.ts';
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-// Helper function to get system message from template
-async function getSystemMessage(supabase: any, templateName: string): Promise<string> {
-  try {
-    const { data: templateData, error } = await supabase
-      .rpc('get_prompt_template', { template_name: templateName });
+// Simplified generate-ibis-roots edge function
 
-    if (templateData && templateData.length > 0) {
-      return templateData[0].template_text;
-    }
-  } catch (error) {
-    EdgeLogger.error(`Failed to fetch ${templateName} template`, error);
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
   }
-  
-  // Fallbacks based on template name
-  const fallbacks = {
-    'ibis_relationship_system_message': 'You are an expert in argument analysis and democratic deliberation. Analyse logical relationships between contributions accurately. Use British English spelling and grammar in all responses.',
-    'issue_recommendation_system_message': 'You are an expert at analysing content and finding relevant issues in deliberative discussions. Always respond with valid JSON. Use British English spelling and grammar throughout.',
-    'ibis_root_generation_system_message': 'You are an expert facilitator specialising in democratic deliberation. You must respond with ONLY a valid JSON array, no additional text or formatting. Each object must have exactly "title" and "description" fields. Focus on specific, actionable issues directly related to the deliberation topic. Use British English spelling and grammar throughout.'
-  };
-  
-  return fallbacks[templateName as keyof typeof fallbacks] || 'You are a helpful AI assistant specialising in democratic deliberation. Use British English spelling and grammar throughout.';
-}
 
-
-// Helper function to get IBIS generation prompt from template system
-async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string, deliberationDescription: string, notion: string): Promise<string> {
   try {
-    EdgeLogger.debug('Fetching generate_ibis_roots template');
-    // Get template using correct column names
-    const { data: templateData, error: templateError } = await supabase
-      .rpc('get_prompt_template', { 
-        template_name: 'generate_ibis_roots'
-      });
+    console.log('🚀 Starting generate-ibis-roots function');
+    
+    // Parse request body
+    const { deliberationId, deliberationTitle, deliberationDescription, notion } = await req.json();
+    console.log('📝 Request data:', { deliberationId, deliberationTitle });
 
-    EdgeLogger.debug('Template fetch result', { templateData: !!templateData, templateError });
-
-    if (templateError) {
-      console.error('Template fetch error:', templateError);
-      throw new Error(`Failed to fetch template: ${templateError.message}`);
+    if (!deliberationId || !deliberationTitle) {
+      throw new Error('Missing required fields: deliberationId and deliberationTitle');
     }
 
-    if (templateData && templateData.length > 0) {
-      console.log('Using database template');
-      let template = templateData[0].template_text;
-      
-      // Replace template variables with actual values
-      template = template
-        .replace(/\{\{deliberation_title\}\}/g, deliberationTitle)
-        .replace(/\{\{deliberation_description\}\}/g, deliberationDescription || 'No description provided');
-      
-      // Handle conditional notion context (Handlebars-style)
-      if (notion) {
-        template = template
-          .replace(/\{\{#notion_context\}\}/g, '')
-          .replace(/\{\{\/notion_context\}\}/g, '')
-          .replace(/\{\{notion_context\}\}/g, notion);
-      } else {
-        // Remove conditional section if no notion provided
-        template = template.replace(/\{\{#notion_context\}\}.*?\{\{\/notion_context\}\}/gs, '');
-      }
-      
-      return template;
-    } else {
-      throw new Error('No template found in database');
-    }
-  } catch (error) {
-    console.error('Failed to fetch IBIS generation prompt template:', error);
-    throw error; // Don't use fallback - throw the actual error
-  }
-}
+    // Get environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 
-// Fallback prompt if template fetch fails
-function getFallbackPrompt(deliberationTitle: string, deliberationDescription: string, notion: string): string {
-  return `You are an expert facilitator helping to identify specific, actionable root issues for the deliberation topic "${deliberationTitle}".
+    if (!supabaseUrl || !supabaseServiceKey || !openaiApiKey) {
+      throw new Error('Missing required environment variables');
+    }
+
+    console.log('✅ Environment variables validated');
+
+    // Create Supabase client
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Create a simple prompt for testing
+    const prompt = `You are an expert facilitator helping to identify specific, actionable root issues for the deliberation topic "${deliberationTitle}".
 
 DELIBERATION CONTEXT:
 Title: "${deliberationTitle}"
@@ -103,113 +57,66 @@ Respond with ONLY a valid JSON array:
     "description": "Why this needs resolution (max 250 chars)"
   }
 ]`;
-}
 
-serve(async (req) => {
-  // Handle CORS preflight with shared utility
-  const corsResponse = handleCORSPreflight(req);
-  if (corsResponse) return corsResponse;
+    console.log('📋 Generated prompt (first 200 chars):', prompt.substring(0, 200));
 
-  try {
-    console.log('Starting generate-ibis-roots function');
-    
-    // Parse and validate the request properly
-    const { deliberationId, deliberationTitle, deliberationDescription, notion } = await parseAndValidateRequest(req, ['deliberationId', 'deliberationTitle']);
-    console.log('Request validated successfully', { deliberationId, deliberationTitle });
+    // Call OpenAI API
+    console.log('🤖 Making OpenAI API call...');
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiApiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-5-2025-08-07',
+        max_completion_tokens: 1000,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert in argument analysis and democratic deliberation. You must respond with ONLY a valid JSON array, no additional text or formatting. Use British English spelling and grammar throughout.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      })
+    });
 
-    // Get environment and clients with caching
-    const { supabase } = validateAndGetEnvironment();
-    const openAIApiKey = getOpenAIKey();
-    console.log('Environment validated and API key retrieved');
-
-    // Get IBIS generation prompt from template system
-    console.log('About to fetch template for generate_ibis_roots...');
-    let prompt;
-    try {
-      prompt = await getIbisGenerationPrompt(supabase, deliberationTitle, deliberationDescription, notion);
-      console.log('✅ Template fetched successfully, prompt length:', prompt.length);
-    } catch (templateError) {
-      console.error('❌ Template fetch failed:', templateError);
-      return createErrorResponse(templateError, 500, 'generate-ibis-roots');
-    }
-    
-    console.log('Final prompt being sent to AI (first 200 chars):', prompt.substring(0, 200));
-
-    // Call OpenAI API with error handling
-    console.log('🚀 Making OpenAI API call...');
-    let openaiResponse;
-    try {
-      openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openAIApiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-5-2025-08-07',
-          max_completion_tokens: 1000,
-          messages: [
-            {
-              role: 'system',
-              content: await getSystemMessage(supabase, 'ibis_root_generation_system_message')
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ]
-        })
-      });
-      console.log('✅ OpenAI response received, status:', openaiResponse.status);
-    } catch (fetchError) {
-      console.error('❌ OpenAI fetch failed:', fetchError);
-      return createErrorResponse(fetchError, 500, 'generate-ibis-roots');
-    }
+    console.log('📡 OpenAI response status:', openaiResponse.status);
 
     if (!openaiResponse.ok) {
       const errorText = await openaiResponse.text();
       console.error('❌ OpenAI API error:', errorText);
-      return createErrorResponse(new Error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`), 500, 'generate-ibis-roots');
+      throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
     }
 
-    let openaiData;
-    try {
-      openaiData = await openaiResponse.json();
-      console.log('✅ OpenAI JSON parsed successfully');
-    } catch (jsonError) {
-      console.error('❌ OpenAI JSON parse failed:', jsonError);
-      return createErrorResponse(jsonError, 500, 'generate-ibis-roots');
-    }
-
+    const openaiData = await openaiResponse.json();
     const aiResponse = openaiData.choices[0].message.content;
-    console.log('✅ AI response extracted, length:', aiResponse?.length);
+    console.log('🎯 AI response received, length:', aiResponse?.length);
 
     // Parse AI response
     let suggestedIssues;
     try {
-      console.log('Raw AI Response:', aiResponse);
-      console.log('AI Response type:', typeof aiResponse);
-      console.log('AI Response length:', aiResponse?.length);
+      console.log('📝 Raw AI Response:', aiResponse);
       
-      // First try to parse the entire response as JSON
+      // Try to parse directly first
       try {
         suggestedIssues = JSON.parse(aiResponse);
       } catch (directParseError) {
-        console.log('Direct JSON parse failed, trying to extract JSON array');
+        console.log('🔍 Direct parse failed, extracting JSON array...');
         // Extract JSON from the response if it's wrapped in text
         const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
         if (!jsonMatch) {
-          console.error('No JSON array found in AI response:', aiResponse);
           throw new Error('No JSON array found in AI response');
         }
-        console.log('Extracted JSON string:', jsonMatch[0]);
         suggestedIssues = JSON.parse(jsonMatch[0]);
       }
       
-      console.log('Parsed suggested issues:', JSON.stringify(suggestedIssues, null, 2));
+      console.log('✅ Parsed suggested issues:', JSON.stringify(suggestedIssues, null, 2));
     } catch (parseError) {
-      console.error('Failed to parse AI response:', aiResponse);
-      console.error('Parse error details:', parseError);
+      console.error('❌ Failed to parse AI response:', parseError);
       throw new Error('Failed to parse AI response as JSON');
     }
 
@@ -220,10 +127,11 @@ serve(async (req) => {
 
     // Create IBIS nodes for each suggested issue
     const createdNodes = [];
-    console.log(`Creating ${suggestedIssues.length} IBIS nodes...`);
+    console.log(`🏗️ Creating ${suggestedIssues.length} IBIS nodes...`);
+    
     for (const issue of suggestedIssues) {
       if (!issue.title || !issue.description) {
-        console.warn('Skipping invalid issue:', issue);
+        console.warn('⚠️ Skipping invalid issue:', issue);
         continue;
       }
 
@@ -242,23 +150,32 @@ serve(async (req) => {
         .single();
 
       if (error) {
-        console.error('Error creating IBIS node:', error);
+        console.error('❌ Error creating IBIS node:', error);
         continue;
       }
 
+      console.log('✅ Created IBIS node:', node.id);
       createdNodes.push(node);
     }
 
-    console.log(`Generated ${createdNodes.length} root issues for deliberation ${deliberationId}`);
+    console.log(`🎉 Successfully generated ${createdNodes.length} root issues`);
 
-    return createSuccessResponse({ 
+    return new Response(JSON.stringify({ 
       success: true, 
       nodes: createdNodes,
       count: createdNodes.length 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in generate-ibis-roots function:', error);
-    return createErrorResponse(error, 500, 'generate-ibis-roots');
+    console.error('💥 Error in generate-ibis-roots function:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      stack: error.stack 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
