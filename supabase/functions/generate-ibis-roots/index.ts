@@ -149,27 +149,26 @@ Respond with ONLY a valid JSON array:
         continue;
       }
 
-      const { data: node, error } = await supabase
-        .from('ibis_nodes')
-        .insert({
-          deliberation_id: deliberationId,
-          node_type: 'issue',
-          title: issue.title.substring(0, 100), // Ensure title length limit
-          description: issue.description.substring(0, 300), // Ensure description length limit
-          created_by: null, // AI-generated, no specific user
-          position_x: Math.random() * 400, // Random positioning for now
-          position_y: Math.random() * 300
-        })
-        .select()
-        .single();
+      const { data: nodes, error } = await supabase
+        .rpc('admin_create_ai_ibis_node', {
+          p_deliberation_id: deliberationId,
+          p_node_type: 'issue',
+          p_title: issue.title.substring(0, 100),
+          p_description: issue.description.substring(0, 300),
+          p_position_x: Math.random() * 400,
+          p_position_y: Math.random() * 300
+        });
 
       if (error) {
         console.error('❌ Error creating IBIS node:', error);
         continue;
       }
 
-      console.log('✅ Created IBIS node:', node.id);
-      createdNodes.push(node);
+      if (nodes && nodes.length > 0) {
+        const node = nodes[0]; // The function returns a single row in an array
+        console.log('✅ Created IBIS node:', node.id);
+        createdNodes.push(node);
+      }
     }
 
     console.log(`🎉 Successfully generated ${createdNodes.length} root issues`);

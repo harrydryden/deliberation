@@ -838,6 +838,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_create_ai_ibis_node: {
+        Args: {
+          p_deliberation_id: string
+          p_description: string
+          p_node_type: string
+          p_position_x?: number
+          p_position_y?: number
+          p_title: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          deliberation_id: string
+          description: string
+          id: string
+          node_type: string
+          position_x: number
+          position_y: number
+          title: string
+        }[]
+      }
       admin_create_ibis_relationship: {
         Args: {
           p_created_by: string
