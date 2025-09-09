@@ -557,13 +557,7 @@ export const useChat = (deliberationId?: string) => {
       }
     });
 
-    // Show immediate feedback that message was queued
-    const currentStats = messageQueue.getQueueStats;
-    stableToast({
-      title: "Message Queued",
-      description: `Your message has been added to the queue (position ${currentStats.total}).`,
-      variant: "default"
-    });
+    // Message queued - visual feedback is provided by the queue icon in header
 
   }, [user, messageQueue, stableToast]);
 
