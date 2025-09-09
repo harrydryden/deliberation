@@ -362,20 +362,16 @@ const OptimizedDeliberationChat = () => {
                     )}
                   </div>
                   
-                  <div className="flex flex-col gap-3">
-                    <div className="rounded-lg border bg-muted/40 p-2">
-                      <ChatModeSelector 
-                        mode={uiState.chatMode} 
-                        onModeChange={(mode) => setUiState(prev => ({ ...prev, chatMode: mode }))} 
-                        variant="bare" 
-                      />
-                    </div>
-                    <div className="rounded-lg border bg-muted/40 p-2">
-                      <ViewModeSelector 
-                        mode={uiState.viewMode} 
-                        onModeChange={(v) => v && setUiState(prev => ({ ...prev, viewMode: v }))} 
-                      />
-                    </div>
+                  <div className="rounded-lg border bg-muted/40 p-2 flex flex-col gap-3">
+                    <ChatModeSelector 
+                      mode={uiState.chatMode} 
+                      onModeChange={(mode) => setUiState(prev => ({ ...prev, chatMode: mode }))} 
+                      variant="bare" 
+                    />
+                    <ViewModeSelector 
+                      mode={uiState.viewMode} 
+                      onModeChange={(v) => v && setUiState(prev => ({ ...prev, viewMode: v }))} 
+                    />
                   </div>
                   
                   <div className="flex gap-3">
@@ -438,14 +434,12 @@ const OptimizedDeliberationChat = () => {
               </div>
               
               <div className="flex flex-wrap gap-3">
-                <div className="rounded-lg border bg-muted/40 p-2">
+                <div className="rounded-lg border bg-muted/40 p-2 flex flex-col gap-3">
                   <ChatModeSelector 
                     mode={uiState.chatMode} 
                     onModeChange={(mode) => setUiState(prev => ({ ...prev, chatMode: mode }))} 
                     variant="bare" 
                   />
-                </div>
-                <div className="rounded-lg border bg-muted/40 p-2">
                   <ViewModeSelector 
                     mode={uiState.viewMode} 
                     onModeChange={(v) => v && setUiState(prev => ({ ...prev, viewMode: v }))} 
