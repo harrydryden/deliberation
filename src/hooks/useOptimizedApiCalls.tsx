@@ -17,18 +17,8 @@ export const useOptimizedApiCalls = () => {
     return {
       execute: async () => {
         try {
-          // Consistent session-based auth for API calls
-          const session = await supabase.auth.getSession();
-          const headers: Record<string, string> = {
-            'Content-Type': 'application/json'
-          };
-          
-          if (session.data.session?.access_token) {
-            headers['Authorization'] = `Bearer ${session.data.session.access_token}`;
-          }
-
+          // Let Supabase handle authentication automatically
           const response = await supabase.functions.invoke(functionName, {
-            headers,
             body: body || {}
           });
           
