@@ -14,48 +14,42 @@ import {
 import { configCache, createCacheKey } from '../shared/cache-manager.ts';
 import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
-// Helper function to get system message from template system
-async function getSystemMessage(supabase: any): Promise<string> {
+// Helper function to get classification templates from template system
+async function getClassificationTemplates(supabase: any, content: string, deliberationContext: string, deliberationNotion: string): Promise<{ systemMessage: string, userPrompt: string }> {
   try {
-    const { data: template } = await supabase
-      .from('prompt_templates')
-      .select('template_text')
-      .eq('name', 'classification_system_message')
-      .eq('is_active', true)
-      .single();
+    // Get both templates in parallel
+    const [systemTemplateResponse, promptTemplateResponse] = await Promise.all([
+      supabase
+        .from('prompt_templates')
+        .select('template_text')
+        .eq('name', 'classification_system_message')
+        .eq('is_active', true)
+        .single(),
+      supabase
+        .from('prompt_templates')
+        .select('template_text')
+        .eq('name', 'classification_prompt')
+        .eq('is_active', true)
+        .single()
+    ]);
 
-    if (template && template.template_text) {
-      return template.template_text;
+    if (!systemTemplateResponse.data?.template_text || !promptTemplateResponse.data?.template_text) {
+      throw new Error('Required classification templates not found');
     }
-  } catch (error) {
-    EdgeLogger.error('Failed to fetch system message template', error);
-  }
-  
-  // Fallback system message
-  return 'You are an AI that classifies messages for democratic deliberation. Respond only with valid JSON.';
-}
 
-// Helper function to get classification prompt from template system
-async function getClassificationPrompt(supabase: any, content: string, deliberationContext: string, deliberationNotion: string): Promise<string> {
-  try {
-    // Try to get classification_prompt template
-    const { data: template } = await supabase
-      .from('prompt_templates')
-      .select('template_text')
-      .eq('name', 'classification_prompt')
-      .eq('is_active', true)
-      .single();
+    // Replace variables in the user prompt template
+    const userPrompt = promptTemplateResponse.data.template_text
+      .replace('{content}', content)
+      .replace('{deliberationContext}', deliberationContext)
+      .replace('{deliberationNotion}', deliberationNotion);
 
-    if (template && template.template_text) {
-      // Replace template variables
-      return template.template_text
-        .replace('{content}', content)
-        .replace('{deliberationContext}', deliberationContext)
-        .replace('{deliberationNotion}', deliberationNotion);
-    }
+    return {
+      systemMessage: systemTemplateResponse.data.template_text,
+      userPrompt
+    };
   } catch (error) {
-    EdgeLogger.error('Failed to fetch classification prompt template', error);
-    throw new Error('Classification prompt template not available');
+    EdgeLogger.error('Failed to fetch classification templates', error);
+    throw new Error('Classification templates not available');
   }
 }
 
@@ -98,8 +92,7 @@ serve(async (req) => {
       }
     }
 
-    const prompt = await getClassificationPrompt(supabase, content, deliberationContext, deliberationNotion);
-    const systemMessage = await getSystemMessage(supabase);
+    const { systemMessage, userPrompt } = await getClassificationTemplates(supabase, content, deliberationContext, deliberationNotion);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -114,7 +107,7 @@ serve(async (req) => {
             role: 'system', 
             content: systemMessage
           },
-          { role: 'user', content: prompt }
+          { role: 'user', content: userPrompt }
         ],
         max_completion_tokens: 1500,
       }),
