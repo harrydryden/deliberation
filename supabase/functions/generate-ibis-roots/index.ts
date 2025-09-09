@@ -50,20 +50,60 @@ async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string,
 
     EdgeLogger.debug('Template fetch result', { templateData: !!templateData, templateError });
 
+    if (templateError) {
+      console.error('Template fetch error:', templateError);
+      throw new Error(`Failed to fetch template: ${templateError.message}`);
+    }
+
     if (templateData && templateData.length > 0) {
       console.log('Using database template');
-      const template = templateData[0];
+      let template = templateData[0].template_text;
       
       // Replace template variables with actual values
-      return template.template_text
+      template = template
         .replace(/\{\{deliberation_title\}\}/g, deliberationTitle)
-        .replace(/\{\{deliberation_description\}\}/g, deliberationDescription || 'No description provided')
-        .replace(/\{\{notion_context\}\}/g, notion || 'No notion statement provided');
+        .replace(/\{\{deliberation_description\}\}/g, deliberationDescription || 'No description provided');
+      
+      // Handle conditional notion context (Handlebars-style)
+      if (notion) {
+        template = template
+          .replace(/\{\{#notion_context\}\}/g, '')
+          .replace(/\{\{\/notion_context\}\}/g, '')
+          .replace(/\{\{notion_context\}\}/g, notion);
+      } else {
+        // Remove conditional section if no notion provided
+        template = template.replace(/\{\{#notion_context\}\}.*?\{\{\/notion_context\}\}/gs, '');
+      }
+      
+      return template;
+    } else {
+      console.warn('No template data found, using fallback');
+      return getFallbackPrompt(deliberationTitle, deliberationDescription, notion);
     }
   } catch (error) {
-    console.log('Failed to fetch IBIS generation prompt template:', error);
-    throw new Error('IBIS generation prompt template not available');
+    console.error('Failed to fetch IBIS generation prompt template:', error);
+    return getFallbackPrompt(deliberationTitle, deliberationDescription, notion);
   }
+}
+
+// Fallback prompt if template fetch fails
+function getFallbackPrompt(deliberationTitle: string, deliberationDescription: string, notion: string): string {
+  return `You are an expert facilitator helping to identify specific, actionable root issues for the deliberation topic "${deliberationTitle}".
+
+DELIBERATION CONTEXT:
+Title: "${deliberationTitle}"
+Description: "${deliberationDescription || 'No description provided'}"
+${notion ? `Stance Scoring Notion: "${notion}"` : ''}
+
+Generate 3-5 specific issues that participants need to resolve about "${deliberationTitle}".
+
+Respond with ONLY a valid JSON array:
+[
+  {
+    "title": "Specific decision question (max 80 chars)",
+    "description": "Why this needs resolution (max 250 chars)"
+  }
+]`;
 }
 
 serve(async (req) => {
