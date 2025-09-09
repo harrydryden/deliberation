@@ -9,6 +9,7 @@ import { MessageService } from './implementations/message.service';
 import { RealtimeService } from './implementations/realtime.service';
 import { PromptService } from './implementations/prompt.service';
 import { StanceService } from './implementations/stance.service';
+import { IBISService } from './implementations/ibis.service';
 
 // Create repository instances
 const userRepository = new UserRepository();
@@ -23,6 +24,7 @@ const messageService = new MessageService(messageRepository);
 const realtimeService = new RealtimeService();
 const promptService = new PromptService();
 const stanceService = new StanceService();
+const ibisService = new IBISService();
 
 const adminService = new AdminService(
   adminRepository,
@@ -39,6 +41,7 @@ export const serviceContainer = {
   realtimeService,
   promptService,
   stanceService,
+  ibisService,
 };
 
 // Export individual services for convenience
@@ -49,5 +52,6 @@ export const {
   messageService: messageServiceInstance,
   realtimeService: realtimeServiceInstance,
   promptService: promptServiceInstance,
-  stanceService: stanceServiceInstance
+  stanceService: stanceServiceInstance,
+  ibisService: ibisServiceInstance
 } = serviceContainer;

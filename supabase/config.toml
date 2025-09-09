@@ -41,6 +41,8 @@ import_map = "import_map.json"
 
 # create-ibis-node function removed - functionality integrated into generate-ibis-roots
 
+# generate-ibis-roots function removed - replaced with manual admin interface
+
 # realtime-chat function removed - no frontend usage found
 
 [functions.realtime-session]
@@ -54,10 +56,6 @@ verify_jwt = false
 import_map = "import_map.json"
 
 [functions.classify-message]
-verify_jwt = true
-import_map = "import_map.json"
-
-[functions.generate-ibis-roots]
 verify_jwt = true
 import_map = "import_map.json"
 

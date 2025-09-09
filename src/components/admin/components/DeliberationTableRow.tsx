@@ -19,28 +19,26 @@ interface DeliberationTableRowProps {
   deliberation: Deliberation;
   updating: string | null;
   clearing: { [key: string]: 'messages' | 'ibis' | null };
-  generatingRoots: string | null;
   onStatusUpdate: (id: string, status: string) => void;
   onEditNodes: (deliberation: Deliberation) => void;
   onEditMap: (deliberation: Deliberation) => void;
   onNotionUpdated: (deliberationId: string, newNotion: string) => void;
   onClearMessages: (deliberationId: string, deliberationTitle: string) => void;
   onClearIbis: (deliberationId: string, deliberationTitle: string) => void;
-  onGenerateIbisRoots: (deliberation: Deliberation) => void;
+  onCreateIssues: (deliberation: Deliberation) => void;
 }
 
 export const DeliberationTableRow = ({
   deliberation,
   updating,
   clearing,
-  generatingRoots,
   onStatusUpdate,
   onEditNodes,
   onEditMap,
   onNotionUpdated,
   onClearMessages,
   onClearIbis,
-  onGenerateIbisRoots
+  onCreateIssues
 }: DeliberationTableRowProps) => {
   const navigate = useNavigate();
   
@@ -122,11 +120,10 @@ export const DeliberationTableRow = ({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onGenerateIbisRoots(deliberation)}
-            disabled={generatingRoots === deliberation.id}
+            onClick={() => onCreateIssues(deliberation)}
           >
             <Lightbulb className="h-4 w-4 mr-2" />
-            {generatingRoots === deliberation.id ? 'Generating...' : 'Generate IBIS Roots'}
+            Create Issues
           </Button>
           
           <Dialog>

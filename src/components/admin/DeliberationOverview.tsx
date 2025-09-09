@@ -9,9 +9,10 @@ import { AdminIbisMapEditor } from './AdminIbisMapEditor';
 import { serviceContainer } from '@/services/domain/container';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
-import { useOptimizedApiCalls } from '@/hooks/useOptimizedApiCalls';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { DeliberationStats } from './components/DeliberationStats';
 import { DeliberationTable } from './components/DeliberationTable';
+import { ManualIbisRootsModal } from './ManualIbisRootsModal';
 
 interface DeliberationOverviewProps {
   deliberations: Deliberation[];
@@ -29,10 +30,10 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
   const [editMode, setEditMode] = useState<'nodes' | 'map' | null>(null);
   const [clearing, setClearing] = useState<{ [key: string]: 'messages' | 'ibis' | null }>({});
   const [deliberations, setDeliberations] = useState(safeInitialDeliberations);
-  const [generatingRoots, setGeneratingRoots] = useState<string | null>(null);
+  const [showCreateIssuesModal, setShowCreateIssuesModal] = useState<Deliberation | null>(null);
   const adminService = serviceContainer.adminService;
   const { toast } = useToast();
-  const { invokeFunction } = useOptimizedApiCalls();
+  const { user } = useSupabaseAuth();
 
   useEffect(() => {
     setDeliberations(safeInitialDeliberations);
@@ -116,32 +117,22 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
     ));
   };
 
-  const handleGenerateIbisRoots = async (deliberation: Deliberation) => {
-    setGeneratingRoots(deliberation.id);
-    try {
-      const { execute } = invokeFunction('generate-ibis-roots', {
-        deliberationId: deliberation.id,
-        deliberationTitle: deliberation.title,
-        deliberationDescription: deliberation.description,
-        notion: deliberation.notion
-      });
-
-      const rootsData = await execute();
-
-      toast({
-        title: "IBIS Roots Generated",
-        description: `Generated ${rootsData?.count || 0} root issues for "${deliberation.title}"`
-      });
-    } catch (error) {
-      logger.error('Failed to generate IBIS roots', error as Error, { deliberationId: deliberation.id });
-      toast({
-        title: "Error",
-        description: "Failed to generate IBIS roots. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setGeneratingRoots(null);
+  const handleCreateManualIssues = async (
+    deliberationId: string, 
+    issues: Array<{ title: string; description?: string }>
+  ) => {
+    if (!user?.id) {
+      throw new Error('User not authenticated');
     }
+
+    logger.info('Creating manual IBIS issues', { 
+      deliberationId, 
+      count: issues.length,
+      userId: user.id
+    });
+
+    const ibisService = serviceContainer.ibisService;
+    await ibisService.createManualRootIssues(deliberationId, issues, user.id);
   };
 
   if (selectedDeliberation && editMode === 'nodes') {
@@ -189,15 +180,30 @@ export const DeliberationOverview = ({ deliberations: initialDeliberations, load
               deliberations={deliberations}
               updating={updating}
               clearing={clearing}
-              generatingRoots={generatingRoots}
               onStatusUpdate={handleStatusUpdate}
               onEditNodes={handleEditNodes}
               onEditMap={handleEditMap}
               onNotionUpdated={handleNotionUpdated}
               onClearMessages={handleClearMessages}
               onClearIbis={handleClearIbis}
-              onGenerateIbisRoots={handleGenerateIbisRoots}
+              onCreateIssues={(deliberation) => setShowCreateIssuesModal(deliberation)}
             />
+
+            {showCreateIssuesModal && (
+              <ManualIbisRootsModal
+                isOpen={!!showCreateIssuesModal}
+                onClose={() => setShowCreateIssuesModal(null)}
+                deliberationId={showCreateIssuesModal.id}
+                deliberationTitle={showCreateIssuesModal.title}
+                onSuccess={(count) => {
+                  toast({
+                    title: "Issues Created",
+                    description: `Successfully created ${count} root issues`
+                  });
+                }}
+                onCreateIssues={(issues) => handleCreateManualIssues(showCreateIssuesModal.id, issues)}
+              />
+            )}
           </div>
         )}
       </CardContent>

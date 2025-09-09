@@ -430,42 +430,64 @@ export class IBISService {
   }
 
   /**
-   * Generate root issues for a deliberation
+   * Create multiple root issues for a deliberation (manual creation)
    */
-  async generateRootIssues(deliberationId: string): Promise<{ success: boolean; count: number }> {
+  async createManualRootIssues(
+    deliberationId: string, 
+    issues: Array<{ title: string; description?: string }>, 
+    userId: string
+  ): Promise<{ success: boolean; count: number }> {
     try {
-      logger.info('[IBISService] Generating root issues', { deliberationId });
-
-      // Get deliberation details
-      const { data: deliberation, error: deliberationError } = await supabase
-        .from('deliberations')
-        .select('title, description, notion')
-        .eq('id', deliberationId)
-        .single();
-
-      if (deliberationError) {
-        logger.error('[IBISService] Error fetching deliberation', { error: deliberationError });
-        throw deliberationError;
-      }
-
-      const { data: rootsData, error: rootsError } = await supabase.functions.invoke('generate-ibis-roots', {
-        body: {
-          deliberationId,
-          deliberationTitle: deliberation.title,
-          deliberationDescription: deliberation.description,
-          notion: deliberation.notion
-        }
+      logger.info('[IBISService] Creating manual root issues', { 
+        deliberationId, 
+        count: issues.length,
+        titles: issues.map(i => i.title)
       });
 
-      if (rootsError) {
-        logger.error('[IBISService] Error generating root issues', { error: rootsError });
-        throw rootsError;
+      if (!issues.length) {
+        throw new Error('At least one issue is required');
       }
 
-      logger.info('[IBISService] Root issues generated successfully', { count: rootsData?.count || 0 });
-      return rootsData || { success: false, count: 0 };
+      if (issues.length > 5) {
+        throw new Error('Maximum 5 issues allowed');
+      }
+
+      // Validate all issues have titles
+      const invalidIssues = issues.filter(issue => !issue.title?.trim());
+      if (invalidIssues.length > 0) {
+        throw new Error('All issues must have titles');
+      }
+
+      // Create all issues in parallel with proper positioning
+      const createPromises = issues.map(async (issue, index) => {
+        const position = this.calculateNodePosition('issue');
+        // Offset each issue slightly to avoid overlap
+        const offsetX = (index % 3) * 150; // 3 columns
+        const offsetY = Math.floor(index / 3) * 100; // Rows of 100px apart
+        
+        const nodeData: IBISNode = {
+          title: issue.title.trim(),
+          description: issue.description?.trim() || undefined,
+          node_type: 'issue',
+          deliberation_id: deliberationId,
+          created_by: userId,
+          position_x: position.x + offsetX,
+          position_y: position.y + offsetY
+        };
+
+        return this.createNode(nodeData);
+      });
+
+      const createdNodes = await Promise.all(createPromises);
+      
+      logger.info('[IBISService] Manual root issues created successfully', { 
+        count: createdNodes.length,
+        nodeIds: createdNodes.map(n => n.id)
+      });
+      
+      return { success: true, count: createdNodes.length };
     } catch (error) {
-      logger.error('[IBISService] Error in generateRootIssues', { error });
+      logger.error('[IBISService] Error in createManualRootIssues', { error });
       throw error;
     }
   }

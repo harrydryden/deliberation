@@ -164,12 +164,11 @@ export const IbisSubmissionModal = ({
   const handleGenerateRootIssues = async () => {
     setIsGeneratingRoots(true);
     try {
-      const result = await ibisService.generateRootIssues(deliberationId);
-      if (result.success) {
-        await loadExistingNodes(); // Reload nodes to show new ones
-      }
+      logger.info('Manual root issue generation is no longer supported. Use the "Create Issues" button in admin interface.');
+      // This feature has been replaced with manual creation in the admin interface
+      await loadExistingNodes(); // Just reload to refresh
     } catch (error) {
-      logger.error('Error generating root issues:', error);
+      logger.error('Error refreshing nodes:', error);
     } finally {
       setIsGeneratingRoots(false);
     }

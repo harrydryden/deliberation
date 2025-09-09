@@ -6,28 +6,26 @@ interface DeliberationTableProps {
   deliberations: Deliberation[];
   updating: string | null;
   clearing: { [key: string]: 'messages' | 'ibis' | null };
-  generatingRoots: string | null;
   onStatusUpdate: (id: string, status: string) => void;
   onEditNodes: (deliberation: Deliberation) => void;
   onEditMap: (deliberation: Deliberation) => void;
   onNotionUpdated: (deliberationId: string, newNotion: string) => void;
   onClearMessages: (deliberationId: string, deliberationTitle: string) => void;
   onClearIbis: (deliberationId: string, deliberationTitle: string) => void;
-  onGenerateIbisRoots: (deliberation: Deliberation) => void;
+  onCreateIssues: (deliberation: Deliberation) => void;
 }
 
 export const DeliberationTable = ({
   deliberations,
   updating,
   clearing,
-  generatingRoots,
   onStatusUpdate,
   onEditNodes,
   onEditMap,
   onNotionUpdated,
   onClearMessages,
   onClearIbis,
-  onGenerateIbisRoots
+  onCreateIssues
 }: DeliberationTableProps) => {
   return (
     <div className="overflow-x-auto">
@@ -50,14 +48,13 @@ export const DeliberationTable = ({
               deliberation={deliberation}
               updating={updating}
               clearing={clearing}
-              generatingRoots={generatingRoots}
               onStatusUpdate={onStatusUpdate}
               onEditNodes={onEditNodes}
               onEditMap={onEditMap}
               onNotionUpdated={onNotionUpdated}
               onClearMessages={onClearMessages}
               onClearIbis={onClearIbis}
-              onGenerateIbisRoots={onGenerateIbisRoots}
+              onCreateIssues={onCreateIssues}
             />
           ))}
         </TableBody>
