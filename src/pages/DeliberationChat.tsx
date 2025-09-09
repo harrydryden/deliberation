@@ -362,7 +362,7 @@ const OptimizedDeliberationChat = () => {
                     )}
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-3">
                     <div className="rounded-lg border bg-muted/40 p-2">
                       <ChatModeSelector 
                         mode={uiState.chatMode} 
