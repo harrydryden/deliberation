@@ -52,7 +52,8 @@ async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string,
 
     if (templateError) {
       console.error('Template fetch error:', templateError);
-      throw new Error(`Failed to fetch template: ${templateError.message}`);
+      console.warn('Using fallback prompt due to template error');
+      return getFallbackPrompt(deliberationTitle, deliberationDescription, notion);
     }
 
     if (templateData && templateData.length > 0) {
@@ -82,6 +83,7 @@ async function getIbisGenerationPrompt(supabase: any, deliberationTitle: string,
     }
   } catch (error) {
     console.error('Failed to fetch IBIS generation prompt template:', error);
+    console.warn('Using fallback prompt due to error');
     return getFallbackPrompt(deliberationTitle, deliberationDescription, notion);
   }
 }
@@ -112,18 +114,22 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
+    console.log('Starting generate-ibis-roots function');
     const { deliberationId, deliberationTitle, deliberationDescription, notion } = await parseAndValidateRequest(req, ['deliberationId', 'deliberationTitle']);
+    console.log('Request validated successfully', { deliberationId, deliberationTitle });
 
     // Get environment and clients with caching
     const { supabase } = validateAndGetEnvironment();
     const openAIApiKey = getOpenAIKey();
+    console.log('Environment validated and API key retrieved');
 
     // Get IBIS generation prompt from template system
     const prompt = await getIbisGenerationPrompt(supabase, deliberationTitle, deliberationDescription, notion);
     
     console.log('Final prompt being sent to AI:', prompt);
 
-    // Call OpenAI API
+    // Call OpenAI API with error handling
+    console.log('Making OpenAI API call...');
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -146,12 +152,16 @@ serve(async (req) => {
       })
     });
 
+    console.log('OpenAI response status:', openaiResponse.status);
     if (!openaiResponse.ok) {
-      throw new Error(`OpenAI API error: ${openaiResponse.statusText}`);
+      const errorText = await openaiResponse.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
     }
 
     const openaiData = await openaiResponse.json();
     const aiResponse = openaiData.choices[0].message.content;
+    console.log('OpenAI response received successfully');
 
     // Parse AI response
     let suggestedIssues;
@@ -189,6 +199,7 @@ serve(async (req) => {
 
     // Create IBIS nodes for each suggested issue
     const createdNodes = [];
+    console.log(`Creating ${suggestedIssues.length} IBIS nodes...`);
     for (const issue of suggestedIssues) {
       if (!issue.title || !issue.description) {
         console.warn('Skipping invalid issue:', issue);
