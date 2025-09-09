@@ -17,15 +17,9 @@ export const useChat = (deliberationId?: string) => {
   const { messageService, realtimeService } = useServices();
   const { handleError, handleAsyncError } = useErrorHandler();
   
-  // Standard React state management for stability
+  // Consolidated state for better performance
   const [chatState, setChatState] = useState({
     messages: [] as ChatMessage[],
-    isLoading: false,
-    isTyping: false
-  });
-  
-  // UI state for loading and typing indicators
-  const [uiState, setUiState] = useState({
     isLoading: false,
     isTyping: false
   });
@@ -80,7 +74,7 @@ export const useChat = (deliberationId?: string) => {
       return;
     }
 
-    setUiState(prev => ({ ...prev, isLoading: true }));
+    setChatState(prev => ({ ...prev, isLoading: true }));
     
     await handleAsyncError(async () => {
       const data = await cacheService.memoizeAsync(
@@ -96,12 +90,12 @@ export const useChat = (deliberationId?: string) => {
       
       setChatState(prev => ({ 
         ...prev, 
-        messages: convertedMessages
+        messages: convertedMessages,
+        isLoading: false
       }));
-      setUiState(prev => ({ ...prev, isLoading: false }));
       logger.api.response('GET', '/messages', 200, { deliberationId, messageCount: data?.length || 0 });
     }, 'loading chat history');
-  }, [user, deliberationId, handleAsyncError, setChatState, setUiState, services.messageService]);
+  }, [user, deliberationId, handleAsyncError, setChatState, services.messageService]);
 
   const stableSetupRealTimeUpdates = useCallback(() => {
     if (!user) return;
@@ -149,7 +143,7 @@ export const useChat = (deliberationId?: string) => {
           
           // Update typing state separately to prevent message list re-renders
           if (message.message_type && (message.message_type.includes('agent') || message.message_type === 'peer_agent' || message.message_type === 'bill_agent' || message.message_type === 'flow_agent')) {
-            setUiState(prev => ({ ...prev, isTyping: false }));
+            setChatState(prev => ({ ...prev, isTyping: false }));
           }
       }, deliberationId);
 
@@ -188,7 +182,7 @@ export const useChat = (deliberationId?: string) => {
   // Listen for agent failure events (e.g., OpenAI quota exceeded)
   useEffect(() => {
     const handler = () => {
-      setUiState(prev => ({ ...prev, isTyping: false }));
+      setChatState(prev => ({ ...prev, isTyping: false }));
       stableToast({ title: 'Contact Platform Admin', description: 'AI responses are temporarily unavailable.', variant: 'destructive' });
     };
     if (typeof window !== 'undefined') {
@@ -199,7 +193,7 @@ export const useChat = (deliberationId?: string) => {
         window.removeEventListener('agent-error', handler);
       }
     };
-  }, [stableToast, setUiState]);
+  }, [stableToast, setChatState]);
 
 
   const processQueuedMessage = useCallback(async (queuedMessage: any) => {
@@ -574,16 +568,16 @@ export const useChat = (deliberationId?: string) => {
       const savedChat = convertApiMessageToChatMessage(saved);
       setChatState(prev => ({
         ...prev,
-        messages: prev.messages.map(m => (m.id === id ? { ...savedChat, status: 'sent' } : m))
+        messages: prev.messages.map(m => (m.id === id ? { ...savedChat, status: 'sent' } : m)),
+        isTyping: true
       }));
-      setUiState(prev => ({ ...prev, isTyping: true }));
     } catch (error) {
       const errMsg = getErrorMessage(error);
       setChatState(prev => ({
         ...prev,
-        messages: prev.messages.map(m => (m.id === id ? { ...m, status: 'failed', error: errMsg } : m))
+        messages: prev.messages.map(m => (m.id === id ? { ...m, status: 'failed', error: errMsg } : m)),
+        isTyping: false
       }));
-      setUiState(prev => ({ ...prev, isTyping: false }));
     }
   }, [chatState.messages, deliberationId, setChatState, services.messageService]);
 
@@ -601,22 +595,22 @@ export const useChat = (deliberationId?: string) => {
 
   return {
     messages: chatState.messages,
-    isLoading: uiState.isLoading,
-    isTyping: uiState.isTyping || streamingState.isStreaming,
+    isLoading: chatState.isLoading,
+    isTyping: chatState.isTyping || streamingState.isStreaming,
     sendMessage,
     loadChatHistory: stableLoadChatHistory,
     retryMessage,
     streamingState,
     stopStreaming,
-    // Message queue functionality - memoized to prevent re-renders
+    // Optimized message queue return object - stable references
     messageQueue: useMemo(() => ({
       queue: messageQueue.queue,
       stats: messageQueue.getQueueStats,
       retryMessage: messageQueue.retryMessage,
       removeMessage: messageQueue.removeFromQueue,
       clearQueue: messageQueue.clearQueue,
-      clearFailedMessages: messageQueue.clearFailedMessages,
-      clearStaleMessages: messageQueue.clearStaleMessages
-    }), [messageQueue.queue, messageQueue.getQueueStats, messageQueue.retryMessage, messageQueue.removeFromQueue, messageQueue.clearQueue, messageQueue.clearFailedMessages, messageQueue.clearStaleMessages])
+      clearFailed: messageQueue.clearFailedMessages,
+      getStats: messageQueue.getQueueStats
+    }), [messageQueue.queue.length, messageQueue.processing.size, messageQueue.retryMessage, messageQueue.removeFromQueue, messageQueue.clearQueue, messageQueue.clearFailedMessages, messageQueue.getQueueStats])
   };
 };

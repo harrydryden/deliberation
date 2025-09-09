@@ -19,11 +19,6 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(
   onRetryMessage,
   onRemoveMessage
 }) => {
-  // Performance tracking
-  const startTime = performance.now();
-  React.useEffect(() => {
-    performanceMonitor.trackRender('MessageQueueStatus', startTime);
-  });
 
   // Memoize expensive computations with optimized dependencies
   const queueStats = useMemo(() => {

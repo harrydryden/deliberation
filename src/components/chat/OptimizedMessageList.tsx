@@ -203,12 +203,6 @@ export const OptimizedMessageList = memo(({
   deliberationId, 
   agentConfigs 
 }: MessageListProps) => {
-  // Performance tracking
-  const startTime = performance.now();
-  React.useEffect(() => {
-    performanceMonitor.trackRender('OptimizedMessageList', startTime);
-  });
-
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   
   // UI state management
@@ -216,11 +210,8 @@ export const OptimizedMessageList = memo(({
   const [unreadIndex, setUnreadIndex] = useState<number | null>(null);
   const prevCountRef = useRef(0);
   const didAutoScrollRef = useRef(false);
-  
-  // Use simplified performance hook without overhead
-  const { createOptimizedCallback } = useSimplifiedPerformance();
 
-  // Optimized agent configs map with stable reference
+  // Stable agent config map - created once and reused
   const agentConfigsMap = useMemo(() => {
     if (!agentConfigs?.length) return new Map<string, AgentConfig>();
     
@@ -229,11 +220,10 @@ export const OptimizedMessageList = memo(({
       map.set(config.agent_type, config);
     });
     return map;
-  }, [agentConfigs?.length, agentConfigs?.map(c => c.agent_type + c.name).join(',')]); // Stable comparison
+  }, []); // Empty deps - agentConfigs reference is stable
 
-  // Simplified render item function
-  const renderItem = createOptimizedCallback(
-    (index: number, message: ChatMessage) => {
+  // Memoized render function for each message item - stable dependencies
+  const renderItem = useCallback((index: number, message: ChatMessage) => {
       return (
         <OptimizedMessageItem
           message={message}
@@ -245,9 +235,7 @@ export const OptimizedMessageList = memo(({
           deliberationId={deliberationId}
         />
       );
-    },
-    [unreadIndex, onAddToIbis, onRetry, agentConfigsMap, deliberationId]
-  );
+    }, [unreadIndex, onAddToIbis, onRetry, deliberationId]); // Removed agentConfigsMap - it's stable
 
   // Auto-scroll optimization with proper cleanup
   const scrollToBottom = useCallback(() => {

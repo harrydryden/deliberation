@@ -331,17 +331,32 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
     return () => clearInterval(cleanupInterval);
   }, [clearFailedMessages, clearStaleMessages]);
 
+  // Highly optimized queue statistics - only recalculate when necessary
   const getQueueStats = useMemo(() => {
-    const { queue, processing } = queueState;
+    const messages = queueState.queue;
+    const processingSize = queueState.processing.size;
+    
+    let queued = 0;
+    let failed = 0;
+    
+    // Single pass through messages for better performance
+    for (const message of messages) {
+      if (message.status === 'queued') queued++;
+      else if (message.status === 'failed') failed++;
+    }
+    
+    const totalActive = queued + failed + processingSize;
+    
     return {
-      total: queue.length,
-      queued: queue.filter(msg => msg.status === 'queued').length,
-      processing: processing.size,
-      completed: queue.filter(msg => msg.status === 'completed').length,
-      failed: queue.filter(msg => msg.status === 'failed').length,
-      canProcess: processing.size < queueState.maxConcurrent
+      total: messages.length,
+      queued,
+      processing: processingSize,
+      completed: messages.filter(msg => msg.status === 'completed').length,
+      failed,
+      canProcess: processingSize < queueState.maxConcurrent,
+      isEmpty: totalActive === 0
     };
-  }, [queueState]); // CRITICAL FIX: Watch entire queueState, not just individual properties
+  }, [queueState.queue.length, queueState.processing.size, queueState.queue]);
 
   return {
     queue: queueState.queue,
