@@ -211,13 +211,76 @@ async function getConversationState(supabase: any, deliberationId: string, userI
   }
 }
 
-// Helper function to find similar nodes
-async function findSimilarNodes(supabase: any, content: string): Promise<any[]> {
+// Helper function to find similar nodes with user exclusion to prevent echo
+async function findSimilarNodes(supabase: any, content: string, deliberationId?: string, excludeUserId?: string): Promise<any[]> {
   try {
-    // Simple implementation - just return empty array for now
-    return [];
+    if (!deliberationId) {
+      console.log('📊 No deliberationId provided for IBIS node search');
+      return [];
+    }
+
+    console.log(`🔍 Searching for IBIS nodes in deliberation ${deliberationId}, excluding user ${excludeUserId}`);
+    
+    // Build query for IBIS nodes
+    let query = supabase
+      .from('ibis_nodes')
+      .select(`
+        id,
+        title,
+        description,
+        node_type,
+        created_by,
+        created_at,
+        message_id
+      `)
+      .eq('deliberation_id', deliberationId);
+    
+    // Exclude nodes created by the current user to prevent echo
+    if (excludeUserId) {
+      query = query.neq('created_by', excludeUserId);
+    }
+    
+    // Order by creation date (most recent first) and limit to prevent overwhelming context
+    query = query.order('created_at', { ascending: false }).limit(10);
+    
+    const { data: nodes, error } = await query;
+    
+    if (error) {
+      console.error('❌ Error fetching IBIS nodes:', error);
+      return [];
+    }
+    
+    if (!nodes || nodes.length === 0) {
+      console.log('📊 No IBIS nodes found in this deliberation');
+      return [];
+    }
+    
+    console.log(`✅ Found ${nodes.length} IBIS nodes (excluding user's own nodes)`);
+    
+    // Also fetch relationships for context
+    const nodeIds = nodes.map(n => n.id);
+    const { data: relationships, error: relError } = await supabase
+      .from('ibis_relationships')
+      .select('source_node_id, target_node_id, relationship_type')
+      .or(`source_node_id.in.(${nodeIds.join(',')}),target_node_id.in.(${nodeIds.join(',')})`);
+    
+    if (relError) {
+      console.warn('⚠️ Error fetching IBIS relationships:', relError);
+    }
+    
+    // Enhance nodes with relationship information
+    const enhancedNodes = nodes.map(node => ({
+      ...node,
+      relationships: relationships?.filter(rel => 
+        rel.source_node_id === node.id || rel.target_node_id === node.id
+      ) || []
+    }));
+    
+    console.log(`📊 Enhanced ${enhancedNodes.length} nodes with relationship data`);
+    return enhancedNodes;
+    
   } catch (error) {
-    console.error('Error finding similar nodes:', error);
+    console.error('❌ Error finding similar nodes:', error);
     return [];
   }
 }
@@ -1116,7 +1179,7 @@ async function processStreamingOrchestration(
         optional: [
           {
             name: 'similar_nodes',
-            fn: () => findSimilarNodes(serviceSupabase, message.content),
+            fn: () => findSimilarNodes(serviceSupabase, message.content, deliberationId, message.user_id),
             fallback: []
           }
         ]

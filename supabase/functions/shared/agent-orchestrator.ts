@@ -586,8 +586,33 @@ export class AgentOrchestrator {
       prompt += "\n\nThis is a complex query requiring detailed analysis and nuanced understanding.";
     }
 
+    // Enhanced IBIS node context with actual content and safety instructions
     if (context.similarNodes?.length > 0) {
-      prompt += `\n\nThere are ${context.similarNodes.length} related discussion points that may be relevant to reference.`;
+      prompt += `\n\nCURRENT DELIBERATION IBIS MAP:`;
+      prompt += `\nThe following ${context.similarNodes.length} points have been contributed to this deliberation's IBIS discussion map:\n`;
+      
+      context.similarNodes.forEach((node: any, index: number) => {
+        prompt += `\n${index + 1}. **${node.title}** (${node.node_type})`;
+        if (node.description) {
+          prompt += `\n   Description: ${node.description}`;
+        }
+        if (node.relationships?.length > 0) {
+          const relSummary = node.relationships.map((rel: any) => rel.relationship_type).join(', ');
+          prompt += `\n   Relationships: ${relSummary}`;
+        }
+        prompt += `\n   Added: ${new Date(node.created_at).toLocaleDateString()}`;
+      });
+
+      prompt += `\n\nIMPORTANT IBIS GUIDELINES:`;
+      prompt += `\n- ONLY reference the IBIS points listed above that actually exist in this deliberation`;
+      prompt += `\n- DO NOT fabricate or make up discussion points that are not listed`;
+      prompt += `\n- If referencing an IBIS point, use its exact title as shown above`;
+      prompt += `\n- When appropriate, encourage users to contribute new points to expand the deliberation map`;
+      prompt += `\n- If the IBIS map seems sparse, suggest that more perspectives would be valuable`;
+    } else {
+      prompt += `\n\nCURRENT IBIS STATUS: No IBIS discussion points have been created yet for this deliberation.`;
+      prompt += `\nIMPORTANT: Do not reference any discussion points from the IBIS database, as none exist yet.`;
+      prompt += `\nEncourage users to contribute structured arguments and positions to build the deliberation map.`;
     }
 
     if (context.knowledgeContext && context.knowledgeContext.length > 0) {
