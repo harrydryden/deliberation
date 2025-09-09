@@ -48,20 +48,19 @@ export const useIbisClassification = (
 
       if (error) throw error;
 
-      if (data.success && data.classification) {
-        const classification = data.classification;
+      if (data && data.title) {
         setAiSuggestions({
-          title: classification.title,
-          keywords: classification.keywords,
-          nodeType: classification.nodeType,
-          description: classification.description,
-          confidence: classification.confidence,
-          stanceScore: classification.stanceScore
+          title: data.title,
+          keywords: data.keywords,
+          nodeType: data.nodeType,
+          description: data.description,
+          confidence: data.confidence,
+          stanceScore: data.stanceScore
         });
 
         logger.info('[useIbisClassification] Message classified successfully', { 
-          nodeType: classification.nodeType,
-          confidence: classification.confidence 
+          nodeType: data.nodeType,
+          confidence: data.confidence 
         });
       }
 
