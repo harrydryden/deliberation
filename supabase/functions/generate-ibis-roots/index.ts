@@ -110,13 +110,44 @@ serve(async (req) => {
   const corsResponse = handleCORSPreflight(req);
   if (corsResponse) return corsResponse;
 
+  console.log('=== DEBUGGING EDGE FUNCTION REQUEST ===');
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+  
+  // Clone the request to read it multiple times
+  const clonedReq = req.clone();
+  
   try {
-    console.log('Starting generate-ibis-roots function');
-    console.log('Request method:', req.method);
-    console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+    // First, let's see what we get when we read the body as text
+    const bodyText = await clonedReq.text();
+    console.log('Raw body as text:', bodyText);
+    console.log('Body length:', bodyText.length);
+    console.log('Body type:', typeof bodyText);
     
-    // Parse and validate the request properly
-    const { deliberationId, deliberationTitle, deliberationDescription, notion } = await parseAndValidateRequest(req, ['deliberationId', 'deliberationTitle']);
+    // Try to parse as JSON
+    let bodyData;
+    if (bodyText.trim() === '') {
+      console.log('Empty body detected');
+      bodyData = {};
+    } else {
+      try {
+        bodyData = JSON.parse(bodyText);
+        console.log('Successfully parsed JSON:', bodyData);
+      } catch (parseError) {
+        console.error('JSON parse failed:', parseError.message);
+        console.error('Failed text:', JSON.stringify(bodyText));
+        return createErrorResponse(new Error(`Invalid JSON in request body: ${parseError.message}`), 400, 'generate-ibis-roots');
+      }
+    }
+    
+    // Check if we have required fields
+    const { deliberationId, deliberationTitle, deliberationDescription, notion } = bodyData;
+    if (!deliberationId || !deliberationTitle) {
+      console.error('Missing required fields:', { deliberationId: !!deliberationId, deliberationTitle: !!deliberationTitle });
+      return createErrorResponse(new Error('Missing required fields: deliberationId, deliberationTitle'), 400, 'generate-ibis-roots');
+    }
+    
     console.log('Request validated successfully', { deliberationId, deliberationTitle });
 
     // Get environment and clients with caching
