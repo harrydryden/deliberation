@@ -108,9 +108,19 @@ Respond with ONLY a valid JSON array:
     }
 
     const openaiData = await openaiResponse.json();
+    console.log('📊 Full OpenAI response:', JSON.stringify(openaiData));
+    
+    if (!openaiData.choices || openaiData.choices.length === 0) {
+      throw new Error('No choices returned from OpenAI API');
+    }
+    
     const aiResponse = openaiData.choices[0].message.content;
     console.log('🎯 AI response received, length:', aiResponse?.length);
     console.log('📝 Raw AI Response:', aiResponse);
+    
+    if (!aiResponse || aiResponse.trim() === '') {
+      throw new Error('Empty response from OpenAI API');
+    }
 
     // Parse AI response
     let suggestedIssues;
