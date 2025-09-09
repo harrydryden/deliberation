@@ -362,9 +362,15 @@ export class AgentOrchestrator {
     const timeoutMs = 8000; // 8 second timeout per attempt
     let lastError: any = null;
 
+    console.log(`🔧 DEBUG: Starting message analysis for content: "${content.substring(0, 100)}..."`);
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`🔍 Message analysis attempt ${attempt}/${maxRetries} for content: "${content.substring(0, 100)}..."`);
+
+        const systemMessage = await this.getSystemMessage('message_analysis_system_message');
+        console.log(`🔧 DEBUG: Got system message for analysis: "${systemMessage.substring(0, 100)}..."`);
+        console.log(`🔧 DEBUG: System message contains 'json': ${systemMessage.toLowerCase().includes('json')}`);
 
         // Add timeout wrapper for each attempt
         const analysisPromise = fetch('https://api.openai.com/v1/chat/completions', {
@@ -378,7 +384,7 @@ export class AgentOrchestrator {
             messages: [
               {
                 role: 'system',
-                content: await this.getSystemMessage('message_analysis_system_message')
+                content: systemMessage
               },
               {
                 role: 'user',
@@ -389,6 +395,8 @@ export class AgentOrchestrator {
             response_format: { type: "json_object" }
           }),
         });
+
+        console.log(`🔧 DEBUG: Making OpenAI API call for message analysis...`);
 
         // Apply timeout to the entire request
         const response = await Promise.race([
@@ -419,6 +427,7 @@ export class AgentOrchestrator {
         let parsedResult: any;
         try {
           parsedResult = JSON.parse(analysisContent);
+          console.log(`🔧 DEBUG: Parsed analysis result:`, parsedResult);
         } catch (parseError) {
           console.error(`❌ JSON parse error:`, parseError);
           throw new Error(`Invalid JSON response: ${analysisContent}`);
@@ -438,6 +447,7 @@ export class AgentOrchestrator {
       } catch (error) {
         lastError = error;
         console.error(`❌ Message analysis attempt ${attempt} failed:`, error);
+        console.error(`❌ Error stack:`, error.stack);
         
         if (attempt < maxRetries) {
           const delay = attempt * 500; // Reduced delay from 1000ms to 500ms
@@ -449,7 +459,9 @@ export class AgentOrchestrator {
 
     // All retries failed, return intelligent defaults based on content analysis
     console.error(`❌ All message analysis attempts failed, using intelligent defaults:`, lastError);
-    return this.generateIntelligentDefaults(content);
+    const defaults = this.generateIntelligentDefaults(content);
+    console.log(`🔧 DEBUG: Using intelligent defaults:`, defaults);
+    return defaults;
   }
 
   private validateIntent(intent: any): string | null {

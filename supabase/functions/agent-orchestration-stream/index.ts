@@ -854,6 +854,13 @@ async function processStreamingOrchestration(
   console.log(`🚀 Starting processStreamingOrchestration`, { messageId, deliberationId, mode });
   console.log(`🔐 Auth header present:`, !!authHeader);
   
+  // CRITICAL: Add immediate test response to verify streaming works
+  sendData({ 
+    content: `🔧 DEBUG: System is processing message ${messageId}`, 
+    done: false,
+    debug: true 
+  });
+  
   try {
     console.log('🔧 Getting environment clients');
     // Use shared environment validation with caching
@@ -1143,6 +1150,8 @@ async function processStreamingOrchestration(
 
     // Enhanced agent selection with 20-second total timeout protection
     try {
+      console.log(`🔧 DEBUG: About to select agent with analysis:`, analysis);
+      
       const selectedAgent = await withTimeout(
         orchestrator.selectOptimalAgent(
           analysis,
@@ -1154,11 +1163,21 @@ async function processStreamingOrchestration(
         'Agent Selection'
       ).catch(error => {
         console.warn('⏰ Agent selection timed out, using flow_agent fallback:', error);
+        sendData({ 
+          content: `🔧 DEBUG: Agent selection timed out, using flow_agent fallback. Error: ${error.message}`, 
+          done: false,
+          debug: true 
+        });
         return 'flow_agent'; // Safe fallback
       });
 
       console.log(`🤖 Selected agent: ${selectedAgent}`);
-      sendData({ agentType: selectedAgent, content: '', done: false });
+      sendData({ 
+        agentType: selectedAgent, 
+        content: `🔧 DEBUG: Selected ${selectedAgent} agent for processing`, 
+        done: false,
+        debug: true 
+      });
 
       // Generate streaming response with orchestrator
       const response = await generateStreamingResponse(
@@ -1233,6 +1252,15 @@ async function processStreamingOrchestration(
 
   } catch (error) {
     console.error('❌ Streaming processing error:', error);
-    sendData({ error: error.message, done: true });
+    console.error('❌ Full error stack:', error.stack);
+    console.error('❌ Error details:', JSON.stringify(error, null, 2));
+    
+    sendData({ 
+      error: error.message, 
+      content: `🔧 DEBUG: Fatal error in processStreamingOrchestration: ${error.message}`,
+      done: true,
+      debug: true,
+      errorStack: error.stack
+    });
   }
 }
