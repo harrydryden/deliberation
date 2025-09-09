@@ -113,8 +113,27 @@ serve(async (req) => {
   try {
     console.log('Starting generate-ibis-roots function');
     
-    // Parse and validate the request properly
-    const { deliberationId, deliberationTitle, deliberationDescription, notion } = await parseAndValidateRequest(req, ['deliberationId', 'deliberationTitle']);
+    // Read and parse request body directly
+    const rawBody = await req.text();
+    console.log('Raw request body:', rawBody);
+    console.log('Raw body length:', rawBody.length);
+    
+    let requestData;
+    try {
+      requestData = JSON.parse(rawBody);
+      console.log('Parsed request data:', requestData);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      return createErrorResponse(new Error('Invalid JSON in request body'), 400, 'generate-ibis-roots');
+    }
+    
+    const { deliberationId, deliberationTitle, deliberationDescription, notion } = requestData;
+    
+    if (!deliberationId || !deliberationTitle) {
+      console.error('Missing required fields:', { deliberationId: !!deliberationId, deliberationTitle: !!deliberationTitle });
+      return createErrorResponse(new Error('Missing required fields: deliberationId, deliberationTitle'), 400, 'generate-ibis-roots');
+    }
+    
     console.log('Request validated successfully', { deliberationId, deliberationTitle });
 
     // Get environment and clients with caching
