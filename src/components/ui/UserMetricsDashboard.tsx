@@ -10,12 +10,15 @@ import {
   RefreshCw,
   User,
   Calendar,
-  BarChart3
+  BarChart3,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { logger } from '@/utils/logger';
+import { RatingService } from '@/services/domain/implementations/rating.service';
 
 interface DeliberationMetrics {
   totalMessages: number;
@@ -23,11 +26,18 @@ interface DeliberationMetrics {
   contributionRate: number;
 }
 
+interface RatingMetrics {
+  helpfulRatings: number;
+  unhelpfulRatings: number;
+  totalRatings: number;
+}
+
 interface UserMetrics {
   allDeliberations: DeliberationMetrics;
   currentDeliberation: DeliberationMetrics | null;
   participatingDeliberations: Array<{ id: string; title: string }>;
   joinDate: string;
+  ratings: RatingMetrics;
 }
 
 export const UserMetricsDashboard: React.FC = () => {
@@ -36,6 +46,7 @@ export const UserMetricsDashboard: React.FC = () => {
   const [selectedDeliberationId, setSelectedDeliberationId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ratingService] = useState(() => new RatingService());
 
   const fetchUserMetrics = async () => {
     if (!user?.id) return;
@@ -94,6 +105,19 @@ export const UserMetricsDashboard: React.FC = () => {
         };
       }
 
+      // Get user ratings
+      const { data: userRatings, error: ratingsError } = await supabase
+        .from('agent_ratings')
+        .select('rating')
+        .eq('user_id', user.id);
+
+      if (ratingsError) throw ratingsError;
+
+      // Calculate rating metrics
+      const ratings = userRatings || [];
+      const helpfulRatings = ratings.filter(r => r.rating === 1).length;
+      const unhelpfulRatings = ratings.filter(r => r.rating === -1).length;
+
       // Prepare deliberation list
       const deliberationList = userParticipations.map(p => ({
         id: p.deliberation_id || '',
@@ -108,7 +132,12 @@ export const UserMetricsDashboard: React.FC = () => {
         },
         currentDeliberation: currentDeliberationMetrics,
         participatingDeliberations: deliberationList,
-        joinDate: profile?.created_at || ''
+        joinDate: profile?.created_at || '',
+        ratings: {
+          helpfulRatings,
+          unhelpfulRatings,
+          totalRatings: helpfulRatings + unhelpfulRatings
+        }
       });
 
       // Auto-select first deliberation if none selected and deliberations exist
@@ -279,6 +308,48 @@ export const UserMetricsDashboard: React.FC = () => {
         <TabsContent value="all" className="space-y-4">
           <h3 className="text-lg font-semibold">All Deliberations Summary</h3>
           {renderMetricsCards(metrics?.allDeliberations || { totalMessages: 0, ibisSubmissions: 0, contributionRate: 0 }, "All Deliberations")}
+          
+          {/* Ratings Section */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Helpful Ratings</CardTitle>
+                <ThumbsUp className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{metrics?.ratings.helpfulRatings || 0}</div>
+                <span className="text-xs text-muted-foreground">
+                  Positive ratings given
+                </span>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Unhelpful Ratings</CardTitle>
+                <ThumbsDown className="h-4 w-4 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{metrics?.ratings.unhelpfulRatings || 0}</div>
+                <span className="text-xs text-muted-foreground">
+                  Negative ratings given
+                </span>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Ratings</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{metrics?.ratings.totalRatings || 0}</div>
+                <span className="text-xs text-muted-foreground">
+                  Agent responses rated
+                </span>
+              </CardContent>
+            </Card>
+          </div>
           
           {/* Additional Summary Info */}
           <Card>
