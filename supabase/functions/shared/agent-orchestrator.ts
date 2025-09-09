@@ -184,12 +184,12 @@ export class AgentOrchestrator {
         return data.template_text;
       }
       
-      console.log(`📝 No template found for ${templateName}, using hardcoded fallback`);
-      return this.getHardcodedFallback(agentType);
+      console.log(`⚠️ No template found for ${templateName}`);
+      throw new Error(`Template ${templateName} not found in database`);
       
     } catch (error) {
       console.error('Error fetching prompt template:', error);
-      return this.getHardcodedFallback(agentType);
+      throw new Error(`Failed to fetch template ${templateName}: ${error.message}`);
     }
   }
 

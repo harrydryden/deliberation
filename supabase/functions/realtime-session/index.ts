@@ -31,8 +31,7 @@ async function getVoiceInstructions(supabase: any): Promise<string> {
     EdgeLogger.error('Failed to fetch voice instructions template', error);
   }
   
-  // Fallback
-  return "You are a civic deliberation assistant. Always speak responses. When asked to analyse policy, first search the local agent knowledge with the 'search_knowledge' tool to ground your answer. When asked for IBIS highlights or a summary, use the 'get_ibis_context' tool and then narrate a clear, 30–60 second spoken summary. Use British English spelling and grammar throughout.";
+  throw new Error('voice_realtime_instructions template not found in database');
 }
 
 serve(async (req) => {

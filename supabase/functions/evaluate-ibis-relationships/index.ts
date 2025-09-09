@@ -27,14 +27,7 @@ async function getSystemMessage(supabase: any, templateName: string): Promise<st
     EdgeLogger.error(`Failed to fetch ${templateName} template`, error);
   }
   
-  // Fallbacks based on template name
-  const fallbacks = {
-    'ibis_relationship_system_message': 'You are an expert in argument analysis and democratic deliberation. Analyse logical relationships between contributions accurately. Use British English spelling and grammar in all responses.',
-    'issue_recommendation_system_message': 'You are an expert at analysing content and finding relevant issues in deliberative discussions. Always respond with valid JSON. Use British English spelling and grammar throughout.',
-    'ibis_root_generation_system_message': 'You are an expert facilitator specialising in democratic deliberation. You must respond with ONLY a valid JSON array, no additional text or formatting. Each object must have exactly "title" and "description" fields. Focus on specific, actionable issues directly related to the deliberation topic. Use British English spelling and grammar throughout.'
-  };
-  
-  return fallbacks[templateName as keyof typeof fallbacks] || 'You are a helpful AI assistant specialising in democratic deliberation. Use British English spelling and grammar throughout.';
+  throw new Error(`Template ${templateName} not found in database`);
 }
 
 

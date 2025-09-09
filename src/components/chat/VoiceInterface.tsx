@@ -154,45 +154,29 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
         // Small deliberation: 30-60 seconds
         duration = "30–60 seconds";
         maxItems = 5;
-        instructions = promptMap['voice_interface_short'] || "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a clear, concise spoken summary.";
+        instructions = promptMap['voice_interface_short'];
       } else if (totalNodes < 50) {
         // Medium deliberation: 2-3 minutes
         duration = "2–3 minutes";
         maxItems = 15;
-        instructions = promptMap['voice_interface_medium'] || "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a comprehensive spoken summary.";
+        instructions = promptMap['voice_interface_medium'];
       } else {
         // Large deliberation: 5-7 minutes
         duration = "5–7 minutes";
         maxItems = 30;
-        instructions = promptMap['voice_interface_long'] || "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a thorough spoken analysis.";
+        instructions = promptMap['voice_interface_long'];
+      }
+      
+      if (!instructions) {
+        throw new Error(`Voice interface template not found for deliberation size: ${totalNodes} nodes`);
       }
 
       return { duration, maxItems, totalNodes, instructions };
     } catch (err) {
       logger.error('complexity analysis error', err as Error);
       
-      // Fallback to database prompt or hardcoded fallback
-      try {
-        const { data: fallbackPrompt } = await supabase
-          .from('prompt_templates')
-          .select('content')
-          .eq('name', 'voice_interface_fallback')
-          .single();
-        
-        return {
-          duration: "30–60 seconds",
-          maxItems: 5,
-          totalNodes: 0,
-          instructions: fallbackPrompt?.content || "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a clear, concise spoken summary."
-        };
-      } catch {
-        return {
-          duration: "30–60 seconds",
-          maxItems: 5,
-          totalNodes: 0,
-          instructions: "You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a clear, concise spoken summary."
-        };
-      }
+      // Return error if no template found
+      throw new Error('Voice interface templates not available in database');
     }
   };
 
