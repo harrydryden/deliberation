@@ -84,8 +84,9 @@ Respond with ONLY a valid JSON array:
         'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
-        max_completion_tokens: 1000,
+        model: 'gpt-4o-mini',
+        max_tokens: 1000,
+        temperature: 0.7,
         messages: [
           {
             role: 'system',
