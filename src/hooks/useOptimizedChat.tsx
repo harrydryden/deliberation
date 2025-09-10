@@ -107,9 +107,21 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
         const chatMessage = convertApiMessageToChatMessage(message);
         
         setChatState(prev => {
-          // Check for duplicates
+          // Check for duplicates - more robust checking
           const exists = prev.messages.some(m => m.id === chatMessage.id);
-          if (exists) return prev;
+          if (exists) {
+            logger.debug('🔍 Skipping duplicate realtime message', { 
+              messageId: chatMessage.id,
+              messageType: message.message_type 
+            });
+            return prev;
+          }
+          
+          logger.debug('📨 Adding realtime message', { 
+            messageId: chatMessage.id, 
+            type: message.message_type,
+            currentCount: prev.messages.length 
+          });
           
           // Add new message and sort by timestamp
           const newMessages = [...prev.messages, chatMessage].sort(
@@ -234,13 +246,21 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       
       const userMessage = convertApiMessageToChatMessage(saved);
       
-      // Add user message immediately for responsiveness
-      setChatState(prev => ({
-        ...prev,
-        messages: [...prev.messages, userMessage].sort(
-          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        )
-      }));
+      // Add user message immediately for responsiveness (avoid duplicates)
+      setChatState(prev => {
+        const exists = prev.messages.some(m => m.id === userMessage.id);
+        if (exists) {
+          logger.debug('🔍 Skipping duplicate optimistic message', { messageId: userMessage.id });
+          return prev;
+        }
+        
+        return {
+          ...prev,
+          messages: [...prev.messages, userMessage].sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          )
+        };
+      });
       
       // Clear cache for fresh data
       cacheService.clearNamespace('chat-messages');

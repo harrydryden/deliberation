@@ -161,6 +161,18 @@ export const useAgentOrchestrationTrigger = () => {
       }, 45000);
       
       try {
+        // CRITICAL: Use console.log directly to ensure logs appear
+        console.log('🌐 [FETCH-DEBUG] About to make fetch request', {
+          requestId,
+          url: functionUrl,
+          method: 'POST',
+          headers: Object.keys(requestHeaders),
+          bodySize: JSON.stringify(requestPayload).length,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          online: navigator.onLine
+        });
+        
         logger.info('🌐 [DEBUG] About to make fetch request', {
           requestId,
           url: functionUrl,
@@ -252,6 +264,19 @@ export const useAgentOrchestrationTrigger = () => {
       } catch (fetchError) {
         clearTimeout(timeoutId);
         streamHealthMonitor.recordDisconnection(streamId, 'fetch_error');
+        
+        // CRITICAL: Use console.error directly to ensure error logs appear
+        console.error('🚨 [FETCH-ERROR] Fetch failed with details:', {
+          requestId,
+          error: fetchError,
+          errorMessage: fetchError instanceof Error ? fetchError.message : 'Unknown fetch error',
+          errorName: fetchError instanceof Error ? fetchError.name : 'Unknown',
+          errorStack: fetchError instanceof Error ? fetchError.stack?.substring(0, 500) : 'No stack',
+          url: functionUrl,
+          timestamp: new Date().toISOString(),
+          networkState: navigator.onLine,
+          connectionType: (navigator as any).connection?.effectiveType || 'unknown'
+        });
         
         logger.error('🚨 [DEBUG] Fetch error details', {
           requestId,
