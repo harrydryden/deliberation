@@ -5,7 +5,8 @@ import { MessageInput, MessageInputRef } from "@/components/chat/MessageInput";
 import { ChatModeSelector, ChatMode } from "@/components/chat/ChatModeSelector";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ViewModeSelector } from "@/components/chat/ViewModeSelector";
+import { ViewModeSelector, ViewMode } from "@/components/chat/ViewModeSelector";
+import { useFilteredMessages } from "@/hooks/useFilteredMessages";
 import { Users, ChevronDown, ChevronUp } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
@@ -22,6 +23,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({
   default: m.IbisMapVisualization
+})));
+
+const IbisTableViewLazy = lazy(() => import("@/components/ibis/IbisTableView").then(m => ({
+  default: m.IbisTableView
 })));
 
 const VoiceInterfaceLazy = lazy(() => import("@/components/chat/VoiceInterface"));
@@ -56,7 +61,7 @@ const OptimizedDeliberationChat = () => {
   // PERFORMANCE OPTIMIZATION: Split state into UI and data concerns to reduce re-render scope
   const [uiState, setUiState] = useState({
     chatMode: 'chat' as ChatMode,
-    viewMode: 'chat' as 'chat' | 'ibis',
+    viewMode: 'chat' as ViewMode,
     isDescriptionOpen: false,
     modalContent: 'description' as 'description' | 'notion',
     isHeaderCollapsed: false,
@@ -99,6 +104,9 @@ const OptimizedDeliberationChat = () => {
     retryMessage,
     messageQueue
   } = useChat(deliberationId);
+
+  // Filter messages based on view mode and user context
+  const filteredMessages = useFilteredMessages(messages, uiState.viewMode, user?.id, isAdmin);
 
 
   // PERFORMANCE OPTIMIZATION: Stable sendMessage with minimal dependencies
@@ -253,7 +261,7 @@ const OptimizedDeliberationChat = () => {
     }
   }, [user?.id, isLoading, deliberationId, navigate, loadDeliberation]); // Only depend on user.id to prevent unnecessary calls
 
-  // Mobile view mode optimization
+  // Mobile view mode optimization - only allow chat mode on mobile
   useEffect(() => {
     if (isMobile && uiState.viewMode !== 'chat') {
       setUiState(prev => ({ ...prev, viewMode: 'chat' }));
@@ -274,7 +282,7 @@ const OptimizedDeliberationChat = () => {
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex-1 overflow-hidden min-h-0">
         <OptimizedMessageList 
-          messages={messages} 
+          messages={filteredMessages} 
           isLoading={chatLoading} 
           isTyping={isTyping} 
           onAddToIbis={handleAddToIbis} 
@@ -285,7 +293,7 @@ const OptimizedDeliberationChat = () => {
       </div>
       <MessageInput ref={messageInputRef} onSendMessage={sendMessage} disabled={chatLoading} />
     </div>
-  ), [messages, chatLoading, isTyping, handleAddToIbis, retryMessage, deliberationId, dataState.agentConfigs, sendMessage]);
+  ), [filteredMessages, chatLoading, isTyping, handleAddToIbis, retryMessage, deliberationId, dataState.agentConfigs, sendMessage]);
 
   // Render loading state
   if (isLoading || dataState.loading) {
@@ -528,9 +536,13 @@ const OptimizedDeliberationChat = () => {
           <div className="flex-1 flex flex-col min-h-0">
             {uiState.viewMode === 'chat' ? (
               <ChatPanel />
-            ) : (
+            ) : uiState.viewMode === 'ibis' ? (
               <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading map…</div></div>}>
                 <IbisMapVisualizationLazy deliberationId={dataState.deliberation.id} />
+              </Suspense>
+            ) : (
+              <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading table…</div></div>}>
+                <IbisTableViewLazy deliberationId={dataState.deliberation.id} />
               </Suspense>
             )}
           </div>

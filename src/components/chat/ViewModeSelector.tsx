@@ -1,9 +1,8 @@
-// View mode toggle switch (Chat | IBIS), styled like ChatModeSelector
 import React, { memo } from "react";
-import { MessageSquare, GitBranch } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
+import { MessageSquare, GitBranch, Table } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { performanceMonitor } from "@/utils/performanceMonitor";
-export type ViewMode = 'chat' | 'ibis';
+export type ViewMode = 'chat' | 'ibis' | 'table';
 interface ViewModeSelectorProps {
   mode: ViewMode;
   onModeChange: (mode: ViewMode) => void;
@@ -18,28 +17,37 @@ export const ViewModeSelector = memo(({
     performanceMonitor.trackRender('ViewModeSelector', startTime);
   });
 
-  const handleSwitch = (checked: boolean) => {
-    onModeChange(checked ? 'ibis' : 'chat');
+  const modes = [
+    { key: 'chat', label: 'Message', icon: MessageSquare },
+    { key: 'ibis', label: 'Map', icon: GitBranch },
+    { key: 'table', label: 'Table', icon: Table }
+  ] as const;
+
+  const handleModeClick = (modeKey: ViewMode) => {
+    onModeChange(modeKey);
   };
-  const containerCls = 'flex items-center gap-3';
-  const chatLabelCls = 'flex items-center gap-2 text-sm transition-colors w-28 justify-end ' + (mode === 'chat' ? 'text-foreground font-medium' : 'text-muted-foreground');
-  const ibisLabelCls = 'flex items-center gap-2 text-sm transition-colors w-28 ' + (mode === 'ibis' ? 'text-foreground font-medium' : 'text-muted-foreground');
-  return <div className={containerCls} aria-label="View mode">
-      {/* Chat label */}
-      <div className={chatLabelCls}>
-        <MessageSquare className="h-4 w-4" />
-        <span>Message</span>
-      </div>
 
-      {/* Switch */}
-      <Switch checked={mode === 'ibis'} onCheckedChange={handleSwitch} className="self-center data-[state=checked]:bg-primary" aria-label="Toggle view mode between Chat and IBIS" />
-
-      {/* IBIS label */}
-      <div className={ibisLabelCls}>
-        <GitBranch className="h-4 w-4" />
-        <span>Map</span>
-      </div>
-    </div>;
+  return (
+    <div className="flex items-center gap-1 bg-muted rounded-lg p-1" aria-label="View mode">
+      {modes.map(({ key, label, icon: Icon }) => (
+        <Button
+          key={key}
+          variant={mode === key ? "default" : "ghost"}
+          size="sm"
+          onClick={() => handleModeClick(key)}
+          className={`h-8 px-3 text-xs transition-all ${
+            mode === key 
+              ? 'bg-background text-foreground shadow-sm' 
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+          aria-label={`Switch to ${label} view`}
+        >
+          <Icon className="h-3 w-3 mr-1.5" />
+          <span>{label}</span>
+        </Button>
+      ))}
+    </div>
+  );
 });
 
 ViewModeSelector.displayName = 'ViewModeSelector';
