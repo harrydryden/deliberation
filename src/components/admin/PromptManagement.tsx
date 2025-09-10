@@ -135,13 +135,13 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
   };
 
   const renderEditDialog = (isCreating: boolean) => (
-    <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col">
-      <DialogHeader className="flex-shrink-0">
+    <DialogContent className="!grid-none flex flex-col max-w-5xl h-[85vh] max-h-[85vh] p-0">
+      <div className="flex-shrink-0 p-6 pb-4 border-b">
         <DialogTitle>{isCreating ? 'Create New Prompt Template' : 'Edit Prompt Template'}</DialogTitle>
-      </DialogHeader>
+      </div>
       
-      <div className="flex-1 overflow-y-auto min-h-0 pr-2">
-        <div className="space-y-4 pb-2">
+      <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="prompt-type">Prompt Type</Label>
@@ -200,8 +200,8 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
               value={editForm.templateText}
               onChange={(e) => setEditForm(prev => ({ ...prev, templateText: e.target.value }))}
               placeholder="Enter the prompt template..."
-              rows={6}
-              className="font-mono text-sm resize-y min-h-[150px] max-h-[300px]"
+              rows={8}
+              className="font-mono text-sm resize-y min-h-[200px]"
             />
             <p className="text-xs text-muted-foreground mt-1">
               Use {'{'}placeholders{'}'} for dynamic values like {'{'}content{'}'}, {'{'}title{'}'}, etc. You can resize this field vertically.
@@ -220,7 +220,7 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
         </div>
       </div>
       
-      <div className="flex-shrink-0 flex justify-end gap-2 pt-4 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex-shrink-0 flex justify-end gap-2 p-6 pt-4 border-t bg-background">
         <Button variant="outline" onClick={() => isCreating ? setCreating(false) : setEditingPrompt(null)}>
           Cancel
         </Button>
