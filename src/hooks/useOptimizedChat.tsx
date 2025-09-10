@@ -7,6 +7,7 @@ import { getErrorMessage } from "@/utils/errors";
 import { logger } from '@/utils/logger';
 import { useToast } from '@/hooks/use-toast';
 import { cacheService } from '@/services/cache.service';
+import { useAgentOrchestrationTrigger } from '@/hooks/useAgentOrchestrationTrigger';
 
 interface OptimizedChatState {
   messages: ChatMessage[];
@@ -29,6 +30,12 @@ export const useOptimizedChat = (deliberationId?: string) => {
   
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const lastLoadedDeliberationRef = useRef<string | null>(null);
+  const { triggerAgentOrchestration } = useAgentOrchestrationTrigger();
+  
+  // Helper to update typing state
+  const setTypingState = useCallback((isTyping: boolean) => {
+    setChatState(prev => ({ ...prev, isTyping }));
+  }, []);
   
   // Optimized message loading with caching
   const loadMessages = useCallback(async () => {
@@ -84,6 +91,7 @@ export const useOptimizedChat = (deliberationId?: string) => {
     }
     
     try {
+      // Real-time message handling with typing state management
       const unsubscribe = realtimeService.subscribeToMessages((message) => {
         // Filter messages for this deliberation
         if (message.deliberation_id !== deliberationId) return;
@@ -103,6 +111,7 @@ export const useOptimizedChat = (deliberationId?: string) => {
           return {
             ...prev,
             messages: newMessages,
+            // Clear typing indicator when agent message arrives
             isTyping: message.message_type?.includes('agent') ? false : prev.isTyping
           };
         });
@@ -124,7 +133,7 @@ export const useOptimizedChat = (deliberationId?: string) => {
     }
   }, [user, deliberationId, realtimeService]);
   
-  // Send message function
+  // Send message function  
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!user || !deliberationId || !content.trim()) return;
     
@@ -153,6 +162,9 @@ export const useOptimizedChat = (deliberationId?: string) => {
       cacheService.clearNamespace('chat-messages');
       
       logger.info('Message sent successfully', { messageId: saved.id });
+      
+      // CRITICAL FIX: Trigger agent orchestration after message is saved
+      await triggerAgentOrchestration(saved.id, deliberationId, mode, setTypingState);
       
     } catch (error) {
       const errorMsg = getErrorMessage(error);
