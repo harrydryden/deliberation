@@ -4,8 +4,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
 
 interface MessageInputProps {
-  onSendMessage: (message: string) => Promise<void> | void;
+  onSendMessage: (message: string, mode?: 'chat' | 'learn') => Promise<void> | void;
   disabled?: boolean;
+  mode?: 'chat' | 'learn';
 }
 
 export interface MessageInputRef {
@@ -13,7 +14,7 @@ export interface MessageInputRef {
   clearMessage: () => void;
 }
 
-export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(({ onSendMessage, disabled }, ref) => {
+export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(({ onSendMessage, disabled, mode = 'chat' }, ref) => {
   const [message, setMessageState] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -38,7 +39,7 @@ export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(
     if (message.trim() && !disabled && !isSubmitting) {
       setIsSubmitting(true);
       try {
-        await onSendMessage(message);
+        await onSendMessage(message, mode);
         setMessageState("");
         // Use requestAnimationFrame to ensure smooth transition
         requestAnimationFrame(() => {
@@ -48,7 +49,7 @@ export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(
         setIsSubmitting(false);
       }
     }
-  }, [message, disabled, onSendMessage, isSubmitting]);
+  }, [message, disabled, onSendMessage, isSubmitting, mode]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {

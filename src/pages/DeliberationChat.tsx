@@ -118,6 +118,14 @@ const OptimizedDeliberationChat = () => {
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!content.trim()) return;
     
+    // Enhanced logging to track mode parameter flow
+    logger.info('sendMessage called with mode parameter', { 
+      mode,
+      isLearnMode: mode === 'learn',
+      contentLength: content.length,
+      chatModeFromUI: uiState.chatMode
+    });
+    
     // Add to queue with proper error handling
     try {
       const messageId = messageQueue.addToQueue(content, undefined, mode);
@@ -139,7 +147,7 @@ const OptimizedDeliberationChat = () => {
         variant: "destructive"
       });
     }
-  }, [messageQueue, toast]); // Enhanced dependencies for proper error handling
+  }, [messageQueue, toast, uiState.chatMode]); // Enhanced dependencies for proper error handling
 
   // setMessageText function for voice interface
   const setMessageText = useCallback((text: string) => {
@@ -337,7 +345,7 @@ const OptimizedDeliberationChat = () => {
           agentConfigs={dataState.agentConfigs} 
         />
       </div>
-      <MessageInput ref={messageInputRef} onSendMessage={sendMessage} disabled={chatLoading} />
+      <MessageInput ref={messageInputRef} onSendMessage={sendMessage} disabled={chatLoading} mode={uiState.chatMode} />
     </div>
   ), [filteredMessages, chatLoading, isTyping, handleAddToIbis, deliberationId, dataState.agentConfigs, sendMessage]);
 
