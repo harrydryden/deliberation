@@ -172,24 +172,50 @@ export const useAgentOrchestrationTrigger = () => {
           timestamp: new Date().toISOString()
         });
 
-        // Use Supabase client instead of fetch to avoid proxy issues
-        const { data: response, error: invokeError } = await supabase.functions.invoke('agent-orchestration-stream', {
-          body: requestPayload,
-          headers: {
-            'X-Request-ID': requestId
-          }
+        // DEBUG: Log Supabase client state before invoke
+        console.log('🔍 [DEBUG] Supabase client state before invoke', {
+          requestId,
+          functionName: 'agent-orchestration-stream',
+          payloadKeys: Object.keys(requestPayload),
+          timestamp: new Date().toISOString()
         });
-        
-        clearTimeout(timeoutId);
-        
-        if (invokeError) {
-          console.error('🚨 [SUPABASE-INVOKE-ERROR] Function invoke failed', {
-            requestId,
-            error: invokeError,
-            message: invokeError.message,
-            context: invokeError.context || 'No context'
+
+        // Use Supabase client instead of fetch to avoid proxy issues
+        let response: any = null;
+        try {
+          const result = await supabase.functions.invoke('agent-orchestration-stream', {
+            body: requestPayload,
+            headers: {
+              'X-Request-ID': requestId
+            }
           });
-          throw new Error(`Agent orchestration failed: ${invokeError.message || 'Unknown invoke error'}`);
+          
+          response = result.data;
+          const invokeError = result.error;
+          
+          clearTimeout(timeoutId);
+          
+          if (invokeError) {
+            console.error('🚨 [SUPABASE-INVOKE-ERROR] Function invoke failed', {
+              requestId,
+              error: invokeError,
+              message: invokeError.message,
+              context: invokeError.context || 'No context',
+              details: invokeError
+            });
+            throw new Error(`Agent orchestration failed: ${invokeError.message || 'Unknown invoke error'}`);
+          }
+        } catch (clientError) {
+          console.error('🚨 [SUPABASE-CLIENT-ERROR] Client threw exception', {
+            requestId,
+            error: clientError,
+            errorType: typeof clientError,
+            errorName: clientError instanceof Error ? clientError.name : 'Unknown',
+            errorMessage: clientError instanceof Error ? clientError.message : String(clientError),
+            errorStack: clientError instanceof Error ? clientError.stack : 'No stack',
+            timestamp: new Date().toISOString()
+          });
+          throw new Error(`Agent orchestration failed: ${clientError instanceof Error ? clientError.message : 'Failed to send a request to the Edge Function'}`);
         }
         
         // PHASE 1: Enhanced Response Logging for Supabase invoke
