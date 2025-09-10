@@ -42,9 +42,9 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
         prompting_questions: [],
         ibis_facilitation: {
           enabled: true,
-          elicit_issue_prompt: 'To build a coherent IBIS map, could you share 1–2 concise issues we should consider?',
-          elicit_position_prompt: 'What is your position on this issue (one sentence, actionable)?',
-          elicit_argument_prompt: 'Please provide 1–2 arguments supporting your position, with any evidence or sources.'
+          share_issue_prompt: 'Based on the existing discussion, here are the key issues other participants have identified. Which of these resonates with your perspective?',
+          share_position_prompt: 'Other participants have taken various positions on this issue. Here are the main viewpoints that have been shared. Do any of these align with your thinking?',
+          share_argument_prompt: 'Here are the arguments other participants have made supporting different positions. Which of these do you find most compelling, or would you like to hear more about any particular argument?'
         }
       }
     },
@@ -77,9 +77,9 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
           prompting_questions: [],
           ibis_facilitation: {
             enabled: true,
-            elicit_issue_prompt: 'To build a coherent IBIS map, could you share 1–2 concise issues we should consider?',
-            elicit_position_prompt: 'What is your position on this issue (one sentence, actionable)?',
-            elicit_argument_prompt: 'Please provide 1–2 arguments supporting your position, with any evidence or sources.'
+            share_issue_prompt: 'Based on the existing discussion, here are the key issues other participants have identified. Which of these resonates with your perspective?',
+            share_position_prompt: 'Other participants have taken various positions on this issue. Here are the main viewpoints that have been shared. Do any of these align with your thinking?',
+            share_argument_prompt: 'Here are the arguments other participants have made supporting different positions. Which of these do you find most compelling, or would you like to hear more about any particular argument?'
           }
         }
       });
@@ -96,18 +96,18 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
       ...form.formData.facilitator_config,
       ibis_facilitation: {
         enabled: !form.formData.facilitator_config.ibis_facilitation?.enabled,
-        elicit_issue_prompt: form.formData.facilitator_config.ibis_facilitation?.elicit_issue_prompt || 'To build a coherent IBIS map, could you share 1–2 concise issues we should consider?',
-        elicit_position_prompt: form.formData.facilitator_config.ibis_facilitation?.elicit_position_prompt || 'What is your position on this issue (one sentence, actionable)?',
-        elicit_argument_prompt: form.formData.facilitator_config.ibis_facilitation?.elicit_argument_prompt || 'Please provide 1–2 arguments supporting your position, with any evidence or sources.'
+        share_issue_prompt: form.formData.facilitator_config.ibis_facilitation?.share_issue_prompt || 'Based on the existing discussion, here are the key issues other participants have identified. Which of these resonates with your perspective?',
+        share_position_prompt: form.formData.facilitator_config.ibis_facilitation?.share_position_prompt || 'Other participants have taken various positions on this issue. Here are the main viewpoints that have been shared. Do any of these align with your thinking?',
+        share_argument_prompt: form.formData.facilitator_config.ibis_facilitation?.share_argument_prompt || 'Here are the arguments other participants have made supporting different positions. Which of these do you find most compelling, or would you like to hear more about any particular argument?'
       }
     });
   };
 
-  const updateIbisPrompt = (field: 'elicit_issue_prompt' | 'elicit_position_prompt' | 'elicit_argument_prompt', value: string) => {
+  const updateIbisPrompt = (field: 'share_issue_prompt' | 'share_position_prompt' | 'share_argument_prompt', value: string) => {
     form.updateField('facilitator_config', {
       ...form.formData.facilitator_config,
       ibis_facilitation: {
-        ...(form.formData.facilitator_config.ibis_facilitation || { enabled: true, elicit_issue_prompt: '', elicit_position_prompt: '', elicit_argument_prompt: '' }),
+        ...(form.formData.facilitator_config.ibis_facilitation || { enabled: true, share_issue_prompt: '', share_position_prompt: '', share_argument_prompt: '' }),
         [field]: value
       }
     });
@@ -208,10 +208,13 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
           </div>
 
 
-          {/* IBIS Facilitation Prompts (Peer Agent) */}
-          {agent.agent_type === 'peer_agent' && (
+          {/* IBIS Facilitation Prompts (Pia Only) */}
+          {agent.agent_type === 'peer_agent' && (agent.name === 'Pia' || agent.name.toLowerCase().includes('pia')) && (
             <div className="space-y-2 border-t pt-4">
-              <Label className="text-base font-semibold">IBIS Facilitation Prompts</Label>
+              <Label className="text-base font-semibold">IBIS Sharing Prompts</Label>
+              <p className="text-sm text-muted-foreground">
+                Configure how Pia shares existing participant perspectives from the IBIS map
+              </p>
               <div className="flex items-center space-x-2">
                 <Button
                   type="button"
@@ -219,39 +222,39 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
                   onClick={toggleIbisFacilitation}
                   size="sm"
                 >
-                  {form.formData.facilitator_config.ibis_facilitation?.enabled ? 'Disable' : 'Enable'} IBIS Facilitation
+                  {form.formData.facilitator_config.ibis_facilitation?.enabled ? 'Disable' : 'Enable'} IBIS Sharing
                 </Button>
               </div>
               {form.formData.facilitator_config.ibis_facilitation?.enabled && (
                 <div className="space-y-3">
                   <div>
-                    <Label htmlFor="ibis-issue">Issue Elicitation Prompt</Label>
+                    <Label htmlFor="ibis-issue">Issue Sharing Prompt</Label>
                     <Textarea
                       id="ibis-issue"
                       rows={2}
-                      value={form.formData.facilitator_config.ibis_facilitation?.elicit_issue_prompt || ''}
-                      onChange={(e) => updateIbisPrompt('elicit_issue_prompt', e.target.value)}
-                      placeholder="Prompt to ask participants for issues first"
+                      value={form.formData.facilitator_config.ibis_facilitation?.share_issue_prompt || ''}
+                      onChange={(e) => updateIbisPrompt('share_issue_prompt', e.target.value)}
+                      placeholder="How to share existing issues from other participants"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="ibis-position">Position Elicitation Prompt</Label>
+                    <Label htmlFor="ibis-position">Position Sharing Prompt</Label>
                     <Textarea
                       id="ibis-position"
                       rows={2}
-                      value={form.formData.facilitator_config.ibis_facilitation?.elicit_position_prompt || ''}
-                      onChange={(e) => updateIbisPrompt('elicit_position_prompt', e.target.value)}
-                      placeholder="Prompt to ask for positions on a selected issue"
+                      value={form.formData.facilitator_config.ibis_facilitation?.share_position_prompt || ''}
+                      onChange={(e) => updateIbisPrompt('share_position_prompt', e.target.value)}
+                      placeholder="How to share existing positions from other participants"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="ibis-argument">Argument Elicitation Prompt</Label>
+                    <Label htmlFor="ibis-argument">Argument Sharing Prompt</Label>
                     <Textarea
                       id="ibis-argument"
                       rows={2}
-                      value={form.formData.facilitator_config.ibis_facilitation?.elicit_argument_prompt || ''}
-                      onChange={(e) => updateIbisPrompt('elicit_argument_prompt', e.target.value)}
-                      placeholder="Prompt to elicit 1–2 supporting arguments with evidence"
+                      value={form.formData.facilitator_config.ibis_facilitation?.share_argument_prompt || ''}
+                      onChange={(e) => updateIbisPrompt('share_argument_prompt', e.target.value)}
+                      placeholder="How to share existing arguments from other participants"
                     />
                   </div>
                 </div>

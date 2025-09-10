@@ -200,9 +200,9 @@ export interface FacilitatorQuestion {
 
 export interface IbisFacilitationConfig {
   enabled: boolean;
-  elicit_issue_prompt: string;
-  elicit_position_prompt: string;
-  elicit_argument_prompt: string;
+  share_issue_prompt: string;
+  share_position_prompt: string;
+  share_argument_prompt: string;
 }
 
 export interface LocalAgentCreate {

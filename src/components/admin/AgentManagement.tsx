@@ -5,6 +5,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Agent, FacilitatorConfig } from '@/types/index';
 import { serviceContainer } from '@/services/domain/container';
@@ -39,9 +41,9 @@ const getDefaultFormData = (): EditForm => ({
     prompting_questions: [],
     ibis_facilitation: {
       enabled: false,
-      elicit_issue_prompt: '',
-      elicit_position_prompt: '',
-      elicit_argument_prompt: ''
+      share_issue_prompt: '',
+      share_position_prompt: '',
+      share_argument_prompt: ''
     }
   }
 });
@@ -122,9 +124,9 @@ export const AgentManagement: React.FC = () => {
         prompting_questions: [],
         ibis_facilitation: {
           enabled: false,
-          elicit_issue_prompt: '',
-          elicit_position_prompt: '',
-          elicit_argument_prompt: ''
+          share_issue_prompt: '',
+          share_position_prompt: '',
+          share_argument_prompt: ''
         }
       }
     });
@@ -236,6 +238,84 @@ export const AgentManagement: React.FC = () => {
         checked={form.formData.is_default}
         onChange={(checked) => form.updateField('is_default', checked)}
       />
+
+      {/* IBIS Sharing Prompts (Pia Only) */}
+      {form.formData.agent_type === 'peer_agent' && (form.formData.name === 'Pia' || form.formData.name.toLowerCase().includes('pia')) && (
+        <div className="space-y-2 border-t pt-4">
+          <Label className="text-base font-semibold">IBIS Sharing Prompts</Label>
+          <p className="text-sm text-muted-foreground">
+            Configure how Pia shares existing participant perspectives from the IBIS map
+          </p>
+          <div className="flex items-center space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => form.updateField('facilitator_config', {
+                ...form.formData.facilitator_config,
+                ibis_facilitation: {
+                  ...form.formData.facilitator_config.ibis_facilitation,
+                  enabled: !form.formData.facilitator_config.ibis_facilitation?.enabled
+                }
+              })}
+              size="sm"
+            >
+              {form.formData.facilitator_config.ibis_facilitation?.enabled ? 'Disable' : 'Enable'} IBIS Sharing
+            </Button>
+          </div>
+          {form.formData.facilitator_config.ibis_facilitation?.enabled && (
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="global-ibis-issue">Issue Sharing Prompt</Label>
+                <Textarea
+                  id="global-ibis-issue"
+                  rows={2}
+                  value={form.formData.facilitator_config.ibis_facilitation?.share_issue_prompt || ''}
+                  onChange={(e) => form.updateField('facilitator_config', {
+                    ...form.formData.facilitator_config,
+                    ibis_facilitation: {
+                      ...form.formData.facilitator_config.ibis_facilitation,
+                      share_issue_prompt: e.target.value
+                    }
+                  })}
+                  placeholder="How to share existing issues from other participants"
+                />
+              </div>
+              <div>
+                <Label htmlFor="global-ibis-position">Position Sharing Prompt</Label>
+                <Textarea
+                  id="global-ibis-position"
+                  rows={2}
+                  value={form.formData.facilitator_config.ibis_facilitation?.share_position_prompt || ''}
+                  onChange={(e) => form.updateField('facilitator_config', {
+                    ...form.formData.facilitator_config,
+                    ibis_facilitation: {
+                      ...form.formData.facilitator_config.ibis_facilitation,
+                      share_position_prompt: e.target.value
+                    }
+                  })}
+                  placeholder="How to share existing positions from other participants"
+                />
+              </div>
+              <div>
+                <Label htmlFor="global-ibis-argument">Argument Sharing Prompt</Label>
+                <Textarea
+                  id="global-ibis-argument"
+                  rows={2}
+                  value={form.formData.facilitator_config.ibis_facilitation?.share_argument_prompt || ''}
+                  onChange={(e) => form.updateField('facilitator_config', {
+                    ...form.formData.facilitator_config,
+                    ibis_facilitation: {
+                      ...form.formData.facilitator_config.ibis_facilitation,
+                      share_argument_prompt: e.target.value
+                    }
+                  })}
+                  placeholder="How to share existing arguments from other participants"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 
