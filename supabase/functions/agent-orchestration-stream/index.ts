@@ -861,13 +861,21 @@ serve(async (req) => {
 
     console.log('📥 Parsing request body');
     // Use proper JSON parsing with error handling
-    const { messageId, deliberationId, mode = 'stream' } = await parseAndValidateRequest<{
+    const { messageId, deliberationId, mode = 'chat' } = await parseAndValidateRequest<{
       messageId: string;
       deliberationId: string;
-      mode?: string;
+      mode?: 'chat' | 'learn';
     }>(req, ['messageId', 'deliberationId']);
     
-    console.log('🚀 Starting streaming agent orchestration', { messageId, deliberationId, mode });
+    // Validate mode parameter
+    if (mode && !['chat', 'learn'].includes(mode)) {
+      console.warn('⚠️ Invalid mode received, defaulting to chat:', mode);
+      const validMode = 'chat';
+      console.log('🚀 Starting streaming agent orchestration', { messageId, deliberationId, mode: validMode });
+    } else {
+      console.log('🚀 Starting streaming agent orchestration', { messageId, deliberationId, mode });
+      console.log('🎯 Mode validation passed:', { mode, isLearnMode: mode === 'learn' });
+    }
     
     // F001 Fix: Acquire distributed lock to prevent duplicate processing
     console.log('🔒 Attempting to acquire processing lock');
