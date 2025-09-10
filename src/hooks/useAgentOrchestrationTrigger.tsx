@@ -162,80 +162,64 @@ export const useAgentOrchestrationTrigger = () => {
       
       try {
         // CRITICAL: Use console.log directly to ensure logs appear
-        console.log('🌐 [FETCH-DEBUG] About to make fetch request', {
+        console.log('🌐 [SUPABASE-CLIENT-DEBUG] Using Supabase client invoke instead of fetch', {
           requestId,
-          url: functionUrl,
-          method: 'POST',
-          headers: Object.keys(requestHeaders),
-          bodySize: JSON.stringify(requestPayload).length,
+          functionName: 'agent-orchestration-stream',
+          payload: requestPayload,
           timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
           online: navigator.onLine
         });
         
-        logger.info('🌐 [DEBUG] About to make fetch request', {
+        logger.info('🌐 [DEBUG] Using Supabase functions.invoke', {
           requestId,
-          url: functionUrl,
-          method: 'POST',
-          headers: Object.keys(requestHeaders),
-          bodySize: JSON.stringify(requestPayload).length,
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-          online: navigator.onLine
+          functionName: 'agent-orchestration-stream',
+          payload: requestPayload,
+          timestamp: new Date().toISOString()
         });
 
-        const response = await fetch(functionUrl, {
-          method: 'POST',
-          headers: requestHeaders,
-          body: JSON.stringify(requestPayload),
-          signal: controller.signal
+        // Use Supabase client instead of fetch to avoid proxy issues
+        const { data: response, error: invokeError } = await supabase.functions.invoke('agent-orchestration-stream', {
+          body: requestPayload,
+          headers: {
+            'X-Request-ID': requestId
+          }
         });
         
         clearTimeout(timeoutId);
         
-        // PHASE 1: Enhanced Response Logging
-        logger.info('📥 [PHASE1] Received orchestration response', {
-          requestId,
-          status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          url: response.url,
-          type: response.type,
-          ok: response.ok,
-          redirected: response.redirected
-        });
-        
-        if (!response.ok) {
-          streamHealthMonitor.recordDisconnection(streamId, `HTTP ${response.status}`);
-          
-          let errorText = '';
-          try {
-            errorText = await response.text();
-          } catch (textError) {
-            logger.warn('🚨 [PHASE1] Could not read error response body', { requestId, textError });
-            errorText = 'Unable to read error response';
-          }
-
-          logger.error('❌ [PHASE1] Edge function response error', {
+        if (invokeError) {
+          console.error('🚨 [SUPABASE-INVOKE-ERROR] Function invoke failed', {
             requestId,
-            status: response.status,
-            statusText: response.statusText,
-            errorText: errorText.substring(0, 500),
-            messageId: messageId.substring(0, 8),
-            streamId,
-            mode,
-            responseHeaders: Object.fromEntries(response.headers.entries())
+            error: invokeError,
+            message: invokeError.message,
+            context: invokeError.context || 'No context'
           });
-          throw new Error(`Agent orchestration failed: ${response.status} - ${errorText}`);
+          throw new Error(`Agent orchestration failed: ${invokeError.message || 'Unknown invoke error'}`);
         }
-
-        logger.info('✅ [PHASE1] Stream response received successfully', {
+        
+        // PHASE 1: Enhanced Response Logging for Supabase invoke
+        console.log('📥 [SUPABASE-RESPONSE] Function invoke succeeded', {
           requestId,
           messageId: messageId.substring(0, 8),
           streamId,
-          contentType: response.headers.get('content-type'),
+          responseData: response ? 'Data received' : 'No data',
+          mode
+        });
+        
+        logger.info('📥 [PHASE1] Received orchestration response via Supabase client', {
+          requestId,
+          messageId: messageId.substring(0, 8),
+          streamId,
+          hasData: !!response,
+          mode
+        });
+
+        logger.info('✅ [PHASE1] Stream response received successfully via Supabase client', {
+          requestId,
+          messageId: messageId.substring(0, 8),
+          streamId,
           mode,
-          responseOk: response.ok
+          success: true
         });
         
         const duration = Date.now() - startTime;
@@ -261,48 +245,36 @@ export const useAgentOrchestrationTrigger = () => {
           onTypingChange?.(false);
         }, 60000);
         
-      } catch (fetchError) {
+      } catch (invokeError) {
         clearTimeout(timeoutId);
-        streamHealthMonitor.recordDisconnection(streamId, 'fetch_error');
+        streamHealthMonitor.recordDisconnection(streamId, 'supabase_invoke_error');
         
         // CRITICAL: Use console.error directly to ensure error logs appear
-        console.error('🚨 [FETCH-ERROR] Fetch failed with details:', {
+        console.error('🚨 [SUPABASE-INVOKE-ERROR] Supabase function invoke failed:', {
           requestId,
-          error: fetchError,
-          errorMessage: fetchError instanceof Error ? fetchError.message : 'Unknown fetch error',
-          errorName: fetchError instanceof Error ? fetchError.name : 'Unknown',
-          errorStack: fetchError instanceof Error ? fetchError.stack?.substring(0, 500) : 'No stack',
-          url: functionUrl,
+          error: invokeError,
+          errorMessage: invokeError instanceof Error ? invokeError.message : 'Unknown invoke error',
+          errorName: invokeError instanceof Error ? invokeError.name : 'Unknown',
+          errorStack: invokeError instanceof Error ? invokeError.stack?.substring(0, 500) : 'No stack',
+          functionName: 'agent-orchestration-stream',
           timestamp: new Date().toISOString(),
           networkState: navigator.onLine,
           connectionType: (navigator as any).connection?.effectiveType || 'unknown'
         });
         
-        logger.error('🚨 [DEBUG] Fetch error details', {
+        logger.error('🚨 [DEBUG] Supabase invoke error details', {
           requestId,
-          error: fetchError,
-          errorMessage: fetchError instanceof Error ? fetchError.message : 'Unknown fetch error',
-          errorName: fetchError instanceof Error ? fetchError.name : 'Unknown',
-          errorStack: fetchError instanceof Error ? fetchError.stack?.substring(0, 500) : 'No stack',
-          url: functionUrl,
+          error: invokeError,
+          errorMessage: invokeError instanceof Error ? invokeError.message : 'Unknown invoke error',
+          errorName: invokeError instanceof Error ? invokeError.name : 'Unknown',
+          errorStack: invokeError instanceof Error ? invokeError.stack?.substring(0, 500) : 'No stack',
+          functionName: 'agent-orchestration-stream',
           timestamp: new Date().toISOString(),
           networkState: navigator.onLine,
           connectionType: (navigator as any).connection?.effectiveType || 'unknown'
         });
         
-        // Try alternative URL format as fallback
-        if (fetchError instanceof Error && fetchError.message === 'Failed to fetch') {
-          logger.info('🔄 [DEBUG] Attempting fallback URL format', {
-            requestId,
-            originalUrl: functionUrl,
-            fallbackUrl: `https://iowsxuxkgvpgrvvklwyt.supabase.co/rest/v1/rpc/agent-orchestration-stream`
-          });
-          
-          // Don't actually retry here - just log for debugging
-          // We'll throw the original error to maintain existing error handling
-        }
-        
-        throw fetchError;
+        throw invokeError;
       }
       
     } catch (error) {
