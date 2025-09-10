@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Eye, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ExpandableText } from '@/components/common/ExpandableText';
@@ -196,7 +196,6 @@ export const IbisTableView: React.FC<IbisTableViewProps> = ({ deliberationId }) 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12"></TableHead>
                 <TableHead className="w-24">Type</TableHead>
                 <TableHead>Content</TableHead>
                 <TableHead className="w-48">Related Issues</TableHead>
@@ -204,26 +203,10 @@ export const IbisTableView: React.FC<IbisTableViewProps> = ({ deliberationId }) 
             </TableHeader>
             <TableBody>
               {filteredNodes.map((node) => {
-                const isExpanded = expandedRows.has(node.id);
                 const nodeRelationships = getNodeRelationships(node.id);
                 
                 return (
                   <TableRow key={node.id} className="group">
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleRowExpansion(node.id)}
-                        className="h-6 w-6 p-0"
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                    
                     <TableCell>
                       <Badge 
                         variant="outline" 
@@ -236,7 +219,7 @@ export const IbisTableView: React.FC<IbisTableViewProps> = ({ deliberationId }) 
                     <TableCell>
                       <div className="space-y-1">
                         <div className="font-medium text-sm">{node.title}</div>
-                        {isExpanded && node.description && (
+                        {node.description && (
                           <div className="text-xs text-muted-foreground">
                             <ExpandableText text={node.description} maxLength={200} />
                           </div>
@@ -250,7 +233,7 @@ export const IbisTableView: React.FC<IbisTableViewProps> = ({ deliberationId }) 
                           <span className="text-xs text-muted-foreground">No relationships</span>
                         ) : (
                           <div className="flex flex-wrap gap-1">
-                            {nodeRelationships.slice(0, isExpanded ? undefined : 2).map((rel, index) => (
+                            {nodeRelationships.map((rel, index) => (
                               <div key={index} className="text-xs">
                                 <span className={relationshipConfig[rel.type].color}>
                                   {relationshipConfig[rel.type].label}
@@ -258,11 +241,6 @@ export const IbisTableView: React.FC<IbisTableViewProps> = ({ deliberationId }) 
                                 <span className="text-muted-foreground"> {rel.relatedNode}</span>
                               </div>
                             ))}
-                            {!isExpanded && nodeRelationships.length > 2 && (
-                              <span className="text-xs text-muted-foreground">
-                                +{nodeRelationships.length - 2} more
-                              </span>
-                            )}
                           </div>
                         )}
                       </div>
