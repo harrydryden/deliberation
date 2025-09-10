@@ -63,16 +63,22 @@ export class AgentOrchestrator {
 
   // UNIFIED AGENT CONFIGURATION FETCHING
   async getAgentConfig(agentType: string, deliberationId?: string): Promise<AgentConfig | null> {
-    const cacheKey = `${agentType}:${deliberationId || 'global'}`;
+    // USE CURRENT TIMESTAMP TO BUST CACHE - CRITICAL DEBUG
+    const timestamp = Date.now();
+    const cacheKey = `${agentType}:${deliberationId || 'global'}:${timestamp}`;
     
-    // Check cache first
-    const cached = agentConfigCache.get(cacheKey);
+    console.log(`🔄 FORCE FETCHING agent config: ${agentType} for deliberation: ${deliberationId} (cache busted with timestamp: ${timestamp})`);
+    
+    // Force cache invalidation for this specific agent
+    console.log('🧹 Clearing agent cache for debugging...');
+    agentConfigCache.clear();
+    
+    // Check cache first (should be empty now)
+    const cached = agentConfigCache.get(`${agentType}:${deliberationId || 'global'}`);
     if (cached && (Date.now() - cached.timestamp) < AGENT_CACHE_DURATION) {
       console.log(`🚀 Agent config cache hit: ${agentType}`);
       return cached.agent;
     }
-    
-    console.log(`🔄 Fetching agent config: ${agentType} for deliberation: ${deliberationId}`);
     
     try {
       let agentConfig: AgentConfig | null = null;
@@ -119,15 +125,17 @@ export class AgentOrchestrator {
         }
       }
       
-      // Cache the result (including null)
-      this.cacheAgentConfig(cacheKey, agentConfig);
+      // Cache the result (including null) with original cache key
+      const originalCacheKey = `${agentType}:${deliberationId || 'global'}`;
+      this.cacheAgentConfig(originalCacheKey, agentConfig);
       
       return agentConfig;
       
     } catch (error) {
       console.error(`Failed to fetch ${agentType} agent configuration:`, error);
       // Cache null result to avoid repeated failures
-      this.cacheAgentConfig(cacheKey, null);
+      const originalCacheKey = `${agentType}:${deliberationId || 'global'}`;
+      this.cacheAgentConfig(originalCacheKey, null);
       return null;
     }
   }
