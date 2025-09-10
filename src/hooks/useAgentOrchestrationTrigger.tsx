@@ -24,12 +24,11 @@ export const useAgentOrchestrationTrigger = () => {
     try {
       onTypingChange?.(true);
 
-      // PHASE 1: Enhanced Mode Parameter Validation and Logging
+      // Enhanced mode validation
       logger.info('🔍 [PHASE1] Mode parameter validation', {
         messageId: messageId.substring(0, 8),
         deliberationId: deliberationId.substring(0, 8),
         mode,
-        modeType: typeof mode,
         requestId,
         validModes: ['chat', 'learn'],
         isValidMode: ['chat', 'learn'].includes(mode)
@@ -62,92 +61,23 @@ export const useAgentOrchestrationTrigger = () => {
         streamId,
         requestId
       });
-      
-      // Get current session for authentication
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // PHASE 1: Detailed Request Preparation Logging
+
+      // Use standard Supabase client invocation
       const requestPayload = {
         messageId,
         deliberationId,
-        mode
+        mode: mode || 'chat'
       };
-
-      const functionUrl = `https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/agent-orchestration-stream`;
-
-      // Test connectivity before making the actual request
-      logger.info('🔍 [DEBUG] Testing edge function connectivity', {
-        requestId,
-        url: functionUrl,
-        timestamp: new Date().toISOString()
-      });
-      
-      // Quick connectivity test
-      try {
-        const testResponse = await fetch(functionUrl, {
-          method: 'OPTIONS',
-          headers: {
-            'Origin': window.location.origin,
-            'Access-Control-Request-Method': 'POST',
-            'Access-Control-Request-Headers': 'authorization, apikey, content-type'
-          }
-        });
-        
-        logger.info('🔍 [DEBUG] Connectivity test result', {
-          requestId,
-          status: testResponse.status,
-          ok: testResponse.ok,
-          statusText: testResponse.statusText,
-          headers: Object.fromEntries(testResponse.headers.entries())
-        });
-      } catch (testError) {
-        logger.error('🚨 [DEBUG] Connectivity test failed', {
-          requestId,
-          error: testError,
-          message: testError instanceof Error ? testError.message : 'Unknown test error'
-        });
-        // Continue with main request anyway - connectivity test might fail but main request might work
-      }
 
       logger.info('📤 [PHASE1] Preparing orchestration request', {
         requestId,
-        url: functionUrl,
-        method: 'POST',
         messageId: messageId.substring(0, 8),
         deliberationId: deliberationId.substring(0, 8),
-        mode,
+        mode: requestPayload.mode,
         streamId,
-        payloadString: JSON.stringify(requestPayload),
-        payloadSize: JSON.stringify(requestPayload).length,
-        hasAuthToken: false,
-        tokenLength: 0
+        payloadSize: JSON.stringify(requestPayload).length
       });
 
-      // PHASE 1: Request Body Validation Before Send
-      if (!requestPayload.messageId || !requestPayload.deliberationId) {
-        logger.error('🚨 [PHASE1] Critical request validation failed', {
-          requestId,
-          hasMessageId: !!requestPayload.messageId,
-          hasDeliberationId: !!requestPayload.deliberationId,
-          mode: requestPayload.mode
-        });
-        throw new Error('Missing required parameters for orchestration request');
-      }
-
-      const requestHeaders = {
-        'Content-Type': 'application/json',
-        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM',
-        'X-Request-ID': requestId  // Add correlation ID
-      };
-
-      logger.info('🚀 [PHASE1] Sending orchestration request', {
-        requestId,
-        timestamp: new Date().toISOString(),
-        headers: Object.keys(requestHeaders),
-        payloadMode: requestPayload.mode,
-        targetFunction: 'agent-orchestration-stream'
-      });
-      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         logger.warn('⏰ [PHASE1] Agent orchestration timeout', { requestId, timeout: '45s' });
@@ -156,82 +86,43 @@ export const useAgentOrchestrationTrigger = () => {
       }, 45000);
       
       try {
-        // CRITICAL: Use console.log directly to ensure logs appear
-        console.log('🌐 [SUPABASE-CLIENT-DEBUG] Using Supabase client invoke instead of fetch', {
+        console.log('🌐 [DEBUG] Using Supabase functions.invoke (standard pattern)', {
           requestId,
           functionName: 'agent-orchestration-stream',
           payload: requestPayload,
-          timestamp: new Date().toISOString(),
-          online: navigator.onLine
+          timestamp: new Date().toISOString()
+        });
+
+        // Use supabase.functions.invoke like all other working functions
+        const result = await supabase.functions.invoke('agent-orchestration-stream', {
+          body: requestPayload,
+          headers: {
+            'X-Request-ID': requestId
+          }
         });
         
-        logger.info('🌐 [DEBUG] Using Supabase functions.invoke', {
-          requestId,
-          functionName: 'agent-orchestration-stream',
-          payload: requestPayload,
-          timestamp: new Date().toISOString()
-        });
-
-        // DEBUG: Using supabase.functions.invoke for authenticated edge function
-        console.log('🔍 [DEBUG] Using supabase.functions.invoke with authenticated client', {
-          requestId,
-          functionName: 'agent-orchestration-stream',
-          payloadKeys: Object.keys(requestPayload),
-          timestamp: new Date().toISOString()
-        });
-
-        // Use standard supabase.functions.invoke like all other functions
-        let response: any = null;
-        try {
-          console.log('🌐 [DEBUG] Using supabase.functions.invoke (standard pattern)', {
+        clearTimeout(timeoutId);
+        
+        const response = result.data;
+        const invokeError = result.error;
+        
+        if (invokeError) {
+          console.error('🚨 [SUPABASE-INVOKE-ERROR] Function invoke failed', {
             requestId,
-            functionName: 'agent-orchestration-stream',
-            payload: requestPayload,
-            timestamp: new Date().toISOString()
+            error: invokeError,
+            message: invokeError.message,
+            context: invokeError.context || 'No context',
+            details: invokeError
           });
-
-          const result = await supabase.functions.invoke('agent-orchestration-stream', {
-            body: requestPayload,
-            headers: {
-              'X-Request-ID': requestId
-            }
-          });
-          
-          clearTimeout(timeoutId);
-          
-          response = result.data;
-          const invokeError = result.error;
-          
-          if (invokeError) {
-            console.error('🚨 [SUPABASE-INVOKE-ERROR] Function invoke failed', {
-              requestId,
-              error: invokeError,
-              message: invokeError.message,
-              context: invokeError.context || 'No context',
-              details: invokeError
-            });
-            throw new Error(`Agent orchestration failed: ${invokeError.message || 'Unknown invoke error'}`);
-          }
-        } catch (clientError) {
-          console.error('🚨 [SUPABASE-CLIENT-ERROR] Client threw exception', {
-            requestId,
-            error: clientError,
-            errorType: typeof clientError,
-            errorName: clientError instanceof Error ? clientError.name : 'Unknown',
-            errorMessage: clientError instanceof Error ? clientError.message : String(clientError),
-            errorStack: clientError instanceof Error ? clientError.stack : 'No stack',
-            timestamp: new Date().toISOString()
-          });
-          throw new Error(`Agent orchestration failed: ${clientError instanceof Error ? clientError.message : 'Failed to send a request to the Edge Function'}`);
+          throw new Error(`Agent orchestration failed: ${invokeError.message || 'Unknown invoke error'}`);
         }
         
-        // PHASE 1: Enhanced Response Logging for Supabase invoke
         console.log('📥 [SUPABASE-RESPONSE] Function invoke succeeded', {
           requestId,
           messageId: messageId.substring(0, 8),
           streamId,
           responseData: response ? 'Data received' : 'No data',
-          mode
+          mode: requestPayload.mode
         });
         
         logger.info('📥 [PHASE1] Received orchestration response via Supabase client', {
@@ -239,22 +130,14 @@ export const useAgentOrchestrationTrigger = () => {
           messageId: messageId.substring(0, 8),
           streamId,
           hasData: !!response,
-          mode
-        });
-
-        logger.info('✅ [PHASE1] Stream response received successfully via Supabase client', {
-          requestId,
-          messageId: messageId.substring(0, 8),
-          streamId,
-          mode,
-          success: true
+          mode: requestPayload.mode
         });
         
         const duration = Date.now() - startTime;
         systemMonitor.recordMetric('agent_orchestration_trigger', duration, true, {
           messageId: messageId.substring(0, 8),
           deliberationId: deliberationId.substring(0, 8),
-          mode,
+          mode: requestPayload.mode,
           success: true
         });
         
@@ -263,7 +146,7 @@ export const useAgentOrchestrationTrigger = () => {
         logger.info('Agent orchestration triggered successfully', { 
           messageId: messageId.substring(0, 8), 
           deliberationId: deliberationId.substring(0, 8), 
-          mode,
+          mode: requestPayload.mode,
           duration,
           streamId
         });
@@ -277,7 +160,6 @@ export const useAgentOrchestrationTrigger = () => {
         clearTimeout(timeoutId);
         streamHealthMonitor.recordDisconnection(streamId, 'supabase_invoke_error');
         
-        // CRITICAL: Use console.error directly to ensure error logs appear
         console.error('🚨 [SUPABASE-INVOKE-ERROR] Supabase function invoke failed:', {
           requestId,
           error: invokeError,
@@ -286,20 +168,7 @@ export const useAgentOrchestrationTrigger = () => {
           errorStack: invokeError instanceof Error ? invokeError.stack?.substring(0, 500) : 'No stack',
           functionName: 'agent-orchestration-stream',
           timestamp: new Date().toISOString(),
-          networkState: navigator.onLine,
-          connectionType: (navigator as any).connection?.effectiveType || 'unknown'
-        });
-        
-        logger.error('🚨 [DEBUG] Supabase invoke error details', {
-          requestId,
-          error: invokeError,
-          errorMessage: invokeError instanceof Error ? invokeError.message : 'Unknown invoke error',
-          errorName: invokeError instanceof Error ? invokeError.name : 'Unknown',
-          errorStack: invokeError instanceof Error ? invokeError.stack?.substring(0, 500) : 'No stack',
-          functionName: 'agent-orchestration-stream',
-          timestamp: new Date().toISOString(),
-          networkState: navigator.onLine,
-          connectionType: (navigator as any).connection?.effectiveType || 'unknown'
+          networkState: navigator.onLine
         });
         
         throw invokeError;
@@ -344,7 +213,6 @@ export const useAgentOrchestrationTrigger = () => {
         variant: "destructive"
       });
       
-      // Update system health status
       systemMonitor.updateComponentHealth('agentOrchestration', 'warning', errorMessage);
       
       throw error;

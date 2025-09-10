@@ -10,10 +10,12 @@ export interface StreamHealthMetrics {
   disconnections: number;
 }
 
+// Clean up stale stream connections on client
 export class StreamHealthMonitor {
   private connections = new Map<string, StreamHealthMetrics>();
   private readonly STALE_CONNECTION_TIMEOUT = 30000; // 30 seconds
   private readonly HEALTH_CHECK_INTERVAL = 5000; // 5 seconds
+  private readonly MAX_STALE_CONNECTIONS = 10; // Maximum stale connections before cleanup
   private healthCheckTimer?: NodeJS.Timeout;
 
   constructor() {
@@ -125,15 +127,27 @@ export class StreamHealthMonitor {
     }
 
     if (staleConnections.length > 0) {
-      logger.warn('⚕️ Stale stream connections detected', {
-        staleCount: staleConnections.length,
-        totalConnections: this.connections.size,
-        staleConnections
-      });
+      // Auto-cleanup if too many stale connections
+      if (staleConnections.length >= this.MAX_STALE_CONNECTIONS) {
+        logger.warn('🧹 Auto-cleaning excessive stale connections', {
+          staleCount: staleConnections.length,
+          maxAllowed: this.MAX_STALE_CONNECTIONS
+        });
+        
+        staleConnections.forEach(connectionId => {
+          this.connections.delete(connectionId);
+        });
+      } else {
+        logger.warn('⚕️ Stale stream connections detected', {
+          staleCount: staleConnections.length,
+          totalConnections: this.connections.size,
+          staleConnections: staleConnections.slice(0, 3) // Only log first 3 to avoid spam
+        });
+      }
     }
 
-    // Log health summary every minute
-    if (Date.now() % 60000 < this.HEALTH_CHECK_INTERVAL) {
+    // Log health summary less frequently to reduce noise
+    if (Date.now() % 120000 < this.HEALTH_CHECK_INTERVAL) { // Every 2 minutes instead of 1
       this.logHealthSummary();
     }
   }
