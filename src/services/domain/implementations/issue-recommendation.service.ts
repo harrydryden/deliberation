@@ -110,7 +110,7 @@ export class IssueRecommendationService {
   }
 
   /**
-   * Get AI recommendations using OpenAI via Supabase Edge Function
+   * Get AI recommendations using OpenAI via Supabase Edge Function with proper error handling
    * @param userId - The authenticated user ID (passed from component)
    */
   private async getAIRecommendations(
@@ -124,6 +124,7 @@ export class IssueRecommendationService {
 
       const { data, error } = await supabase.functions.invoke('generate-issue-recommendations', {
         body: {
+          deliberationId: this.currentDeliberationId,
           content,
           existingIssues,
           userId,
@@ -146,7 +147,7 @@ export class IssueRecommendationService {
       });
 
       return data.recommendations.map((rec: any) => ({
-        issueId: rec.id || `temp_${Date.now()}_${Math.random()}`,
+        issueId: rec.issueId || `temp_${Date.now()}_${Math.random()}`,
         title: rec.title || 'Untitled Issue',
         description: rec.description || 'No description provided',
         relevanceScore: Math.max(0, Math.min(1, rec.relevanceScore || rec.relevance_score || 0.5)),

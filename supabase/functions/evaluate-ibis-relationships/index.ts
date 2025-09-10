@@ -1,5 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import OpenAI from 'https://deno.land/x/openai@v4.57.0/mod.ts';
 
 // Import shared utilities for performance and consistency
 import { 
@@ -142,14 +144,17 @@ serve(async (req) => {
       });
     }
 
-    // Generate embedding for new content
+    // Generate embedding for new content with timeout
     const openai = new OpenAI({ apiKey: openaiKey });
     const fullContent = `${title}\n\n${content}`;
     
-    const embedRes = await openai.embeddings.create({
-      model: "text-embedding-3-small",
-      input: fullContent.slice(0, 8000),
-    });
+    const embedRes = await withTimeout(
+      openai.embeddings.create({
+        model: "text-embedding-3-small",
+        input: fullContent.slice(0, 8000),
+      }),
+      15000 // 15 second timeout for embedding
+    );
     
     const newContentEmbedding = embedRes.data[0]?.embedding as number[];
 
@@ -226,7 +231,12 @@ ${i + 1}. [${node.node_type.toUpperCase()}] ${node.title}
     );
 
     console.log(`🤖 Using model: ${selectedModel} for relationship evaluation`);
-    const aiResponse = await openai.chat.completions.create(apiParams);
+    
+    // Add timeout for AI response
+    const aiResponse = await withTimeout(
+      openai.chat.completions.create(apiParams),
+      30000 // 30 second timeout
+    );
 
     let aiRelationships: any[] = [];
     try {
