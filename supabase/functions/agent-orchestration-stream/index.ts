@@ -842,12 +842,56 @@ serve(async (req) => {
   // Comprehensive error boundary for all non-OPTIONS requests
   try {
     console.log('🔧 Starting environment validation');
-    // Environment validation only for POST requests
-    const { supabase, userSupabase } = validateAndGetEnvironment();
+    // Environment validation for service role client
+    const { supabase: serviceSupabase } = validateAndGetEnvironment();
     console.log('✅ Environment validation successful');
     
-    // AUTHENTICATION: Edge function now requires JWT - no manual auth header handling needed
-    console.log('🔑 JWT verification enabled - using authenticated context');
+    // AUTHENTICATION: Extract JWT token from authenticated request
+    console.log('🔑 JWT verification enabled - extracting authenticated user context');
+    const authHeader = req.headers.get('Authorization');
+    const bearerToken = authHeader?.replace('Bearer ', '');
+    
+    if (!bearerToken) {
+      console.error('❌ Missing Authorization header in authenticated request');
+      
+      // Return streaming error response for consistency
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+      const encoder = new TextEncoder();
+      
+      const errorData = `data: ${JSON.stringify({ 
+        error: 'Missing authentication token',
+        done: true,
+        timestamp: new Date().toISOString(),
+        context: 'authentication-required' 
+      })}\n\n`;
+      
+      writer.write(encoder.encode(errorData));
+      writer.close();
+      
+      return new Response(readable, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        }
+      });
+    }
+    
+    // Create authenticated Supabase client using the user's JWT token
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const authenticatedSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${bearerToken}`
+        }
+      }
+    });
+    
+    console.log('✅ Authenticated Supabase client created with user JWT context');
     
     const requestId = req.headers.get('X-Request-ID') || `edge_${Date.now()}`;
     console.log('📥 [PHASE1] Edge function request received', {
@@ -943,7 +987,7 @@ serve(async (req) => {
 
     console.log('🚀 Starting background processing');
     // Start background processing with authenticated context and cleanup
-    processStreamingOrchestration(messageId, deliberationId, mode, supabase, sendData).finally(() => {
+    processStreamingOrchestration(messageId, deliberationId, mode, serviceSupabase, authenticatedSupabase, sendData).finally(() => {
       console.log('🔓 Releasing processing lock');
       releaseProcessingLock(messageId, lockId);
       console.log('🔚 Closing writer');
@@ -1011,7 +1055,8 @@ async function processStreamingOrchestration(
   messageId: string,
   deliberationId: string,
   mode: string,
-  userSupabase: any,
+  serviceSupabase: any,
+  authenticatedSupabase: any,
   sendData: (data: any) => void
 ) {
   console.log(`🚀 Starting processStreamingOrchestration`, { messageId, deliberationId, mode });
@@ -1025,15 +1070,12 @@ async function processStreamingOrchestration(
   });
   
   try {
-    console.log('🔧 Getting environment clients');
-    // Use shared environment validation with caching
-    const { supabase: serviceSupabase } = validateAndGetEnvironment();
+    console.log('🔧 Getting OpenAI API key');
     const openAIApiKey = getOpenAIKey();
-    console.log('✅ Environment clients ready');
+    console.log('✅ Environment setup complete');
 
     // Use authenticated user client passed from main function
     console.log('🔐 Using authenticated user client from JWT context');
-    const authenticatedUserSupabase = userSupabase;
 
     console.log(`📊 Supabase clients ready - authenticated context available`);
   
@@ -1077,7 +1119,7 @@ async function processStreamingOrchestration(
     console.log(`🔍 Using authenticated JWT context`);
     
     let message: any = null;
-    const { data: messageData, error: messageError } = await authenticatedUserSupabase
+    const { data: messageData, error: messageError } = await authenticatedSupabase
       .from('messages')
       .select('*')
       .eq('id', messageId)
