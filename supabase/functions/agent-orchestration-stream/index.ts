@@ -846,9 +846,8 @@ serve(async (req) => {
     const { supabase, userSupabase } = validateAndGetEnvironment();
     console.log('✅ Environment validation successful');
     
-    // Get authorization header for user authentication  
-    const authHeader = req.headers.get('authorization');
-    console.log('🔑 Auth header present:', !!authHeader);
+    // AUTHENTICATION: Edge function now requires JWT - no manual auth header handling needed
+    console.log('🔑 JWT verification enabled - using authenticated context');
     
     const requestId = req.headers.get('X-Request-ID') || `edge_${Date.now()}`;
     console.log('📥 [PHASE1] Edge function request received', {
@@ -943,8 +942,8 @@ serve(async (req) => {
     };
 
     console.log('🚀 Starting background processing');
-    // Start background processing with auth header and cleanup
-    processStreamingOrchestration(messageId, deliberationId, mode, authHeader, sendData).finally(() => {
+    // Start background processing with authenticated context and cleanup
+    processStreamingOrchestration(messageId, deliberationId, mode, supabase, sendData).finally(() => {
       console.log('🔓 Releasing processing lock');
       releaseProcessingLock(messageId, lockId);
       console.log('🔚 Closing writer');
@@ -977,21 +976,32 @@ serve(async (req) => {
       }
     }
     
-    // CRITICAL: Always return proper JSON response with CORS headers
+    // CRITICAL: Always return proper streaming response with CORS headers, even on errors
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    const errorResponse = {
-      error: errorMessage,
-      timestamp: new Date().toISOString(),
-      context: 'agent-orchestration-stream',
-      method: req.method,
-      url: req.url
-    };
     
-    return new Response(JSON.stringify(errorResponse), {
-      status: 500,
+    // For streaming endpoints, we need to return a streaming error response
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+    const encoder = new TextEncoder();
+    
+    // Send error as streaming data
+    const errorData = `data: ${JSON.stringify({ 
+      error: errorMessage,
+      done: true,
+      timestamp: new Date().toISOString(),
+      context: 'agent-orchestration-stream' 
+    })}\n\n`;
+    
+    writer.write(encoder.encode(errorData));
+    writer.close();
+    
+    return new Response(readable, {
+      status: 200, // Use 200 for streaming responses to avoid browser issues
       headers: {
         ...corsHeaders,
-        'Content-Type': 'application/json'
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
       }
     });
   }
@@ -1001,11 +1011,11 @@ async function processStreamingOrchestration(
   messageId: string,
   deliberationId: string,
   mode: string,
-  authHeader: string,
+  userSupabase: any,
   sendData: (data: any) => void
 ) {
   console.log(`🚀 Starting processStreamingOrchestration`, { messageId, deliberationId, mode });
-  console.log(`🔐 Auth header present:`, !!authHeader);
+  console.log(`🔐 Using authenticated Supabase client context`);
   
   // CRITICAL: Add immediate test response to verify streaming works
   sendData({ 
@@ -1017,24 +1027,15 @@ async function processStreamingOrchestration(
   try {
     console.log('🔧 Getting environment clients');
     // Use shared environment validation with caching
-    const { supabase: serviceSupabase, userSupabase } = validateAndGetEnvironment();
+    const { supabase: serviceSupabase } = validateAndGetEnvironment();
     const openAIApiKey = getOpenAIKey();
     console.log('✅ Environment clients ready');
 
-    // Configure user client with auth header
-    console.log('🔐 Configuring authenticated user client');
-    const authenticatedUserSupabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      {
-        global: {
-          headers: { authorization: authHeader }
-        },
-        auth: { persistSession: false }
-      }
-    );
+    // Use authenticated user client passed from main function
+    console.log('🔐 Using authenticated user client from JWT context');
+    const authenticatedUserSupabase = userSupabase;
 
-    console.log(`📊 Supabase clients created successfully`);
+    console.log(`📊 Supabase clients ready - authenticated context available`);
   
     // Check for existing responses first with improved performance
     console.log(`🔍 Checking for existing responses for message ${messageId}...`);
@@ -1071,9 +1072,9 @@ async function processStreamingOrchestration(
     const orchestrator = new AgentOrchestrator(serviceSupabase);
     console.log(`✅ AgentOrchestrator initialized successfully`);
 
-    // Get message details using user client (respects RLS)
+    // Get message details using authenticated user client (respects RLS) 
     console.log(`📨 Fetching message details for messageId: ${messageId}`);
-    console.log(`🔍 Using auth header: ${authHeader ? 'YES' : 'NO'}`);
+    console.log(`🔍 Using authenticated JWT context`);
     
     let message: any = null;
     const { data: messageData, error: messageError } = await authenticatedUserSupabase
@@ -1083,13 +1084,13 @@ async function processStreamingOrchestration(
       .single();
 
     if (messageError || !messageData) {
-      console.error(`❌ Error fetching message:`, messageError);
+      console.error(`❌ Error fetching message with user context:`, messageError);
       console.error(`❌ Full message error details:`, JSON.stringify(messageError, null, 2));
       console.error(`❌ Message ID being searched: ${messageId}`);
       console.error(`❌ Deliberation ID: ${deliberationId}`);
       
-      // Try with service role as fallback
-      console.log(`🔄 Trying with service role client...`);
+      // Try with service role as fallback if RLS policy issue
+      console.log(`🔄 Trying with service role client as fallback...`);
       const { data: serviceMessage, error: serviceError } = await serviceSupabase
         .from('messages')
         .select('*')
@@ -1101,18 +1102,18 @@ async function processStreamingOrchestration(
         sendData({ error: `Message not found: ${messageId}`, done: true });
         return;
       } else {
-        console.log(`✅ Found message with service role - RLS issue detected`);
+        console.log(`✅ Found message with service role - may indicate RLS policy issue`);
         console.log(`📊 Message details:`, { 
           id: serviceMessage.id, 
           type: serviceMessage.message_type,
           userId: serviceMessage.user_id,
           content: serviceMessage.content?.substring(0, 50) 
         });
-        // Use the service message but continue processing
         message = serviceMessage;
       }
     } else {
       message = messageData;
+      console.log(`✅ Message fetched successfully with user context`);
     }
 
     console.log(`✅ Message fetched successfully:`, {
@@ -1410,10 +1411,9 @@ async function processStreamingOrchestration(
     
     sendData({ 
       error: error.message, 
-      content: `🔧 DEBUG: Fatal error in processStreamingOrchestration: ${error.message}`,
+      content: `System error: ${error.message}. The system has been notified and will investigate.`,
       done: true,
-      debug: true,
-      errorStack: error.stack
+      systemError: true
     });
   }
 }

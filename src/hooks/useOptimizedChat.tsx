@@ -153,67 +153,19 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     }
   }, [user, deliberationId, realtimeService]);
   
-  // Legacy direct send message (fallback when no queue provided)
-  const sendMessageDirect = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
-    if (!user || !deliberationId || !content.trim()) return;
-    
-    setChatState(prev => ({ ...prev, isTyping: true, error: null }));
-    
-    try {
-      const saved = await messageService.sendMessage(
-        content.trim(),
-        'user',
-        deliberationId,
-        mode,
-        user.id
-      );
-      
-      const userMessage = convertApiMessageToChatMessage(saved);
-      
-      // Add user message immediately for responsiveness
-      setChatState(prev => ({
-        ...prev,
-        messages: [...prev.messages, userMessage].sort(
-          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-        )
-      }));
-      
-      // Clear cache
-      cacheService.clearNamespace('chat-messages');
-      
-      logger.info('Message sent successfully (direct)', { messageId: saved.id });
-      
-      // Trigger agent orchestration after message is saved
-      await triggerAgentOrchestration(saved.id, deliberationId, mode, setTypingState);
-      
-    } catch (error) {
-      const errorMsg = getErrorMessage(error);
-      setChatState(prev => ({ 
-        ...prev, 
-        isTyping: false, 
-        error: errorMsg 
-      }));
-      
-      toast({
-        title: "Error",
-        description: errorMsg,
-        variant: "destructive"
-      });
-      
-      logger.error('Failed to send message (direct)', error as Error);
-    }
-  }, [user, deliberationId, messageService, toast, triggerAgentOrchestration, setTypingState]);
+  // REMOVED: Direct messaging path - all messages must go through queue
 
-  // Main send message function - REMOVED queue logic to prevent double processing
+  // Main send message function - queue-based messaging only
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!content.trim()) return;
     
-    // Queue handling is now done in DeliberationChat only
-    // This is a fallback for direct use without queue
     if (!messageQueue) {
-      await sendMessageDirect(content, mode);
+      throw new Error('Message queue is required for all messaging operations');
     }
-  }, [messageQueue, sendMessageDirect]);
+    
+    // Add message to queue - this is the only messaging path
+    messageQueue.addToQueue(content, undefined, mode);
+  }, [messageQueue]);
 
   // Process queued messages
   const processQueuedMessage = useCallback(async (queuedMessage: QueuedMessage) => {

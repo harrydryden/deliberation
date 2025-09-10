@@ -172,53 +172,50 @@ export const useAgentOrchestrationTrigger = () => {
           timestamp: new Date().toISOString()
         });
 
-        // DEBUG: Direct fetch approach since edge function has verify_jwt = false
-        console.log('🔍 [DEBUG] Using direct fetch for unauthenticated edge function', {
+        // DEBUG: Using supabase.functions.invoke for authenticated edge function
+        console.log('🔍 [DEBUG] Using supabase.functions.invoke with authenticated client', {
           requestId,
           functionName: 'agent-orchestration-stream',
           payloadKeys: Object.keys(requestPayload),
           timestamp: new Date().toISOString()
         });
 
-        // Use direct fetch since the edge function doesn't require authentication
+        // Use supabase client for proper authentication
         let response: any = null;
         try {
-          const fetchResponse = await fetch('https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/agent-orchestration-stream', {
-            method: 'POST',
+          const result = await supabase.functions.invoke('agent-orchestration-stream', {
+            body: requestPayload,
             headers: {
-              'Content-Type': 'application/json',
               'X-Request-ID': requestId
-            },
-            body: JSON.stringify(requestPayload),
-            signal: controller.signal
+            }
           });
           
           clearTimeout(timeoutId);
           
-          if (!fetchResponse.ok) {
-            console.error('🚨 [FETCH-ERROR] Direct fetch failed', {
+          response = result.data;
+          const invokeError = result.error;
+          
+          if (invokeError) {
+            console.error('🚨 [SUPABASE-INVOKE-ERROR] Function invoke failed', {
               requestId,
-              status: fetchResponse.status,
-              statusText: fetchResponse.statusText,
-              headers: Object.fromEntries(fetchResponse.headers.entries())
+              error: invokeError,
+              message: invokeError.message,
+              context: invokeError.context || 'No context',
+              details: invokeError
             });
-            throw new Error(`Agent orchestration failed: ${fetchResponse.status} ${fetchResponse.statusText}`);
+            throw new Error(`Agent orchestration failed: ${invokeError.message || 'Unknown invoke error'}`);
           }
-          
-          // For streaming responses, we just need to confirm the request was accepted
-          response = await fetchResponse.text();
-          
-        } catch (fetchError) {
-          console.error('🚨 [FETCH-CLIENT-ERROR] Direct fetch threw exception', {
+        } catch (clientError) {
+          console.error('🚨 [SUPABASE-CLIENT-ERROR] Client threw exception', {
             requestId,
-            error: fetchError,
-            errorType: typeof fetchError,
-            errorName: fetchError instanceof Error ? fetchError.name : 'Unknown',
-            errorMessage: fetchError instanceof Error ? fetchError.message : String(fetchError),
-            errorStack: fetchError instanceof Error ? fetchError.stack : 'No stack',
+            error: clientError,
+            errorType: typeof clientError,
+            errorName: clientError instanceof Error ? clientError.name : 'Unknown',
+            errorMessage: clientError instanceof Error ? clientError.message : String(clientError),
+            errorStack: clientError instanceof Error ? clientError.stack : 'No stack',
             timestamp: new Date().toISOString()
           });
-          throw new Error(`Agent orchestration failed: ${fetchError instanceof Error ? fetchError.message : 'Direct fetch failed'}`);
+          throw new Error(`Agent orchestration failed: ${clientError instanceof Error ? clientError.message : 'Failed to send a request to the Edge Function'}`);
         }
         
         // PHASE 1: Enhanced Response Logging for Supabase invoke
