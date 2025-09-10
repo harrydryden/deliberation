@@ -180,33 +180,132 @@ export const useAgentOrchestrationTrigger = () => {
           timestamp: new Date().toISOString()
         });
 
-        // Use supabase client for proper authentication
+        // CRITICAL FIX: Use direct fetch instead of supabase.functions.invoke
+        // The invoke method is failing in Lovable environment, so use direct HTTP call
         let response: any = null;
         try {
-          const result = await supabase.functions.invoke('agent-orchestration-stream', {
-            body: requestPayload,
+          console.log('🌐 [DEBUG] Using direct fetch to edge function', {
+            requestId,
+            url: `https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/agent-orchestration-stream`,
+            payload: requestPayload,
+            timestamp: new Date().toISOString()
+          });
+
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session?.access_token) {
+            throw new Error('No valid session found for edge function authentication');
+          }
+
+          const fetchResponse = await fetch(`https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/agent-orchestration-stream`, {
+            method: 'POST',
             headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM',
               'X-Request-ID': requestId
-            }
+            },
+            body: JSON.stringify(requestPayload),
+            signal: controller.signal
           });
           
           clearTimeout(timeoutId);
-          
-          response = result.data;
-          const invokeError = result.error;
-          
-          if (invokeError) {
-            console.error('🚨 [SUPABASE-INVOKE-ERROR] Function invoke failed', {
+
+          if (!fetchResponse.ok) {
+            const errorText = await fetchResponse.text();
+            console.error('🚨 [EDGE-FUNCTION-ERROR] Edge function returned error', {
               requestId,
-              error: invokeError,
-              message: invokeError.message,
-              context: invokeError.context || 'No context',
-              details: invokeError
+              status: fetchResponse.status,
+              statusText: fetchResponse.statusText,
+              errorText,
+              headers: Object.fromEntries(fetchResponse.headers.entries())
             });
-            throw new Error(`Agent orchestration failed: ${invokeError.message || 'Unknown invoke error'}`);
+            throw new Error(`Edge function failed: ${fetchResponse.status} ${fetchResponse.statusText} - ${errorText}`);
           }
+
+          // Handle streaming response
+          const reader = fetchResponse.body?.getReader();
+          if (!reader) {
+            throw new Error('No response body reader available');
+          }
+
+          console.log('✅ [DEBUG] Edge function connected successfully', {
+            requestId,
+            status: fetchResponse.status,
+            headers: Object.fromEntries(fetchResponse.headers.entries())
+          });
+
+          // Process the streaming response
+          return new Promise((resolve) => {
+            const processStream = async () => {
+              try {
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                  const { done, value } = await reader.read();
+                  
+                  if (done) {
+                    console.log('✅ [DEBUG] Stream completed', { requestId });
+                    break;
+                  }
+
+                  buffer += decoder.decode(value, { stream: true });
+                  const lines = buffer.split('\n');
+                  buffer = lines.pop() || '';
+
+                  for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                      try {
+                        const data = JSON.parse(line.slice(6));
+                        console.log('📦 [DEBUG] Received streaming data', { 
+                          requestId,
+                          hasContent: !!data.content,
+                          done: data.done,
+                          error: data.error 
+                        });
+                        
+                        if (onTypingChange) {
+                          onTypingChange(!data.done);
+                        }
+
+                        if (data.error) {
+                          console.error('🚨 [STREAM-ERROR] Error in stream data', {
+                            requestId,
+                            error: data.error
+                          });
+                        }
+
+                        if (data.done) {
+                          resolve(undefined);
+                          return;
+                        }
+                      } catch (parseError) {
+                        console.warn('⚠️ [DEBUG] Failed to parse streaming data', {
+                          requestId,
+                          line,
+                          parseError
+                        });
+                      }
+                    }
+                  }
+                }
+                resolve(undefined);
+              } catch (streamError) {
+                console.error('🚨 [STREAM-ERROR] Stream processing failed', {
+                  requestId,
+                  streamError
+                });
+                throw streamError;
+              }
+            };
+
+            processStream().catch((streamError) => {
+              throw streamError;
+            });
+          });
+
         } catch (clientError) {
-          console.error('🚨 [SUPABASE-CLIENT-ERROR] Client threw exception', {
+          console.error('🚨 [DIRECT-FETCH-ERROR] Direct fetch failed', {
             requestId,
             error: clientError,
             errorType: typeof clientError,
@@ -215,7 +314,7 @@ export const useAgentOrchestrationTrigger = () => {
             errorStack: clientError instanceof Error ? clientError.stack : 'No stack',
             timestamp: new Date().toISOString()
           });
-          throw new Error(`Agent orchestration failed: ${clientError instanceof Error ? clientError.message : 'Failed to send a request to the Edge Function'}`);
+          throw new Error(`Agent orchestration failed: ${clientError instanceof Error ? clientError.message : 'Failed to connect to edge function'}`);
         }
         
         // PHASE 1: Enhanced Response Logging for Supabase invoke
