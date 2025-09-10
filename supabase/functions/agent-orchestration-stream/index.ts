@@ -2,122 +2,155 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-// Import shared utilities for performance and consistency
-import { 
-  corsHeaders, 
-  validateAndGetEnvironment, 
-  createErrorResponse, 
-  createSuccessResponse,
-  handleCORSPreflight,
-  getOpenAIKey,
-  parseAndValidateRequest,
-  createStreamingResponse,
-  scheduleCleanup
-} from '../shared/edge-function-utils.ts';
-import { responseCache, configCache, createCacheKey } from '../shared/cache-manager.ts';
-import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
-import { ModelConfigManager } from '../shared/model-config.ts';
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
-import { OptimizedCache, executeTieredOperations, DEFAULT_TIMEOUTS } from '../shared/performance-optimizer.ts';
+// Basic CORS headers
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-// Re-export types from shared orchestrator
-import type { AgentConfig, AnalysisResult, ConversationContext } from '../shared/agent-orchestrator.ts';
-
-// Helper function to get fast path system prompt from template with caching
-async function getFastPathSystemPrompt(supabase: any, agentType: string): Promise<string> {
-  const cacheKey = createCacheKey('fast_path_prompt', agentType);
-  const cached = configCache.get(cacheKey);
-  
-  if (cached) {
-    return cached.replace(/\{\{agent_type\}\}/g, agentType);
+// Helper function to handle CORS preflight
+function handleCORSPreflight(req: Request): Response | null {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
   }
-
-  try {
-    const { data: templateData, error } = await supabase
-      .rpc('get_prompt_template', { template_name: 'fast_path_response' });
-
-    if (templateData && templateData.length > 0) {
-      const template = templateData[0];
-      configCache.set(cacheKey, template.template_text);
-      return template.template_text.replace(/\{\{agent_type\}\}/g, agentType);
-    }
-  } catch (error) {
-    EdgeLogger.error('Failed to fetch fast path template', error);
-    throw new Error('Fast path response template not available');
-  }
-}
-
-// Fast path pattern matching with high confidence threshold
-function checkFastPath(content: string): { agent: string; confidence: number } | null {
-  const patterns = [
-    {
-      regex: /^(what|which|how many|list)\s+(countries|nations|jurisdictions)\s+(have|allow|permit|legalized|legalised)\s+(assisted dying|euthanasia|MAID)/i,
-      agent: 'bill_agent',
-      confidence: 0.98
-    },
-    {
-      regex: /^what\s+(specific\s+)?(safeguards|protections|requirements|criteria)\s+(are|exist|in place)/i,
-      agent: 'bill_agent', 
-      confidence: 0.97
-    },
-    {
-      regex: /^(what did|what have|have any)\s+(other\s+)?(participants|people|users)\s+(said|mentioned|shared|contributed|think|believe)/i,
-      agent: 'flow_agent',
-      confidence: 0.96
-    },
-    {
-      regex: /^(show me|tell me about|what are)\s+(other|existing|previous)\s+(views|viewpoints|perspectives|opinions|positions|arguments)/i,
-      agent: 'flow_agent',
-      confidence: 0.95
-    },
-    {
-      regex: /^(summarise|summarize|what's the range of)\s+(views|viewpoints|perspectives|opinions|positions)/i,
-      agent: 'flow_agent',
-      confidence: 0.94
-    }
-  ];
-
-  for (const pattern of patterns) {
-    if (pattern.regex.test(content)) {
-    EdgeLogger.debug('High-confidence fast path detected', { content: content.substring(0, 50), agent: pattern.agent, confidence: pattern.confidence });
-      return {
-        agent: pattern.agent,
-        confidence: pattern.confidence
-      };
-    }
-  }
-
   return null;
 }
 
-// Optimized response caching with shared cache manager
-function checkResponseCache(content: string, deliberationId?: string): string | null {
-  const cacheKey = createCacheKey('agent_response', deliberationId || 'global', content.toLowerCase().trim());
-  return responseCache.get(cacheKey);
+// Helper function to create error response
+function createErrorResponse(error: any, status: number = 500, context?: string): Response {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  console.error(`[${context || 'ERROR'}]:`, errorMessage);
+  
+  return new Response(
+    JSON.stringify({ 
+      error: errorMessage,
+      context: context || 'unknown'
+    }), 
+    { 
+      status, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    }
+  );
 }
 
-function cacheResponse(content: string, response: string, agentType: string, deliberationId?: string): void {
-  const cacheKey = createCacheKey('agent_response', deliberationId || 'global', content.toLowerCase().trim());
-  responseCache.set(cacheKey, response);
+// Helper function to get OpenAI API key
+function getOpenAIKey(): string {
+  const key = Deno.env.get('OPENAI_API_KEY');
+  if (!key) {
+    throw new Error('OpenAI API key not configured');
+  }
+  return key;
 }
 
-// Generate fast response using templates and simple AI with improved error handling and timeout
-async function generateFastResponse(
-  content: string,
-  fastPath: any,
-  supabase: any,
+// Helper function to validate request
+async function parseAndValidateRequest(req: Request, requiredFields: string[]) {
+  const body = await req.json();
+  
+  for (const field of requiredFields) {
+    if (!body[field]) {
+      throw new Error(`Missing required field: ${field}`);
+    }
+  }
+  
+  return body;
+}
+
+// Helper function to create streaming response
+function createStreamingResponse(): { response: Response; writer: WritableStreamDefaultWriter } {
+  const stream = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+      const writer = {
+        write: (chunk: string) => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk, done: false })}\n\n`));
+          } catch (error) {
+            console.error('Error writing to stream:', error);
+          }
+        },
+        close: () => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: '', done: true })}\n\n`));
+            controller.close();
+          } catch (error) {
+            console.error('Error closing stream:', error);
+          }
+        }
+      };
+      
+      // Store writer for external access
+      (controller as any)._writer = writer;
+    }
+  });
+
+  const response = new Response(stream, {
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
+
+  return { 
+    response, 
+    writer: (stream as any)._writer || {
+      write: () => {},
+      close: () => {}
+    }
+  };
+}
+
+// Main orchestration function
+async function processStreamingOrchestration(
+  messageId: string,
+  deliberationId: string,
+  mode: string,
+  serviceSupabase: any,
+  authSupabase: any,
   sendData: (data: any) => void
-): Promise<string> {
-  const openAIApiKey = getOpenAIKey();
-  
-  // Enhanced timeout with proper cleanup and error handling
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    EdgeLogger.warn('OpenAI request timeout in generateFastResponse');
-    controller.abort();
-  }, 35000); // Reduced to 35s to prevent edge function timeout
-  
+): Promise<void> {
+  console.log(`🤖 Processing orchestration for message ${messageId} in mode ${mode}`);
+
   try {
+    // Get the message using authenticated client
+    const { data: message, error: messageError } = await authSupabase
+      .from('messages')
+      .select('*')
+      .eq('id', messageId)
+      .single();
+
+    if (messageError || !message) {
+      throw new Error(`Message not found: ${messageError?.message || 'Unknown error'}`);
+    }
+
+    console.log(`📝 Retrieved message: "${message.content.substring(0, 100)}..."`);
+
+    // Get active agents for this deliberation
+    const { data: agents, error: agentsError } = await serviceSupabase
+      .from('agent_configurations')
+      .select('*')
+      .eq('deliberation_id', deliberationId)
+      .eq('is_active', true);
+
+    if (agentsError) {
+      throw new Error(`Failed to get agents: ${agentsError.message}`);
+    }
+
+    console.log(`🤖 Found ${agents?.length || 0} active agents`);
+
+    // Simple agent selection - pick the first active agent
+    const selectedAgent = agents?.[0];
+    if (!selectedAgent) {
+      throw new Error('No active agents found for this deliberation');
+    }
+
+    console.log(`🎯 Selected agent: ${selectedAgent.name} (${selectedAgent.agent_type})`);
+
+    // Generate response using OpenAI
+    const openAIApiKey = getOpenAIKey();
+    const systemPrompt = selectedAgent.prompt_overrides?.system_prompt || `You are ${selectedAgent.name}, a ${selectedAgent.agent_type}. ${selectedAgent.description || ''}`;
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -125,18 +158,14 @@ async function generateFastResponse(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'gpt-4o-mini',
         messages: [
-          {
-            role: 'system',
-            content: await getFastPathSystemPrompt(supabase, fastPath.agent)
-          },
-          { role: 'user', content: content }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message.content }
         ],
-        max_completion_tokens: 1000,
+        max_tokens: 1000,
         stream: true
       }),
-      signal: controller.signal
     });
 
     if (!response.ok) {
@@ -173,1219 +202,106 @@ async function generateFastResponse(
       }
     }
 
-    return fullResponse;
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      EdgeLogger.warn('OpenAI request aborted due to timeout');
-      throw new Error('Request timeout - please try again');
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-    // Ensure controller is properly cleaned up
-    if (!controller.signal.aborted) {
-      try {
-        controller.abort();
-      } catch (e) {
-        // Ignore cleanup errors
-      }
-    }
-  }
-}
-
-// Enhanced conversation state cache
-const conversationStateCache = new OptimizedCache<ConversationContext>(100, 300000); // 5 minutes
-
-// Optimized helper function to get conversation state with caching
-async function getConversationState(supabase: any, deliberationId: string, userId: string): Promise<ConversationContext> {
-  const cacheKey = `conv_state:${deliberationId}`;
-  
-  // Check cache first
-  const cached = conversationStateCache.get(cacheKey);
-  if (cached) {
-    console.log('🚀 Conversation state cache hit');
-    return cached;
-  }
-  
-  try {
-    const { data: recentMessages } = await supabase
+    // Save the agent response to the database using authenticated client
+    const { error: insertError } = await authSupabase
       .from('messages')
-      .select('message_type, created_at')
-      .eq('deliberation_id', deliberationId)
-      .order('created_at', { ascending: false })
-      .limit(10); // Reduced from 20 to 10 for faster queries
-
-    const messageCount = recentMessages?.length || 0;
-    const recentTypes = recentMessages?.map(m => m.message_type) || [];
-    
-    const result = {
-      messageCount,
-      recentAgentTypes: recentTypes,
-      lastAgentType: recentTypes.find(t => t !== 'user') || null
-    };
-    
-    // Cache the result
-    conversationStateCache.set(cacheKey, result);
-    
-    return result;
-  } catch (error) {
-    console.error('Error getting conversation state:', error);
-    const fallback = { messageCount: 0, recentAgentTypes: [], lastAgentType: null };
-    conversationStateCache.set(cacheKey, fallback); // Cache fallback to prevent repeated failures
-    return fallback;
-  }
-}
-
-// Helper function to find similar nodes with user exclusion to prevent echo
-async function findSimilarNodes(supabase: any, content: string, deliberationId?: string, excludeUserId?: string): Promise<any[]> {
-  try {
-    if (!deliberationId) {
-      console.log('📊 No deliberationId provided for IBIS node search');
-      return [];
-    }
-
-    console.log(`🔍 Searching for IBIS nodes in deliberation ${deliberationId}, excluding user ${excludeUserId}`);
-    
-    // Build query for IBIS nodes
-    let query = supabase
-      .from('ibis_nodes')
-      .select(`
-        id,
-        title,
-        description,
-        node_type,
-        created_by,
-        created_at,
-        message_id
-      `)
-      .eq('deliberation_id', deliberationId);
-    
-    // Exclude nodes created by the current user to prevent echo
-    if (excludeUserId) {
-      query = query.neq('created_by', excludeUserId);
-    }
-    
-    // Order by creation date (most recent first) and limit to prevent overwhelming context
-    query = query.order('created_at', { ascending: false }).limit(10);
-    
-    const { data: nodes, error } = await query;
-    
-    if (error) {
-      console.error('❌ Error fetching IBIS nodes:', error);
-      return [];
-    }
-    
-    if (!nodes || nodes.length === 0) {
-      console.log('📊 No IBIS nodes found in this deliberation');
-      return [];
-    }
-    
-    console.log(`✅ Found ${nodes.length} IBIS nodes (excluding user's own nodes)`);
-    
-    // Also fetch relationships for context
-    const nodeIds = nodes.map(n => n.id);
-    const { data: relationships, error: relError } = await supabase
-      .from('ibis_relationships')
-      .select('source_node_id, target_node_id, relationship_type')
-      .or(`source_node_id.in.(${nodeIds.join(',')}),target_node_id.in.(${nodeIds.join(',')})`);
-    
-    if (relError) {
-      console.warn('⚠️ Error fetching IBIS relationships:', relError);
-    }
-    
-    // Enhance nodes with relationship information
-    const enhancedNodes = nodes.map(node => ({
-      ...node,
-      relationships: relationships?.filter(rel => 
-        rel.source_node_id === node.id || rel.target_node_id === node.id
-      ) || []
-    }));
-    
-    console.log(`📊 Enhanced ${enhancedNodes.length} nodes with relationship data`);
-    return enhancedNodes;
-    
-  } catch (error) {
-    console.error('❌ Error finding similar nodes:', error);
-    return [];
-  }
-}
-
-// Enhanced knowledge availability cache
-const knowledgeAvailabilityCache = new OptimizedCache<boolean>(50, 900000); // 15 minutes
-
-// Optimized helper function to check available knowledge with caching
-async function checkAvailableKnowledge(supabase: any, deliberationId: string): Promise<boolean> {
-  const cacheKey = `knowledge_avail:${deliberationId}`;
-  
-  // Check cache first
-  const cached = knowledgeAvailabilityCache.get(cacheKey);
-  if (cached !== null) {
-    console.log('🚀 Knowledge availability cache hit');
-    return cached;
-  }
-  
-  try {
-    const { data } = await supabase
-      .from('agent_knowledge')
-      .select('id')
-      .limit(1);
-    
-    const result = !!(data && data.length > 0);
-    knowledgeAvailabilityCache.set(cacheKey, result);
-    
-    return result;
-  } catch (error) {
-    console.error('Error checking available knowledge:', error);
-    knowledgeAvailabilityCache.set(cacheKey, false); // Cache failure result
-    return false;
-  }
-}
-
-// Enhanced knowledge retrieval with timeout and caching
-async function retrieveBillAgentKnowledge(query: string, deliberationId: string): Promise<string> {
-  try {
-    const cacheKey = `knowledge_${deliberationId}_${query.substring(0, 50).replace(/\s+/g, '_')}`;
-    
-    // Check cache first for faster response
-    const cached = responseCache.get(cacheKey);
-    if (cached) {
-      console.log('🚀 Knowledge retrieval cache hit');
-      return cached;
-    }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // Enhanced agent lookup with timeout
-    const agentLookupPromise = withTimeout(
-      (async () => {
-        // Get bill agent for this deliberation
-        const { data: billAgents } = await supabase
-          .from('agent_configurations')
-          .select('id')
-          .eq('agent_type', 'bill_agent')
-          .eq('deliberation_id', deliberationId)
-          .eq('is_active', true)
-          .limit(1);
-
-        if (!billAgents || billAgents.length === 0) {
-          console.log('📚 No bill agent found for deliberation, checking global agents...');
-          
-          // Fallback to global bill agent
-          const { data: globalAgents } = await supabase
-            .from('agent_configurations')
-            .select('id')
-            .eq('agent_type', 'bill_agent')
-            .is('deliberation_id', null)
-            .eq('is_active', true)
-            .limit(1);
-            
-          if (!globalAgents || globalAgents.length === 0) {
-            console.log('📚 No bill agent found at all');
-            return null;
-          }
-          
-          return globalAgents[0];
-        }
-        
-        return billAgents[0];
-      })(),
-      5000,
-      'Agent Lookup',
-      null
-    );
-
-    const agent = await agentLookupPromise;
-    if (!agent) {
-      return '';
-    }
-
-    const agentId = agent.id;
-    console.log(`📚 Using optimized knowledge retrieval for agent: ${agentId} with query: "${query.substring(0, 100)}..."`);
-
-    // Enhanced parallel knowledge operations with tiered approach
-    const knowledgeResults = await executeTieredOperations({
-      critical: [
-        {
-          name: 'knowledge_check',
-          fn: async () => {
-            const { data } = await supabase
-              .from('agent_knowledge')
-              .select('id')
-              .eq('agent_id', agentId)
-              .limit(1);
-            return !!(data && data.length > 0);
-          },
-          fallback: false
-        }
-      ],
-      secondary: [
-        {
-          name: 'fallback_knowledge',
-          fn: async () => {
-            const { data } = await supabase
-              .from('agent_knowledge')
-              .select('content, metadata')
-              .eq('agent_id', agentId)
-              .limit(3);
-            return data || [];
-          },
-          fallback: []
-        }
-      ],
-      optional: [
-        {
-          name: 'langchain_rag',
-          fn: async () => {
-            console.log('🧠 Calling optimized LangChain RAG system...');
-            const { data: ragResult, error: ragError } = await supabase.functions.invoke('langchain-query-knowledge', {
-              body: {
-                query: query,
-                agentId: agentId,
-                maxResults: 3 // Reduced from 5 for faster response
-              }
-            });
-
-            if (ragError) {
-              console.error('❌ LangChain RAG error:', ragError);
-              throw new Error(`RAG query failed: ${ragError.message}`);
-            }
-
-            return ragResult;
-          },
-          fallback: null
-        }
-      ]
-    }, { individual: 8000, total: 15000, retryDelay: 500 }); // Optimized timeouts
-
-    console.log(`📊 Knowledge retrieval completed in ${knowledgeResults.totalTime}ms`);
-
-    // Check if we have any knowledge available
-    const hasKnowledge = knowledgeResults.critical.knowledge_check;
-    if (!hasKnowledge) {
-      console.log('📚 No knowledge available for agent, skipping RAG retrieval');
-      return '';
-    }
-
-    // Process results with fallback strategy
-    const ragResult = knowledgeResults.optional.langchain_rag;
-    const fallbackKnowledge = knowledgeResults.secondary.fallback_knowledge || [];
-
-    let contextChunks = '';
-
-    // Try LangChain RAG first
-    if (ragResult?.success && ragResult?.relevantKnowledge?.length > 0) {
-      contextChunks = ragResult.relevantKnowledge
-        .map((chunk: any) => chunk.content)
-        .join('\n\n');
-      
-      console.log(`✅ LangChain RAG retrieved ${ragResult.relevantKnowledge.length} semantically relevant chunks`);
-      console.log(`📄 Sources: ${ragResult.sources?.join(', ') || 'Unknown'}`);
-    } else if (fallbackKnowledge.length > 0) {
-      // Fall back to pre-fetched knowledge
-      contextChunks = fallbackKnowledge.map((item: any) => item.content).join('\n\n');
-      console.log(`📚 Fallback: Using ${fallbackKnowledge.length} pre-fetched knowledge chunks`);
-    } else {
-      console.log('📚 No relevant knowledge found');
-      return '';
-    }
-
-    // Cache successful results for 10 minutes
-    if (contextChunks) {
-      responseCache.set(cacheKey, contextChunks);
-    }
-
-    return contextChunks;
-
-  } catch (error) {
-    console.error('📚 Knowledge retrieval error:', error);
-    return '';
-  }
-}
-
-// Enhanced streaming response generation with conditional knowledge loading
-async function generateStreamingResponse(
-  content: string,
-  agentType: string,
-  analysis: AnalysisResult,
-  conversationState: ConversationContext,
-  similarNodes: any[],
-  deliberationId: string,
-  openAIApiKey: string,
-  sendData: (data: any) => void,
-  orchestrator: AgentOrchestrator,
-  mode: string = 'stream'
-): Promise<string> {
-  console.log(`🎯 generateStreamingResponse called:`, {
-    agentType,
-    contentLength: content?.length || 0,
-    mode,
-    hasOrchestrator: !!orchestrator,
-    hasOpenAIKey: !!openAIApiKey
-  });
-
-  // Get agent configuration through orchestrator with timeout
-  console.log(`🔧 Getting agent config for ${agentType}...`);
-  const agentConfig = await withTimeout(
-    orchestrator.getAgentConfig(agentType, deliberationId),
-    5000,
-    `Agent Config: ${agentType}`,
-    null
-  );
-  console.log(`✅ Agent config retrieved:`, { hasConfig: !!agentConfig, configName: agentConfig?.name });
-  
-  // Select standardized model (using gpt-5 for best performance)
-  const model = 'gpt-5-2025-08-07';
-  
-  console.log(`🧠 Using ${model} for ${agentType} response (config: ${agentConfig ? 'custom' : 'default'})`);
-
-  // For bill agent, retrieve relevant knowledge with conditional loading
-  let knowledgeContext = '';
-  if (agentType === 'bill_agent') {
-    console.log('📚 Retrieving knowledge for bill agent with timeout...');
-    try {
-      // Only retrieve knowledge for complex queries or when specifically needed
-      const shouldRetrieveKnowledge = 
-        analysis.complexity > 0.3 || 
-        analysis.requiresExpertise || 
-        content.toLowerCase().includes('bill') ||
-        content.toLowerCase().includes('policy') ||
-        content.toLowerCase().includes('legislation');
-        
-      if (shouldRetrieveKnowledge) {
-        knowledgeContext = await withTimeout(
-          retrieveBillAgentKnowledge(content, deliberationId),
-          10000, // 10 seconds for knowledge retrieval
-          'Knowledge Retrieval',
-          '' // Empty fallback to continue without knowledge
-        );
-        console.log(`📚 Knowledge context retrieved: ${knowledgeContext.length} characters`);
-      } else {
-        console.log('📚 Skipping knowledge retrieval for simple query');
-      }
-    } catch (knowledgeError) {
-      console.error('❌ Knowledge retrieval error:', knowledgeError);
-      knowledgeContext = '';
-    }
-  }
-
-  // Generate system prompt using orchestrator with timeout
-  const enhancementContext = {
-    complexity: analysis.complexity,
-    similarNodes,
-    knowledgeContext
-  };
-  
-  console.log('🔧 Enhancement context:', JSON.stringify(enhancementContext, null, 2));
-  
-  try {
-    const systemPrompt = await withTimeout(
-      orchestrator.generateSystemPrompt(agentConfig, agentType, enhancementContext),
-      5000,
-      'System Prompt Generation'
-    );
-    
-    console.log('📝 Generated system prompt length:', systemPrompt?.length || 0);
-    console.log('📝 System prompt preview:', systemPrompt?.substring(0, 200) + '...');
-
-    if (!systemPrompt || systemPrompt.trim().length === 0) {
-      throw new Error('System prompt is empty or undefined');
-    }
-
-    const useStreaming = mode !== 'bulk_processing';
-    console.log(`🌊 Streaming mode: ${useStreaming}`);
-    
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: content }
-    ];
-    
-    // Extract character limit for prompt instructions (not API constraints)
-    let characterLimit = agentConfig?.max_response_characters || 800; // Default to 800
-    
-    // Fallback to parsing response_style if max_response_characters not set
-    if (!agentConfig?.max_response_characters && agentConfig?.response_style) {
-      // Look for the standardized phrase first
-      const standardMatch = agentConfig.response_style.match(/Keep responses to no more than (\d+) characters/);
-      if (standardMatch) {
-        characterLimit = parseInt(standardMatch[1]);
-      } else {
-        // Fallback to the more flexible regex for existing agents
-        const responseStyle = agentConfig.response_style.toLowerCase();
-        const characterMatch = responseStyle.match(/(?:no more than|maximum|max|limit.*?to)\s*(\d+)\s*characters?/);
-        if (characterMatch) {
-          characterLimit = parseInt(characterMatch[1]);
-        }
-      }
-    }
-    
-    console.log(`🎯 Character limit for ${agentType}: ${characterLimit} chars (prompt guidance only)`);
-    console.log(`📏 System prompt length: ${systemPrompt?.length || 0} chars`);
-    
-    // Use generous token budget for API call (not constrained by character limits)
-    const requestBody: any = ModelConfigManager.generateAPIParams(model, messages, { stream: useStreaming });
-
-    console.log('🔧 FULL Request body for debugging:', JSON.stringify(requestBody, null, 2));
-
-    console.log(`🚀 About to make OpenAI API call (${useStreaming ? 'streaming' : 'non-streaming'})...`);
-    console.log('📏 User content length:', content?.length || 0);
-    console.log('📝 User content preview:', content?.substring(0, 200) + '...');
-    console.log('📝 FULL System prompt:', systemPrompt);
-    console.log('📝 FULL User content:', content);
-
-    // Enhanced OpenAI API call with timeout
-    const response = await withTimeout(
-      fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
+      .insert({
+        deliberation_id: deliberationId,
+        user_id: message.user_id, // Use the same user for now
+        content: fullResponse,
+        message_type: selectedAgent.agent_type,
+        agent_context: {
+          agent_type: selectedAgent.agent_type,
+          processing_mode: mode,
+          processing_method: 'simplified_orchestration'
         },
-        body: JSON.stringify(requestBody),
-      }),
-      47000, // 35 second timeout for OpenAI API call
-      'OpenAI API Call'
-    );
+        parent_message_id: messageId
+      });
 
-    console.log('📡 Response status:', response.status);
-    console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ OpenAI API error: ${response.status} - ${errorText}`);
-      console.error('❌ Original request body:', JSON.stringify(requestBody, null, 2));
-      
-      // If streaming fails due to organization verification, try non-streaming
-      if (errorText.includes('organization must be verified') && requestBody.stream) {
-        console.log('🔄 Retrying with non-streaming mode...');
-        const nonStreamBody = { ...requestBody, stream: false };
-        
-        const nonStreamResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(nonStreamBody),
-        });
-        
-        if (nonStreamResponse.ok) {
-          const data = await nonStreamResponse.json();
-          const content = data.choices?.[0]?.message?.content || '';
-          console.log(`✅ Non-streaming response received: ${content.length} characters`);
-          
-          // Send the content as if it were streamed
-          sendData({ content, done: false });
-          return content;
-        }
-      }
-      
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    if (insertError) {
+      console.error('Failed to save agent response:', insertError);
     }
 
-    console.log(`✅ OpenAI API call successful for ${agentType}`);
-    console.log('📡 Response status:', response.status);
-    console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+    sendData({ content: '', done: true });
+    console.log(`✅ Orchestration completed successfully`);
 
-    // Handle non-streaming response for bulk processing
-    if (!useStreaming) {
-      console.log('📦 Processing non-streaming response for bulk mode');
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      console.log(`✅ Non-streaming response received: ${content.length} characters`);
-      
-      // Send the content as if it were streamed
-      sendData({ content, done: false });
-      return content;
-    }
-
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let fullResponse = '';
-
-    console.log('🔍 Reader available:', !!reader);
-
-    if (reader) {
-      console.log('📖 Starting to read stream chunks...');
-      let chunkCount = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        chunkCount++;
-        console.log(`📦 Chunk ${chunkCount}: done=${done}, value size=${value?.length || 0}`);
-        
-        if (done) {
-          console.log(`🏁 Stream completed after ${chunkCount} chunks`);
-          break;
-        }
-
-        const chunk = decoder.decode(value);
-        console.log(`📝 Raw chunk ${chunkCount}:`, chunk.substring(0, 200) + '...');
-        
-        const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
-        console.log(`📋 Found ${lines.length} data lines in chunk ${chunkCount}`);
-        
-        for (const line of lines) {
-          if (line.includes('[DONE]')) {
-            console.log('🔚 Found [DONE] marker');
-            continue;
-          }
-          
-            try {
-              const data = JSON.parse(line.slice(6));
-              console.log(`📦 Parsed data from chunk ${chunkCount}:`, JSON.stringify(data, null, 2));
-              const content = data.choices?.[0]?.delta?.content || '';
-              const finishReason = data.choices?.[0]?.finish_reason;
-              console.log(`🔍 Content: "${content}", Finish reason: ${finishReason}`);
-              if (content) {
-                console.log(`💬 Content found: "${content}"`);
-                fullResponse += content;
-                sendData({ content, done: false });
-              } else {
-                console.log('📭 No content in this chunk');
-                if (finishReason) {
-                  console.log(`🏁 Stream finished with reason: ${finishReason}`);
-                }
-              }
-            } catch (e) {
-            console.warn(`⚠️ Parse error in chunk ${chunkCount}:`, e);
-            console.warn(`⚠️ Problematic line: "${line}"`);
-          }
-        }
-      }
-    }
-
-    console.log(`📝 Full response length: ${fullResponse.length}`);
-    return fullResponse;
-    
-  } catch (systemPromptError) {
-    console.error('❌ Error generating system prompt - FULL ERROR DETAILS:', {
-      error: systemPromptError,
-      message: systemPromptError.message,
-      stack: systemPromptError.stack,
-      name: systemPromptError.name
-    });
-    
-    sendData({ 
-      content: `Error generating system prompt: ${systemPromptError.message}`,
-      done: false 
-    });
-    throw systemPromptError;
+  } catch (error) {
+    console.error('❌ Orchestration error:', error);
+    sendData({ error: error instanceof Error ? error.message : 'Unknown error', done: true });
   }
 }
 
-// Distributed lock for preventing duplicate agent responses (F001 Fix)
-const PROCESSING_LOCKS = new Map<string, { timestamp: number; lockId: string }>();
-const LOCK_TIMEOUT = 60000; // 60 seconds - aligned with message processing lock
-
-function acquireProcessingLock(messageId: string): string | null {
-  const now = Date.now();
-  const existing = PROCESSING_LOCKS.get(messageId);
-  
-  // Clean up expired locks
-  if (existing && (now - existing.timestamp) > LOCK_TIMEOUT) {
-    PROCESSING_LOCKS.delete(messageId);
-  }
-  
-  // Check if still locked
-  if (PROCESSING_LOCKS.has(messageId)) {
-    console.log(`⚠️ Message ${messageId} is already being processed`);
-    return null;
-  }
-  
-  const lockId = crypto.randomUUID();
-  PROCESSING_LOCKS.set(messageId, { timestamp: now, lockId });
-  console.log(`🔒 Acquired processing lock for message ${messageId}, lockId: ${lockId}`);
-  return lockId;
-}
-
-function releaseProcessingLock(messageId: string, lockId: string): void {
-  const existing = PROCESSING_LOCKS.get(messageId);
-  if (existing && existing.lockId === lockId) {
-    PROCESSING_LOCKS.delete(messageId);
-    console.log(`🔓 Released processing lock for message ${messageId}`);
-  }
-}
-
-// Main streaming handler with distributed locking for race condition prevention
 serve(async (req) => {
-  // Handle CORS preflight with shared utility like all other functions
+  // Handle CORS preflight
   const corsResponse = handleCORSPreflight(req);
   if (corsResponse) return corsResponse;
 
-  console.log('🚀 Edge function invoked:', req.method, req.url);
-  console.log('📋 Request headers:', Object.fromEntries(req.headers.entries()));
-  
-  // Comprehensive error boundary for all non-OPTIONS requests
   try {
-    console.log('🔧 Starting environment validation');
-    // Use the standard environment validation
-    const { supabase: serviceSupabase, userSupabase: authenticatedSupabase } = validateAndGetEnvironment();
-    console.log('✅ Environment validation successful');
-    
-    const requestId = req.headers.get('X-Request-ID') || `edge_${Date.now()}`;
-    console.log('📥 [PHASE1] Edge function request received', {
-      requestId,
-      method: req.method,
-      url: req.url,
-      headers: Object.fromEntries(req.headers.entries()),
-      timestamp: new Date().toISOString()
-    });
+    console.log('🚀 Agent orchestration stream starting...');
 
-    console.log('📥 [PHASE1] Parsing request body for orchestration');
-    // Use proper JSON parsing with error handling
-    const { messageId, deliberationId, mode = 'chat' } = await parseAndValidateRequest<{
-      messageId: string;
-      deliberationId: string;
-      mode?: 'chat' | 'learn';
-    }>(req, ['messageId', 'deliberationId']);
+    // Parse and validate request
+    const { messageId, deliberationId, mode } = await parseAndValidateRequest(req, [
+      'messageId', 
+      'deliberationId'
+    ]);
+
+    console.log(`📋 Request: messageId=${messageId}, deliberationId=${deliberationId}, mode=${mode || 'chat'}`);
+
+    // Get environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    // PHASE 1: Enhanced mode parameter validation and logging
-    console.log('🎯 [PHASE1] Mode parameter processing in edge function', {
-      requestId,
-      messageId: messageId.substring(0, 8),
-      deliberationId: deliberationId.substring(0, 8),
-      receivedMode: mode,
-      modeType: typeof mode,
-      isLearnMode: mode === 'learn',
-      isChatMode: mode === 'chat',
-      validModes: ['chat', 'learn'],
-      modeValidation: ['chat', 'learn'].includes(mode)
-    });
-    
-    // Validate mode parameter with enhanced logging
-    let finalMode = mode;
-    if (mode && !['chat', 'learn'].includes(mode)) {
-      console.warn('⚠️ [PHASE1] Invalid mode received, defaulting to chat:', {
-        requestId,
-        invalidMode: mode,
-        defaultingTo: 'chat'
-      });
-      finalMode = 'chat';
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing Supabase configuration');
     }
 
-    console.log('🚀 [PHASE1] Starting streaming agent orchestration', {
-      requestId,
-      messageId: messageId.substring(0, 8),
-      deliberationId: deliberationId.substring(0, 8),
-      finalMode,
-      originalMode: mode,
-      modeChanged: finalMode !== mode
-    });
+    // Create service role client (for agent configurations)
+    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    if (finalMode === 'learn') {
-      console.log('🎓 [PHASE1] LEARN MODE DETECTED - Should force Bill agent', {
-        requestId,
-        mode: finalMode,
-        messageId: messageId.substring(0, 8),
-        timestamp: new Date().toISOString()
-      });
-    }
+    // Extract user token for authenticated operations
+    const authHeader = req.headers.get('authorization');
+    let authSupabase = serviceSupabase; // fallback to service role
     
-    // F001 Fix: Acquire distributed lock to prevent duplicate processing
-    console.log('🔒 Attempting to acquire processing lock');
-    const lockId = acquireProcessingLock(messageId);
-    if (!lockId) {
-      console.log('⚠️ Message already being processed:', messageId);
-      return new Response(JSON.stringify({ 
-        error: 'Message is already being processed',
-        messageId 
-      }), {
-        status: 409, // Conflict
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    console.log('✅ Processing lock acquired:', lockId);
-    
-    // Special handling for bulk processing mode
-    if (mode === 'bulk_processing') {
-      console.log(`🔄 Bulk processing mode enabled for message ${messageId}`);
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const userToken = authHeader.substring(7);
+      try {
+        // Create authenticated client with user's token
+        authSupabase = createClient(supabaseUrl, supabaseServiceKey, {
+          global: {
+            headers: {
+              authorization: `Bearer ${userToken}`
+            }
+          }
+        });
+        console.log('🔐 Using authenticated user client');
+      } catch (error) {
+        console.warn('⚠️ Failed to create authenticated client, using service role:', error);
+      }
     }
 
-    console.log('🌊 Creating streaming response transform');
     // Create streaming response
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-    const encoder = new TextEncoder();
+    const { response, writer } = createStreamingResponse();
 
-    // Send data function
-    const sendData = (data: any) => {
-      const message = `data: ${JSON.stringify(data)}\n\n`;
-      console.log('📤 Sending data chunk:', data.content?.substring(0, 50) || '[no content]');
-      writer.write(encoder.encode(message));
-    };
-
-    console.log('🚀 Starting background processing');
-    // Start background processing with standard authenticated context and cleanup
-    processStreamingOrchestration(messageId, deliberationId, mode, serviceSupabase, authenticatedSupabase, sendData).finally(() => {
-      console.log('🔓 Releasing processing lock');
-      releaseProcessingLock(messageId, lockId);
-      console.log('🔚 Closing writer');
+    // Process orchestration in background
+    processStreamingOrchestration(
+      messageId,
+      deliberationId,
+      mode || 'chat',
+      serviceSupabase,
+      authSupabase,
+      (data) => writer.write(JSON.stringify(data))
+    ).then(() => {
+      writer.close();
+    }).catch((error) => {
+      console.error('Orchestration failed:', error);
+      writer.write(JSON.stringify({ error: error.message, done: true }));
       writer.close();
     });
 
-    console.log('✅ Returning streaming response');
-    return new Response(readable, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no', // Disable Nginx buffering
-        'Access-Control-Expose-Headers': 'X-Accel-Buffering'
-      },
-    });
+    return response;
 
-  } catch (error) {
-    console.error('❌ Streaming orchestration error:', error);
-    console.error('❌ Error stack:', (error as Error)?.stack);
-    console.error('❌ Error details:', JSON.stringify(error, null, 2));
-    
-    // Detailed error logging for debugging
-    if (error instanceof Error) {
-      console.error('❌ Error name:', error.name);
-      console.error('❌ Error message:', error.message);
-      if (error.cause) {
-        console.error('❌ Error cause:', error.cause);
-      }
-    }
-    
-    // CRITICAL: Always return proper streaming response with CORS headers, even on errors
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    
-    // For streaming endpoints, we need to return a streaming error response
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-    const encoder = new TextEncoder();
-    
-    // Send error as streaming data
-    const errorData = `data: ${JSON.stringify({ 
-      error: errorMessage,
-      done: true,
-      timestamp: new Date().toISOString(),
-      context: 'agent-orchestration-stream' 
-    })}\n\n`;
-    
-    writer.write(encoder.encode(errorData));
-    writer.close();
-    
-    return new Response(readable, {
-      status: 200, // Use 200 for streaming responses to avoid browser issues
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-      }
-    });
+  } catch (error: any) {
+    console.error('❌ Request processing error:', error);
+    return createErrorResponse(error, 500, 'agent-orchestration-stream');
   }
 });
-
-async function processStreamingOrchestration(
-  messageId: string,
-  deliberationId: string,
-  mode: string,
-  serviceSupabase: any,
-  authenticatedSupabase: any,
-  sendData: (data: any) => void
-) {
-  console.log(`🚀 Starting processStreamingOrchestration`, { messageId, deliberationId, mode });
-  console.log(`🔐 Using authenticated Supabase client context`);
-  
-  // CRITICAL: Add immediate test response to verify streaming works
-  sendData({ 
-    content: `🔧 DEBUG: System is processing message ${messageId}`, 
-    done: false,
-    debug: true 
-  });
-  
-  try {
-    console.log('🔧 Getting OpenAI API key');
-    const openAIApiKey = getOpenAIKey();
-    console.log('✅ Environment setup complete');
-
-    // Use authenticated user client passed from main function
-    console.log('🔐 Using authenticated user client from JWT context');
-
-    console.log(`📊 Supabase clients ready - authenticated context available`);
-  
-    // Check for existing responses first with improved performance
-    console.log(`🔍 Checking for existing responses for message ${messageId}...`);
-    
-    const { data: existingResponses, error: checkError } = await serviceSupabase
-      .from('messages')
-      .select('id, agent_context')
-      .eq('deliberation_id', deliberationId)
-      .eq('parent_message_id', messageId)
-      .neq('message_type', 'user');
-    
-    if (checkError) {
-      console.error(`❌ Error checking existing responses: ${checkError.message}`);
-      sendData({ content: '', done: true, error: 'check_error' });
-      return;
-    }
-    
-    if (existingResponses && existingResponses.length > 0) {
-      console.log(`✅ Response(s) already exist for message ${messageId} - skipping processing`);
-      console.log(`   Existing responses: ${existingResponses.map(r => r.id).join(', ')}`);
-      sendData({ 
-        content: '', 
-        done: true,
-        duplicate: true,
-        existingResponseIds: existingResponses.map(r => r.id)
-      });
-      return;
-    }
-      
-    console.log(`✅ No existing responses found for message ${messageId} - proceeding with processing`);
-
-    // Initialize orchestrator with service client
-    console.log(`🤖 Initializing AgentOrchestrator`);
-    const orchestrator = new AgentOrchestrator(serviceSupabase);
-    console.log(`✅ AgentOrchestrator initialized successfully`);
-
-    // Get message details using authenticated user client (respects RLS) 
-    console.log(`📨 Fetching message details for messageId: ${messageId}`);
-    console.log(`🔍 Using authenticated JWT context`);
-    
-    let message: any = null;
-    const { data: messageData, error: messageError } = await authenticatedSupabase
-      .from('messages')
-      .select('*')
-      .eq('id', messageId)
-      .single();
-
-    if (messageError || !messageData) {
-      console.error(`❌ Error fetching message with user context:`, messageError);
-      console.error(`❌ Full message error details:`, JSON.stringify(messageError, null, 2));
-      console.error(`❌ Message ID being searched: ${messageId}`);
-      console.error(`❌ Deliberation ID: ${deliberationId}`);
-      
-      // Try with service role as fallback if RLS policy issue
-      console.log(`🔄 Trying with service role client as fallback...`);
-      const { data: serviceMessage, error: serviceError } = await serviceSupabase
-        .from('messages')
-        .select('*')
-        .eq('id', messageId)
-        .single();
-        
-      if (serviceError || !serviceMessage) {
-        console.error(`❌ Service role also failed:`, serviceError);
-        sendData({ error: `Message not found: ${messageId}`, done: true });
-        return;
-      } else {
-        console.log(`✅ Found message with service role - may indicate RLS policy issue`);
-        console.log(`📊 Message details:`, { 
-          id: serviceMessage.id, 
-          type: serviceMessage.message_type,
-          userId: serviceMessage.user_id,
-          content: serviceMessage.content?.substring(0, 50) 
-        });
-        message = serviceMessage;
-      }
-    } else {
-      message = messageData;
-      console.log(`✅ Message fetched successfully with user context`);
-    }
-
-    console.log(`✅ Message fetched successfully:`, {
-      id: message.id,
-      content: message.content?.substring(0, 100) + '...',
-      type: message.message_type,
-      userId: message.user_id,
-      deliberationId: message.deliberation_id
-    });
-
-    console.log('📨 Processing message:', message.content);
-
-    // Calculate response timestamp: parent message time + 1 second
-    const parentTimestamp = new Date(message.created_at);
-    const responseTimestamp = new Date(parentTimestamp.getTime() + 1000).toISOString();
-
-    // Check response cache first
-    const cachedResponse = checkResponseCache(message.content, deliberationId);
-    if (cachedResponse) {
-      console.log('🚀 Using cached response');
-      
-      sendData({ 
-        agentType: cachedResponse.agentType,
-        content: cachedResponse.response,
-        done: true,
-        cached: true
-      });
-      return;
-    }
-
-    // Enhanced fast path - only for highest confidence patterns
-    const fastPath = checkFastPath(message.content);
-    if (fastPath && fastPath.confidence >= 0.95) {
-      console.log('🚀 Using high-confidence fast path:', fastPath.agent, `(confidence: ${fastPath.confidence})`);
-      
-      const response = await generateFastResponse(
-        message.content,
-        fastPath,
-        serviceSupabase,
-        sendData
-      );
-
-      // Cache the response
-      cacheResponse(message.content, response, fastPath.agent, deliberationId);
-
-      // Store response using service client with enhanced verification for bulk processing
-      const insertData = {
-        content: response,
-        message_type: fastPath.agent,
-        user_id: message.user_id,
-        deliberation_id: deliberationId,
-        parent_message_id: messageId, // Link to the triggering message
-        created_at: responseTimestamp, // Use calculated timestamp for proper ordering
-        agent_context: { 
-          agent_type: fastPath.agent,
-          processing_method: 'high_confidence_fast_path',
-          confidence: fastPath.confidence,
-          processing_mode: mode
-        }
-      };
-
-      const { data: fastInsertData, error: fastInsertError } = await serviceSupabase.from('messages').insert(insertData);
-
-      if (fastInsertError) {
-        console.error('❌ Fast path database insert error:', fastInsertError);
-        throw new Error(`Failed to save fast path response: ${fastInsertError.message}`);
-      }
-
-      sendData({ done: true });
-      return;
-    } else if (fastPath) {
-      console.log('🔍 Fast path matched but confidence too low, proceeding to full analysis:', 
-        fastPath.agent, `(confidence: ${fastPath.confidence})`);
-    }
-
-    // Check mode first - if learn mode, force bill agent
-    if (mode === 'learn') {
-      console.log('🎓 Learn mode detected - forcing Bill agent');
-      
-      sendData({ 
-        agentType: 'bill_agent',
-        content: '',
-        done: false 
-      });
-
-      const response = await generateStreamingResponse(
-        message.content,
-        'bill_agent',
-        { intent: 'policy_question', complexity: 0.8, requiresExpertise: true },
-        { messageCount: 1 },
-        [],
-        deliberationId,
-        openAIApiKey,
-        sendData,
-        orchestrator,
-        mode
-      );
-
-      // Store response using service client
-      await serviceSupabase.from('messages').insert({
-        content: response,
-        message_type: 'bill_agent',
-        user_id: message.user_id,
-        deliberation_id: deliberationId,
-        parent_message_id: messageId,
-        created_at: responseTimestamp,
-        agent_context: { 
-          agent_type: 'bill_agent',
-          processing_method: 'mode_forced',
-          mode: 'learn'
-        }
-      });
-
-      sendData({ done: true });
-      return;
-    }
-
-    // Enhanced orchestration using unified service
-    console.log('🔄 Using enhanced orchestration');
-    
-    // For bulk processing, skip complex analysis to avoid timeouts
-    let analysis, conversationState, similarNodes, availableKnowledge;
-    
-    if (mode === 'bulk_processing') {
-      console.log('📦 Bulk mode: Using simplified analysis');
-      analysis = { intent: 'general', complexity: 0.5, requiresExpertise: false };
-      conversationState = { messageCount: 1, recentAgentTypes: [], lastAgentType: null };
-      similarNodes = [];
-      availableKnowledge = false;
-    } else {
-      console.log('🧠 Performing enhanced tiered analysis with timeouts');
-      
-      // Enhanced tiered parallel processing with progressive timeouts
-      const tieredResults = await executeTieredOperations({
-        critical: [
-          {
-            name: 'message_analysis',
-            fn: () => orchestrator.analyzeMessage(message.content, openAIApiKey),
-            fallback: { intent: 'general', complexity: 0.5, topicRelevance: 0.5, requiresExpertise: false }
-          },
-          {
-            name: 'conversation_state',
-            fn: () => getConversationState(serviceSupabase, deliberationId, message.user_id),
-            fallback: { messageCount: 1, recentAgentTypes: [], lastAgentType: null }
-          }
-        ],
-        secondary: [
-          {
-            name: 'knowledge_availability',
-            fn: () => checkAvailableKnowledge(serviceSupabase, deliberationId),
-            fallback: false
-          }
-        ],
-        optional: [
-          {
-            name: 'similar_nodes',
-            fn: () => findSimilarNodes(serviceSupabase, message.content, deliberationId, message.user_id),
-            fallback: []
-          }
-        ]
-      }, DEFAULT_TIMEOUTS);
-      
-      console.log(`📊 Tiered analysis completed in ${tieredResults.totalTime}ms`);
-      
-      // Extract results with fallbacks
-      analysis = tieredResults.critical.message_analysis || { 
-        intent: 'general', 
-        complexity: 0.5, 
-        topicRelevance: 0.5, 
-        requiresExpertise: false 
-      };
-      conversationState = tieredResults.critical.conversation_state || { 
-        messageCount: 1, 
-        recentAgentTypes: [], 
-        lastAgentType: null 
-      };
-      availableKnowledge = tieredResults.secondary.knowledge_availability || false;
-      similarNodes = tieredResults.optional.similar_nodes || [];
-      
-      console.log('✅ Enhanced analysis results:', {
-        analysis,
-        conversationState,
-        availableKnowledge,
-        similarNodesCount: similarNodes.length,
-        totalProcessingTime: tieredResults.totalTime
-      });
-    }
-
-    // Enhanced agent selection with 20-second total timeout protection
-    try {
-      console.log(`🔧 DEBUG: About to select agent with analysis:`, analysis);
-      
-      const selectedAgent = await withTimeout(
-        orchestrator.selectOptimalAgent(
-          analysis,
-          conversationState,
-          deliberationId,
-          availableKnowledge
-        ),
-        8000, // 8 seconds for agent selection
-        'Agent Selection'
-      ).catch(error => {
-        console.warn('⏰ Agent selection timed out, using flow_agent fallback:', error);
-        sendData({ 
-          content: `🔧 DEBUG: Agent selection timed out, using flow_agent fallback. Error: ${error.message}`, 
-          done: false,
-          debug: true 
-        });
-        return 'flow_agent'; // Safe fallback
-      });
-
-      console.log(`🤖 Selected agent: ${selectedAgent}`);
-      sendData({ 
-        agentType: selectedAgent, 
-        content: `🔧 DEBUG: Selected ${selectedAgent} agent for processing`, 
-        done: false,
-        debug: true 
-      });
-
-      // Generate streaming response with orchestrator
-      const response = await generateStreamingResponse(
-        message.content,
-        selectedAgent,
-        analysis,
-        conversationState,
-        similarNodes,
-        deliberationId,
-        openAIApiKey,
-        sendData,
-        orchestrator,
-        mode
-      );
-
-      console.log(`✅ Generated response length: ${response.length}`);
-      console.log(`✅ Response preview: ${response.substring(0, 200)}...`);
-
-      // Cache the final response
-      cacheResponse(message.content, response, selectedAgent, deliberationId);
-
-      // Store final response using service client
-      console.log('💾 Storing response in database...');
-      
-      const insertData = {
-        content: response,
-        message_type: selectedAgent,
-        user_id: message.user_id,
-        deliberation_id: deliberationId,
-        parent_message_id: messageId,
-        created_at: responseTimestamp,
-        agent_context: { 
-          agent_type: selectedAgent,
-          processing_method: 'full_orchestration',
-          analysis: analysis,
-          processing_mode: mode
-        }
-      };
-
-      const { data: insertResult, error: insertError } = await serviceSupabase
-        .from('messages')
-        .insert(insertData)
-        .select('id')
-        .single();
-
-      if (insertError) {
-        console.error('❌ Database insert error:', insertError);
-        sendData({ error: 'Failed to save response to database', insertError: insertError.message });
-        throw new Error(`Failed to save response: ${insertError.message}`);
-      } else {
-        console.log('✅ Response stored successfully in database');
-      }
-
-      sendData({ done: true });
-      console.log('🏁 Sent final completion signal');
-
-    } catch (responseError) {
-      console.error('❌ Error generating response - FULL ERROR DETAILS:', {
-        error: responseError,
-        message: responseError.message,
-        stack: responseError.stack,
-        name: responseError.name
-      });
-      
-      sendData({ 
-        error: `Response generation failed: ${responseError.message}`,
-        content: `Error: ${responseError.message}. Please check the logs for details.`,
-        done: true 
-      });
-      return; // Exit early on error
-    }
-
-  } catch (error) {
-    console.error('❌ Streaming processing error:', error);
-    console.error('❌ Full error stack:', error.stack);
-    console.error('❌ Error details:', JSON.stringify(error, null, 2));
-    
-    sendData({ 
-      error: error.message, 
-      content: `System error: ${error.message}. The system has been notified and will investigate.`,
-      done: true,
-      systemError: true
-    });
-  }
-}
