@@ -148,7 +148,7 @@ const OptimizedMessageItem = memo(({
   const canRetryStream = !isUser && streamingState?.canRetry && streamingState?.messageId === message.id;
 
   return (
-    <div className="pb-4">
+    <div className="pb-4 min-h-[80px]">
       <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
         <div className={`flex gap-3 max-w-[80%] ${isUser ? 'flex-row-reverse' : ''}`}>
           <Avatar className="h-8 w-8 flex-shrink-0">
@@ -381,19 +381,20 @@ export const OptimizedMessageList = memo(({
         <>
           <Virtuoso
             ref={virtuosoRef}
-            className="h-full"
+            style={{ height: '100%' }}
             data={messages}
             initialTopMostItemIndex={Math.max(0, messages.length - 1)}
             followOutput="auto"
             atBottomStateChange={setAtBottom}
             itemContent={renderItem}
             increaseViewportBy={200}
-            overscan={3}
+            overscan={5}
+            defaultItemHeight={120}
             components={{
               Footer: () => (
                 isTyping ? (
-                  <div className="flex gap-3 mt-2">
-                    <Avatar className="h-8 w-8">
+                  <div className="flex gap-3 mt-2 min-h-[60px]">
+                    <Avatar className="h-8 w-8 flex-shrink-0">
                       <AvatarFallback className="bg-muted-foreground">
                         <Bot className="h-4 w-4 text-white" />
                       </AvatarFallback>
@@ -409,7 +410,7 @@ export const OptimizedMessageList = memo(({
                       </Card>
                     </div>
                   </div>
-                ) : <div />
+                ) : <div style={{ minHeight: '1px' }} />
               ),
             }}
           />

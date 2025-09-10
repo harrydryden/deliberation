@@ -98,14 +98,20 @@ export const useChat = (deliberationId?: string) => {
   }, [user, deliberationId, handleAsyncError, setChatState, services.messageService]);
 
   const stableSetupRealTimeUpdates = useCallback(() => {
-    if (!user) return;
+    if (!user || !deliberationId) return;
 
     try {
       const unsubscribe = realtimeService.subscribeToMessages((message) => {
+        // Skip messages that don't belong to this deliberation
+        if (message.deliberation_id !== deliberationId) {
+          return;
+        }
+
         logger.info('📨 Realtime message received', { 
           id: message.id, 
           type: message.message_type, 
-          user_id: message.user_id
+          user_id: message.user_id,
+          deliberation_id: message.deliberation_id
         });
         
         const chatMessage: ChatMessage = {
@@ -114,61 +120,84 @@ export const useChat = (deliberationId?: string) => {
           message_type: message.message_type as ChatMessage['message_type'],
           created_at: message.created_at,
           user_id: message.user_id,
+          deliberation_id: message.deliberation_id,
           submitted_to_ibis: message.submitted_to_ibis || false
         };
 
         setChatState(prev => {
-          // CRITICAL FIX: Better duplicate detection for queue/realtime coordination
-          const existingMessage = prev.messages.find(msg => msg.id === chatMessage.id);
-          const existingStreaming = prev.messages.find(msg => msg.id.startsWith(`streaming-${message.id}`));
-          const existingFinal = prev.messages.find(msg => msg.id.startsWith(`${message.id}-final`));
+          // Check for duplicates more efficiently
+          const isDuplicate = prev.messages.some(msg => 
+            msg.id === chatMessage.id || 
+            msg.id === `streaming-${message.id}` || 
+            msg.id === `${message.id}-final`
+          );
           
-          if (existingMessage || existingStreaming || existingFinal) {
+          if (isDuplicate) {
+            logger.debug('Skipping duplicate realtime message', { messageId: chatMessage.id });
             return prev;
           }
           
           logger.info('➕ Adding realtime message', { messageId: chatMessage.id, type: chatMessage.message_type });
+          
+          // Use functional update to prevent stale state
+          const newMessages = [...prev.messages, chatMessage];
+          
           return {
             ...prev,
-            messages: [...prev.messages, chatMessage]
+            messages: newMessages,
+            isTyping: message.message_type?.includes('agent') ? false : prev.isTyping
           };
         });
-          
-          // Update typing state separately to prevent message list re-renders
-          if (message.message_type && (message.message_type.includes('agent') || message.message_type === 'peer_agent' || message.message_type === 'bill_agent' || message.message_type === 'flow_agent')) {
-            setChatState(prev => ({ ...prev, isTyping: false }));
-          }
       }, deliberationId);
 
       unsubscribeRef.current = unsubscribe;
+      logger.info('Real-time subscription established', { deliberationId });
     } catch (error) {
+      logger.error('Failed to setup real-time updates', error as Error);
       handleError(error, 'real-time setup');
     }
-  }, [user, realtimeService, deliberationId, setChatState, handleError]);
+  }, [user, realtimeService, deliberationId, handleError]);
 
-  // F006 Fix: Optimize cache clearing - only clear on user change, not on every load
+  // Optimize cache clearing and setup
   const currentUserIdRef = useRef<string | null>(null);
+  const setupCompleteRef = useRef<boolean>(false);
   
   useEffect(() => {
-    if (!authLoading && user) {
-      // Only clear cache when user changes, not on every load
-      if (user.id !== currentUserIdRef.current) {
-        cacheService.clearNamespace('chat-history');
-        currentUserIdRef.current = user.id;
-      }
-      stableLoadChatHistory();
-      stableSetupRealTimeUpdates();
+    if (authLoading || !user || !deliberationId) return;
+
+    // Prevent duplicate setups
+    if (setupCompleteRef.current && user.id === currentUserIdRef.current) return;
+
+    // Only clear cache when user changes
+    if (user.id !== currentUserIdRef.current) {
+      cacheService.clearNamespace('chat-history');
+      currentUserIdRef.current = user.id;
     }
+
+    // Setup chat data and real-time updates
+    const setupChat = async () => {
+      try {
+        await stableLoadChatHistory();
+        stableSetupRealTimeUpdates();
+        setupCompleteRef.current = true;
+        logger.info('Chat setup completed', { userId: user.id, deliberationId });
+      } catch (error) {
+        logger.error('Chat setup failed', error as Error);
+        setupCompleteRef.current = false;
+      }
+    };
+
+    setupChat();
 
     return () => {
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
       }
-      // F002 Fix: Cleanup scheduled message cleanups on unmount
       cancelAllCleanups();
+      setupCompleteRef.current = false;
     };
-  }, [user, authLoading, deliberationId, stableLoadChatHistory, stableSetupRealTimeUpdates, cancelAllCleanups]);
+  }, [user?.id, authLoading, deliberationId, stableLoadChatHistory, stableSetupRealTimeUpdates, cancelAllCleanups]);
 
   // Remove redundant reload - realtime updates should handle missed messages
 

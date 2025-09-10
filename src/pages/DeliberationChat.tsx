@@ -16,7 +16,7 @@ import { MessageQueueStatus } from "@/components/chat/MessageQueueStatus";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useOptimizedDeliberationService } from "@/hooks/useOptimizedDeliberationService";
 import { useServices } from "@/hooks/useServices";
-import { useChat } from "@/hooks/useChat";
+import { useOptimizedChat } from "@/hooks/useOptimizedChat";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/utils/logger";
 import { supabase } from "@/integrations/supabase/client";
@@ -100,18 +100,16 @@ const OptimizedDeliberationChat = () => {
     isLoading: chatLoading,
     isTyping,
     sendMessage: originalSendMessage,
-    loadChatHistory,
-    retryMessage,
-    messageQueue
-  } = useChat(deliberationId);
+    reloadMessages
+  } = useOptimizedChat(deliberationId);
 
   // Filter messages based on view mode and user context
   const filteredMessages = useFilteredMessages(messages, uiState.viewMode, user?.id, isAdmin);
 
 
   // PERFORMANCE OPTIMIZATION: Stable sendMessage with minimal dependencies
-  const sendMessage = useCallback(async (content: string) => {
-    await originalSendMessage(content, chatModeRef.current);
+  const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
+    await originalSendMessage(content, mode);
     setUserMetrics(prev => ({
       ...prev,
       engagement: prev.engagement + 1
@@ -227,28 +225,17 @@ const OptimizedDeliberationChat = () => {
   }, []);
 
   const handleIbisSuccess = useCallback(() => {
-    loadChatHistory();
+    reloadMessages();
     loadDeliberation();
-  }, [loadChatHistory, loadDeliberation]);
+  }, [reloadMessages, loadDeliberation]);
 
-  // PERFORMANCE OPTIMIZATION: Throttled queue status updates to prevent excessive re-renders
-  const queueStatusProps = useMemo(() => {
-    // Only update if there are actual changes to prevent unnecessary re-renders
-    const currentQueue = messageQueue?.queue || [];
-    const processingCount = messageQueue?.stats.processing || 0;
-    
-    return {
-      queuedMessages: currentQueue,
-      processingCount,
-      onRetryMessage: messageQueue?.retryMessage || (() => {}),
-      onRemoveMessage: messageQueue?.removeMessage || (() => {})
-    };
-  }, [
-    messageQueue?.queue?.length, // Only depend on length to reduce re-renders
-    messageQueue?.stats.processing,
-    messageQueue?.retryMessage,
-    messageQueue?.removeMessage
-  ]);
+  // PERFORMANCE OPTIMIZATION: Throttled queue status - simplified without message queue
+  const queueStatusProps = useMemo(() => ({
+    queuedMessages: [],
+    processingCount: 0,
+    onRetryMessage: () => {},
+    onRemoveMessage: () => {}
+  }), []);
 
   // PERFORMANCE OPTIMIZATION: Optimized effects with stable dependencies
   useEffect(() => {
@@ -286,14 +273,13 @@ const OptimizedDeliberationChat = () => {
           isLoading={chatLoading} 
           isTyping={isTyping} 
           onAddToIbis={handleAddToIbis} 
-          onRetry={retryMessage} 
           deliberationId={deliberationId || ''} 
           agentConfigs={dataState.agentConfigs} 
         />
       </div>
       <MessageInput ref={messageInputRef} onSendMessage={sendMessage} disabled={chatLoading} />
     </div>
-  ), [filteredMessages, chatLoading, isTyping, handleAddToIbis, retryMessage, deliberationId, dataState.agentConfigs, sendMessage]);
+  ), [filteredMessages, chatLoading, isTyping, handleAddToIbis, deliberationId, dataState.agentConfigs, sendMessage]);
 
   // Render loading state
   if (isLoading || dataState.loading) {
@@ -332,9 +318,7 @@ const OptimizedDeliberationChat = () => {
                    </Badge>
                 </div>
                 <div className="flex items-center gap-2">
-                  {messageQueue && messageQueue.queue.length > 0 && (
-                    <MessageQueueStatus {...queueStatusProps} />
-                  )}
+                  {/* Queue status temporarily disabled for optimization */}
                   <Button
                     variant="default"
                     size="sm"
@@ -422,11 +406,9 @@ const OptimizedDeliberationChat = () => {
                          {dataState.deliberation.status}
                        </Badge>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {messageQueue && messageQueue.queue.length > 0 && (
-                        <MessageQueueStatus {...queueStatusProps} />
-                      )}
-                      <Button
+                     <div className="flex items-center gap-2">
+                       {/* Queue status temporarily disabled for optimization */}
+                       <Button
                         variant="default"
                         size="sm"
                         onClick={() => setUiState(prev => ({ ...prev, isHeaderCollapsed: !prev.isHeaderCollapsed }))}
