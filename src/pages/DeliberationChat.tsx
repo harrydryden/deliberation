@@ -104,22 +104,40 @@ const OptimizedDeliberationChat = () => {
     isLoading: chatLoading,
     isTyping,
     sendMessage: originalSendMessage,
-    reloadMessages
+    reloadMessages,
+    recovery
   } = useOptimizedChat(deliberationId, messageQueue);
 
   // Filter messages based on view mode and user context
   const filteredMessages = useFilteredMessages(messages, uiState.viewMode, user?.id, isAdmin);
 
 
-  // PERFORMANCE OPTIMIZATION: Stable sendMessage with queue integration
+  // PERFORMANCE OPTIMIZATION: Stable sendMessage with enhanced queue integration
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
-    // Add to queue instead of direct sending
-    messageQueue.addToQueue(content, undefined, mode);
-    setUserMetrics(prev => ({
-      ...prev,
-      engagement: prev.engagement + 1
-    }));
-  }, [messageQueue]); // Depend on queue for proper integration
+    if (!content.trim()) return;
+    
+    // Add to queue with proper error handling
+    try {
+      const messageId = messageQueue.addToQueue(content, undefined, mode);
+      logger.info('Message added to queue successfully', { 
+        messageId: messageId.substring(0, 8),
+        mode,
+        content: content.substring(0, 50) + (content.length > 50 ? '...' : '')
+      });
+      
+      setUserMetrics(prev => ({
+        ...prev,
+        engagement: prev.engagement + 1
+      }));
+    } catch (error) {
+      logger.error('Failed to add message to queue', error as Error);
+      toast({
+        title: "Error",
+        description: "Failed to queue message. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [messageQueue, toast]); // Enhanced dependencies for proper error handling
 
   // setMessageText function for voice interface
   const setMessageText = useCallback((text: string) => {
@@ -234,15 +252,45 @@ const OptimizedDeliberationChat = () => {
     loadDeliberation();
   }, [reloadMessages, loadDeliberation]);
 
-  // Active queue status integration
-  const queueStatusProps = useMemo(() => ({
-    queuedMessages: messageQueue.queue,
-    processingCount: messageQueue.processing.size,
-    onRetryMessage: messageQueue.retryMessage,
-    onRemoveMessage: messageQueue.removeFromQueue
-  }), [messageQueue.queue, messageQueue.processing.size, messageQueue.retryMessage, messageQueue.removeFromQueue]);
+  // Enhanced queue status integration with debugging and recovery
+  const queueStatusProps = useMemo(() => {
+    const props = {
+      queuedMessages: messageQueue.queue,
+      processingCount: messageQueue.processing.size,
+      onRetryMessage: messageQueue.retryMessage,
+      onRemoveMessage: messageQueue.removeFromQueue,
+      messageQueue: messageQueue, // Pass full queue for debug panel
+      recovery: recovery // Pass recovery system
+    };
+    
+    // Enhanced logging for debugging
+    logger.debug('Queue status props updated', {
+      queueLength: props.queuedMessages.length,
+      processingCount: props.processingCount,
+      stats: messageQueue.getQueueStats
+    });
+    
+    return props;
+  }, [messageQueue, recovery]);
 
-  // PERFORMANCE OPTIMIZATION: Optimized effects with stable dependencies
+  // Enhanced queue processor monitoring
+  useEffect(() => {
+    const stats = messageQueue.getQueueStats;
+    
+    logger.info('Queue state changed', {
+      stats,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Alert if queue is stuck
+    if (stats.processing > 0 && stats.queued > 0 && !stats.canProcess) {
+      logger.warn('Queue appears to be at capacity', {
+        stats,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+  }, [messageQueue.queue.length, messageQueue.processing.size]);
   useEffect(() => {
     if (!isLoading && !user) {
       navigate("/auth");

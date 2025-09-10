@@ -48,7 +48,7 @@ export const useAgentOrchestrationTrigger = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
         controller.abort();
-      }, 10000); // 10 second timeout for orchestration trigger
+      }, 25000); // 25 second timeout for orchestration trigger
       
       try {
         const response = await fetch(functionUrl, {

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useServices } from '@/hooks/useServices';
 import { useMessageQueue, QueuedMessage } from '@/hooks/useMessageQueue';
+import { useMessageQueueRecovery } from '@/hooks/useMessageQueueRecovery';
 import type { ChatMessage } from "@/types/index";
 import { convertApiMessagesToChatMessages, convertApiMessageToChatMessage } from "@/utils/chat";
 import { getErrorMessage } from "@/utils/errors";
@@ -33,6 +34,9 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
   const lastLoadedDeliberationRef = useRef<string | null>(null);
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { triggerAgentOrchestration } = useAgentOrchestrationTrigger();
+  
+  // Initialize recovery system for the queue
+  const recovery = messageQueue ? useMessageQueueRecovery(messageQueue) : null;
   
   // Helper to update typing state
   const setTypingState = useCallback((isTyping: boolean) => {
@@ -186,15 +190,13 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     }
   }, [user, deliberationId, messageService, toast, triggerAgentOrchestration, setTypingState]);
 
-  // Main send message function - uses queue if available, direct otherwise
+  // Main send message function - REMOVED queue logic to prevent double processing
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!content.trim()) return;
     
-    if (messageQueue) {
-      // Use queue system
-      messageQueue.addToQueue(content.trim(), undefined, mode);
-    } else {
-      // Fallback to direct sending
+    // Queue handling is now done in DeliberationChat only
+    // This is a fallback for direct use without queue
+    if (!messageQueue) {
       await sendMessageDirect(content, mode);
     }
   }, [messageQueue, sendMessageDirect]);
@@ -250,13 +252,21 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
         error: errorMsg 
       }));
       
-      toast({
-        title: "Error",
-        description: errorMsg,
-        variant: "destructive"
+      // Enhanced error logging with retry info
+      logger.error('Failed to send queued message', error as Error, {
+        queueId: queuedMessage.id.substring(0, 8),
+        retries: queuedMessage.retries,
+        canRetry: queuedMessage.retries < 2
       });
       
-      logger.error('Failed to send queued message', error as Error);
+      // Only show toast for final failures
+      if (queuedMessage.retries >= 1) {
+        toast({
+          title: "Message Failed",
+          description: "Message failed to send after retries. Check queue status for details.",
+          variant: "destructive"
+        });
+      }
     }
   }, [user, deliberationId, messageQueue, messageService, toast, triggerAgentOrchestration, setTypingState]);
 
@@ -266,8 +276,12 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     
     const processNextMessage = async () => {
       const nextMessage = messageQueue.getNextQueuedMessage();
-      if (nextMessage && messageQueue.processing.size < messageQueue.queue.length) {
-        await processQueuedMessage(nextMessage);
+      // CRITICAL FIX: Check if can process using queue stats
+      if (nextMessage) {
+        const stats = messageQueue.getQueueStats;
+        if (stats.canProcess) {
+          await processQueuedMessage(nextMessage);
+        }
       }
     };
     
@@ -310,6 +324,11 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     isTyping: chatState.isTyping,
     error: chatState.error,
     sendMessage,
-    reloadMessages: loadMessages
+    reloadMessages: loadMessages,
+    recovery: recovery ? {
+      getStats: recovery.getRecoveryStats,
+      performHealthCheck: recovery.performHealthCheck,
+      recoverStuck: recovery.recoverStuckMessages
+    } : undefined
   };
 };
