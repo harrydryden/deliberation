@@ -850,15 +850,6 @@ serve(async (req) => {
     const authHeader = req.headers.get('authorization');
     console.log('🔑 Auth header present:', !!authHeader);
     
-    // Since verify_jwt is disabled, we handle auth manually for security
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('❌ Missing or invalid authorization header');
-      return new Response(JSON.stringify({ error: 'Missing or invalid authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const requestId = req.headers.get('X-Request-ID') || `edge_${Date.now()}`;
     console.log('📥 [PHASE1] Edge function request received', {
       requestId,
