@@ -110,11 +110,12 @@ async function generateFastResponse(
 ): Promise<string> {
   const openAIApiKey = getOpenAIKey();
   
-  // Add timeout for OpenAI requests to prevent hanging
+  // Enhanced timeout with proper cleanup and error handling
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
+    EdgeLogger.warn('OpenAI request timeout in generateFastResponse');
     controller.abort();
-  }, 45000); // 45 second timeout to leave buffer for edge function limit
+  }, 40000); // Reduced to 40s to leave more buffer for edge function cleanup
   
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -173,8 +174,22 @@ async function generateFastResponse(
     }
 
     return fullResponse;
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      EdgeLogger.warn('OpenAI request aborted due to timeout');
+      throw new Error('Request timeout - please try again');
+    }
+    throw error;
   } finally {
     clearTimeout(timeoutId);
+    // Ensure controller is properly cleaned up
+    if (!controller.signal.aborted) {
+      try {
+        controller.abort();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
   }
 }
 

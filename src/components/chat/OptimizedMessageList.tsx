@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState, useCallback, lazy, Suspense, memo, 
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Bot, User, Users, Workflow, FileText, Loader2, Share2 } from "lucide-react";
+import { Bot, User, Users, Workflow, FileText, Loader2, Share2, RefreshCw, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { formatMessageTime } from '@/utils/timeDisplay';
 const LazyMarkdownMessage = lazy(() => import("@/components/common/MarkdownMessage").then(m => ({ default: m.MarkdownMessage })));
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
@@ -23,8 +24,16 @@ interface MessageListProps {
   isTyping: boolean;
   onAddToIbis?: (messageId: string, content: string) => void;
   onRetry?: (id: string, content: string) => void;
+  onRetryStream?: (messageId: string) => void; // New retry stream functionality
   deliberationId: string; // Required for optimized loading
   agentConfigs?: AgentConfig[];
+  streamingState?: {
+    isStreaming: boolean;
+    messageId: string | null;
+    retryCount: number;
+    lastError: string | null;
+    canRetry: boolean;
+  };
 }
 
 const AGENTS = {
@@ -57,17 +66,27 @@ const OptimizedMessageItem = memo(({
   index, 
   unreadIndex, 
   onAddToIbis, 
-  onRetry, 
+  onRetry,
+  onRetryStream,
   agentConfigsMap, 
-  deliberationId 
+  deliberationId,
+  streamingState
 }: { 
   message: ChatMessage;
   index: number;
   unreadIndex: number | null;
   onAddToIbis?: (messageId: string, content: string) => void;
   onRetry?: (id: string, content: string) => void;
+  onRetryStream?: (messageId: string) => void;
   agentConfigsMap: Map<string, AgentConfig>;
   deliberationId?: string;
+  streamingState?: {
+    isStreaming: boolean;
+    messageId: string | null;
+    retryCount: number;
+    lastError: string | null;
+    canRetry: boolean;
+  };
 }) => {
   const isUser = message.message_type === 'user';
   
@@ -112,12 +131,21 @@ const OptimizedMessageItem = memo(({
     onRetry?.(message.id, message.content);
   }, [onRetry, message.id, message.content]);
 
+  const handleRetryStream = useCallback(() => {
+    onRetryStream?.(message.id);
+  }, [onRetryStream, message.id]);
+
   const handleShare = useCallback(() => {
     // For user messages, "Share" means submit to IBIS
     if (isUser) {
       onAddToIbis?.(message.id, message.content);
     }
   }, [isUser, onAddToIbis, message.id, message.content]);
+
+  // Check if this message is currently streaming or has stream issues
+  const isCurrentlyStreaming = streamingState?.isStreaming && streamingState?.messageId === message.id;
+  const hasStreamError = !isUser && streamingState?.lastError && streamingState?.messageId === message.id;
+  const canRetryStream = !isUser && streamingState?.canRetry && streamingState?.messageId === message.id;
 
   return (
     <div className="pb-4">
@@ -144,7 +172,25 @@ const OptimizedMessageItem = memo(({
             </div>
             
             <Card className="p-3 relative bg-card border">
-              <div className={`${isUser ? 'pr-20 pb-8' : ''}`}>
+              {/* Stream status indicator for agent messages */}
+              {!isUser && (isCurrentlyStreaming || hasStreamError) && (
+                <div className="absolute top-2 right-2 z-10">
+                  {isCurrentlyStreaming && (
+                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Streaming... (Attempt {(streamingState?.retryCount || 0) + 1})
+                    </Badge>
+                  )}
+                  {hasStreamError && (
+                    <Badge variant="destructive" className="text-xs">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      Stream Error
+                    </Badge>
+                  )}
+                </div>
+              )}
+              
+              <div className={`${isUser ? 'pr-20 pb-8' : hasStreamError ? 'pb-8' : ''}`}>
                 <Suspense fallback={<Skeleton className="h-4 w-full" />}>
                   <LazyMarkdownMessage 
                     content={message.content}
@@ -152,6 +198,29 @@ const OptimizedMessageItem = memo(({
                   />
                 </Suspense>
               </div>
+              
+              {/* Stream error display and retry button */}
+              {hasStreamError && (
+                <div className="mt-3 pt-2 border-t border-destructive/20 bg-destructive/5 rounded p-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <p className="text-sm text-destructive font-medium">Stream interrupted</p>
+                      <p className="text-xs text-muted-foreground">{streamingState?.lastError}</p>
+                    </div>
+                    {canRetryStream && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRetryStream}
+                        className="text-xs h-7 ml-2"
+                      >
+                        <RefreshCw className="h-3 w-3 mr-1" />
+                        Retry Stream
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
               
               {/* Integrated Share button for user messages */}
               {isUser && (
@@ -170,8 +239,8 @@ const OptimizedMessageItem = memo(({
                 </div>
               )}
 
-              {/* Rating buttons for agent messages */}
-              {!isUser && (
+              {/* Rating buttons for agent messages (only show if no stream error) */}
+              {!isUser && !hasStreamError && (
                 <div className="mt-3 pt-2 border-t border-muted/50">
                   <MessageRating 
                     messageId={message.id}
@@ -199,9 +268,11 @@ export const OptimizedMessageList = memo(({
   isLoading, 
   isTyping, 
   onAddToIbis, 
-  onRetry, 
+  onRetry,
+  onRetryStream,
   deliberationId, 
-  agentConfigs 
+  agentConfigs,
+  streamingState
 }: MessageListProps) => {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   
@@ -231,11 +302,13 @@ export const OptimizedMessageList = memo(({
           unreadIndex={unreadIndex}
           onAddToIbis={onAddToIbis}
           onRetry={onRetry}
+          onRetryStream={onRetryStream}
           agentConfigsMap={agentConfigsMap}
           deliberationId={deliberationId}
+          streamingState={streamingState}
         />
       );
-    }, [unreadIndex, onAddToIbis, onRetry, deliberationId]); // Removed agentConfigsMap - it's stable
+    }, [unreadIndex, onAddToIbis, onRetry, onRetryStream, deliberationId, streamingState]);
 
   // Auto-scroll optimization with proper cleanup
   const scrollToBottom = useCallback(() => {

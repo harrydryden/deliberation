@@ -94,28 +94,80 @@ export class MessageProcessingLockManager {
   }
 
   /**
-   * Execute function with lock protection
+   * Execute function with lock protection and timeout handling
    */
   static async executeWithLock<T>(
     userId: string,
     deliberationId: string | null,
     operation: ProcessingLock['operation'],
     fn: () => Promise<T>,
-    contentHash?: string
+    contentHash?: string,
+    timeoutMs: number = 60000 // 60 second default timeout
   ): Promise<T> {
     const lockKey = this.generateLockKey(userId, deliberationId, operation, contentHash);
     
     // Acquire lock
     const messageId = await this.acquireLock(userId, deliberationId, operation, contentHash);
     
+    // Set up timeout to prevent hanging operations
+    const timeoutId = setTimeout(() => {
+      productionLogger.warn('Lock operation timeout, releasing lock', {
+        userId,
+        deliberationId,
+        operation,
+        timeoutMs
+      });
+      this.releaseLock(userId, deliberationId, operation, contentHash);
+    }, timeoutMs);
+    
     try {
-      // Execute the function
-      const result = await fn();
+      // Execute the function with timeout
+      const result = await Promise.race([
+        fn(),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(`Operation timeout after ${timeoutMs}ms`));
+          }, timeoutMs);
+        })
+      ]);
+      
       return result;
+    } catch (error) {
+      productionLogger.error('Error in executeWithLock', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        userId,
+        deliberationId,
+        operation
+      });
+      throw error;
     } finally {
-      // Always release lock
+      // Always clear timeout and release lock
+      clearTimeout(timeoutId);
       this.releaseLock(userId, deliberationId, operation, contentHash);
     }
+  }
+
+  /**
+   * Force release all locks for a specific user (emergency cleanup)
+   */
+  static forceReleaseUserLocks(userId: string): number {
+    let releasedCount = 0;
+    const keysToDelete: string[] = [];
+    
+    for (const [key, lock] of this.locks.entries()) {
+      if (lock.userId === userId) {
+        keysToDelete.push(key);
+        releasedCount++;
+      }
+    }
+    
+    keysToDelete.forEach(key => this.locks.delete(key));
+    
+    if (releasedCount > 0) {
+      productionLogger.info('Force released user locks', { userId, releasedCount });
+    }
+    
+    return releasedCount;
   }
 
   /**

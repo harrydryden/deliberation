@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { productionLogger } from '@/utils/productionLogger';
-// Streaming performance monitoring consolidated into production logger
 import { useNetworkPerformanceTracker } from './useNetworkPerformanceTracker';
 
 interface StreamingState {
@@ -9,6 +8,9 @@ interface StreamingState {
   currentMessage: string;
   messageId: string | null;
   agentType: string | null;
+  retryCount: number;
+  lastError: string | null;
+  canRetry: boolean;
 }
 
 interface StreamingResponse {
@@ -19,26 +21,61 @@ interface StreamingResponse {
   error?: string;
 }
 
+interface StreamRecoveryConfig {
+  maxRetries: number;
+  retryDelay: number;
+  timeoutMs: number;
+  heartbeatIntervalMs: number;
+  stalledConnectionMs: number;
+}
+
+const DEFAULT_RECOVERY_CONFIG: StreamRecoveryConfig = {
+  maxRetries: 3,
+  retryDelay: 2000,
+  timeoutMs: 75000,
+  heartbeatIntervalMs: 5000,
+  stalledConnectionMs: 25000,
+};
+
 export const useResponseStreaming = () => {
   const [streamingState, setStreamingState] = useState<StreamingState>({
     isStreaming: false,
     currentMessage: '',
     messageId: null,
     agentType: null,
+    retryCount: 0,
+    lastError: null,
+    canRetry: false,
   });
 
   const streamControllerRef = useRef<AbortController | null>(null);
   const accumulatorRef = useRef<string>('');
   const rafIdRef = useRef<number | null>(null);
-  
-  // Performance monitoring replaced with production logging
   const startTime = useRef<number>(0);
   const networkTracker = useNetworkPerformanceTracker();
+  const recoveryConfigRef = useRef<StreamRecoveryConfig>(DEFAULT_RECOVERY_CONFIG);
+  const lastActivityRef = useRef<number>(0);
+  const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const connectionHealthRef = useRef<{
+    consecutiveFailures: number;
+    lastSuccessfulConnection: number;
+    totalBytesReceived: number;
+  }>({
+    consecutiveFailures: 0,
+    lastSuccessfulConnection: Date.now(),
+    totalBytesReceived: 0,
+  });
 
-  // Critical cleanup on component unmount to prevent memory leaks
+  // Enhanced cleanup with health monitoring
   useEffect(() => {
     return () => {
       productionLogger.debug('ResponseStreaming component unmounting - cleaning up');
+      
+      // Clear health check interval
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+        healthCheckIntervalRef.current = null;
+      }
       
       // Abort any active streaming
       if (streamControllerRef.current) {
@@ -61,19 +98,26 @@ export const useResponseStreaming = () => {
     };
   }, []);
 
-  // Enhanced timeout detection in streaming state management
-  const startStreaming = useCallback(async (
+  // Enhanced stream recovery with automatic retry
+  const startStreamingWithRecovery = useCallback(async (
     messageId: string,
     deliberationId: string,
     onUpdate: (content: string, messageId: string, agentType: string | null) => void,
     onComplete: (finalContent: string, messageId: string, agentType: string | null) => void,
     onError: (error: string) => void,
-    mode: 'chat' | 'learn' = 'chat'
+    mode: 'chat' | 'learn' = 'chat',
+    retryAttempt: number = 0
   ) => {
-    productionLogger.debug('Starting streaming for message', { messageId });
+    const config = recoveryConfigRef.current;
+    productionLogger.debug('Starting streaming for message', { 
+      messageId, 
+      retryAttempt, 
+      maxRetries: config.maxRetries 
+    });
     
     // Start performance tracking
     startTime.current = Date.now();
+    lastActivityRef.current = Date.now();
     
     // Cleanup any previous RAF callbacks to prevent memory leaks
     if (rafIdRef.current) {
@@ -82,12 +126,18 @@ export const useResponseStreaming = () => {
     }
     
     // Reset previous state
-    accumulatorRef.current = '';
+    if (retryAttempt === 0) {
+      accumulatorRef.current = '';
+    }
+    
     setStreamingState({
       isStreaming: true,
-      currentMessage: '',
+      currentMessage: accumulatorRef.current,
       messageId,
       agentType: null,
+      retryCount: retryAttempt,
+      lastError: null,
+      canRetry: retryAttempt < config.maxRetries,
     });
 
     // Cancel any existing stream
@@ -101,15 +151,57 @@ export const useResponseStreaming = () => {
 
     streamControllerRef.current = new AbortController();
     
-    // ALIGNED TIMEOUTS: Match with queue processing timeout for consistency
-    const STREAMING_TIMEOUT = 75000; // 75 seconds to align with queue timeout
-    const HEARTBEAT_INTERVAL = 5000; // 5 second heartbeat checks
-    
-    let lastActivity = Date.now();
     let heartbeatCount = 0;
     
+    // Start enhanced health monitoring
+    const startHealthMonitoring = () => {
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+      }
+      
+      healthCheckIntervalRef.current = setInterval(() => {
+        const timeSinceActivity = Date.now() - lastActivityRef.current;
+        heartbeatCount++;
+        
+        // Check for stalled connection
+        const hasReceivedData = accumulatorRef.current.length > 0;
+        
+        if (timeSinceActivity > config.stalledConnectionMs && hasReceivedData) {
+          productionLogger.warn('Connection stalled, triggering recovery', {
+            heartbeatCount,
+            timeSinceActivity,
+            retryAttempt,
+            accumulatedLength: accumulatorRef.current.length
+          });
+          
+          connectionHealthRef.current.consecutiveFailures++;
+          
+          if (streamControllerRef.current) {
+            streamControllerRef.current.abort();
+          }
+        } else if (timeSinceActivity < config.heartbeatIntervalMs) {
+          // Reset failure count on successful activity
+          connectionHealthRef.current.consecutiveFailures = 0;
+          connectionHealthRef.current.lastSuccessfulConnection = Date.now();
+        }
+        
+        productionLogger.debug('Stream health check', {
+          heartbeatCount,
+          timeSinceActivity,
+          hasReceivedData,
+          consecutiveFailures: connectionHealthRef.current.consecutiveFailures
+        });
+      }, config.heartbeatIntervalMs);
+    };
+    
+    startHealthMonitoring();
+    
     const timeoutId = setTimeout(() => {
-      productionLogger.warn('Main streaming timeout reached (60s), aborting');
+      productionLogger.warn('Main streaming timeout reached', { 
+        timeoutMs: config.timeoutMs, 
+        retryAttempt 
+      });
+      
       if (streamControllerRef.current) {
         try {
           streamControllerRef.current.abort();
@@ -117,50 +209,7 @@ export const useResponseStreaming = () => {
           productionLogger.warn('Error aborting on timeout', error);
         }
       }
-      // ALIGNED FIX: Clear streaming state on timeout
-      setStreamingState({
-        isStreaming: false,
-        currentMessage: '',
-        messageId: null,
-        agentType: null,
-      });
-      // ALIGNED TIMEOUT: Updated message to match new timeout
-      onError('Streaming timeout after 75 seconds. Please try again.');
-    }, STREAMING_TIMEOUT);
-    
-    // Heartbeat monitoring to detect stalled connections
-    const heartbeatId = setInterval(() => {
-      const timeSinceActivity = Date.now() - lastActivity;
-      heartbeatCount++;
-      
-      // Only check for stalls if we've received at least one chunk
-      // This prevents premature timeout during initial processing
-      const hasReceivedData = accumulatorRef.current.length > 0;
-      
-      if (timeSinceActivity > 15000) { // 15 seconds without activity
-        productionLogger.debug('Heartbeat: No activity detected', { 
-          heartbeatCount, 
-          timeSinceActivity, 
-          hasReceivedData,
-          accumulatedLength: accumulatorRef.current.length 
-        });
-        
-        // Only trigger stall detection if we've already received data and then stopped
-        // This prevents false positives during initial AI processing time
-        if (hasReceivedData && timeSinceActivity > 25000) { // Increased to 25 seconds after first data
-          productionLogger.warn('Connection appears stalled after receiving data, preparing for timeout'); 
-          // Pre-emptively clear state to prevent hanging UI
-          setStreamingState(prev => ({
-            ...prev,
-            isStreaming: false
-          }));
-          // Call onError to notify queue
-          onError('Connection stalled - no activity for 25 seconds after receiving data.');
-        }
-      } else {
-        productionLogger.debug('Heartbeat: Connection active', { heartbeatCount, timeSinceActivity });
-      }
-    }, HEARTBEAT_INTERVAL);
+    }, config.timeoutMs);
 
     try {
       productionLogger.debug('Checking if streaming is already in progress');
@@ -169,12 +218,15 @@ export const useResponseStreaming = () => {
       const isAlreadyStreaming = streamingState.isStreaming && streamingState.messageId === messageId;
       if (isAlreadyStreaming) {
         productionLogger.warn('Message already streaming, skipping');
-        setStreamingState({
-          isStreaming: false,
-          currentMessage: '',
-          messageId: null,
-          agentType: null,
-        });
+            setStreamingState({
+              isStreaming: false,
+              currentMessage: '',
+              messageId: null,
+              agentType: null,
+              retryCount: 0,
+              lastError: null,
+              canRetry: false,
+            });
         return;
       }
 
@@ -277,62 +329,67 @@ export const useResponseStreaming = () => {
             break;
           }
 
-          try {
-            const chunk = decoder.decode(value, { stream: true });
-            lastActivity = Date.now(); // Update activity timestamp
-            productionLogger.debug('Received chunk', { chunkLength: chunk.length });
+            try {
+              const chunk = decoder.decode(value, { stream: true });
+              lastActivityRef.current = Date.now(); // Update activity timestamp
+              connectionHealthRef.current.totalBytesReceived += chunk.length;
+              
+              productionLogger.debug('Received chunk', { 
+                chunkLength: chunk.length,
+                totalBytes: connectionHealthRef.current.totalBytesReceived
+              });
 
-            // Parse each line as a potential JSON object
-            const lines = chunk.split('\n').filter(line => line.trim());
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const jsonStr = line.slice(6);
-                if (jsonStr === '[DONE]') {
-                  productionLogger.debug('Received [DONE] signal');
-                  break;
-                }
-                
-                try {
-                  const parsed: StreamingResponse = JSON.parse(jsonStr);
-                  
-                  if (parsed.error) {
-                    throw new Error(parsed.error);
-                  }
-                  
-                  if (parsed.content) {
-                    accumulatorRef.current += parsed.content;
-                    lastActivity = Date.now(); // Update activity timestamp
-                    
-                    // Update agent type if provided
-                    if (parsed.agentType && !streamingState.agentType) {
-                      setStreamingState(prev => ({
-                        ...prev,
-                        agentType: parsed.agentType || null,
-                      }));
-                    }
-                    
-                    // Throttle UI updates using requestAnimationFrame
-                    if (rafIdRef.current) {
-                      cancelAnimationFrame(rafIdRef.current);
-                    }
-                    rafIdRef.current = requestAnimationFrame(updateUI);
-                  }
-                  
-                  if (parsed.done) {
-                    productionLogger.debug('Received done signal from parsed data');
+              // Parse each line as a potential JSON object
+              const lines = chunk.split('\n').filter(line => line.trim());
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const jsonStr = line.slice(6);
+                  if (jsonStr === '[DONE]') {
+                    productionLogger.debug('Received [DONE] signal');
                     break;
                   }
-                } catch (parseError) {
-                  productionLogger.warn('Failed to parse streaming chunk', parseError);
-                  // Continue processing other lines
+                  
+                  try {
+                    const parsed: StreamingResponse = JSON.parse(jsonStr);
+                    
+                    if (parsed.error) {
+                      throw new Error(parsed.error);
+                    }
+                    
+                    if (parsed.content) {
+                      accumulatorRef.current += parsed.content;
+                      lastActivityRef.current = Date.now(); // Update activity timestamp
+                      
+                      // Update agent type if provided
+                      if (parsed.agentType && !streamingState.agentType) {
+                        setStreamingState(prev => ({
+                          ...prev,
+                          agentType: parsed.agentType || null,
+                        }));
+                      }
+                      
+                      // Throttle UI updates using requestAnimationFrame
+                      if (rafIdRef.current) {
+                        cancelAnimationFrame(rafIdRef.current);
+                      }
+                      rafIdRef.current = requestAnimationFrame(updateUI);
+                    }
+                    
+                    if (parsed.done) {
+                      productionLogger.debug('Received done signal from parsed data');
+                      break;
+                    }
+                  } catch (parseError) {
+                    productionLogger.warn('Failed to parse streaming chunk', parseError);
+                    // Continue processing other lines
+                  }
                 }
               }
+            } catch (chunkError) {
+              productionLogger.error('Error processing chunk', chunkError);
+              // Continue processing stream
             }
-          } catch (chunkError) {
-            productionLogger.error('Error processing chunk', chunkError);
-            // Continue processing stream
-          }
         } catch (readError) {
           // Handle specific abort errors gracefully
           if (readError instanceof DOMException && readError.name === 'AbortError') {
@@ -348,69 +405,182 @@ export const useResponseStreaming = () => {
       updateUI();
       onComplete(accumulatorRef.current, messageId, streamingState.agentType);
       
+      // Reset connection health on success
+      connectionHealthRef.current.consecutiveFailures = 0;
+      connectionHealthRef.current.lastSuccessfulConnection = Date.now();
+      
       // Record successful completion
       const completionTime = Date.now() - startTime.current;
       productionLogger.debug('Stream completed successfully', { 
         messageId, 
         duration: completionTime, 
-        finalLength: accumulatorRef.current.length 
+        finalLength: accumulatorRef.current.length,
+        retryAttempt
       });
 
     } catch (error) {
       // Handle specific abort errors gracefully
       if (error instanceof DOMException && error.name === 'AbortError') {
-        productionLogger.debug('Request aborted intentionally');
-        return; // Exit gracefully without calling onError
+        // Check if this was a timeout/stall abort that should trigger retry
+        const timeSinceActivity = Date.now() - lastActivityRef.current;
+        const shouldRetry = retryAttempt < config.maxRetries && 
+                           timeSinceActivity > config.stalledConnectionMs;
+                           
+        if (shouldRetry) {
+          productionLogger.info('Stream aborted due to stall, attempting recovery', {
+            retryAttempt,
+            maxRetries: config.maxRetries,
+            timeSinceActivity
+          });
+          
+          // Wait before retrying
+          setTimeout(() => {
+            startStreamingWithRecovery(
+              messageId, 
+              deliberationId, 
+              onUpdate, 
+              onComplete, 
+              onError, 
+              mode, 
+              retryAttempt + 1
+            );
+          }, config.retryDelay * Math.pow(2, retryAttempt)); // Exponential backoff
+          
+          return;
+        } else {
+          productionLogger.debug('Request aborted intentionally or max retries reached');
+          return; // Exit gracefully without calling onError
+        }
       }
       
       productionLogger.error('Streaming error occurred', error);
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
       
+      // Check if we should retry
+      const shouldRetry = retryAttempt < config.maxRetries && 
+                         !errorMessage.includes('abort') &&
+                         !errorMessage.includes('cancelled');
+      
+      if (shouldRetry) {
+        productionLogger.info('Attempting stream recovery', {
+          error: errorMessage,
+          retryAttempt,
+          maxRetries: config.maxRetries
+        });
+        
+        setStreamingState(prev => ({
+          ...prev,
+          lastError: errorMessage,
+          canRetry: true
+        }));
+        
+        // Wait before retrying with exponential backoff
+        setTimeout(() => {
+          startStreamingWithRecovery(
+            messageId, 
+            deliberationId, 
+            onUpdate, 
+            onComplete, 
+            onError, 
+            mode, 
+            retryAttempt + 1
+          );
+        }, config.retryDelay * Math.pow(2, retryAttempt));
+        
+        return;
+      }
+      
       // Record streaming error  
       productionLogger.error('Streaming error details', { 
         messageId, 
         errorMessage, 
-        duration: Date.now() - startTime.current 
+        duration: Date.now() - startTime.current,
+        retryAttempt,
+        maxRetries: config.maxRetries
       });
       
-      // F005 Fix: Enhanced structured logging for better observability
-      productionLogger.error('Streaming failed', error as Error);
+      setStreamingState(prev => ({
+        ...prev,
+        lastError: errorMessage,
+        canRetry: false
+      }));
       
       onError(errorMessage);
     } finally {
-      // F003 Fix: Enhanced cleanup to prevent memory leaks and hanging UI
+      // Enhanced cleanup to prevent memory leaks and hanging UI
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
       
-      if (heartbeatId) {
-        clearInterval(heartbeatId);
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+        healthCheckIntervalRef.current = null;
       }
       
-      // F003 Fix: Always reset streaming state in finally block to prevent memory leaks
-      setStreamingState({
-        isStreaming: false,
-        currentMessage: '',
-        messageId: null,
-        agentType: null,
-      });
+      // Reset streaming state if this is the final attempt
+      if (retryAttempt >= config.maxRetries || 
+          !streamingState.canRetry ||
+          streamingState.lastError?.includes('abort')) {
+        setStreamingState({
+          isStreaming: false,
+          currentMessage: '',
+          messageId: null,
+          agentType: null,
+          retryCount: 0,
+          lastError: null,
+          canRetry: false,
+        });
+      }
       
-      // F003 Fix: Critical RAF cleanup to prevent memory accumulation
+      // Critical RAF cleanup to prevent memory accumulation
       if (rafIdRef.current) {
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
       
-      // F003 Fix: Ensure all references are cleared
+      // Clear stream controller reference
       streamControllerRef.current = null;
-      accumulatorRef.current = '';
       
-      productionLogger.debug('Streaming cleanup completed with memory leak prevention');
+      productionLogger.debug('Streaming cleanup completed', { 
+        retryAttempt, 
+        finalAttempt: retryAttempt >= config.maxRetries 
+      });
     }
-  }, [streamingState.agentType, streamingState.isStreaming, streamingState.messageId]);
+  }, [streamingState.agentType, streamingState.isStreaming, streamingState.messageId, streamingState.canRetry, streamingState.lastError]);
+
+  const startStreaming = useCallback((
+    messageId: string,
+    deliberationId: string,
+    onUpdate: (content: string, messageId: string, agentType: string | null) => void,
+    onComplete: (finalContent: string, messageId: string, agentType: string | null) => void,
+    onError: (error: string) => void,
+    mode: 'chat' | 'learn' = 'chat'
+  ) => {
+    return startStreamingWithRecovery(messageId, deliberationId, onUpdate, onComplete, onError, mode, 0);
+  }, [startStreamingWithRecovery]);
+
+  const retryStreaming = useCallback((
+    messageId: string,
+    deliberationId: string,
+    onUpdate: (content: string, messageId: string, agentType: string | null) => void,
+    onComplete: (finalContent: string, messageId: string, agentType: string | null) => void,
+    onError: (error: string) => void,
+    mode: 'chat' | 'learn' = 'chat'
+  ) => {
+    productionLogger.info('Manual stream retry requested', { messageId });
+    // Reset accumulator for fresh retry
+    accumulatorRef.current = '';
+    return startStreamingWithRecovery(messageId, deliberationId, onUpdate, onComplete, onError, mode, 0);
+  }, [startStreamingWithRecovery]);
 
   const stopStreaming = useCallback(() => {
     productionLogger.debug('Stopping stream');
+    
+    if (healthCheckIntervalRef.current) {
+      clearInterval(healthCheckIntervalRef.current);
+      healthCheckIntervalRef.current = null;
+    }
+    
     if (streamControllerRef.current) {
       try {
         streamControllerRef.current.abort();
@@ -430,6 +600,9 @@ export const useResponseStreaming = () => {
       currentMessage: '',
       messageId: null,
       agentType: null,
+      retryCount: 0,
+      lastError: null,
+      canRetry: false,
     });
     
     accumulatorRef.current = '';
@@ -439,10 +612,22 @@ export const useResponseStreaming = () => {
     return streamingState.isStreaming && streamingState.messageId === messageId;
   }, [streamingState.isStreaming, streamingState.messageId]);
 
+  const getStreamHealth = useCallback(() => {
+    return {
+      ...connectionHealthRef.current,
+      lastActivity: lastActivityRef.current,
+      currentRetryCount: streamingState.retryCount,
+      canRetry: streamingState.canRetry,
+      lastError: streamingState.lastError,
+    };
+  }, [streamingState.retryCount, streamingState.canRetry, streamingState.lastError]);
+
   return {
     streamingState,
     startStreaming,
+    retryStreaming,
     stopStreaming,
     isStreamingMessage,
+    getStreamHealth,
   };
 };
