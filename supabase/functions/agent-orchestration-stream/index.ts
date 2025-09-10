@@ -2,15 +2,15 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 
-// Import only the working shared utilities
+// Import only the working shared utilities - removed streaming since we're using JSON
 import {
   corsHeaders,
   validateAndGetEnvironment,
   handleCORSPreflight,
   createErrorResponse,
+  createSuccessResponse,
   getOpenAIKey,
-  parseAndValidateRequest,
-  createStreamingResponse
+  parseAndValidateRequest
 } from '../shared/edge-function-utils.ts';
 
 // Enhanced authentication-aware client creation
@@ -49,15 +49,14 @@ function createAuthenticatedClients(request: Request) {
   return { serviceClient, userClient };
 }
 
-// Main orchestration function with enhanced authentication
-async function processStreamingOrchestration(
+// Main orchestration function - now returns JSON instead of streaming
+async function processOrchestration(
   messageId: string,
   deliberationId: string,
   mode: string,
   serviceClient: any,
-  userClient: any,
-  sendData: (data: any) => void
-): Promise<void> {
+  userClient: any
+): Promise<{ success: boolean; data?: any; error?: string }> {
   console.log(`🤖 Processing orchestration for message ${messageId} in mode ${mode}`);
 
   try {
@@ -95,7 +94,7 @@ async function processStreamingOrchestration(
 
     console.log(`🎯 Selected agent: ${selectedAgent.name} (${selectedAgent.agent_type})`);
 
-    // Generate response using OpenAI
+    // Generate response using OpenAI - NON-STREAMING for JSON response
     const openAIApiKey = getOpenAIKey();
     const systemPrompt = selectedAgent.prompt_overrides?.system_prompt || 
       `You are ${selectedAgent.name}, a ${selectedAgent.agent_type}. ${selectedAgent.description || ''}`;
@@ -113,7 +112,7 @@ async function processStreamingOrchestration(
           { role: 'user', content: message.content }
         ],
         max_completion_tokens: 1000,
-        stream: true
+        stream: false // Changed to non-streaming
       }),
     });
 
@@ -122,37 +121,15 @@ async function processStreamingOrchestration(
       throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let fullResponse = '';
+    const data = await response.json();
+    const fullResponse = data.choices?.[0]?.message?.content || '';
 
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.startsWith('data: '));
-        
-        for (const line of lines) {
-          if (line.includes('[DONE]')) continue;
-          
-          try {
-            const data = JSON.parse(line.slice(6));
-            const content = data.choices?.[0]?.delta?.content || '';
-            if (content) {
-              fullResponse += content;
-              sendData({ content, done: false });
-            }
-          } catch (e) {
-            // Ignore parse errors for streaming
-          }
-        }
-      }
+    if (!fullResponse) {
+      throw new Error('No response generated from OpenAI');
     }
 
     // Save the agent response using user client for proper attribution
-    const { error: insertError } = await userClient
+    const { data: insertedMessage, error: insertError } = await userClient
       .from('messages')
       .insert({
         deliberation_id: deliberationId,
@@ -162,22 +139,35 @@ async function processStreamingOrchestration(
         agent_context: {
           agent_type: selectedAgent.agent_type,
           processing_mode: mode,
-          processing_method: 'streaming_orchestration'
+          processing_method: 'json_orchestration'
         },
         parent_message_id: messageId
-      });
+      })
+      .select()
+      .single();
 
     if (insertError) {
       console.error('Failed to save agent response:', insertError);
       throw new Error(`Database save error: ${insertError.message}`);
     }
 
-    sendData({ content: '', done: true });
     console.log(`✅ Orchestration completed successfully`);
+    
+    return {
+      success: true,
+      data: {
+        message: insertedMessage,
+        agentType: selectedAgent.agent_type,
+        processingMode: mode
+      }
+    };
 
   } catch (error) {
     console.error('❌ Orchestration error:', error);
-    sendData({ error: error instanceof Error ? error.message : 'Unknown error', done: true });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 }
 
@@ -187,7 +177,7 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    console.log('🚀 Agent orchestration stream starting...');
+    console.log('🚀 Agent orchestration starting...');
 
     // Parse and validate request with shared utility
     const { messageId, deliberationId, mode } = await parseAndValidateRequest(req, [
@@ -200,37 +190,24 @@ serve(async (req) => {
     // Create authenticated clients using enhanced method
     const { serviceClient, userClient } = createAuthenticatedClients(req);
 
-    // Create streaming response with shared utility
-    const { sendData, stream } = createStreamingResponse();
-    
-    const response = new Response(stream, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      }
-    });
-
-    // Process orchestration in background
-    processStreamingOrchestration(
+    // Process orchestration and wait for completion - JSON response pattern
+    const result = await processOrchestration(
       messageId,
       deliberationId,
       mode || 'chat',
       serviceClient,
-      userClient,
-      sendData
-    ).then(() => {
-      sendData({ content: '', done: true });
-    }).catch((error) => {
-      console.error('Orchestration failed:', error);
-      sendData({ error: error.message, done: true });
-    });
+      userClient
+    );
 
-    return response;
+    // Return standard JSON response like all other working functions
+    if (result.success) {
+      return createSuccessResponse(result.data);
+    } else {
+      return createErrorResponse(new Error(result.error || 'Unknown error'), 500, 'agent-orchestration');
+    }
 
   } catch (error: any) {
     console.error('❌ Request processing error:', error);
-    return createErrorResponse(error, 500, 'agent-orchestration-stream');
+    return createErrorResponse(error, 500, 'agent-orchestration');
   }
 });
