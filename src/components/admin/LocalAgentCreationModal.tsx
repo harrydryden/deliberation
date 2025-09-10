@@ -21,7 +21,7 @@ export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading 
     name: '',
     agent_type: '',
     deliberationId: '',
-    max_response_characters: 800,
+      max_response_characters: 1500,
   });
 
   const agentTypes = [
@@ -49,7 +49,7 @@ export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading 
       name: '',
       agent_type: '',
       deliberationId: '',
-      max_response_characters: 800,
+      max_response_characters: 1500,
     });
   };
 
@@ -117,11 +117,17 @@ export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading 
               min="100"
               max="4000"
               value={formData.max_response_characters}
-              onChange={(e) => setFormData(prev => ({ ...prev, max_response_characters: parseInt(e.target.value) || 800 }))}
-              placeholder="800"
+              onChange={(e) => setFormData(prev => ({ ...prev, max_response_characters: parseInt(e.target.value) || 1500 }))}
+              placeholder="1500"
+              className={formData.max_response_characters < 1000 ? "border-orange-500" : ""}
             />
+            {formData.max_response_characters < 1000 && (
+              <p className="text-xs text-orange-600 font-medium">
+                ⚠️ Warning: Character limits below 1000 may result in blank responses from GPT-5 models due to token constraints.
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
-              Maximum characters for agent responses (soft limit - will retry with no limit if empty)
+              Maximum characters for agent responses (soft limit - will retry with no limit if empty). Recommended: 1500+ for GPT-5.
             </p>
           </div>
 

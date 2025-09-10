@@ -34,7 +34,7 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
       name: agent.name,
       description: agent.description || '',
       response_style: agent.response_style || '',
-      max_response_characters: agent.max_response_characters || 800,
+        max_response_characters: agent.max_response_characters || 1500,
       goals: agent.goals || [],
       prompt_overrides: agent.prompt_overrides || {},
       facilitator_config: agent.facilitator_config || {
@@ -71,7 +71,7 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
         name: agent.name,
         description: agent.description || '',
         response_style: agent.response_style || '',
-        max_response_characters: agent.max_response_characters || 800,
+        max_response_characters: agent.max_response_characters || 1500,
         goals: agent.goals || [],
         prompt_overrides: agent.prompt_overrides || {},
         facilitator_config: agent.facilitator_config || {
@@ -165,14 +165,20 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
           <FormField
             type="input"
             label="Max Response Characters"
-            value={form.formData.max_response_characters?.toString() || '800'}
-            onChange={(value) => form.updateField('max_response_characters', parseInt(value) || 800)}
-            placeholder="800"
+            value={form.formData.max_response_characters?.toString() || '1500'}
+            onChange={(value) => form.updateField('max_response_characters', parseInt(value) || 1500)}
+            placeholder="1500"
             inputType="number"
             min="100"
             max="4000"
-            helpText="Maximum characters for agent responses. Uses soft limit - will retry with no limit if response is empty."
+            helpText="Maximum characters for agent responses. Uses soft limit - will retry with no limit if response is empty. Recommended: 1500+ for GPT-5."
+            className={form.formData.max_response_characters < 1000 ? "border-orange-500" : ""}
           />
+          {form.formData.max_response_characters < 1000 && (
+            <div className="text-xs text-orange-600 font-medium mt-1">
+              ⚠️ Warning: Character limits below 1000 may result in blank responses from GPT-5 models due to token constraints.
+            </div>
+          )}
 
           <GoalsInput
             goals={form.formData.goals}
