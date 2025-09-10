@@ -298,7 +298,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     }
   }, [user, deliberationId, messageQueue, messageService, toast, triggerAgentOrchestration, setTypingState]);
 
-  // Queue processor - processes one message at a time
+  // Event-driven queue processor - triggers when queue changes
   useEffect(() => {
     if (!messageQueue || !user || !deliberationId) return;
     
@@ -312,7 +312,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
           canProcess: stats.canProcess, 
           stats 
         });
-        return; // No messages to process or at capacity
+        return;
       }
 
       logger.info('📋 Processing queued message', { 
@@ -326,16 +326,12 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       await processQueuedMessage(nextMessage);
     };
     
-    // Process queue every 100ms when there are queued messages
-    const queueInterval = setInterval(() => {
-      const stats = messageQueue.getQueueStats;
-      if (stats.queued > 0 && stats.canProcess) {
-        processNextMessage();
-      }
-    }, 100);
-    
-    return () => clearInterval(queueInterval);
-  }, [messageQueue, user, deliberationId, processQueuedMessage]);
+    // Trigger immediate processing when queue has items
+    const stats = messageQueue.getQueueStats;
+    if (stats.queued > 0 && stats.canProcess) {
+      processNextMessage();
+    }
+  }, [messageQueue, user, deliberationId, processQueuedMessage, messageQueue?.getQueueStats]);
   
   // Effect for loading messages and setting up real-time
   useEffect(() => {
@@ -359,18 +355,18 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     };
   }, [user?.id]);
 
-  // Periodic refresh when expecting agent responses
+  // Typing state timeout management - prevent stuck typing state
   useEffect(() => {
     if (!chatState.isTyping) return;
 
-    const refreshInterval = setInterval(() => {
-      logger.debug('⏰ Periodic refresh while typing indicator active');
-      lastLoadedDeliberationRef.current = null; // Force reload
-      loadMessages();
-    }, 10000); // Refresh every 10 seconds while typing
+    // Maximum typing duration - auto-clear after 30 seconds
+    const typingTimeout = setTimeout(() => {
+      logger.info('⚠️ Auto-clearing stuck typing indicator after 30 seconds');
+      setChatState(prev => ({ ...prev, isTyping: false }));
+    }, 30000);
 
-    return () => clearInterval(refreshInterval);
-  }, [chatState.isTyping, loadMessages]);
+    return () => clearTimeout(typingTimeout);
+  }, [chatState.isTyping]);
   
   return {
     messages: chatState.messages,

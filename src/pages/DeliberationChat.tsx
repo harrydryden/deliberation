@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ViewModeSelector, ViewMode } from "@/components/chat/ViewModeSelector";
 import { useFilteredMessages } from "@/hooks/useFilteredMessages";
 import { Users, ChevronDown, ChevronUp } from "lucide-react";
+import { useRenderPerformanceTracker } from "@/utils/renderPerformanceMonitor";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -48,6 +49,9 @@ interface Deliberation {
 }
 
 const OptimizedDeliberationChat = () => {
+  // Performance tracking
+  useRenderPerformanceTracker('DeliberationChat');
+  
   const { deliberationId } = useParams<{ deliberationId: string }>();
   const { user, isLoading, isAdmin } = useSupabaseAuth();
   const navigate = useNavigate();
@@ -345,7 +349,13 @@ const OptimizedDeliberationChat = () => {
           agentConfigs={dataState.agentConfigs} 
         />
       </div>
-      <MessageInput ref={messageInputRef} onSendMessage={sendMessage} disabled={chatLoading} mode={uiState.chatMode} />
+      <MessageInput 
+        ref={messageInputRef} 
+        onSendMessage={sendMessage} 
+        disabled={chatLoading} 
+        mode={uiState.chatMode}
+        deliberationId={deliberationId}
+      />
     </div>
   ), [filteredMessages, chatLoading, isTyping, handleAddToIbis, deliberationId, dataState.agentConfigs, sendMessage]);
 
