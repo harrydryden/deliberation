@@ -21,7 +21,7 @@ interface RequestBody {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight with shared utility
+  // Handle CORS preflight with shared utility - retry deployment 2025-01-10
   const corsResponse = handleCORSPreflight(req);
   if (corsResponse) return corsResponse;
 
