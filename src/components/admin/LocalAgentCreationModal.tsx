@@ -17,11 +17,15 @@ interface LocalAgentCreationModalProps {
 
 export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading }: LocalAgentCreationModalProps) => {
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState<LocalAgentCreate & { max_response_characters: number }>({
+  const [formData, setFormData] = useState<LocalAgentCreate & { 
+    character_limit: number;
+    additional_response_style: string;
+  }>({
     name: '',
     agent_type: '',
     deliberationId: '',
-      max_response_characters: 1500,
+    character_limit: 1500,
+    additional_response_style: '',
   });
 
   const agentTypes = [
@@ -36,9 +40,15 @@ export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading 
       return;
     }
     
+    // Construct response_style from character limit and additional notes
+    const response_style = `Keep responses to no more than ${formData.character_limit} characters.${
+      formData.additional_response_style ? ` ${formData.additional_response_style}` : ''
+    }`;
+    
     onCreateAgent({
       ...formData,
-      max_response_characters: formData.max_response_characters
+      response_style,
+      max_response_characters: formData.character_limit
     });
     setOpen(false);
     resetForm();
@@ -49,7 +59,8 @@ export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading 
       name: '',
       agent_type: '',
       deliberationId: '',
-      max_response_characters: 1500,
+      character_limit: 1500,
+      additional_response_style: '',
     });
   };
 
@@ -110,24 +121,45 @@ export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading 
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="max_response_characters">Max Response Characters</Label>
+            <Label htmlFor="character_limit">Character Limit *</Label>
             <Input
-              id="max_response_characters"
+              id="character_limit"
               type="number"
               min="100"
               max="4000"
-              value={formData.max_response_characters}
-              onChange={(e) => setFormData(prev => ({ ...prev, max_response_characters: parseInt(e.target.value) || 1500 }))}
+              value={formData.character_limit}
+              onChange={(e) => setFormData(prev => ({ ...prev, character_limit: parseInt(e.target.value) || 1500 }))}
               placeholder="1500"
-              className={formData.max_response_characters < 1000 ? "border-orange-500" : ""}
+              className={formData.character_limit < 1000 ? "border-orange-500" : ""}
+              required
             />
-            {formData.max_response_characters < 1000 && (
+            {formData.character_limit < 1000 && (
               <p className="text-xs text-orange-600 font-medium">
-                ⚠️ Warning: Character limits below 1000 may result in blank responses from GPT-5 models due to token constraints.
+                ⚠️ Warning: Character limits below 1000 may result in blank responses from GPT-5 models.
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              Maximum characters for agent responses (soft limit - will retry with no limit if empty). Recommended: 1500+ for GPT-5.
+              Maximum characters for agent responses. Recommended: 1500+ for GPT-5.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="additional_style">Additional Response Style (Optional)</Label>
+            <Textarea
+              id="additional_style"
+              value={formData.additional_response_style}
+              onChange={(e) => setFormData(prev => ({ ...prev, additional_response_style: e.target.value }))}
+              placeholder="e.g., Use formal tone, provide examples, etc."
+              rows={2}
+            />
+          </div>
+
+          {/* Response Style Preview */}
+          <div className="space-y-2 p-3 bg-muted/50 rounded-md">
+            <Label className="text-sm font-medium">Response Style Preview:</Label>
+            <p className="text-sm text-muted-foreground">
+              Keep responses to no more than {formData.character_limit} characters.
+              {formData.additional_response_style ? ` ${formData.additional_response_style}` : ''}
             </p>
           </div>
 

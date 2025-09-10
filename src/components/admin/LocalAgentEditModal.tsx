@@ -22,19 +22,36 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
   type LocalAgentForm = {
     name: string;
     description: string;
-    response_style: string;
-    max_response_characters: number;
+    character_limit: number;
+    additional_response_style: string;
     goals: string[];
     facilitator_config: FacilitatorConfig;
     prompt_overrides: Record<string, string>;
   };
 
+  // Parse existing response_style to extract character limit and additional notes
+  const parseResponseStyle = (responseStyle: string) => {
+    if (!responseStyle) return { characterLimit: 1500, additionalStyle: '' };
+    
+    const match = responseStyle.match(/Keep responses to no more than (\d+) characters\.?\s*(.*)/);
+    if (match) {
+      return {
+        characterLimit: parseInt(match[1]) || 1500,
+        additionalStyle: match[2] || ''
+      };
+    }
+    // If it doesn't match the standard format, put the whole thing in additional style
+    return { characterLimit: 1500, additionalStyle: responseStyle };
+  };
+
+  const { characterLimit: initialCharLimit, additionalStyle: initialAdditionalStyle } = parseResponseStyle(agent.response_style || '');
+
   const form = useForm<LocalAgentForm>({
     initialData: {
       name: agent.name,
       description: agent.description || '',
-      response_style: agent.response_style || '',
-        max_response_characters: agent.max_response_characters || 1500,
+      character_limit: agent.max_response_characters || initialCharLimit,
+      additional_response_style: initialAdditionalStyle,
       goals: agent.goals || [],
       prompt_overrides: agent.prompt_overrides || {},
       facilitator_config: agent.facilitator_config || {
@@ -51,11 +68,16 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
       }
     },
     onSubmit: async (data) => {
+      // Construct response_style from character limit and additional notes
+      const response_style = `Keep responses to no more than ${data.character_limit} characters.${
+        data.additional_response_style ? ` ${data.additional_response_style}` : ''
+      }`;
+
       onUpdateAgent(agent.id, {
         name: data.name,
         description: data.description,
-        response_style: data.response_style,
-        max_response_characters: data.max_response_characters,
+        response_style,
+        max_response_characters: data.character_limit,
         goals: data.goals,
         prompt_overrides: data.prompt_overrides,
         facilitator_config: data.facilitator_config,
@@ -67,11 +89,13 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
   // Reset form data when agent changes or modal opens
   useEffect(() => {
     if (open) {
+      const { characterLimit: resetCharLimit, additionalStyle: resetAdditionalStyle } = parseResponseStyle(agent.response_style || '');
+      
       form.resetForm({
         name: agent.name,
         description: agent.description || '',
-        response_style: agent.response_style || '',
-        max_response_characters: agent.max_response_characters || 1500,
+        character_limit: agent.max_response_characters || resetCharLimit,
+        additional_response_style: resetAdditionalStyle,
         goals: agent.goals || [],
         prompt_overrides: agent.prompt_overrides || {},
         facilitator_config: agent.facilitator_config || {
@@ -156,29 +180,39 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
 
           <FormField
             type="input"
-            label="Response Style"
-            value={form.formData.response_style}
-            onChange={(value) => form.updateField('response_style', value)}
-            placeholder="e.g., formal, casual, analytical"
-          />
-
-          <FormField
-            type="input"
-            label="Max Response Characters"
-            value={form.formData.max_response_characters?.toString() || '1500'}
-            onChange={(value) => form.updateField('max_response_characters', parseInt(value) || 1500)}
+            label="Character Limit"
+            value={form.formData.character_limit.toString()}
+            onChange={(value) => form.updateField('character_limit', parseInt(value) || 1500)}
             placeholder="1500"
             inputType="number"
             min="100"
             max="4000"
-            helpText="Maximum characters for agent responses. Uses soft limit - will retry with no limit if response is empty. Recommended: 1500+ for GPT-5."
-            className={form.formData.max_response_characters < 1000 ? "border-orange-500" : ""}
+            helpText={
+              form.formData.character_limit < 1000 
+                ? "⚠️ Warning: Limits below 1000 may cause blank responses from GPT-5 models."
+                : "Recommended: 1500+ for reliable responses with GPT-5 models."
+            }
+            className={form.formData.character_limit < 1000 ? "border-orange-500" : ""}
+            required
           />
-          {form.formData.max_response_characters < 1000 && (
-            <div className="text-xs text-orange-600 font-medium mt-1">
-              ⚠️ Warning: Character limits below 1000 may result in blank responses from GPT-5 models due to token constraints.
-            </div>
-          )}
+
+          <FormField
+            type="textarea"
+            label="Additional Response Style Notes"
+            value={form.formData.additional_response_style}
+            onChange={(value) => form.updateField('additional_response_style', value)}
+            placeholder="Optional: Additional style guidelines (e.g., formal tone, include examples, etc.)"
+            rows={2}
+          />
+
+          {/* Response Style Preview */}
+          <div className="space-y-2 p-3 bg-muted/50 rounded-md">
+            <Label className="text-sm font-medium">Response Style Preview:</Label>
+            <p className="text-sm text-muted-foreground">
+              Keep responses to no more than {form.formData.character_limit} characters.
+              {form.formData.additional_response_style ? ` ${form.formData.additional_response_style}` : ''}
+            </p>
+          </div>
 
           <GoalsInput
             goals={form.formData.goals}

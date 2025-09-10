@@ -606,10 +606,17 @@ async function generateStreamingResponse(
     
     // Fallback to parsing response_style if max_response_characters not set
     if (!agentConfig?.max_response_characters && agentConfig?.response_style) {
-      const responseStyle = agentConfig.response_style.toLowerCase();
-      const characterMatch = responseStyle.match(/(?:no more than|maximum|max|limit.*?to)\s*(\d+)\s*characters?/);
-      if (characterMatch) {
-        characterLimit = parseInt(characterMatch[1]);
+      // Look for the standardized phrase first
+      const standardMatch = agentConfig.response_style.match(/Keep responses to no more than (\d+) characters/);
+      if (standardMatch) {
+        characterLimit = parseInt(standardMatch[1]);
+      } else {
+        // Fallback to the more flexible regex for existing agents
+        const responseStyle = agentConfig.response_style.toLowerCase();
+        const characterMatch = responseStyle.match(/(?:no more than|maximum|max|limit.*?to)\s*(\d+)\s*characters?/);
+        if (characterMatch) {
+          characterLimit = parseInt(characterMatch[1]);
+        }
       }
     }
     

@@ -19,7 +19,8 @@ interface EditForm {
   name: string;
   description: string;
   is_active: boolean;
-  response_style: string;
+  character_limit: number;
+  additional_response_style: string;
   goals: string[];
   agent_type: string;
   is_default: boolean;
@@ -30,7 +31,8 @@ const getDefaultFormData = (): EditForm => ({
   name: '',
   description: '',
   is_active: false,
-  response_style: '',
+  character_limit: 1500,
+  additional_response_style: '',
   goals: [] as string[],
   agent_type: '',
   is_default: false,
@@ -60,7 +62,18 @@ export const AgentManagement: React.FC = () => {
   const createForm = useForm({
     initialData: getDefaultFormData(),
     onSubmit: async (data) => {
-      const createdAgent = await agentService.createAgent(data as Omit<Agent, 'id' | 'created_at'>);
+      // Construct response_style from character limit and additional notes
+      const response_style = `Keep responses to no more than ${data.character_limit} characters.${
+        data.additional_response_style ? ` ${data.additional_response_style}` : ''
+      }`;
+      
+      const agentData = {
+        ...data,
+        response_style,
+        max_response_characters: data.character_limit,
+      };
+      
+      const createdAgent = await agentService.createAgent(agentData as Omit<Agent, 'id' | 'created_at'>);
       setAgents([...agents, createdAgent]);
       setIsCreateDialogOpen(false);
       createForm.resetForm();
@@ -75,7 +88,19 @@ export const AgentManagement: React.FC = () => {
     initialData: getDefaultFormData(),
     onSubmit: async (data) => {
       if (!editingAgent) return;
-      const updatedAgent = await agentService.updateAgent(editingAgent.id, data);
+      
+      // Construct response_style from character limit and additional notes
+      const response_style = `Keep responses to no more than ${data.character_limit} characters.${
+        data.additional_response_style ? ` ${data.additional_response_style}` : ''
+      }`;
+      
+      const agentData = {
+        ...data,
+        response_style,
+        max_response_characters: data.character_limit,
+      };
+      
+      const updatedAgent = await agentService.updateAgent(editingAgent.id, agentData);
       setAgents(agents.map(a => a.id === editingAgent.id ? updatedAgent : a));
       setIsEditDialogOpen(false);
       setEditingAgent(null);
@@ -109,11 +134,28 @@ export const AgentManagement: React.FC = () => {
 
   const handleEditAgent = (agent: Agent) => {
     setEditingAgent(agent);
+    
+    // Parse existing response_style to extract character limit and additional notes
+    let characterLimit = agent.max_response_characters || 1500;
+    let additionalResponseStyle = '';
+    
+    if (agent.response_style) {
+      const match = agent.response_style.match(/Keep responses to no more than (\d+) characters\.?\s*(.*)/);
+      if (match) {
+        characterLimit = parseInt(match[1]) || characterLimit;
+        additionalResponseStyle = match[2] || '';
+      } else {
+        // If it doesn't match the standard format, put the whole thing in additional style
+        additionalResponseStyle = agent.response_style;
+      }
+    }
+    
     editForm.resetForm({
       name: agent.name,
       description: agent.description,
       is_active: agent.is_active,
-      response_style: agent.response_style || '',
+      character_limit: characterLimit,
+      additional_response_style: additionalResponseStyle,
       goals: agent.goals || [],
       agent_type: agent.agent_type || '',
       is_default: agent.is_default || false,
@@ -213,12 +255,40 @@ export const AgentManagement: React.FC = () => {
       />
 
       <FormField
-        type="textarea"
-        label="Response Style"
-        value={form.formData.response_style}
-        onChange={(value) => form.updateField('response_style', value)}
-        placeholder="Response style guidelines"
+        type="input"
+        label="Character Limit"
+        inputType="number"
+        value={form.formData.character_limit.toString()}
+        onChange={(value) => form.updateField('character_limit', parseInt(value) || 1500)}
+        placeholder="1500"
+        min="100"
+        max="4000"
+        helpText={
+          form.formData.character_limit < 1000 
+            ? "⚠️ Warning: Limits below 1000 may cause blank responses from GPT-5 models."
+            : "Recommended: 1500+ for reliable responses with GPT-5 models."
+        }
+        className={form.formData.character_limit < 1000 ? "border-orange-500" : ""}
+        required
       />
+
+      <FormField
+        type="textarea"
+        label="Additional Response Style Notes"
+        value={form.formData.additional_response_style}
+        onChange={(value) => form.updateField('additional_response_style', value)}
+        placeholder="Optional: Additional style guidelines (e.g., formal tone, include examples, etc.)"
+        rows={2}
+      />
+
+      {/* Response Style Preview */}
+      <div className="space-y-2 p-3 bg-muted/50 rounded-md">
+        <Label className="text-sm font-medium">Response Style Preview:</Label>
+        <p className="text-sm text-muted-foreground">
+          Keep responses to no more than {form.formData.character_limit} characters.
+          {form.formData.additional_response_style ? ` ${form.formData.additional_response_style}` : ''}
+        </p>
+      </div>
 
       <GoalsInput
         goals={form.formData.goals}
