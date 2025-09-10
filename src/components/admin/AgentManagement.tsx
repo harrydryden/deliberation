@@ -258,7 +258,7 @@ export const AgentManagement: React.FC = () => {
               <DialogTrigger asChild>
                 <Button>Create Agent</Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Create New Agent</DialogTitle>
                   <p className="text-sm text-muted-foreground">
@@ -333,7 +333,7 @@ export const AgentManagement: React.FC = () => {
       </Card>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Agent</DialogTitle>
           <p className="text-sm text-muted-foreground">
