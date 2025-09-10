@@ -1227,7 +1227,9 @@ async function processStreamingOrchestration(
         optional: [
           {
             name: 'similar_nodes',
-            fn: () => findSimilarNodes(serviceSupabase, message.content, deliberationId, message.user_id),
+            fn: () => selectedAgent === 'peer_agent' 
+              ? findSimilarNodes(serviceSupabase, message.content, deliberationId, message.user_id)
+              : Promise.resolve([]),
             fallback: []
           }
         ]

@@ -144,7 +144,7 @@ export class AgentOrchestrator {
   async generateSystemPrompt(agentConfig: AgentConfig | null, agentType: string, context?: any): Promise<string> {
     if (agentConfig?.prompt_overrides?.system_prompt) {
       // Use custom system prompt if available
-      return this.enhancePromptWithContext(agentConfig.prompt_overrides.system_prompt, {
+      return this.enhancePromptWithContext(agentConfig.prompt_overrides.system_prompt, agentType, {
         ...context,
         agentConfig // Pass agent config to enhance method
       });
@@ -181,14 +181,14 @@ export class AgentOrchestrator {
         }
       }
       
-      return this.enhancePromptWithContext(prompt, {
+      return this.enhancePromptWithContext(prompt, agentType, {
         ...context,
         agentConfig // Pass agent config to enhance method
       });
     }
     
     // Fallback to database prompt templates
-    return this.enhancePromptWithContext(await this.getPromptTemplateDefault(agentType), {
+    return this.enhancePromptWithContext(await this.getPromptTemplateDefault(agentType), agentType, {
       ...context,
       agentConfig // Pass agent config even for templates to add character limits
     });
@@ -615,7 +615,7 @@ export class AgentOrchestrator {
     console.log(`🔄 Invalidated agent cache: ${agentType || 'all'}`);
   }
 
-  private enhancePromptWithContext(prompt: string, context?: any): string {
+  private enhancePromptWithContext(prompt: string, agentType: string, context?: any): string {
     if (!context) return prompt;
 
     // Add character limit instructions for database template prompts
@@ -648,33 +648,39 @@ export class AgentOrchestrator {
       prompt += "\n\nThis is a complex query requiring detailed analysis and nuanced understanding.";
     }
 
-    // Enhanced IBIS node context with actual content and safety instructions
-    if (context.similarNodes?.length > 0) {
-      prompt += `\n\nCURRENT DELIBERATION IBIS MAP:`;
-      prompt += `\nThe following ${context.similarNodes.length} points have been contributed to this deliberation's IBIS discussion map:\n`;
-      
-      context.similarNodes.forEach((node: any, index: number) => {
-        prompt += `\n${index + 1}. **${node.title}** (${node.node_type})`;
-        if (node.description) {
-          prompt += `\n   Description: ${node.description}`;
-        }
-        if (node.relationships?.length > 0) {
-          const relSummary = node.relationships.map((rel: any) => rel.relationship_type).join(', ');
-          prompt += `\n   Relationships: ${relSummary}`;
-        }
-        prompt += `\n   Added: ${new Date(node.created_at).toLocaleDateString()}`;
-      });
+    // IBIS node context - ONLY for peer_agent (Pia)
+    if (agentType === 'peer_agent') {
+      if (context.similarNodes?.length > 0) {
+        prompt += `\n\nCURRENT DELIBERATION IBIS MAP:`;
+        prompt += `\nThe following ${context.similarNodes.length} points have been contributed to this deliberation's IBIS discussion map:\n`;
+        
+        context.similarNodes.forEach((node: any, index: number) => {
+          prompt += `\n${index + 1}. **${node.title}** (${node.node_type})`;
+          if (node.description) {
+            prompt += `\n   Description: ${node.description}`;
+          }
+          if (node.relationships?.length > 0) {
+            const relSummary = node.relationships.map((rel: any) => rel.relationship_type).join(', ');
+            prompt += `\n   Relationships: ${relSummary}`;
+          }
+          prompt += `\n   Added: ${new Date(node.created_at).toLocaleDateString()}`;
+        });
 
-      prompt += `\n\nIMPORTANT IBIS GUIDELINES:`;
-      prompt += `\n- ONLY reference the IBIS points listed above that actually exist in this deliberation`;
-      prompt += `\n- DO NOT fabricate or make up discussion points that are not listed`;
-      prompt += `\n- If referencing an IBIS point, use its exact title as shown above`;
-      prompt += `\n- When appropriate, encourage users to contribute new points to expand the deliberation map`;
-      prompt += `\n- If the IBIS map seems sparse, suggest that more perspectives would be valuable`;
+        prompt += `\n\nIMPORTANT IBIS GUIDELINES:`;
+        prompt += `\n- ONLY reference the IBIS points listed above that actually exist in this deliberation`;
+        prompt += `\n- DO NOT fabricate or make up discussion points that are not listed`;
+        prompt += `\n- If referencing an IBIS point, use its exact title as shown above`;
+        prompt += `\n- When appropriate, encourage users to contribute new points to expand the deliberation map`;
+        prompt += `\n- If the IBIS map seems sparse, suggest that more perspectives would be valuable`;
+      } else {
+        prompt += `\n\nCURRENT IBIS STATUS: No IBIS discussion points have been created yet for this deliberation.`;
+        prompt += `\nIMPORTANT: Do not reference any discussion points from the IBIS database, as none exist yet.`;
+        prompt += `\nEncourage users to contribute structured arguments and positions to build the deliberation map.`;
+      }
     } else {
-      prompt += `\n\nCURRENT IBIS STATUS: No IBIS discussion points have been created yet for this deliberation.`;
-      prompt += `\nIMPORTANT: Do not reference any discussion points from the IBIS database, as none exist yet.`;
-      prompt += `\nEncourage users to contribute structured arguments and positions to build the deliberation map.`;
+      // For non-peer agents, explicitly state no IBIS access
+      console.log(`🚫 IBIS access restricted for agent type: ${agentType}`);
+      prompt += `\n\nIBIS ACCESS: You do not have access to the deliberation's IBIS discussion map. Focus on your specialized role without referencing specific discussion points or issues from the IBIS structure.`;
     }
 
     if (context.knowledgeContext && context.knowledgeContext.length > 0) {
