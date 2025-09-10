@@ -601,7 +601,7 @@ async function generateStreamingResponse(
       { role: 'user', content: content }
     ];
     
-    // Use the new max_response_characters field, fallback to parsing response_style
+    // Extract character limit for prompt instructions (not API constraints)
     let characterLimit = agentConfig?.max_response_characters || 800; // Default to 800
     
     // Fallback to parsing response_style if max_response_characters not set
@@ -620,12 +620,11 @@ async function generateStreamingResponse(
       }
     }
     
-    console.log(`🎯 Character limit for ${agentType}: ${characterLimit} chars`);
+    console.log(`🎯 Character limit for ${agentType}: ${characterLimit} chars (prompt guidance only)`);
+    console.log(`📏 System prompt length: ${systemPrompt?.length || 0} chars`);
     
-    // Convert to token limit using improved 3:1 ratio with buffer
-    const maxTokens = ModelConfigManager.characterLimitToTokens(characterLimit);
-
-    const requestBody: any = ModelConfigManager.generateAPIParams(model, messages, { maxTokens, stream: useStreaming });
+    // Use generous token budget for API call (not constrained by character limits)
+    const requestBody: any = ModelConfigManager.generateAPIParams(model, messages, { stream: useStreaming });
 
     console.log('🔧 FULL Request body for debugging:', JSON.stringify(requestBody, null, 2));
 

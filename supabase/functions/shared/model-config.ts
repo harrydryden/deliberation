@@ -134,13 +134,18 @@ export class ModelConfigManager {
     modelName: string, 
     messages: any[], 
     options: {
-      maxTokens?: number;
       stream?: boolean;
       temperature?: number;
     } = {}
   ): any {
     const config = this.getConfig(modelName);
-    const { maxTokens = 1000, stream = false, temperature } = options;
+    const { stream = false, temperature } = options;
+    
+    // Use generous default token budget for response generation
+    // This ensures we don't constrain responses due to system prompt length
+    const responseTokens = Math.floor(config.maxTokens * 0.75); // Use 75% of model capacity for responses
+    
+    console.log(`🎯 Using ${responseTokens} response tokens (75% of ${config.maxTokens} model capacity)`);
     
     // Base parameters
     const params: any = {
@@ -152,7 +157,7 @@ export class ModelConfigManager {
     // Use correct token parameter based on model
     if (config.supportsTemperature) {
       // Legacy models use max_tokens
-      params.max_tokens = Math.min(maxTokens, config.maxTokens);
+      params.max_tokens = responseTokens;
       
       // Add temperature if supported and specified
       if (temperature !== undefined) {
@@ -160,7 +165,7 @@ export class ModelConfigManager {
       }
     } else {
       // Newer models use max_completion_tokens and don't support temperature
-      params.max_completion_tokens = Math.min(maxTokens, config.maxTokens);
+      params.max_completion_tokens = responseTokens;
     }
     
     return params;

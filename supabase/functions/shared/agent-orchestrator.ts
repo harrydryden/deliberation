@@ -144,7 +144,10 @@ export class AgentOrchestrator {
   async generateSystemPrompt(agentConfig: AgentConfig | null, agentType: string, context?: any): Promise<string> {
     if (agentConfig?.prompt_overrides?.system_prompt) {
       // Use custom system prompt if available
-      return this.enhancePromptWithContext(agentConfig.prompt_overrides.system_prompt, context);
+      return this.enhancePromptWithContext(agentConfig.prompt_overrides.system_prompt, {
+        ...context,
+        agentConfig // Pass agent config to enhance method
+      });
     }
     
     if (agentConfig) {
@@ -178,11 +181,17 @@ export class AgentOrchestrator {
         }
       }
       
-      return this.enhancePromptWithContext(prompt, context);
+      return this.enhancePromptWithContext(prompt, {
+        ...context,
+        agentConfig // Pass agent config to enhance method
+      });
     }
     
     // Fallback to database prompt templates
-    return this.enhancePromptWithContext(await this.getPromptTemplateDefault(agentType), context);
+    return this.enhancePromptWithContext(await this.getPromptTemplateDefault(agentType), {
+      ...context,
+      agentConfig // Pass agent config even for templates to add character limits
+    });
   }
 
   // Fetch default prompt from database prompt templates
@@ -385,11 +394,15 @@ export class AgentOrchestrator {
     const timeoutMs = 8000; // 8 second timeout per attempt
     let lastError: any = null;
 
-    console.log(`🔧 DEBUG: Starting message analysis for content: "${content.substring(0, 100)}..."`);
+    // Ensure content is defined and handle null/undefined cases
+    const safeContent = content || '';
+    const contentPreview = safeContent.length > 0 ? safeContent.substring(0, 100) + '...' : '[empty content]';
+    
+    console.log(`🔧 DEBUG: Starting message analysis for content: "${contentPreview}"`);
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`🔍 Message analysis attempt ${attempt}/${maxRetries} for content: "${content.substring(0, 100)}..."`);
+        console.log(`🔍 Message analysis attempt ${attempt}/${maxRetries} for content: "${contentPreview}"`);
 
         const systemMessage = await this.getSystemMessage('message_analysis_system_message');
         console.log(`🔧 DEBUG: Got system message for analysis: "${systemMessage.substring(0, 100)}..."`);
@@ -411,7 +424,7 @@ export class AgentOrchestrator {
               },
               {
                 role: 'user',
-                content: content.trim()
+                content: safeContent.trim()
               }
             ],
             max_completion_tokens: 150, // Reduced from 200 for faster response
@@ -604,6 +617,32 @@ export class AgentOrchestrator {
 
   private enhancePromptWithContext(prompt: string, context?: any): string {
     if (!context) return prompt;
+
+    // Add character limit instructions for database template prompts
+    if (context.agentConfig) {
+      let characterLimit = context.agentConfig?.max_response_characters;
+      
+      // Fallback to parsing response_style if max_response_characters not set
+      if (!characterLimit && context.agentConfig?.response_style) {
+        // Look for the standardized phrase first
+        const standardMatch = context.agentConfig.response_style.match(/Keep responses to no more than (\d+) characters/);
+        if (standardMatch) {
+          characterLimit = parseInt(standardMatch[1]);
+        } else {
+          // Fallback to the more flexible regex for existing agents
+          const responseStyle = context.agentConfig.response_style.toLowerCase();
+          const characterMatch = responseStyle.match(/(?:no more than|maximum|max|limit.*?to)\s*(\d+)\s*characters?/);
+          if (characterMatch) {
+            characterLimit = parseInt(characterMatch[1]);
+          }
+        }
+      }
+      
+      // Add character limit instruction if found and not already in template
+      if (characterLimit && !prompt.includes('CRITICAL: Your response must be NO MORE THAN')) {
+        prompt += `\n\n⚠️ CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
+      }
+    }
 
     if (context.complexity > 0.7) {
       prompt += "\n\nThis is a complex query requiring detailed analysis and nuanced understanding.";
