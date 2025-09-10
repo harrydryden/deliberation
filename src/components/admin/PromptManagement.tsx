@@ -135,83 +135,92 @@ export const PromptManagement = ({ onLoad }: PromptManagementProps) => {
   };
 
   const renderEditDialog = (isCreating: boolean) => (
-    <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
-      <DialogHeader>
+    <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col">
+      <DialogHeader className="flex-shrink-0">
         <DialogTitle>{isCreating ? 'Create New Prompt Template' : 'Edit Prompt Template'}</DialogTitle>
       </DialogHeader>
-      <div className="space-y-4 overflow-y-auto flex-1 px-1">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="prompt-type">Prompt Type</Label>
-            <Select value={editForm.category} onValueChange={(value) => setEditForm(prev => ({ ...prev, category: value }))}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select prompt type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="classification_prompt">Classification Prompt</SelectItem>
-                <SelectItem value="ibis_generation_prompt">IBIS Generation Prompt</SelectItem>
-              </SelectContent>
-            </Select>
+      
+      <div className="flex-1 overflow-y-auto min-h-0 pr-2">
+        <div className="space-y-4 pb-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="prompt-type">Prompt Type</Label>
+              <Select value={editForm.category} onValueChange={(value) => setEditForm(prev => ({ ...prev, category: value }))}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select prompt type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="classification_prompt">Classification Prompt</SelectItem>
+                  <SelectItem value="ibis_generation_prompt">IBIS Generation Prompt</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="agent-type">Agent Type (Optional)</Label>
+              <Select value="global" onValueChange={() => {}}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select agent type or leave blank for global" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="global">Global (All Agents)</SelectItem>
+                  <SelectItem value="bill_agent">Bill Agent</SelectItem>
+                  <SelectItem value="peer_agent">Peer Agent</SelectItem>
+                  <SelectItem value="flow_agent">Flow Agent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          
           <div>
-            <Label htmlFor="agent-type">Agent Type (Optional)</Label>
-            <Select value="global" onValueChange={() => {}}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select agent type or leave blank for global" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="global">Global (All Agents)</SelectItem>
-                <SelectItem value="bill_agent">Bill Agent</SelectItem>
-                <SelectItem value="peer_agent">Peer Agent</SelectItem>
-                <SelectItem value="flow_agent">Flow Agent</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div>
-          <Label htmlFor="prompt-name">Name</Label>
-          <Input
-            id="prompt-name"
-            value={editForm.name}
-            onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-            placeholder="Enter prompt name"
-          />
-        </div>
-        <div>
-          <Label htmlFor="prompt-description">Description</Label>
-          <Textarea
-            id="prompt-description"
-            value={editForm.description}
-            onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-            placeholder="Describe what this prompt does"
-            rows={2}
-          />
-        </div>
-        <div>
-          <Label htmlFor="prompt-template">Prompt Template</Label>
-          <Textarea
-            id="prompt-template"
-            value={editForm.templateText}
-            onChange={(e) => setEditForm(prev => ({ ...prev, templateText: e.target.value }))}
-            placeholder="Enter the prompt template..."
-            rows={10}
-            className="font-mono text-sm"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            Use {'{'}placeholders{'}'} for dynamic values like {'{'}content{'}'}, {'{'}title{'}'}, etc.
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center space-x-2">
-            <Switch
-              checked={editForm.isActive}
-              onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, isActive: checked }))}
+            <Label htmlFor="prompt-name">Name</Label>
+            <Input
+              id="prompt-name"
+              value={editForm.name}
+              onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Enter prompt name"
             />
-            <Label>Active</Label>
+          </div>
+          
+          <div>
+            <Label htmlFor="prompt-description">Description</Label>
+            <Textarea
+              id="prompt-description"
+              value={editForm.description}
+              onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Describe what this prompt does"
+              rows={2}
+              className="resize-none"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="prompt-template">Prompt Template</Label>
+            <Textarea
+              id="prompt-template"
+              value={editForm.templateText}
+              onChange={(e) => setEditForm(prev => ({ ...prev, templateText: e.target.value }))}
+              placeholder="Enter the prompt template..."
+              rows={6}
+              className="font-mono text-sm resize-y min-h-[150px] max-h-[300px]"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Use {'{'}placeholders{'}'} for dynamic values like {'{'}content{'}'}, {'{'}title{'}'}, etc. You can resize this field vertically.
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                checked={editForm.isActive}
+                onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, isActive: checked }))}
+              />
+              <Label>Active</Label>
+            </div>
           </div>
         </div>
       </div>
-      <div className="flex justify-end gap-2 mt-4">
+      
+      <div className="flex-shrink-0 flex justify-end gap-2 pt-4 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <Button variant="outline" onClick={() => isCreating ? setCreating(false) : setEditingPrompt(null)}>
           Cancel
         </Button>
