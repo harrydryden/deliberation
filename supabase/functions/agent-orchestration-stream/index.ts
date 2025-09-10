@@ -115,7 +115,7 @@ async function generateFastResponse(
   const timeoutId = setTimeout(() => {
     EdgeLogger.warn('OpenAI request timeout in generateFastResponse');
     controller.abort();
-  }, 40000); // Reduced to 40s to leave more buffer for edge function cleanup
+  }, 35000); // Reduced to 35s to prevent edge function timeout
   
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -644,7 +644,7 @@ async function generateStreamingResponse(
         },
         body: JSON.stringify(requestBody),
       }),
-      45000, // 45 second timeout for OpenAI API call
+      47000, // 35 second timeout for OpenAI API call
       'OpenAI API Call'
     );
 
@@ -776,7 +776,7 @@ async function generateStreamingResponse(
 
 // Distributed lock for preventing duplicate agent responses (F001 Fix)
 const PROCESSING_LOCKS = new Map<string, { timestamp: number; lockId: string }>();
-const LOCK_TIMEOUT = 30000; // 30 seconds
+const LOCK_TIMEOUT = 60000; // 60 seconds - aligned with message processing lock
 
 function acquireProcessingLock(messageId: string): string | null {
   const now = Date.now();
@@ -1227,9 +1227,7 @@ async function processStreamingOrchestration(
         optional: [
           {
             name: 'similar_nodes',
-            fn: () => selectedAgent === 'peer_agent' 
-              ? findSimilarNodes(serviceSupabase, message.content, deliberationId, message.user_id)
-              : Promise.resolve([]),
+            fn: () => findSimilarNodes(serviceSupabase, message.content, deliberationId, message.user_id),
             fallback: []
           }
         ]

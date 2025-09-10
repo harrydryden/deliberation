@@ -15,7 +15,7 @@ interface ProcessingLock {
 
 export class MessageProcessingLockManager {
   private static locks = new Map<string, ProcessingLock>();
-  private static readonly LOCK_TIMEOUT_MS = 30000; // 30 seconds
+  private static readonly LOCK_TIMEOUT_MS = 60000; // 60 seconds - increased for agent orchestration
   private static readonly CLEANUP_INTERVAL_MS = 60000; // 1 minute
 
   static {

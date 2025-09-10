@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { productionLogger } from '@/utils/productionLogger';
 import { useNetworkPerformanceTracker } from './useNetworkPerformanceTracker';
+import { useStreamHealthMonitor } from './useStreamHealthMonitor';
+import { useGracefulFallback } from './useGracefulFallback';
 
 interface StreamingState {
   isStreaming: boolean;
@@ -32,7 +34,7 @@ interface StreamRecoveryConfig {
 const DEFAULT_RECOVERY_CONFIG: StreamRecoveryConfig = {
   maxRetries: 3,
   retryDelay: 2000,
-  timeoutMs: 75000,
+  timeoutMs: 45000,
   heartbeatIntervalMs: 5000,
   stalledConnectionMs: 25000,
 };
@@ -53,29 +55,16 @@ export const useResponseStreaming = () => {
   const rafIdRef = useRef<number | null>(null);
   const startTime = useRef<number>(0);
   const networkTracker = useNetworkPerformanceTracker();
+  const healthMonitor = useStreamHealthMonitor();
+  const gracefulFallback = useGracefulFallback();
   const recoveryConfigRef = useRef<StreamRecoveryConfig>(DEFAULT_RECOVERY_CONFIG);
-  const lastActivityRef = useRef<number>(0);
-  const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const connectionHealthRef = useRef<{
-    consecutiveFailures: number;
-    lastSuccessfulConnection: number;
-    totalBytesReceived: number;
-  }>({
-    consecutiveFailures: 0,
-    lastSuccessfulConnection: Date.now(),
-    totalBytesReceived: 0,
-  });
 
   // Enhanced cleanup with health monitoring
   useEffect(() => {
     return () => {
       productionLogger.debug('ResponseStreaming component unmounting - cleaning up');
       
-      // Clear health check interval
-      if (healthCheckIntervalRef.current) {
-        clearInterval(healthCheckIntervalRef.current);
-        healthCheckIntervalRef.current = null;
-      }
+      healthMonitor.stopHealthMonitoring();
       
       // Abort any active streaming
       if (streamControllerRef.current) {
@@ -96,7 +85,7 @@ export const useResponseStreaming = () => {
       // Clear refs
       accumulatorRef.current = '';
     };
-  }, []);
+  }, [healthMonitor]);
 
   // Enhanced stream recovery with automatic retry
   const startStreamingWithRecovery = useCallback(async (
@@ -115,9 +104,16 @@ export const useResponseStreaming = () => {
       maxRetries: config.maxRetries 
     });
     
-    // Start performance tracking
+    // Start performance tracking and health monitoring
     startTime.current = Date.now();
-    lastActivityRef.current = Date.now();
+    
+    // Start health monitoring with auto-recovery
+    healthMonitor.startHealthMonitoring(() => {
+      productionLogger.warn('Health monitor detected stream stall, triggering recovery');
+      if (streamControllerRef.current) {
+        streamControllerRef.current.abort();
+      }
+    });
     
     // Cleanup any previous RAF callbacks to prevent memory leaks
     if (rafIdRef.current) {
@@ -150,51 +146,6 @@ export const useResponseStreaming = () => {
     }
 
     streamControllerRef.current = new AbortController();
-    
-    let heartbeatCount = 0;
-    
-    // Start enhanced health monitoring
-    const startHealthMonitoring = () => {
-      if (healthCheckIntervalRef.current) {
-        clearInterval(healthCheckIntervalRef.current);
-      }
-      
-      healthCheckIntervalRef.current = setInterval(() => {
-        const timeSinceActivity = Date.now() - lastActivityRef.current;
-        heartbeatCount++;
-        
-        // Check for stalled connection
-        const hasReceivedData = accumulatorRef.current.length > 0;
-        
-        if (timeSinceActivity > config.stalledConnectionMs && hasReceivedData) {
-          productionLogger.warn('Connection stalled, triggering recovery', {
-            heartbeatCount,
-            timeSinceActivity,
-            retryAttempt,
-            accumulatedLength: accumulatorRef.current.length
-          });
-          
-          connectionHealthRef.current.consecutiveFailures++;
-          
-          if (streamControllerRef.current) {
-            streamControllerRef.current.abort();
-          }
-        } else if (timeSinceActivity < config.heartbeatIntervalMs) {
-          // Reset failure count on successful activity
-          connectionHealthRef.current.consecutiveFailures = 0;
-          connectionHealthRef.current.lastSuccessfulConnection = Date.now();
-        }
-        
-        productionLogger.debug('Stream health check', {
-          heartbeatCount,
-          timeSinceActivity,
-          hasReceivedData,
-          consecutiveFailures: connectionHealthRef.current.consecutiveFailures
-        });
-      }, config.heartbeatIntervalMs);
-    };
-    
-    startHealthMonitoring();
     
     const timeoutId = setTimeout(() => {
       productionLogger.warn('Main streaming timeout reached', { 
@@ -331,12 +282,11 @@ export const useResponseStreaming = () => {
 
             try {
               const chunk = decoder.decode(value, { stream: true });
-              lastActivityRef.current = Date.now(); // Update activity timestamp
-              connectionHealthRef.current.totalBytesReceived += chunk.length;
+              healthMonitor.recordActivity(chunk.length);
               
               productionLogger.debug('Received chunk', { 
                 chunkLength: chunk.length,
-                totalBytes: connectionHealthRef.current.totalBytesReceived
+                healthStats: healthMonitor.getHealthStats()
               });
 
               // Parse each line as a potential JSON object
@@ -359,7 +309,7 @@ export const useResponseStreaming = () => {
                     
                     if (parsed.content) {
                       accumulatorRef.current += parsed.content;
-                      lastActivityRef.current = Date.now(); // Update activity timestamp
+                      healthMonitor.recordActivity();
                       
                       // Update agent type if provided
                       if (parsed.agentType && !streamingState.agentType) {
@@ -405,33 +355,35 @@ export const useResponseStreaming = () => {
       updateUI();
       onComplete(accumulatorRef.current, messageId, streamingState.agentType);
       
-      // Reset connection health on success
-      connectionHealthRef.current.consecutiveFailures = 0;
-      connectionHealthRef.current.lastSuccessfulConnection = Date.now();
-      
-      // Record successful completion
+      // Record successful completion and stop health monitoring
+      healthMonitor.stopHealthMonitoring();
       const completionTime = Date.now() - startTime.current;
       productionLogger.debug('Stream completed successfully', { 
         messageId, 
         duration: completionTime, 
         finalLength: accumulatorRef.current.length,
-        retryAttempt
+        retryAttempt,
+        healthStats: healthMonitor.getHealthStats()
       });
 
     } catch (error) {
+      // Stop health monitoring on error
+      healthMonitor.stopHealthMonitoring();
+      
       // Handle specific abort errors gracefully
       if (error instanceof DOMException && error.name === 'AbortError') {
-        // Check if this was a timeout/stall abort that should trigger retry
-        const timeSinceActivity = Date.now() - lastActivityRef.current;
+        const healthStats = healthMonitor.getHealthStats();
         const shouldRetry = retryAttempt < config.maxRetries && 
-                           timeSinceActivity > config.stalledConnectionMs;
+                           !healthStats.isHealthy;
                            
         if (shouldRetry) {
-          productionLogger.info('Stream aborted due to stall, attempting recovery', {
+          productionLogger.info('Stream aborted due to health issues, attempting recovery', {
             retryAttempt,
             maxRetries: config.maxRetries,
-            timeSinceActivity
+            healthStats
           });
+          
+          gracefulFallback.triggerFallback('Stream health failure', error as Error);
           
           // Wait before retrying
           setTimeout(() => {
@@ -512,10 +464,8 @@ export const useResponseStreaming = () => {
         clearTimeout(timeoutId);
       }
       
-      if (healthCheckIntervalRef.current) {
-        clearInterval(healthCheckIntervalRef.current);
-        healthCheckIntervalRef.current = null;
-      }
+      // Stop health monitoring
+      healthMonitor.stopHealthMonitoring();
       
       // Reset streaming state if this is the final attempt
       if (retryAttempt >= config.maxRetries || 
@@ -576,10 +526,8 @@ export const useResponseStreaming = () => {
   const stopStreaming = useCallback(() => {
     productionLogger.debug('Stopping stream');
     
-    if (healthCheckIntervalRef.current) {
-      clearInterval(healthCheckIntervalRef.current);
-      healthCheckIntervalRef.current = null;
-    }
+    // Stop health monitoring
+    healthMonitor.stopHealthMonitoring();
     
     if (streamControllerRef.current) {
       try {
@@ -606,7 +554,7 @@ export const useResponseStreaming = () => {
     });
     
     accumulatorRef.current = '';
-  }, []);
+  }, [healthMonitor]);
 
   const isStreamingMessage = useCallback((messageId: string) => {
     return streamingState.isStreaming && streamingState.messageId === messageId;
@@ -614,13 +562,12 @@ export const useResponseStreaming = () => {
 
   const getStreamHealth = useCallback(() => {
     return {
-      ...connectionHealthRef.current,
-      lastActivity: lastActivityRef.current,
+      ...healthMonitor.getHealthStats(),
       currentRetryCount: streamingState.retryCount,
       canRetry: streamingState.canRetry,
       lastError: streamingState.lastError,
     };
-  }, [streamingState.retryCount, streamingState.canRetry, streamingState.lastError]);
+  }, [healthMonitor, streamingState.retryCount, streamingState.canRetry, streamingState.lastError]);
 
   return {
     streamingState,
