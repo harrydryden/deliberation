@@ -127,9 +127,7 @@ export const useIbisSubmission = (
 
       toast({
         title: "Success",
-        description: submissionData.isLinkingMode 
-          ? "Message linked to existing issue successfully"
-          : "Message successfully submitted to IBIS"
+        description: "Thanks for sharing your view"
       });
 
       onSuccess?.();
