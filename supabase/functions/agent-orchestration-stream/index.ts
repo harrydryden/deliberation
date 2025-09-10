@@ -809,89 +809,19 @@ function releaseProcessingLock(messageId: string, lockId: string): void {
 
 // Main streaming handler with distributed locking for race condition prevention
 serve(async (req) => {
+  // Handle CORS preflight with shared utility like all other functions
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
+
   console.log('🚀 Edge function invoked:', req.method, req.url);
   console.log('📋 Request headers:', Object.fromEntries(req.headers.entries()));
   
-  // CRITICAL: Handle CORS preflight first with comprehensive error handling
-  if (req.method === 'OPTIONS') {
-    try {
-      console.log('✅ Handling CORS preflight request');
-      return new Response(null, { 
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Max-Age': '86400'
-        } 
-      });
-    } catch (corsError) {
-      console.error('❌ CORS preflight error:', corsError);
-      // NEVER let CORS preflight fail - always return 200 OK
-      return new Response(null, { 
-        status: 200,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Max-Age': '86400'
-        } 
-      });
-    }
-  }
-
   // Comprehensive error boundary for all non-OPTIONS requests
   try {
     console.log('🔧 Starting environment validation');
-    // Environment validation for service role client
-    const { supabase: serviceSupabase } = validateAndGetEnvironment();
+    // Use the standard environment validation
+    const { supabase: serviceSupabase, userSupabase: authenticatedSupabase } = validateAndGetEnvironment();
     console.log('✅ Environment validation successful');
-    
-    // AUTHENTICATION: Extract JWT token from authenticated request
-    console.log('🔑 JWT verification enabled - extracting authenticated user context');
-    const authHeader = req.headers.get('Authorization');
-    const bearerToken = authHeader?.replace('Bearer ', '');
-    
-    if (!bearerToken) {
-      console.error('❌ Missing Authorization header in authenticated request');
-      
-      // Return streaming error response for consistency
-      const { readable, writable } = new TransformStream();
-      const writer = writable.getWriter();
-      const encoder = new TextEncoder();
-      
-      const errorData = `data: ${JSON.stringify({ 
-        error: 'Missing authentication token',
-        done: true,
-        timestamp: new Date().toISOString(),
-        context: 'authentication-required' 
-      })}\n\n`;
-      
-      writer.write(encoder.encode(errorData));
-      writer.close();
-      
-      return new Response(readable, {
-        status: 200,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive'
-        }
-      });
-    }
-    
-    // Create authenticated Supabase client using the user's JWT token
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const authenticatedSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: `Bearer ${bearerToken}`
-        }
-      }
-    });
-    
-    console.log('✅ Authenticated Supabase client created with user JWT context');
     
     const requestId = req.headers.get('X-Request-ID') || `edge_${Date.now()}`;
     console.log('📥 [PHASE1] Edge function request received', {
@@ -986,7 +916,7 @@ serve(async (req) => {
     };
 
     console.log('🚀 Starting background processing');
-    // Start background processing with authenticated context and cleanup
+    // Start background processing with standard authenticated context and cleanup
     processStreamingOrchestration(messageId, deliberationId, mode, serviceSupabase, authenticatedSupabase, sendData).finally(() => {
       console.log('🔓 Releasing processing lock');
       releaseProcessingLock(messageId, lockId);
