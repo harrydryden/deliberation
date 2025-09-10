@@ -153,6 +153,14 @@ export class AgentOrchestrator {
       
       if (agentConfig.response_style) {
         prompt += `\n\nResponse style: ${agentConfig.response_style}`;
+        
+        // Extract and emphasize character limits
+        const responseStyle = agentConfig.response_style.toLowerCase();
+        const characterMatch = responseStyle.match(/(?:no more than|maximum|max|limit.*?to)\s*(\d+)\s*characters?/);
+        if (characterMatch) {
+          const characterLimit = parseInt(characterMatch[1]);
+          prompt += `\n\n⚠️ CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
+        }
       }
       
       return this.enhancePromptWithContext(prompt, context);

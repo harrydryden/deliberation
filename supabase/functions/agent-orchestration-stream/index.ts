@@ -601,7 +601,23 @@ async function generateStreamingResponse(
       { role: 'user', content: content }
     ];
     
-    const requestBody: any = ModelConfigManager.generateAPIParams(model, messages, { maxTokens: 2500, stream: useStreaming }); // Reduced from 3000
+    // Extract character limit from agent configuration response_style
+    let characterLimit = null;
+    let maxTokens = 2500; // Default
+    
+    if (agentConfig?.response_style) {
+      const responseStyle = agentConfig.response_style.toLowerCase();
+      // Look for character limits in the response style
+      const characterMatch = responseStyle.match(/(?:no more than|maximum|max|limit.*?to)\s*(\d+)\s*characters?/);
+      if (characterMatch) {
+        characterLimit = parseInt(characterMatch[1]);
+        // Convert characters to approximate tokens (1 token ≈ 4 characters)
+        maxTokens = Math.ceil(characterLimit / 4) + 50; // Add buffer for formatting
+        console.log(`🎯 Character limit found for ${agentType}: ${characterLimit} chars → ${maxTokens} tokens`);
+      }
+    }
+
+    const requestBody: any = ModelConfigManager.generateAPIParams(model, messages, { maxTokens, stream: useStreaming });
 
     console.log('🔧 Request body preview:', JSON.stringify({
       model: requestBody.model,
