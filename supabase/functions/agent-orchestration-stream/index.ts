@@ -1,120 +1,68 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 
-// Basic CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Import shared utilities for consistency with other edge functions
+import {
+  corsHeaders,
+  validateAndGetEnvironment,
+  handleCORSPreflight,
+  createErrorResponse,
+  getOpenAIKey,
+  parseAndValidateRequest,
+  createStreamingResponse
+} from '../shared/edge-function-utils.ts';
 
-// Helper function to handle CORS preflight
-function handleCORSPreflight(req: Request): Response | null {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-  return null;
-}
-
-// Helper function to create error response
-function createErrorResponse(error: any, status: number = 500, context?: string): Response {
-  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-  console.error(`[${context || 'ERROR'}]:`, errorMessage);
+// Enhanced authentication-aware client creation
+function createAuthenticatedClients(request: Request) {
+  const { supabase: serviceClient } = validateAndGetEnvironment();
   
-  return new Response(
-    JSON.stringify({ 
-      error: errorMessage,
-      context: context || 'unknown'
-    }), 
-    { 
-      status, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    }
-  );
-}
-
-// Helper function to get OpenAI API key
-function getOpenAIKey(): string {
-  const key = Deno.env.get('OPENAI_API_KEY');
-  if (!key) {
-    throw new Error('OpenAI API key not configured');
-  }
-  return key;
-}
-
-// Helper function to validate request
-async function parseAndValidateRequest(req: Request, requiredFields: string[]) {
-  const body = await req.json();
+  // Extract user token for authenticated operations
+  const authHeader = request.headers.get('authorization');
+  let userClient = serviceClient; // fallback to service role
   
-  for (const field of requiredFields) {
-    if (!body[field]) {
-      throw new Error(`Missing required field: ${field}`);
-    }
-  }
-  
-  return body;
-}
-
-// Helper function to create streaming response
-function createStreamingResponse(): { response: Response; writer: WritableStreamDefaultWriter } {
-  const stream = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder();
-      const writer = {
-        write: (chunk: string) => {
-          try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk, done: false })}\n\n`));
-          } catch (error) {
-            console.error('Error writing to stream:', error);
-          }
-        },
-        close: () => {
-          try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: '', done: true })}\n\n`));
-            controller.close();
-          } catch (error) {
-            console.error('Error closing stream:', error);
-          }
-        }
-      };
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const userToken = authHeader.substring(7);
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
       
-      // Store writer for external access
-      (controller as any)._writer = writer;
+      if (supabaseUrl && supabaseAnonKey) {
+        // Create authenticated client with user's token
+        userClient = createClient(supabaseUrl, supabaseAnonKey, {
+          auth: { persistSession: false },
+          global: {
+            headers: {
+              authorization: authHeader
+            }
+          }
+        });
+        console.log('🔐 Using authenticated user client');
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to create authenticated client, using service role:', error);
     }
-  });
-
-  const response = new Response(stream, {
-    headers: {
-      ...corsHeaders,
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    },
-  });
-
-  return { 
-    response, 
-    writer: (stream as any)._writer || {
-      write: () => {},
-      close: () => {}
-    }
-  };
+  } else {
+    console.warn('⚠️ No authorization header found, using service role');
+  }
+  
+  return { serviceClient, userClient };
 }
 
-// Main orchestration function
+// Main orchestration function with enhanced authentication
 async function processStreamingOrchestration(
   messageId: string,
   deliberationId: string,
   mode: string,
-  serviceSupabase: any,
-  authSupabase: any,
+  serviceClient: any,
+  userClient: any,
   sendData: (data: any) => void
 ): Promise<void> {
   console.log(`🤖 Processing orchestration for message ${messageId} in mode ${mode}`);
 
   try {
-    // Get the message using authenticated client
-    const { data: message, error: messageError } = await authSupabase
+    // Get the message using user client for proper RLS
+    const { data: message, error: messageError } = await userClient
       .from('messages')
       .select('*')
       .eq('id', messageId)
@@ -126,8 +74,8 @@ async function processStreamingOrchestration(
 
     console.log(`📝 Retrieved message: "${message.content.substring(0, 100)}..."`);
 
-    // Get active agents for this deliberation
-    const { data: agents, error: agentsError } = await serviceSupabase
+    // Get active agents for this deliberation using service client
+    const { data: agents, error: agentsError } = await serviceClient
       .from('agent_configurations')
       .select('*')
       .eq('deliberation_id', deliberationId)
@@ -149,7 +97,8 @@ async function processStreamingOrchestration(
 
     // Generate response using OpenAI
     const openAIApiKey = getOpenAIKey();
-    const systemPrompt = selectedAgent.prompt_overrides?.system_prompt || `You are ${selectedAgent.name}, a ${selectedAgent.agent_type}. ${selectedAgent.description || ''}`;
+    const systemPrompt = selectedAgent.prompt_overrides?.system_prompt || 
+      `You are ${selectedAgent.name}, a ${selectedAgent.agent_type}. ${selectedAgent.description || ''}`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -202,24 +151,25 @@ async function processStreamingOrchestration(
       }
     }
 
-    // Save the agent response to the database using authenticated client
-    const { error: insertError } = await authSupabase
+    // Save the agent response using user client for proper attribution
+    const { error: insertError } = await userClient
       .from('messages')
       .insert({
         deliberation_id: deliberationId,
-        user_id: message.user_id, // Use the same user for now
+        user_id: message.user_id,
         content: fullResponse,
         message_type: selectedAgent.agent_type,
         agent_context: {
           agent_type: selectedAgent.agent_type,
           processing_mode: mode,
-          processing_method: 'simplified_orchestration'
+          processing_method: 'streaming_orchestration'
         },
         parent_message_id: messageId
       });
 
     if (insertError) {
       console.error('Failed to save agent response:', insertError);
+      throw new Error(`Database save error: ${insertError.message}`);
     }
 
     sendData({ content: '', done: true });
@@ -232,14 +182,14 @@ async function processStreamingOrchestration(
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
+  // Handle CORS preflight with shared utility
   const corsResponse = handleCORSPreflight(req);
   if (corsResponse) return corsResponse;
 
   try {
     console.log('🚀 Agent orchestration stream starting...');
 
-    // Parse and validate request
+    // Parse and validate request with shared utility
     const { messageId, deliberationId, mode } = await parseAndValidateRequest(req, [
       'messageId', 
       'deliberationId'
@@ -247,55 +197,34 @@ serve(async (req) => {
 
     console.log(`📋 Request: messageId=${messageId}, deliberationId=${deliberationId}, mode=${mode || 'chat'}`);
 
-    // Get environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing Supabase configuration');
-    }
+    // Create authenticated clients using enhanced method
+    const { serviceClient, userClient } = createAuthenticatedClients(req);
 
-    // Create service role client (for agent configurations)
-    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Create streaming response with shared utility
+    const { sendData, stream } = createStreamingResponse();
     
-    // Extract user token for authenticated operations
-    const authHeader = req.headers.get('authorization');
-    let authSupabase = serviceSupabase; // fallback to service role
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const userToken = authHeader.substring(7);
-      try {
-        // Create authenticated client with user's token
-        authSupabase = createClient(supabaseUrl, supabaseServiceKey, {
-          global: {
-            headers: {
-              authorization: `Bearer ${userToken}`
-            }
-          }
-        });
-        console.log('🔐 Using authenticated user client');
-      } catch (error) {
-        console.warn('⚠️ Failed to create authenticated client, using service role:', error);
+    const response = new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
       }
-    }
-
-    // Create streaming response
-    const { response, writer } = createStreamingResponse();
+    });
 
     // Process orchestration in background
     processStreamingOrchestration(
       messageId,
       deliberationId,
       mode || 'chat',
-      serviceSupabase,
-      authSupabase,
-      (data) => writer.write(JSON.stringify(data))
+      serviceClient,
+      userClient,
+      sendData
     ).then(() => {
-      writer.close();
+      sendData({ content: '', done: true });
     }).catch((error) => {
       console.error('Orchestration failed:', error);
-      writer.write(JSON.stringify({ error: error.message, done: true }));
-      writer.close();
+      sendData({ error: error.message, done: true });
     });
 
     return response;
