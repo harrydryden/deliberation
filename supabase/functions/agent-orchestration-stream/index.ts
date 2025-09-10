@@ -62,17 +62,17 @@ function checkFastPath(content: string): { agent: string; confidence: number } |
     },
     {
       regex: /^(what did|what have|have any)\s+(other\s+)?(participants|people|users)\s+(said|mentioned|shared|contributed|think|believe)/i,
-      agent: 'peer_agent',
+      agent: 'flow_agent',
       confidence: 0.96
     },
     {
       regex: /^(show me|tell me about|what are)\s+(other|existing|previous)\s+(views|viewpoints|perspectives|opinions|positions|arguments)/i,
-      agent: 'peer_agent',
+      agent: 'flow_agent',
       confidence: 0.95
     },
     {
       regex: /^(summarise|summarize|what's the range of)\s+(views|viewpoints|perspectives|opinions|positions)/i,
-      agent: 'peer_agent',
+      agent: 'flow_agent',
       confidence: 0.94
     }
   ];

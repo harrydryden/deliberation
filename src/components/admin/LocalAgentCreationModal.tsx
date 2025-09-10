@@ -97,8 +97,8 @@ export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading 
             </Select>
             <p className="text-xs text-muted-foreground">
               The agent will inherit system prompt, goals, and other settings from the global {formData.agent_type ? agentTypes.find(t => t.value === formData.agent_type)?.label : 'agent'} template
-              {formData.agent_type === 'peer_agent' && (formData.name === 'Pia' || formData.name.toLowerCase().includes('pia')) && (
-                <span className="block mt-1 text-xs text-green-600">IBIS Sharing prompts will be available for this Pia agent</span>
+              {formData.agent_type === 'flow_agent' && (formData.name === 'Flo' || formData.name.toLowerCase().includes('flo')) && (
+                <span className="block mt-1 text-xs text-green-600">IBIS Facilitation prompts will be available for this Flo agent</span>
               )}
             </p>
           </div>
