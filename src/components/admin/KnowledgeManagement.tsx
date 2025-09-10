@@ -416,7 +416,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
                       Test Knowledge Query
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-4xl">
+                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Test Knowledge Query</DialogTitle>
                       <DialogDescription>
