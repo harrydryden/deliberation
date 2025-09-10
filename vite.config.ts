@@ -1,17 +1,29 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  // Conditional import for Lovable development compatibility
+  let componentTagger = null;
+  if (mode === 'development') {
+    try {
+      const { componentTagger: tagger } = eval('require("lovable-tagger")');
+      componentTagger = tagger;
+    } catch {
+      // Gracefully handle missing dependency
+      componentTagger = null;
+    }
+  }
+
+  return {
   server: {
     host: "::",
     port: 8080,
   },
   plugins: [
     react(),
-    mode === 'development' && componentTagger(),
+    componentTagger && componentTagger(),
   ].filter(Boolean),
   resolve: {
     alias: {
@@ -58,4 +70,5 @@ export default defineConfig(({ mode }) => ({
   esbuild: {
     target: 'esnext',
   },
-}));
+}
+});
