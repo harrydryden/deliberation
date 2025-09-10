@@ -157,18 +157,36 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
 
   // Main send message function - queue-based messaging only
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
+    console.log('🚀 [DEBUG] useOptimizedChat.sendMessage called', {
+      content: content.substring(0, 50) + '...',
+      mode,
+      hasQueue: !!messageQueue,
+      queueStats: messageQueue?.getQueueStats
+    });
+    
     if (!content.trim()) return;
     
     if (!messageQueue) {
+      console.error('❌ [DEBUG] Message queue is required for all messaging operations');
       throw new Error('Message queue is required for all messaging operations');
     }
     
+    console.log('📋 [DEBUG] Adding message to queue...', { content: content.substring(0, 30) + '...', mode });
     // Add message to queue - this is the only messaging path
     messageQueue.addToQueue(content, undefined, mode);
+    console.log('✅ [DEBUG] Message added to queue successfully');
   }, [messageQueue]);
 
   // Process queued messages
   const processQueuedMessage = useCallback(async (queuedMessage: QueuedMessage) => {
+    console.log('🔄 [DEBUG] Starting processQueuedMessage', {
+      messageId: queuedMessage.id,
+      content: queuedMessage.content.substring(0, 50) + '...',
+      mode: queuedMessage.mode,
+      hasUser: !!user,
+      hasDeliberationId: !!deliberationId
+    });
+    
     if (!user || !deliberationId || !messageQueue) return;
     
     try {
@@ -181,6 +199,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       messageQueue.updateMessageStatus(queuedMessage.id, 'processing');
       setTypingState(true);
       
+      console.log('💾 [DEBUG] Saving user message to database...', { messageId: queuedMessage.id });
       logger.info('💾 Saving user message to database', { messageId: queuedMessage.id });
       const saved = await messageService.sendMessage(
         queuedMessage.content,
@@ -189,6 +208,12 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
         queuedMessage.mode,
         user.id
       );
+      
+      console.log('✅ [DEBUG] User message saved successfully', { 
+        messageId: queuedMessage.id, 
+        dbMessageId: saved.id,
+        contentLength: saved.content?.length || 0
+      });
       
       logger.info('✅ User message saved and verified', { 
         messageId: queuedMessage.id, 

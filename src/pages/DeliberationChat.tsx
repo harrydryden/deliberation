@@ -102,6 +102,16 @@ const OptimizedDeliberationChat = () => {
 
   // Initialize message queue system
   const messageQueue = useMessageQueue(3); // max 3 concurrent messages
+  
+  // DEBUG: Add logging to verify queue initialization
+  useEffect(() => {
+    console.log('🔧 [DEBUG] Message queue initialized:', {
+      hasQueue: !!messageQueue,
+      queueStats: messageQueue?.getQueueStats,
+      deliberationId,
+      timestamp: new Date().toISOString()
+    });
+  }, [messageQueue, deliberationId]);
 
   const {
     messages,
@@ -120,7 +130,17 @@ const OptimizedDeliberationChat = () => {
 
   // PERFORMANCE OPTIMIZATION: Stable sendMessage with enhanced queue integration
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
-    if (!content.trim()) return;
+    console.log('🚀 [DEBUG] sendMessageWithQueue called', { 
+      content: content.substring(0, 50) + '...', 
+      mode, 
+      hasQueue: !!messageQueue,
+      queueStats: messageQueue?.getQueueStats
+    });
+    
+    if (!content.trim()) {
+      console.warn('⚠️ [DEBUG] Empty message content, aborting');
+      return;
+    }
     
     // Enhanced logging to track mode parameter flow
     logger.info('sendMessage called with mode parameter', { 
@@ -132,7 +152,24 @@ const OptimizedDeliberationChat = () => {
     
     // Add to queue with proper error handling
     try {
+      if (!messageQueue) {
+        console.error('❌ [DEBUG] No message queue available!');
+        toast({
+          title: "Error",
+          description: "Message queue not available. Please refresh the page.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const messageId = messageQueue.addToQueue(content, undefined, mode);
+      console.log('✅ [DEBUG] Message added to queue successfully', { 
+        messageId: messageId.substring(0, 8),
+        mode,
+        content: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
+        newStats: messageQueue.getQueueStats
+      });
+      
       logger.info('Message added to queue successfully', { 
         messageId: messageId.substring(0, 8),
         mode,
@@ -144,6 +181,7 @@ const OptimizedDeliberationChat = () => {
         engagement: prev.engagement + 1
       }));
     } catch (error) {
+      console.error('❌ [DEBUG] Failed to add message to queue', error);
       logger.error('Failed to add message to queue', error as Error);
       toast({
         title: "Error",
@@ -151,7 +189,7 @@ const OptimizedDeliberationChat = () => {
         variant: "destructive"
       });
     }
-  }, [messageQueue, toast, uiState.chatMode]); // Enhanced dependencies for proper error handling
+  }, [messageQueue, toast, uiState.chatMode, logger]); // Enhanced dependencies for proper error handling
 
   // setMessageText function for voice interface
   const setMessageText = useCallback((text: string) => {
