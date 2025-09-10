@@ -79,6 +79,40 @@ export const useAgentOrchestrationTrigger = () => {
 
       const functionUrl = `https://iowsxuxkgvpgrvvklwyt.supabase.co/functions/v1/agent-orchestration-stream`;
 
+      // Test connectivity before making the actual request
+      logger.info('🔍 [DEBUG] Testing edge function connectivity', {
+        requestId,
+        url: functionUrl,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Quick connectivity test
+      try {
+        const testResponse = await fetch(functionUrl, {
+          method: 'OPTIONS',
+          headers: {
+            'Origin': window.location.origin,
+            'Access-Control-Request-Method': 'POST',
+            'Access-Control-Request-Headers': 'authorization, apikey, content-type'
+          }
+        });
+        
+        logger.info('🔍 [DEBUG] Connectivity test result', {
+          requestId,
+          status: testResponse.status,
+          ok: testResponse.ok,
+          statusText: testResponse.statusText,
+          headers: Object.fromEntries(testResponse.headers.entries())
+        });
+      } catch (testError) {
+        logger.error('🚨 [DEBUG] Connectivity test failed', {
+          requestId,
+          error: testError,
+          message: testError instanceof Error ? testError.message : 'Unknown test error'
+        });
+        // Continue with main request anyway - connectivity test might fail but main request might work
+      }
+
       logger.info('📤 [PHASE1] Preparing orchestration request', {
         requestId,
         url: functionUrl,
@@ -127,6 +161,17 @@ export const useAgentOrchestrationTrigger = () => {
       }, 45000);
       
       try {
+        logger.info('🌐 [DEBUG] About to make fetch request', {
+          requestId,
+          url: functionUrl,
+          method: 'POST',
+          headers: Object.keys(requestHeaders),
+          bodySize: JSON.stringify(requestPayload).length,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          online: navigator.onLine
+        });
+
         const response = await fetch(functionUrl, {
           method: 'POST',
           headers: requestHeaders,
@@ -206,6 +251,32 @@ export const useAgentOrchestrationTrigger = () => {
         
       } catch (fetchError) {
         clearTimeout(timeoutId);
+        streamHealthMonitor.recordDisconnection(streamId, 'fetch_error');
+        
+        logger.error('🚨 [DEBUG] Fetch error details', {
+          requestId,
+          error: fetchError,
+          errorMessage: fetchError instanceof Error ? fetchError.message : 'Unknown fetch error',
+          errorName: fetchError instanceof Error ? fetchError.name : 'Unknown',
+          errorStack: fetchError instanceof Error ? fetchError.stack?.substring(0, 500) : 'No stack',
+          url: functionUrl,
+          timestamp: new Date().toISOString(),
+          networkState: navigator.onLine,
+          connectionType: (navigator as any).connection?.effectiveType || 'unknown'
+        });
+        
+        // Try alternative URL format as fallback
+        if (fetchError instanceof Error && fetchError.message === 'Failed to fetch') {
+          logger.info('🔄 [DEBUG] Attempting fallback URL format', {
+            requestId,
+            originalUrl: functionUrl,
+            fallbackUrl: `https://iowsxuxkgvpgrvvklwyt.supabase.co/rest/v1/rpc/agent-orchestration-stream`
+          });
+          
+          // Don't actually retry here - just log for debugging
+          // We'll throw the original error to maintain existing error handling
+        }
+        
         throw fetchError;
       }
       
