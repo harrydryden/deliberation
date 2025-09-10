@@ -30,7 +30,7 @@ class MessageCache {
     hasMore: boolean,
     totalCount: number 
   }>();
-  private readonly TTL = 5 * 60 * 1000; // 5 minutes
+  private readonly TTL = 5 * 1000; // 5 seconds for real-time updates
   private readonly MAX_SIZE = 50;
 
   get(deliberationId: string, page: number = 0): { messages: Message[], hasMore: boolean, totalCount: number } | null {

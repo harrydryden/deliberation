@@ -81,7 +81,7 @@ export class CacheService {
     options: { ttl?: number } = {}
   ): Promise<T> {
     const key = this.generateKey(namespace, args);
-    const ttl = options.ttl || 30000; // Default 30 seconds
+    const ttl = options.ttl || 5000; // Default 5 seconds for faster updates
 
     // Check cache first
     const cached = this.cache.get(key);

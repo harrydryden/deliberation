@@ -17,7 +17,13 @@ export class RealtimeService implements IRealtimeService {
             filter: deliberationId ? `deliberation_id=eq.${deliberationId}` : undefined,
           },
            (payload) => {
-            logger.info('New message received via realtime', { messageId: payload.new.id });
+            logger.info('📨 New message received via realtime', { 
+              messageId: payload.new.id,
+              messageType: payload.new.message_type,
+              deliberationId: payload.new.deliberation_id,
+              timestamp: new Date().toISOString()
+            });
+            
             const message: Message = {
               id: payload.new.id,
               content: payload.new.content,
@@ -28,6 +34,16 @@ export class RealtimeService implements IRealtimeService {
               updated_at: payload.new.updated_at,
               submitted_to_ibis: payload.new.submitted_to_ibis || false
             };
+            
+            // Enhanced logging for agent messages
+            if (payload.new.message_type === 'agent') {
+              logger.info('🤖 Agent response received via real-time', {
+                messageId: payload.new.id,
+                contentLength: payload.new.content?.length || 0,
+                deliberationId: payload.new.deliberation_id
+              });
+            }
+            
             callback(message);
           }
         )

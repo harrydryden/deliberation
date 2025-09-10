@@ -105,7 +105,9 @@ const OptimizedDeliberationChat = () => {
     isTyping,
     sendMessage: originalSendMessage,
     reloadMessages,
-    recovery
+    recovery,
+    realtimeConnection,
+    forceReconnect
   } = useOptimizedChat(deliberationId, messageQueue);
 
   // Filter messages based on view mode and user context
@@ -260,18 +262,23 @@ const OptimizedDeliberationChat = () => {
       onRetryMessage: messageQueue.retryMessage,
       onRemoveMessage: messageQueue.removeFromQueue,
       messageQueue: messageQueue, // Pass full queue for debug panel
-      recovery: recovery // Pass recovery system
+      recovery: recovery, // Pass recovery system
+      realtimeConnection: realtimeConnection, // Pass real-time connection status
+      onRefreshMessages: reloadMessages, // Pass refresh function
+      onForceReconnect: forceReconnect // Pass force reconnect function
     };
     
     // Enhanced logging for debugging
     logger.debug('Queue status props updated', {
       queueLength: props.queuedMessages.length,
       processingCount: props.processingCount,
+      realtimeConnected: realtimeConnection?.isConnected,
+      realtimeStatus: realtimeConnection?.status,
       stats: messageQueue.getQueueStats
     });
     
     return props;
-  }, [messageQueue, recovery]);
+  }, [messageQueue, recovery, realtimeConnection, reloadMessages, forceReconnect]);
 
   // Enhanced queue processor monitoring
   useEffect(() => {

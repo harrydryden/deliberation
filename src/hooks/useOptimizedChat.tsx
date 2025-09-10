@@ -10,6 +10,7 @@ import { logger } from '@/utils/logger';
 import { useToast } from '@/hooks/use-toast';
 import { cacheService } from '@/services/cache.service';
 import { useAgentOrchestrationTrigger } from '@/hooks/useAgentOrchestrationTrigger';
+import { useRealtimeConnection } from '@/hooks/useRealtimeConnection';
 
 interface OptimizedChatState {
   messages: ChatMessage[];
@@ -34,6 +35,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
   const lastLoadedDeliberationRef = useRef<string | null>(null);
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { triggerAgentOrchestration } = useAgentOrchestrationTrigger();
+  const realtimeConnection = useRealtimeConnection(deliberationId);
   
   // Initialize recovery system for the queue
   const recovery = messageQueue ? useMessageQueueRecovery(messageQueue) : null;
@@ -57,7 +59,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
         'chat-messages',
         [deliberationId, user.id],
         () => messageService.getMessages(deliberationId),
-        { ttl: 30000 } // 30 second cache
+        { ttl: 5000 } // 5 second cache for real-time updates
       );
       
       const convertedMessages = convertApiMessagesToChatMessages(data || []);
@@ -240,8 +242,9 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
         )
       }));
       
-      // Clear cache
+      // Clear cache for fresh data
       cacheService.clearNamespace('chat-messages');
+      cacheService.clearNamespace('loadMessages');
       
       logger.info('🤖 Triggering agent orchestration', { 
         messageId: queuedMessage.id,
@@ -257,8 +260,15 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
         dbMessageId: saved.id
       });
       
-      // Update queue status to completed only after successful orchestration
+      // Update queue status to completed and force refresh
       messageQueue.updateMessageStatus(queuedMessage.id, 'completed');
+      
+      // Force refresh messages after agent response
+      setTimeout(() => {
+        logger.info('🔄 Force refreshing messages after agent response');
+        lastLoadedDeliberationRef.current = null; // Reset to force reload
+        loadMessages();
+      }, 1000);
       
     } catch (error) {
       const errorMsg = getErrorMessage(error);
@@ -348,6 +358,19 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       lastLoadedDeliberationRef.current = null;
     };
   }, [user?.id]);
+
+  // Periodic refresh when expecting agent responses
+  useEffect(() => {
+    if (!chatState.isTyping) return;
+
+    const refreshInterval = setInterval(() => {
+      logger.debug('⏰ Periodic refresh while typing indicator active');
+      lastLoadedDeliberationRef.current = null; // Force reload
+      loadMessages();
+    }, 10000); // Refresh every 10 seconds while typing
+
+    return () => clearInterval(refreshInterval);
+  }, [chatState.isTyping, loadMessages]);
   
   return {
     messages: chatState.messages,
@@ -356,6 +379,8 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     error: chatState.error,
     sendMessage,
     reloadMessages: loadMessages,
+    realtimeConnection: realtimeConnection.connectionState,
+    forceReconnect: realtimeConnection.forceReconnect,
     recovery: recovery ? {
       getStats: recovery.getRecoveryStats,
       performHealthCheck: recovery.performHealthCheck,

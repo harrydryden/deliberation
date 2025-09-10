@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, AlertCircle, RotateCcw } from 'lucide-react';
+import { Clock, AlertCircle, RotateCcw, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { QueuedMessage } from '@/hooks/useMessageQueue';
 import { performanceMonitor } from "@/utils/performanceMonitor";
@@ -14,6 +14,13 @@ interface MessageQueueStatusProps {
   onRemoveMessage: (messageId: string) => void;
   messageQueue?: any; // For debug panel
   recovery?: any; // For debug panel
+  realtimeConnection?: {
+    isConnected: boolean;
+    status: string;
+    connectionError: string | null;
+  };
+  onRefreshMessages?: () => void;
+  onForceReconnect?: () => void;
 }
 
 export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(({
@@ -22,7 +29,10 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(
   onRetryMessage,
   onRemoveMessage,
   messageQueue,
-  recovery
+  recovery,
+  realtimeConnection,
+  onRefreshMessages,
+  onForceReconnect
 }) => {
 
   // Memoize expensive computations with optimized dependencies
@@ -65,6 +75,36 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(
 
   return (
     <div className="flex items-center gap-1">
+      {/* Real-time connection status */}
+      {realtimeConnection && (
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-8 px-2 gap-1"
+          onClick={onForceReconnect}
+          title={`Real-time: ${realtimeConnection.status}`}
+        >
+          {realtimeConnection.isConnected ? (
+            <Wifi className="h-3 w-3 text-green-500" />
+          ) : (
+            <WifiOff className="h-3 w-3 text-red-500" />
+          )}
+        </Button>
+      )}
+
+      {/* Manual refresh button */}
+      {onRefreshMessages && (
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-8 px-2"
+          onClick={onRefreshMessages}
+          title="Refresh messages"
+        >
+          <RefreshCw className="h-3 w-3" />
+        </Button>
+      )}
+
       <Popover>
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className="h-8 px-2 gap-1">
@@ -124,6 +164,31 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(
                 ))
               )}
             </div>
+
+            {/* Real-time connection status */}
+            {realtimeConnection && (
+              <div className={`p-2 rounded border ${
+                realtimeConnection.isConnected 
+                  ? 'bg-green-50 border-green-200' 
+                  : 'bg-red-50 border-red-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  {realtimeConnection.isConnected ? (
+                    <Wifi className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <WifiOff className="h-4 w-4 text-red-600" />
+                  )}
+                  <span className="text-xs">
+                    Real-time: {realtimeConnection.status}
+                  </span>
+                  {realtimeConnection.connectionError && (
+                    <span className="text-xs text-red-600">
+                      ({realtimeConnection.connectionError})
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {failedCount > 0 && (
               <div className="p-2 bg-destructive/10 rounded border border-destructive/20">
