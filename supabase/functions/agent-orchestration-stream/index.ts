@@ -2,7 +2,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
 
-// Import only working shared utilities
+// Import only the working shared utilities
 import {
   corsHeaders,
   validateAndGetEnvironment,
@@ -107,12 +107,12 @@ async function processStreamingOrchestration(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-2025-08-07',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message.content }
         ],
-        max_tokens: 1000,
+        max_completion_tokens: 1000,
         stream: true
       }),
     });
