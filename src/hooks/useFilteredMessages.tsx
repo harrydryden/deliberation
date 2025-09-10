@@ -18,19 +18,41 @@ export const useFilteredMessages = (
     // For 'chat' view mode, filter to show only user's conversation thread
     if (!currentUserId) return messages;
     
-    return messages.filter(msg => {
+    // Debug logging for message filtering
+    console.log('Filtering messages for user:', currentUserId, 'viewMode:', viewMode);
+    console.log('Total messages:', messages.length);
+    
+    const filtered = messages.filter(msg => {
       // Include user's own messages (not submitted to IBIS - those are for IBIS context)
       if (msg.message_type === 'user' && msg.user_id === currentUserId && !msg.submitted_to_ibis) {
+        console.log('Including user message:', msg.id);
         return true;
       }
       
       // Include agent responses to user's messages
       if (msg.message_type !== 'user' && msg.parent_message_id) {
         const parentMessage = messages.find(m => m.id === msg.parent_message_id);
-        return parentMessage?.user_id === currentUserId;
+        const shouldInclude = parentMessage?.user_id === currentUserId;
+        console.log('Agent message:', msg.id, 'parent:', msg.parent_message_id, 'parentFound:', !!parentMessage, 'shouldInclude:', shouldInclude);
+        return shouldInclude;
+      }
+      
+      // Fallback: Include agent messages that might not have proper parent linking
+      if (msg.message_type !== 'user' && !msg.parent_message_id) {
+        // Check if this is the most recent agent message after a user message
+        const messageIndex = messages.findIndex(m => m.id === msg.id);
+        if (messageIndex > 0) {
+          const previousMessage = messages[messageIndex - 1];
+          const shouldInclude = previousMessage?.message_type === 'user' && previousMessage?.user_id === currentUserId;
+          console.log('Agent message without parent:', msg.id, 'previousMessage:', previousMessage?.id, 'shouldInclude:', shouldInclude);
+          return shouldInclude;
+        }
       }
       
       return false;
     });
+    
+    console.log('Filtered messages count:', filtered.length);
+    return filtered;
   }, [messages, viewMode, currentUserId, isAdmin]);
 };
