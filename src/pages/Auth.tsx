@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const Auth = () => {
@@ -33,6 +34,14 @@ const Auth = () => {
         return;
       }
       
+      // First try to find the last deliberation the user wrote a message in
+      const lastMessageDeliberation = await findLastMessageDeliberation();
+      if (lastMessageDeliberation) {
+        navigate(`/deliberations/${lastMessageDeliberation}`);
+        return;
+      }
+      
+      // Fallback to most recent active deliberation if no messages found
       const data = await deliberationService.getDeliberations();
       setDeliberations(data);
       
@@ -52,6 +61,31 @@ const Auth = () => {
         // Fallback to deliberations page
         navigate("/deliberations");
       }
+    }
+  };
+
+  const findLastMessageDeliberation = async (): Promise<string | null> => {
+    try {
+      if (!user?.id) return null;
+      
+      // Query for the user's most recent message with a deliberation_id
+      const { data, error } = await supabase
+        .from('messages')
+        .select('deliberation_id')
+        .eq('user_id', user.id)
+        .not('deliberation_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !data?.deliberation_id) {
+        return null;
+      }
+
+      return data.deliberation_id;
+    } catch (error) {
+      console.warn('Failed to find last message deliberation:', error);
+      return null;
     }
   };
 

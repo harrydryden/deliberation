@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Users, Vote, Brain, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
+import { supabase } from "@/integrations/supabase/client";
 import { logError } from '@/utils/consoleLogger';
 const Index = () => {
   const {
@@ -18,9 +19,51 @@ const Index = () => {
     if (!user) {
       navigate("/auth");
     } else {
-      loadDeliberations();
+      checkForLastDeliberationAndRedirect();
     }
   }, [user, navigate]);
+
+  const checkForLastDeliberationAndRedirect = async () => {
+    try {
+      // First try to find the last deliberation the user wrote a message in
+      const lastMessageDeliberation = await findLastMessageDeliberation();
+      if (lastMessageDeliberation) {
+        navigate(`/deliberations/${lastMessageDeliberation}`);
+        return;
+      }
+      
+      // If no messages found, load available deliberations for the landing page
+      loadDeliberations();
+    } catch (error) {
+      logError('Failed to check for last deliberation', error);
+      loadDeliberations();
+    }
+  };
+
+  const findLastMessageDeliberation = async (): Promise<string | null> => {
+    try {
+      if (!user?.id) return null;
+      
+      // Query for the user's most recent message with a deliberation_id
+      const { data, error } = await supabase
+        .from('messages')
+        .select('deliberation_id')
+        .eq('user_id', user.id)
+        .not('deliberation_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !data?.deliberation_id) {
+        return null;
+      }
+
+      return data.deliberation_id;
+    } catch (error) {
+      console.warn('Failed to find last message deliberation:', error);
+      return null;
+    }
+  };
   const loadDeliberations = async () => {
     try {
       const data = await deliberationService.getDeliberations();
