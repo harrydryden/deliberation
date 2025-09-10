@@ -3,10 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Filter, Eye, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Eye, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ExpandableText } from '@/components/common/ExpandableText';
@@ -51,7 +50,6 @@ export const IbisTableView: React.FC<IbisTableViewProps> = ({ deliberationId }) 
   const [relationships, setRelationships] = useState<IbisRelationship[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterType, setFilterType] = useState<'all' | IbisNode['node_type']>('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
@@ -118,14 +116,9 @@ export const IbisTableView: React.FC<IbisTableViewProps> = ({ deliberationId }) 
     });
   };
 
-  // Filter and search nodes
+  // Filter and search nodes with custom ordering
   const filteredNodes = useMemo(() => {
     let filtered = nodes;
-
-    // Apply type filter
-    if (filterType !== 'all') {
-      filtered = filtered.filter(node => node.node_type === filterType);
-    }
 
     // Apply search filter
     if (searchTerm) {
@@ -136,8 +129,18 @@ export const IbisTableView: React.FC<IbisTableViewProps> = ({ deliberationId }) 
       );
     }
 
+    // Sort by type priority (issues, positions, arguments, uncategorized) then by date
+    const typeOrder = { issue: 0, position: 1, argument: 2, uncategorized: 3 };
+    filtered.sort((a, b) => {
+      const typeComparison = typeOrder[a.node_type] - typeOrder[b.node_type];
+      if (typeComparison !== 0) return typeComparison;
+      
+      // Within same type, sort by date (newest first)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
     return filtered;
-  }, [nodes, filterType, searchTerm]);
+  }, [nodes, searchTerm]);
 
   const toggleRowExpansion = (nodeId: string) => {
     setExpandedRows(prev => {
@@ -168,7 +171,7 @@ export const IbisTableView: React.FC<IbisTableViewProps> = ({ deliberationId }) 
           IBIS Table View
         </CardTitle>
         
-        {/* Filters */}
+        {/* Search */}
         <div className="flex gap-2 pt-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -179,20 +182,6 @@ export const IbisTableView: React.FC<IbisTableViewProps> = ({ deliberationId }) 
               className="pl-10"
             />
           </div>
-          
-          <Select value={filterType} onValueChange={(value) => setFilterType(value as typeof filterType)}>
-            <SelectTrigger className="w-40">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="issue">Issues</SelectItem>
-              <SelectItem value="position">Positions</SelectItem>
-              <SelectItem value="argument">Arguments</SelectItem>
-              <SelectItem value="uncategorized">Uncategorized</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </CardHeader>
 
@@ -250,11 +239,6 @@ export const IbisTableView: React.FC<IbisTableViewProps> = ({ deliberationId }) 
                         {isExpanded && node.description && (
                           <div className="text-xs text-muted-foreground">
                             <ExpandableText text={node.description} maxLength={200} />
-                          </div>
-                        )}
-                        {isExpanded && (
-                          <div className="text-xs text-muted-foreground">
-                            Created: {new Date(node.created_at).toLocaleDateString()}
                           </div>
                         )}
                       </div>
