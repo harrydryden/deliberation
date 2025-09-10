@@ -165,6 +165,16 @@ export class ModelConfigManager {
     
     return params;
   }
+
+  /**
+   * Convert character limit to token count using improved 3:1 ratio
+   */
+  static characterLimitToTokens(characterLimit: number): number {
+    // Use 3:1 ratio (more conservative) with minimum 100 token buffer
+    const tokens = Math.ceil(characterLimit / 3) + 100;
+    console.log(`🎯 Converting ${characterLimit} chars to ${tokens} tokens (3:1 ratio + 100 buffer)`);
+    return tokens;
+  }
   
   /**
    * Get all available model names

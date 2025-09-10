@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Plus } from 'lucide-react';
 import { LocalAgentCreate, Deliberation } from '@/types/index';
+import { Textarea } from '@/components/ui/textarea';
 
 interface LocalAgentCreationModalProps {
   deliberations: Deliberation[];
@@ -16,10 +17,11 @@ interface LocalAgentCreationModalProps {
 
 export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading }: LocalAgentCreationModalProps) => {
   const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState<LocalAgentCreate>({
+  const [formData, setFormData] = useState<LocalAgentCreate & { max_response_characters: number }>({
     name: '',
     agent_type: '',
     deliberationId: '',
+    max_response_characters: 800,
   });
 
   const agentTypes = [
@@ -34,7 +36,10 @@ export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading 
       return;
     }
     
-    onCreateAgent(formData);
+    onCreateAgent({
+      ...formData,
+      max_response_characters: formData.max_response_characters
+    });
     setOpen(false);
     resetForm();
   };
@@ -44,6 +49,7 @@ export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading 
       name: '',
       agent_type: '',
       deliberationId: '',
+      max_response_characters: 800,
     });
   };
 
@@ -100,6 +106,22 @@ export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading 
               {formData.agent_type === 'flow_agent' && (formData.name === 'Flo' || formData.name.toLowerCase().includes('flo')) && (
                 <span className="block mt-1 text-xs text-green-600">IBIS Facilitation prompts will be available for this Flo agent</span>
               )}
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="max_response_characters">Max Response Characters</Label>
+            <Input
+              id="max_response_characters"
+              type="number"
+              min="100"
+              max="4000"
+              value={formData.max_response_characters}
+              onChange={(e) => setFormData(prev => ({ ...prev, max_response_characters: parseInt(e.target.value) || 800 }))}
+              placeholder="800"
+            />
+            <p className="text-xs text-muted-foreground">
+              Maximum characters for agent responses (soft limit - will retry with no limit if empty)
             </p>
           </div>
 

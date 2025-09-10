@@ -23,6 +23,7 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
     name: string;
     description: string;
     response_style: string;
+    max_response_characters: number;
     goals: string[];
     facilitator_config: FacilitatorConfig;
     prompt_overrides: Record<string, string>;
@@ -33,6 +34,7 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
       name: agent.name,
       description: agent.description || '',
       response_style: agent.response_style || '',
+      max_response_characters: agent.max_response_characters || 800,
       goals: agent.goals || [],
       prompt_overrides: agent.prompt_overrides || {},
       facilitator_config: agent.facilitator_config || {
@@ -53,6 +55,7 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
         name: data.name,
         description: data.description,
         response_style: data.response_style,
+        max_response_characters: data.max_response_characters,
         goals: data.goals,
         prompt_overrides: data.prompt_overrides,
         facilitator_config: data.facilitator_config,
@@ -68,6 +71,7 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
         name: agent.name,
         description: agent.description || '',
         response_style: agent.response_style || '',
+        max_response_characters: agent.max_response_characters || 800,
         goals: agent.goals || [],
         prompt_overrides: agent.prompt_overrides || {},
         facilitator_config: agent.facilitator_config || {
@@ -156,6 +160,18 @@ export const LocalAgentEditModal = ({ agent, onUpdateAgent, loading }: LocalAgen
             value={form.formData.response_style}
             onChange={(value) => form.updateField('response_style', value)}
             placeholder="e.g., formal, casual, analytical"
+          />
+
+          <FormField
+            type="input"
+            label="Max Response Characters"
+            value={form.formData.max_response_characters?.toString() || '800'}
+            onChange={(value) => form.updateField('max_response_characters', parseInt(value) || 800)}
+            placeholder="800"
+            inputType="number"
+            min="100"
+            max="4000"
+            helpText="Maximum characters for agent responses. Uses soft limit - will retry with no limit if response is empty."
           />
 
           <GoalsInput

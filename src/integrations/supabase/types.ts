@@ -26,6 +26,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_default: boolean
+          max_response_characters: number | null
           name: string
           preferred_model: string | null
           preset_questions: Json | null
@@ -44,6 +45,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_default?: boolean
+          max_response_characters?: number | null
           name: string
           preferred_model?: string | null
           preset_questions?: Json | null
@@ -62,6 +64,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_default?: boolean
+          max_response_characters?: number | null
           name?: string
           preferred_model?: string | null
           preset_questions?: Json | null

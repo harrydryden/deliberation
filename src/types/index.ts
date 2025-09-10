@@ -168,6 +168,7 @@ export interface Agent {
   agent_type: string;
   goals?: string[];
   response_style?: string;
+  max_response_characters?: number;
   is_active: boolean;
   is_default: boolean;
   deliberation_id?: string;
@@ -211,6 +212,7 @@ export interface LocalAgentCreate {
   deliberationId: string;
   description?: string;
   response_style?: string;
+  max_response_characters?: number;
   goals?: string[];
   facilitator_config?: FacilitatorConfig;
 }

@@ -18,6 +18,10 @@ interface InputFieldProps extends BaseFieldProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  min?: string;
+  max?: string;
+  inputType?: string;
+  helpText?: string;
 }
 
 interface TextareaFieldProps extends BaseFieldProps {
@@ -52,13 +56,21 @@ export const FormField = (props: FormFieldProps) => {
     switch (props.type) {
       case 'input':
         return (
-          <Input
-            value={props.value}
-            onChange={(e) => props.onChange(e.target.value)}
-            placeholder={props.placeholder}
-            disabled={disabled}
-            className={error ? 'border-red-500' : ''}
-          />
+          <div>
+            <Input
+              value={props.value}
+              onChange={(e) => props.onChange(e.target.value)}
+              placeholder={props.placeholder}
+              disabled={disabled}
+              type={props.inputType || 'text'}
+              min={props.min}
+              max={props.max}
+              className={error ? 'border-destructive' : ''}
+            />
+            {props.helpText && (
+              <p className="text-xs text-muted-foreground mt-1">{props.helpText}</p>
+            )}
+          </div>
         );
 
       case 'textarea':
