@@ -620,19 +620,13 @@ async function generateStreamingResponse(
 
     const requestBody: any = ModelConfigManager.generateAPIParams(model, messages, { maxTokens, stream: useStreaming });
 
-    console.log('🔧 Request body preview:', JSON.stringify({
-      model: requestBody.model,
-      messages: [
-        { role: 'system', content: `${systemPrompt.substring(0, 100)}...` },
-        { role: 'user', content: content }
-      ],
-      stream: requestBody.stream,
-      max_completion_tokens: requestBody.max_completion_tokens
-    }, null, 2));
+    console.log('🔧 FULL Request body for debugging:', JSON.stringify(requestBody, null, 2));
 
     console.log(`🚀 About to make OpenAI API call (${useStreaming ? 'streaming' : 'non-streaming'})...`);
     console.log('📏 User content length:', content?.length || 0);
     console.log('📝 User content preview:', content?.substring(0, 200) + '...');
+    console.log('📝 FULL System prompt:', systemPrompt);
+    console.log('📝 FULL User content:', content);
 
     // Enhanced OpenAI API call with timeout
     const response = await withTimeout(
@@ -654,6 +648,7 @@ async function generateStreamingResponse(
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`❌ OpenAI API error: ${response.status} - ${errorText}`);
+      console.error('❌ Original request body:', JSON.stringify(requestBody, null, 2));
       
       // If streaming fails due to organization verification, try non-streaming
       if (errorText.includes('organization must be verified') && requestBody.stream) {
@@ -730,18 +725,23 @@ async function generateStreamingResponse(
             continue;
           }
           
-          try {
-            const data = JSON.parse(line.slice(6));
-            console.log(`📦 Parsed data from chunk ${chunkCount}:`, JSON.stringify(data, null, 2));
-            const content = data.choices?.[0]?.delta?.content || '';
-            if (content) {
-              console.log(`💬 Content found: "${content}"`);
-              fullResponse += content;
-              sendData({ content, done: false });
-            } else {
-              console.log('📭 No content in this chunk');
-            }
-          } catch (e) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              console.log(`📦 Parsed data from chunk ${chunkCount}:`, JSON.stringify(data, null, 2));
+              const content = data.choices?.[0]?.delta?.content || '';
+              const finishReason = data.choices?.[0]?.finish_reason;
+              console.log(`🔍 Content: "${content}", Finish reason: ${finishReason}`);
+              if (content) {
+                console.log(`💬 Content found: "${content}"`);
+                fullResponse += content;
+                sendData({ content, done: false });
+              } else {
+                console.log('📭 No content in this chunk');
+                if (finishReason) {
+                  console.log(`🏁 Stream finished with reason: ${finishReason}`);
+                }
+              }
+            } catch (e) {
             console.warn(`⚠️ Parse error in chunk ${chunkCount}:`, e);
             console.warn(`⚠️ Problematic line: "${line}"`);
           }
