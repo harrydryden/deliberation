@@ -66,10 +66,6 @@ export const useAgentOrchestrationTrigger = () => {
       // Get current session for authentication
       const { data: { session } } = await supabase.auth.getSession();
       
-      if (!session?.access_token) {
-        throw new Error('No authentication token available');
-      }
-      
       // PHASE 1: Detailed Request Preparation Logging
       const requestPayload = {
         messageId,
@@ -123,8 +119,8 @@ export const useAgentOrchestrationTrigger = () => {
         streamId,
         payloadString: JSON.stringify(requestPayload),
         payloadSize: JSON.stringify(requestPayload).length,
-        hasAuthToken: !!session.access_token,
-        tokenLength: session.access_token?.length || 0
+        hasAuthToken: false,
+        tokenLength: 0
       });
 
       // PHASE 1: Request Body Validation Before Send
@@ -140,7 +136,6 @@ export const useAgentOrchestrationTrigger = () => {
 
       const requestHeaders = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
         'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM',
         'X-Request-ID': requestId  // Add correlation ID
       };
