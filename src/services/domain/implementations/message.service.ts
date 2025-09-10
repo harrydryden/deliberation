@@ -62,7 +62,27 @@ export class MessageService implements IMessageService {
 
           const message = await this.messageRepository.create(messageData);
           
-          logger.info('Message sent successfully', { 
+          // PERSISTENCE VERIFICATION: Ensure message was actually saved
+          if (!message || !message.id) {
+            throw new Error('Message creation failed - no ID returned');
+          }
+          
+          // Verify message exists by attempting to read it back
+          try {
+            const verificationMessage = await this.messageRepository.findById(message.id);
+            if (!verificationMessage) {
+              throw new Error(`Message persistence verification failed - message ${message.id} not found`);
+            }
+            logger.info('Message persistence verified', { messageId: message.id });
+          } catch (verificationError) {
+            logger.error('Message persistence verification failed', { 
+              messageId: message.id, 
+              error: verificationError 
+            });
+            throw new Error(`Message was created but verification failed: ${verificationError}`);
+          }
+          
+          logger.info('Message sent and verified successfully', { 
             messageId: message.id, 
             type: messageType, 
             deliberationId,

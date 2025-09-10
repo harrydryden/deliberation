@@ -206,10 +206,16 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     if (!user || !deliberationId || !messageQueue) return;
     
     try {
+      logger.info('🚀 Starting message processing', { 
+        messageId: queuedMessage.id, 
+        content: queuedMessage.content.substring(0, 50) + '...',
+        mode: queuedMessage.mode
+      });
+      
       messageQueue.updateMessageStatus(queuedMessage.id, 'processing');
       setTypingState(true);
       
-      // Send the message using the existing service
+      logger.info('💾 Saving user message to database', { messageId: queuedMessage.id });
       const saved = await messageService.sendMessage(
         queuedMessage.content,
         'user',
@@ -217,6 +223,12 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
         queuedMessage.mode,
         user.id
       );
+      
+      logger.info('✅ User message saved and verified', { 
+        messageId: queuedMessage.id, 
+        dbMessageId: saved.id,
+        contentLength: saved.content?.length || 0
+      });
       
       const userMessage = convertApiMessageToChatMessage(saved);
       
@@ -231,19 +243,33 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       // Clear cache
       cacheService.clearNamespace('chat-messages');
       
-      // Update queue status to completed
-      messageQueue.updateMessageStatus(queuedMessage.id, 'completed');
-      
-      logger.info('Message sent successfully from queue', { 
-        messageId: saved.id,
-        queueId: queuedMessage.id 
+      logger.info('🤖 Triggering agent orchestration', { 
+        messageId: queuedMessage.id,
+        dbMessageId: saved.id,
+        mode: queuedMessage.mode
       });
       
-      // Trigger agent orchestration after message is saved
+      // Trigger agent orchestration after message is saved and verified
       await triggerAgentOrchestration(saved.id, deliberationId, queuedMessage.mode, setTypingState);
+      
+      logger.info('✅ Agent orchestration completed successfully', { 
+        messageId: queuedMessage.id,
+        dbMessageId: saved.id
+      });
+      
+      // Update queue status to completed only after successful orchestration
+      messageQueue.updateMessageStatus(queuedMessage.id, 'completed');
       
     } catch (error) {
       const errorMsg = getErrorMessage(error);
+      
+      logger.error('❌ Message processing failed', { 
+        messageId: queuedMessage.id,
+        error: errorMsg,
+        retries: queuedMessage.retries,
+        content: queuedMessage.content.substring(0, 50) + '...'
+      });
+      
       messageQueue.updateMessageStatus(queuedMessage.id, 'failed', errorMsg);
       
       setChatState(prev => ({ 
@@ -252,21 +278,13 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
         error: errorMsg 
       }));
       
-      // Enhanced error logging with retry info
-      logger.error('Failed to send queued message', error as Error, {
-        queueId: queuedMessage.id.substring(0, 8),
-        retries: queuedMessage.retries,
-        canRetry: queuedMessage.retries < 2
+      toast({
+        title: "Message Processing Error",
+        description: `Failed to process message: ${errorMsg}`,
+        variant: "destructive"
       });
       
-      // Only show toast for final failures
-      if (queuedMessage.retries >= 1) {
-        toast({
-          title: "Message Failed",
-          description: "Message failed to send after retries. Check queue status for details.",
-          variant: "destructive"
-        });
-      }
+      logger.error('Failed to process queued message', error as Error);
     }
   }, [user, deliberationId, messageQueue, messageService, toast, triggerAgentOrchestration, setTypingState]);
 
@@ -275,14 +293,27 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     if (!messageQueue || !user || !deliberationId) return;
     
     const processNextMessage = async () => {
+      const stats = messageQueue.getQueueStats;
       const nextMessage = messageQueue.getNextQueuedMessage();
-      // CRITICAL FIX: Check if can process using queue stats
-      if (nextMessage) {
-        const stats = messageQueue.getQueueStats;
-        if (stats.canProcess) {
-          await processQueuedMessage(nextMessage);
-        }
+      
+      if (!nextMessage || !stats.canProcess) {
+        logger.debug('Queue processor: No messages or at capacity', { 
+          hasMessage: !!nextMessage, 
+          canProcess: stats.canProcess, 
+          stats 
+        });
+        return; // No messages to process or at capacity
       }
+
+      logger.info('📋 Processing queued message', { 
+        messageId: nextMessage.id, 
+        queuePosition: nextMessage.queuePosition,
+        retries: nextMessage.retries,
+        status: nextMessage.status,
+        processingCount: stats.processing
+      });
+
+      await processQueuedMessage(nextMessage);
     };
     
     // Process queue every 100ms when there are queued messages

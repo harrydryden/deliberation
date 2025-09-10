@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
 import { useToast } from '@/hooks/use-toast';
 import { systemMonitor } from '@/services/system-monitoring.service';
+import { streamHealthMonitor } from '@/utils/streamHealthMonitor';
 
 /**
  * Dedicated hook for triggering agent orchestration
@@ -21,12 +22,23 @@ export const useAgentOrchestrationTrigger = () => {
     
     try {
       onTypingChange?.(true);
+
+      // Start monitoring stream health
+      const streamId = streamHealthMonitor.startConnection(messageId);
       
       // Record the operation start
       systemMonitor.recordMetric('agent_orchestration_trigger', 0, true, {
         messageId: messageId.substring(0, 8),
         deliberationId: deliberationId.substring(0, 8),
-        mode
+        mode,
+        streamId
+      });
+      
+      logger.info('🤖 Triggering agent orchestration with stream monitoring', { 
+        messageId, 
+        deliberationId, 
+        mode,
+        streamId
       });
       
       // Get current session for authentication
@@ -47,8 +59,10 @@ export const useAgentOrchestrationTrigger = () => {
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
+        logger.warn('Agent orchestration timeout');
+        streamHealthMonitor.recordDisconnection(streamId, 'timeout');
         controller.abort();
-      }, 25000); // 25 second timeout for orchestration trigger
+      }, 45000); // Increased to 45 seconds timeout for better reliability
       
       try {
         const response = await fetch(functionUrl, {
@@ -69,9 +83,23 @@ export const useAgentOrchestrationTrigger = () => {
         clearTimeout(timeoutId);
         
         if (!response.ok) {
+          streamHealthMonitor.recordDisconnection(streamId, `HTTP ${response.status}`);
           const errorText = await response.text();
+          logger.error('❌ Edge function response error', {
+            status: response.status,
+            statusText: response.statusText,
+            errorText: errorText.substring(0, 500),
+            messageId,
+            streamId
+          });
           throw new Error(`Agent orchestration failed: ${response.status} - ${errorText}`);
         }
+
+        logger.info('✅ Stream response received successfully', {
+          messageId,
+          streamId,
+          contentType: response.headers.get('content-type')
+        });
         
         const duration = Date.now() - startTime;
         systemMonitor.recordMetric('agent_orchestration_trigger', duration, true, {
@@ -81,11 +109,14 @@ export const useAgentOrchestrationTrigger = () => {
           success: true
         });
         
+        streamHealthMonitor.endConnection(streamId, 'complete');
+        
         logger.info('Agent orchestration triggered successfully', { 
           messageId: messageId.substring(0, 8), 
           deliberationId: deliberationId.substring(0, 8), 
           mode,
-          duration
+          duration,
+          streamId
         });
         
         // Set timeout to clear typing indicator if no response in 60 seconds

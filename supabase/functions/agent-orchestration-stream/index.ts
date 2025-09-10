@@ -918,6 +918,8 @@ serve(async (req) => {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no', // Disable Nginx buffering
+        'Access-Control-Expose-Headers': 'X-Accel-Buffering'
       },
     });
 
