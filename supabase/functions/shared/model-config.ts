@@ -170,10 +170,10 @@ export class ModelConfigManager {
    * Convert character limit to token count using improved 3:1 ratio
    */
   static characterLimitToTokens(characterLimit: number): number {
-    // Use 3:1 ratio (more conservative) with minimum 500 token floor
+    // Use 3:1 ratio (more conservative) with minimum 1000 token floor
     const baseTokens = Math.ceil(characterLimit / 3) + 100;
-    const tokens = Math.max(baseTokens, 500); // Ensure minimum 500 tokens for meaningful responses
-    console.log(`🎯 Converting ${characterLimit} chars to ${tokens} tokens (3:1 ratio + 100 buffer, min 500)`);
+    const tokens = Math.max(baseTokens, 1000); // Ensure minimum 1000 tokens for meaningful responses
+    console.log(`🎯 Converting ${characterLimit} chars to ${tokens} tokens (3:1 ratio + 100 buffer, min 1000)`);
     return tokens;
   }
   
