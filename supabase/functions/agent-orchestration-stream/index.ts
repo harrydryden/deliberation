@@ -859,7 +859,16 @@ serve(async (req) => {
       });
     }
 
-    console.log('📥 Parsing request body');
+    const requestId = req.headers.get('X-Request-ID') || `edge_${Date.now()}`;
+    console.log('📥 [PHASE1] Edge function request received', {
+      requestId,
+      method: req.method,
+      url: req.url,
+      headers: Object.fromEntries(req.headers.entries()),
+      timestamp: new Date().toISOString()
+    });
+
+    console.log('📥 [PHASE1] Parsing request body for orchestration');
     // Use proper JSON parsing with error handling
     const { messageId, deliberationId, mode = 'chat' } = await parseAndValidateRequest<{
       messageId: string;
@@ -867,14 +876,46 @@ serve(async (req) => {
       mode?: 'chat' | 'learn';
     }>(req, ['messageId', 'deliberationId']);
     
-    // Validate mode parameter
+    // PHASE 1: Enhanced mode parameter validation and logging
+    console.log('🎯 [PHASE1] Mode parameter processing in edge function', {
+      requestId,
+      messageId: messageId.substring(0, 8),
+      deliberationId: deliberationId.substring(0, 8),
+      receivedMode: mode,
+      modeType: typeof mode,
+      isLearnMode: mode === 'learn',
+      isChatMode: mode === 'chat',
+      validModes: ['chat', 'learn'],
+      modeValidation: ['chat', 'learn'].includes(mode)
+    });
+    
+    // Validate mode parameter with enhanced logging
+    let finalMode = mode;
     if (mode && !['chat', 'learn'].includes(mode)) {
-      console.warn('⚠️ Invalid mode received, defaulting to chat:', mode);
-      const validMode = 'chat';
-      console.log('🚀 Starting streaming agent orchestration', { messageId, deliberationId, mode: validMode });
-    } else {
-      console.log('🚀 Starting streaming agent orchestration', { messageId, deliberationId, mode });
-      console.log('🎯 Mode validation passed:', { mode, isLearnMode: mode === 'learn' });
+      console.warn('⚠️ [PHASE1] Invalid mode received, defaulting to chat:', {
+        requestId,
+        invalidMode: mode,
+        defaultingTo: 'chat'
+      });
+      finalMode = 'chat';
+    }
+
+    console.log('🚀 [PHASE1] Starting streaming agent orchestration', {
+      requestId,
+      messageId: messageId.substring(0, 8),
+      deliberationId: deliberationId.substring(0, 8),
+      finalMode,
+      originalMode: mode,
+      modeChanged: finalMode !== mode
+    });
+    
+    if (finalMode === 'learn') {
+      console.log('🎓 [PHASE1] LEARN MODE DETECTED - Should force Bill agent', {
+        requestId,
+        mode: finalMode,
+        messageId: messageId.substring(0, 8),
+        timestamp: new Date().toISOString()
+      });
     }
     
     // F001 Fix: Acquire distributed lock to prevent duplicate processing

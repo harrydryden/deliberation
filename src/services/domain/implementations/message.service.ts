@@ -26,8 +26,29 @@ export class MessageService implements IMessageService {
     userId?: string
   ): Promise<Message> {
     try {
+      // PHASE 1: Mode parameter logging in message service
+      logger.info('📨 [PHASE1] Message service sendMessage called', {
+        messageType,
+        deliberationId: deliberationId?.substring(0, 8),
+        mode,
+        modeType: typeof mode,
+        userId: userId?.substring(0, 8),
+        contentLength: content?.length || 0,
+        hasMode: mode !== undefined,
+        isLearnMode: mode === 'learn'
+      });
+
       if (!userId) {
         throw new Error('User ID is required to send a message');
+      }
+
+      // Validate mode parameter
+      if (mode && !['chat', 'learn'].includes(mode)) {
+        logger.warn('⚠️ [PHASE1] Invalid mode in message service', {
+          invalidMode: mode,
+          defaultingTo: 'chat',
+          userId: userId.substring(0, 8)
+        });
       }
 
       // CRITICAL: Prevent race conditions with processing lock
@@ -58,7 +79,17 @@ export class MessageService implements IMessageService {
             message_type: messageType as any,
             user_id: userId,
             deliberation_id: deliberationId,
+            processing_mode: mode  // PHASE 1: Ensure mode is stored with message
           } as any;
+
+          // PHASE 1: Log message data before creation
+          logger.info('💾 [PHASE1] Creating message with mode', {
+            messageType,
+            deliberationId: deliberationId?.substring(0, 8),
+            userId: userId.substring(0, 8),
+            processingMode: messageData.processing_mode,
+            hasProcessingMode: 'processing_mode' in messageData
+          });
 
           const message = await this.messageRepository.create(messageData);
           

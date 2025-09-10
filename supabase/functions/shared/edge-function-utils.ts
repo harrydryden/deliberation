@@ -130,24 +130,84 @@ export function getOpenAIKey(): string {
   return apiKey;
 }
 
-// Request validation helper
+// Enhanced request validation helper with detailed logging
 export async function parseAndValidateRequest<T>(
   request: Request,
   requiredFields: string[] = []
 ): Promise<T> {
+  const requestId = request.headers.get('X-Request-ID') || `parse_${Date.now()}`;
+  
+  console.log(`🔍 [PHASE1] Parsing request body`, {
+    requestId,
+    method: request.method,
+    url: request.url,
+    contentType: request.headers.get('content-type'),
+    hasBody: request.body !== null,
+    requiredFields
+  });
+
   let body: any;
+  let rawBodyText = '';
   
   try {
-    body = await request.json();
+    rawBodyText = await request.text();
+    console.log(`📝 [PHASE1] Raw request body received`, {
+      requestId,
+      bodyLength: rawBodyText.length,
+      bodyPreview: rawBodyText.substring(0, 200)
+    });
+    
+    body = JSON.parse(rawBodyText);
+    console.log(`✅ [PHASE1] JSON parsing successful`, {
+      requestId,
+      parsedKeys: Object.keys(body),
+      bodyStructure: typeof body === 'object' ? Object.keys(body).map(key => `${key}: ${typeof body[key]}`).join(', ') : typeof body
+    });
   } catch (error) {
+    console.error(`❌ [PHASE1] JSON parsing failed`, {
+      requestId,
+      error: error.message,
+      rawBody: rawBodyText.substring(0, 500)
+    });
     throw new Error('Invalid JSON in request body');
   }
 
-  // Validate required fields
+  // Enhanced field validation with detailed logging
+  console.log(`🔍 [PHASE1] Validating required fields`, {
+    requestId,
+    requiredFields,
+    receivedFields: Object.keys(body),
+    bodyValues: Object.entries(body).reduce((acc, [key, value]) => ({
+      ...acc,
+      [key]: typeof value === 'string' && value.length > 50 ? `${value.substring(0, 50)}...` : value
+    }), {})
+  });
+
   const missing = requiredFields.filter(field => !(field in body));
   if (missing.length > 0) {
+    console.error(`❌ [PHASE1] Required field validation failed`, {
+      requestId,
+      missingFields: missing,
+      receivedFields: Object.keys(body)
+    });
     throw new Error(`Missing required fields: ${missing.join(', ')}`);
   }
+
+  // Special logging for mode parameter if present
+  if ('mode' in body) {
+    console.log(`🎯 [PHASE1] Mode parameter detected in request`, {
+      requestId,
+      mode: body.mode,
+      modeType: typeof body.mode,
+      isValidMode: ['chat', 'learn'].includes(body.mode)
+    });
+  }
+
+  console.log(`✅ [PHASE1] Request validation complete`, {
+    requestId,
+    validatedFields: Object.keys(body).length,
+    finalMode: body.mode || 'not-specified'
+  });
 
   return body as T;
 }
