@@ -17,6 +17,7 @@ import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useOptimizedDeliberationService } from "@/hooks/useOptimizedDeliberationService";
 import { useServices } from "@/hooks/useServices";
 import { useOptimizedChat } from "@/hooks/useOptimizedChat";
+import { useMessageQueue } from "@/hooks/useMessageQueue";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/utils/logger";
 import { supabase } from "@/integrations/supabase/client";
@@ -95,26 +96,30 @@ const OptimizedDeliberationChat = () => {
   chatModeRef.current = uiState.chatMode;
   deliberationRef.current = dataState.deliberation;
 
+  // Initialize message queue system
+  const messageQueue = useMessageQueue(3); // max 3 concurrent messages
+
   const {
     messages,
     isLoading: chatLoading,
     isTyping,
     sendMessage: originalSendMessage,
     reloadMessages
-  } = useOptimizedChat(deliberationId);
+  } = useOptimizedChat(deliberationId, messageQueue);
 
   // Filter messages based on view mode and user context
   const filteredMessages = useFilteredMessages(messages, uiState.viewMode, user?.id, isAdmin);
 
 
-  // PERFORMANCE OPTIMIZATION: Stable sendMessage with minimal dependencies
+  // PERFORMANCE OPTIMIZATION: Stable sendMessage with queue integration
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
-    await originalSendMessage(content, mode);
+    // Add to queue instead of direct sending
+    messageQueue.addToQueue(content, undefined, mode);
     setUserMetrics(prev => ({
       ...prev,
       engagement: prev.engagement + 1
     }));
-  }, [originalSendMessage]); // Only depend on the original function
+  }, [messageQueue]); // Depend on queue for proper integration
 
   // setMessageText function for voice interface
   const setMessageText = useCallback((text: string) => {
@@ -229,13 +234,13 @@ const OptimizedDeliberationChat = () => {
     loadDeliberation();
   }, [reloadMessages, loadDeliberation]);
 
-  // PERFORMANCE OPTIMIZATION: Throttled queue status - simplified without message queue
+  // Active queue status integration
   const queueStatusProps = useMemo(() => ({
-    queuedMessages: [],
-    processingCount: 0,
-    onRetryMessage: () => {},
-    onRemoveMessage: () => {}
-  }), []);
+    queuedMessages: messageQueue.queue,
+    processingCount: messageQueue.processing.size,
+    onRetryMessage: messageQueue.retryMessage,
+    onRemoveMessage: messageQueue.removeFromQueue
+  }), [messageQueue.queue, messageQueue.processing.size, messageQueue.retryMessage, messageQueue.removeFromQueue]);
 
   // PERFORMANCE OPTIMIZATION: Optimized effects with stable dependencies
   useEffect(() => {
@@ -318,7 +323,7 @@ const OptimizedDeliberationChat = () => {
                    </Badge>
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Queue status temporarily disabled for optimization */}
+                 <MessageQueueStatus {...queueStatusProps} />
                   <Button
                     variant="default"
                     size="sm"
@@ -407,7 +412,7 @@ const OptimizedDeliberationChat = () => {
                        </Badge>
                     </div>
                      <div className="flex items-center gap-2">
-                       {/* Queue status temporarily disabled for optimization */}
+                       <MessageQueueStatus {...queueStatusProps} />
                        <Button
                         variant="default"
                         size="sm"

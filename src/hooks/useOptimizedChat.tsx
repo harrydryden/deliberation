@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useServices } from '@/hooks/useServices';
+import { useMessageQueue, QueuedMessage } from '@/hooks/useMessageQueue';
 import type { ChatMessage } from "@/types/index";
 import { convertApiMessagesToChatMessages, convertApiMessageToChatMessage } from "@/utils/chat";
 import { getErrorMessage } from "@/utils/errors";
@@ -16,7 +17,7 @@ interface OptimizedChatState {
   error: string | null;
 }
 
-export const useOptimizedChat = (deliberationId?: string) => {
+export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnType<typeof useMessageQueue>) => {
   const { user, isLoading: authLoading } = useSupabaseAuth();
   const { messageService, realtimeService } = useServices();
   const { toast } = useToast();
@@ -30,6 +31,7 @@ export const useOptimizedChat = (deliberationId?: string) => {
   
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const lastLoadedDeliberationRef = useRef<string | null>(null);
+  const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { triggerAgentOrchestration } = useAgentOrchestrationTrigger();
   
   // Helper to update typing state
@@ -133,8 +135,8 @@ export const useOptimizedChat = (deliberationId?: string) => {
     }
   }, [user, deliberationId, realtimeService]);
   
-  // Send message function  
-  const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
+  // Legacy direct send message (fallback when no queue provided)
+  const sendMessageDirect = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     if (!user || !deliberationId || !content.trim()) return;
     
     setChatState(prev => ({ ...prev, isTyping: true, error: null }));
@@ -161,9 +163,9 @@ export const useOptimizedChat = (deliberationId?: string) => {
       // Clear cache
       cacheService.clearNamespace('chat-messages');
       
-      logger.info('Message sent successfully', { messageId: saved.id });
+      logger.info('Message sent successfully (direct)', { messageId: saved.id });
       
-      // CRITICAL FIX: Trigger agent orchestration after message is saved
+      // Trigger agent orchestration after message is saved
       await triggerAgentOrchestration(saved.id, deliberationId, mode, setTypingState);
       
     } catch (error) {
@@ -180,9 +182,105 @@ export const useOptimizedChat = (deliberationId?: string) => {
         variant: "destructive"
       });
       
-      logger.error('Failed to send message', error as Error);
+      logger.error('Failed to send message (direct)', error as Error);
     }
-  }, [user, deliberationId, messageService, toast]);
+  }, [user, deliberationId, messageService, toast, triggerAgentOrchestration, setTypingState]);
+
+  // Main send message function - uses queue if available, direct otherwise
+  const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
+    if (!content.trim()) return;
+    
+    if (messageQueue) {
+      // Use queue system
+      messageQueue.addToQueue(content.trim(), undefined, mode);
+    } else {
+      // Fallback to direct sending
+      await sendMessageDirect(content, mode);
+    }
+  }, [messageQueue, sendMessageDirect]);
+
+  // Process queued messages
+  const processQueuedMessage = useCallback(async (queuedMessage: QueuedMessage) => {
+    if (!user || !deliberationId || !messageQueue) return;
+    
+    try {
+      messageQueue.updateMessageStatus(queuedMessage.id, 'processing');
+      setTypingState(true);
+      
+      // Send the message using the existing service
+      const saved = await messageService.sendMessage(
+        queuedMessage.content,
+        'user',
+        deliberationId,
+        queuedMessage.mode,
+        user.id
+      );
+      
+      const userMessage = convertApiMessageToChatMessage(saved);
+      
+      // Add user message immediately for responsiveness
+      setChatState(prev => ({
+        ...prev,
+        messages: [...prev.messages, userMessage].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        )
+      }));
+      
+      // Clear cache
+      cacheService.clearNamespace('chat-messages');
+      
+      // Update queue status to completed
+      messageQueue.updateMessageStatus(queuedMessage.id, 'completed');
+      
+      logger.info('Message sent successfully from queue', { 
+        messageId: saved.id,
+        queueId: queuedMessage.id 
+      });
+      
+      // Trigger agent orchestration after message is saved
+      await triggerAgentOrchestration(saved.id, deliberationId, queuedMessage.mode, setTypingState);
+      
+    } catch (error) {
+      const errorMsg = getErrorMessage(error);
+      messageQueue.updateMessageStatus(queuedMessage.id, 'failed', errorMsg);
+      
+      setChatState(prev => ({ 
+        ...prev, 
+        isTyping: false, 
+        error: errorMsg 
+      }));
+      
+      toast({
+        title: "Error",
+        description: errorMsg,
+        variant: "destructive"
+      });
+      
+      logger.error('Failed to send queued message', error as Error);
+    }
+  }, [user, deliberationId, messageQueue, messageService, toast, triggerAgentOrchestration, setTypingState]);
+
+  // Queue processor - processes one message at a time
+  useEffect(() => {
+    if (!messageQueue || !user || !deliberationId) return;
+    
+    const processNextMessage = async () => {
+      const nextMessage = messageQueue.getNextQueuedMessage();
+      if (nextMessage && messageQueue.processing.size < messageQueue.queue.length) {
+        await processQueuedMessage(nextMessage);
+      }
+    };
+    
+    // Process queue every 100ms when there are queued messages
+    const queueInterval = setInterval(() => {
+      const stats = messageQueue.getQueueStats;
+      if (stats.queued > 0 && stats.canProcess) {
+        processNextMessage();
+      }
+    }, 100);
+    
+    return () => clearInterval(queueInterval);
+  }, [messageQueue, user, deliberationId, processQueuedMessage]);
   
   // Effect for loading messages and setting up real-time
   useEffect(() => {
