@@ -304,8 +304,15 @@ const OptimizedDeliberationChat = () => {
     loadDeliberation();
   }, [reloadMessages, loadDeliberation]);
 
-  // Enhanced queue status integration with debugging and recovery
+  // Enhanced queue status integration with debugging and recovery - stabilized
   const queueStatusProps = useMemo(() => {
+    // Stabilize realtime connection to prevent rapid re-renders
+    const stableRealtimeConnection = realtimeConnection ? {
+      isConnected: realtimeConnection.isConnected,
+      status: realtimeConnection.status,
+      connectionError: realtimeConnection.connectionError
+    } : null;
+
     const props = {
       queuedMessages: messageQueue.queue,
       processingCount: messageQueue.processing.size,
@@ -313,22 +320,24 @@ const OptimizedDeliberationChat = () => {
       onRemoveMessage: messageQueue.removeFromQueue,
       messageQueue: messageQueue, // Pass full queue for debug panel
       recovery: recovery, // Pass recovery system
-      realtimeConnection: realtimeConnection, // Pass real-time connection status
+      realtimeConnection: stableRealtimeConnection, // Use stabilized connection
       onRefreshMessages: reloadMessages, // Pass refresh function
       onForceReconnect: forceReconnect // Pass force reconnect function
     };
     
-    // Enhanced logging for debugging
-    logger.debug('Queue status props updated', {
-      queueLength: props.queuedMessages.length,
-      processingCount: props.processingCount,
-      realtimeConnected: realtimeConnection?.isConnected,
-      realtimeStatus: realtimeConnection?.status,
-      stats: messageQueue.getQueueStats
-    });
-    
     return props;
-  }, [messageQueue, recovery, realtimeConnection, reloadMessages, forceReconnect]);
+  }, [
+    messageQueue.queue.length, 
+    messageQueue.processing.size, 
+    messageQueue.retryMessage,
+    messageQueue.removeFromQueue,
+    recovery, 
+    realtimeConnection?.isConnected, // Only key properties, not the whole object
+    realtimeConnection?.status,
+    realtimeConnection?.connectionError,
+    reloadMessages, 
+    forceReconnect
+  ]);
 
   // Enhanced queue processor monitoring
   useEffect(() => {
@@ -395,7 +404,16 @@ const OptimizedDeliberationChat = () => {
         deliberationId={deliberationId}
       />
     </div>
-  ), [filteredMessages, chatLoading, isTyping, handleAddToIbis, deliberationId, dataState.agentConfigs, sendMessage]);
+  ), [
+    filteredMessages, 
+    chatLoading, 
+    isTyping, 
+    handleAddToIbis, 
+    deliberationId, 
+    dataState.agentConfigs, 
+    sendMessage,
+    uiState.chatMode
+  ]);
 
   // Render loading state
   if (isLoading || dataState.loading) {

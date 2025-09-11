@@ -60,6 +60,21 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(
     return 'secondary';
   }, [failedCount, processingCount]);
 
+  // Stabilize real-time connection display to prevent rapid re-renders
+  const stableRealtimeStatus = useMemo(() => {
+    if (!realtimeConnection) return null;
+    
+    return {
+      isConnected: realtimeConnection.isConnected,
+      status: realtimeConnection.status,
+      connectionError: realtimeConnection.connectionError
+    };
+  }, [
+    realtimeConnection?.isConnected,
+    realtimeConnection?.status,
+    realtimeConnection?.connectionError
+  ]);
+
   const getStatusIcon = (status: QueuedMessage['status']) => {
     switch (status) {
       case 'queued':
@@ -76,15 +91,15 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(
   return (
     <div className="flex items-center gap-1">
       {/* Real-time connection status */}
-      {realtimeConnection && (
+      {stableRealtimeStatus && (
         <Button 
           variant="ghost" 
           size="sm" 
           className="h-8 px-2 gap-1"
           onClick={onForceReconnect}
-          title={`Real-time: ${realtimeConnection.status}`}
+          title={`Real-time: ${stableRealtimeStatus.status}`}
         >
-          {realtimeConnection.isConnected ? (
+          {stableRealtimeStatus.isConnected ? (
             <Wifi className="h-3 w-3 text-green-500" />
           ) : (
             <WifiOff className="h-3 w-3 text-red-500" />
@@ -166,24 +181,24 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(
             </div>
 
             {/* Real-time connection status */}
-            {realtimeConnection && (
+            {stableRealtimeStatus && (
               <div className={`p-2 rounded border ${
-                realtimeConnection.isConnected 
+                stableRealtimeStatus.isConnected 
                   ? 'bg-green-50 border-green-200' 
                   : 'bg-red-50 border-red-200'
               }`}>
                 <div className="flex items-center gap-2">
-                  {realtimeConnection.isConnected ? (
+                  {stableRealtimeStatus.isConnected ? (
                     <Wifi className="h-4 w-4 text-green-600" />
                   ) : (
                     <WifiOff className="h-4 w-4 text-red-600" />
                   )}
                   <span className="text-xs">
-                    Real-time: {realtimeConnection.status}
+                    Real-time: {stableRealtimeStatus.status}
                   </span>
-                  {realtimeConnection.connectionError && (
+                  {stableRealtimeStatus.connectionError && (
                     <span className="text-xs text-red-600">
-                      ({realtimeConnection.connectionError})
+                      ({stableRealtimeStatus.connectionError})
                     </span>
                   )}
                 </div>

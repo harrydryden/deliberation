@@ -58,14 +58,17 @@ export const useRealtimeConnection = (deliberationId?: string): RealtimeConnecti
     }
   }, [state.lastActivity, state.isConnected, deliberationId]);
 
-  // Connect with exponential backoff
+  // Connect with exponential backoff and connection stability
   const connect = useCallback(() => {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
 
-    setState(prev => ({ ...prev, status: 'reconnecting' }));
+    // Don't set to reconnecting immediately - wait a bit to prevent rapid state changes
+    const statusTimeout = setTimeout(() => {
+      setState(prev => ({ ...prev, status: 'reconnecting' }));
+    }, 100);
 
     try {
       const channel = supabase
@@ -106,6 +109,7 @@ export const useRealtimeConnection = (deliberationId?: string): RealtimeConnecti
           }
         })
         .subscribe((status) => {
+          clearTimeout(statusTimeout);
           productionLogger.info('Real-time subscription status', { status, deliberationId });
           
           if (status === 'SUBSCRIBED') {
@@ -115,7 +119,7 @@ export const useRealtimeConnection = (deliberationId?: string): RealtimeConnecti
               status: 'connected',
               reconnectAttempts: 0,
               connectionError: null,
-              lastActivity: Date.now() // Update activity on successful subscription
+              lastActivity: Date.now()
             }));
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             setState(prev => ({
@@ -125,13 +129,13 @@ export const useRealtimeConnection = (deliberationId?: string): RealtimeConnecti
               connectionError: `Subscription ${status.toLowerCase()}`
             }));
             
-            // Retry with exponential backoff
-            scheduleReconnect();
+            // Don't retry immediately - wait for the scheduled reconnect
           }
         });
 
       channelRef.current = channel;
     } catch (error) {
+      clearTimeout(statusTimeout);
       productionLogger.error('Real-time connection failed', error);
       setState(prev => ({
         ...prev,
@@ -143,7 +147,7 @@ export const useRealtimeConnection = (deliberationId?: string): RealtimeConnecti
     }
   }, [deliberationId]);
 
-  // Schedule reconnect with exponential backoff
+  // Schedule reconnect with exponential backoff - prevent rapid attempts
   const scheduleReconnect = useCallback(() => {
     if (state.reconnectAttempts >= maxReconnectAttempts) {
       productionLogger.error('Max reconnection attempts reached', { deliberationId });
@@ -155,7 +159,8 @@ export const useRealtimeConnection = (deliberationId?: string): RealtimeConnecti
       return;
     }
 
-    const delay = Math.min(1000 * Math.pow(2, state.reconnectAttempts), 30000);
+    // Increased minimum delay to prevent rapid reconnects
+    const delay = Math.min(2000 * Math.pow(2, state.reconnectAttempts), 30000);
     
     productionLogger.info('Scheduling real-time reconnect', { 
       delay, 
@@ -201,26 +206,30 @@ export const useRealtimeConnection = (deliberationId?: string): RealtimeConnecti
     };
   }, [state]);
 
-  // Initialize connection
+  // Initialize connection with delay to prevent immediate reconnection loops
   useEffect(() => {
     if (deliberationId) {
-      connect();
+      // Add small delay to prevent rapid connection attempts
+      const initTimeout = setTimeout(() => {
+        connect();
+      }, 100);
+      
+      // Start health check interval with longer intervals
+      healthCheckIntervalRef.current = setInterval(performHealthCheck, 60000); // Check every minute
+
+      return () => {
+        clearTimeout(initTimeout);
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current);
+        }
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+        }
+        if (healthCheckIntervalRef.current) {
+          clearInterval(healthCheckIntervalRef.current);
+        }
+      };
     }
-
-    // Start health check interval
-    healthCheckIntervalRef.current = setInterval(performHealthCheck, 30000); // Check every 30s
-
-    return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (healthCheckIntervalRef.current) {
-        clearInterval(healthCheckIntervalRef.current);
-      }
-    };
   }, [deliberationId, connect, performHealthCheck]);
 
   return {
