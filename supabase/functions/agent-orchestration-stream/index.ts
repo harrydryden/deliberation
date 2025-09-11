@@ -49,55 +49,153 @@ function createAuthenticatedClients(request: Request) {
   return { serviceClient, userClient };
 }
 
-// Main orchestration function - now returns JSON instead of streaming
+// Enhanced system prompt builder
+function buildSystemPrompt(agent: any): string {
+  console.log(`🔧 Building system prompt for agent: ${agent.name}`);
+  
+  let systemPrompt = '';
+  
+  // Start with base prompt from overrides or construct default
+  if (agent.prompt_overrides?.system_prompt) {
+    systemPrompt = agent.prompt_overrides.system_prompt;
+    console.log(`📝 Using override system prompt (${systemPrompt.length} chars)`);
+  } else {
+    // Construct comprehensive default prompt
+    systemPrompt = `You are ${agent.name}, a ${agent.agent_type} agent.`;
+    
+    if (agent.description) {
+      systemPrompt += `\n\nDescription: ${agent.description}`;
+    }
+    
+    if (agent.goals && Array.isArray(agent.goals) && agent.goals.length > 0) {
+      systemPrompt += `\n\nYour goals are:\n${agent.goals.map((goal: string, i: number) => `${i + 1}. ${goal}`).join('\n')}`;
+    }
+    
+    if (agent.response_style) {
+      systemPrompt += `\n\nResponse style: ${agent.response_style}`;
+    }
+    
+    console.log(`🏗️ Built default system prompt (${systemPrompt.length} chars)`);
+  }
+  
+  // Add facilitator configuration if present
+  if (agent.facilitator_config && Object.keys(agent.facilitator_config).length > 0) {
+    console.log(`🎯 Adding facilitator config`);
+    if (agent.facilitator_config.guidelines) {
+      systemPrompt += `\n\nFacilitator Guidelines: ${agent.facilitator_config.guidelines}`;
+    }
+    if (agent.facilitator_config.intervention_triggers) {
+      systemPrompt += `\n\nIntervention Triggers: ${JSON.stringify(agent.facilitator_config.intervention_triggers)}`;
+    }
+  }
+  
+  return systemPrompt;
+}
+
+// Enhanced error handling with specific error types
+class OrchestrationError extends Error {
+  constructor(message: string, public type: string, public details?: any) {
+    super(message);
+    this.name = 'OrchestrationError';
+  }
+}
+
+// Main orchestration function with enhanced error handling and monitoring
 async function processOrchestration(
   messageId: string,
   deliberationId: string,
   mode: string,
   serviceClient: any,
   userClient: any
-): Promise<{ success: boolean; data?: any; error?: string }> {
-  console.log(`🤖 Processing orchestration for message ${messageId} in mode ${mode}`);
+): Promise<{ success: boolean; data?: any; error?: string; errorType?: string }> {
+  const startTime = Date.now();
+  console.log(`🚀 [ORCHESTRATION] Starting for message ${messageId} in mode ${mode}`);
 
   try {
-    // Get the message using user client for proper RLS
+    // Phase 1: Message Retrieval with enhanced validation
+    console.log(`📥 [PHASE1] Retrieving message ${messageId}`);
     const { data: message, error: messageError } = await userClient
       .from('messages')
       .select('*')
       .eq('id', messageId)
       .single();
 
-    if (messageError || !message) {
-      throw new Error(`Message not found: ${messageError?.message || 'Unknown error'}`);
+    if (messageError) {
+      throw new OrchestrationError(
+        `Message retrieval failed: ${messageError.message}`,
+        'MESSAGE_RETRIEVAL_ERROR',
+        { messageId, error: messageError }
+      );
     }
 
-    console.log(`📝 Retrieved message: "${message.content.substring(0, 100)}..."`);
+    if (!message) {
+      throw new OrchestrationError(
+        'Message not found',
+        'MESSAGE_NOT_FOUND',
+        { messageId }
+      );
+    }
 
-    // Get active agents for this deliberation using service client
+    console.log(`✅ [PHASE1] Retrieved message: "${message.content.substring(0, 100)}..." (user: ${message.user_id})`);
+
+    // Phase 2: Agent Selection with enhanced logic
+    console.log(`🤖 [PHASE2] Retrieving active agents for deliberation ${deliberationId}`);
     const { data: agents, error: agentsError } = await serviceClient
       .from('agent_configurations')
       .select('*')
       .eq('deliberation_id', deliberationId)
-      .eq('is_active', true);
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
 
     if (agentsError) {
-      throw new Error(`Failed to get agents: ${agentsError.message}`);
+      throw new OrchestrationError(
+        `Agent retrieval failed: ${agentsError.message}`,
+        'AGENT_RETRIEVAL_ERROR',
+        { deliberationId, error: agentsError }
+      );
     }
 
-    console.log(`🤖 Found ${Array.isArray(agents) ? agents.length : 0} active agents`);
-
-    // Simple agent selection - pick the first active agent
-    const selectedAgent = Array.isArray(agents) && agents.length > 0 ? agents[0] : null;
-    if (!selectedAgent) {
-      throw new Error('No active agents found for this deliberation');
+    if (!Array.isArray(agents) || agents.length === 0) {
+      throw new OrchestrationError(
+        'No active agents found for this deliberation',
+        'NO_ACTIVE_AGENTS',
+        { deliberationId }
+      );
     }
 
-    console.log(`🎯 Selected agent: ${selectedAgent.name} (${selectedAgent.agent_type})`);
+    console.log(`✅ [PHASE2] Found ${agents.length} active agents`);
 
-    // Generate response using OpenAI - NON-STREAMING for JSON response
+    // Enhanced agent selection - prefer default agent or most recent
+    const selectedAgent = agents.find(agent => agent.is_default) || agents[0];
+    console.log(`🎯 [PHASE2] Selected agent: ${selectedAgent.name} (${selectedAgent.agent_type}) - Default: ${selectedAgent.is_default}`);
+
+    // Phase 3: System Prompt Construction
+    console.log(`📝 [PHASE3] Building system prompt`);
+    const systemPrompt = buildSystemPrompt(selectedAgent);
+    console.log(`✅ [PHASE3] System prompt built (${systemPrompt.length} characters)`);
+
+    // Phase 4: OpenAI API Call with enhanced error handling
+    console.log(`🧠 [PHASE4] Calling OpenAI API`);
     const openAIApiKey = getOpenAIKey();
-    const systemPrompt = selectedAgent.prompt_overrides?.system_prompt || 
-      `You are ${selectedAgent.name}, a ${selectedAgent.agent_type}. ${selectedAgent.description || ''}`;
+    
+    if (!openAIApiKey) {
+      throw new OrchestrationError(
+        'OpenAI API key not configured',
+        'OPENAI_KEY_MISSING'
+      );
+    }
+
+    const openAIRequest = {
+      model: 'gpt-5-2025-08-07',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message.content }
+      ],
+      max_completion_tokens: selectedAgent.max_response_characters || 1000,
+      stream: false
+    };
+
+    console.log(`📤 [PHASE4] OpenAI request configured - model: ${openAIRequest.model}, max_tokens: ${openAIRequest.max_completion_tokens}`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -105,20 +203,23 @@ async function processOrchestration(
         'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message.content }
-        ],
-        max_completion_tokens: 1000,
-        stream: false // Changed to non-streaming
-      }),
+      body: JSON.stringify(openAIRequest),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      let errorDetails;
+      try {
+        errorDetails = JSON.parse(errorText);
+      } catch {
+        errorDetails = { message: errorText };
+      }
+      
+      throw new OrchestrationError(
+        `OpenAI API error: ${response.status} - ${errorDetails.error?.message || errorText}`,
+        'OPENAI_API_ERROR',
+        { status: response.status, error: errorDetails }
+      );
     }
 
     const data = await response.json();
@@ -127,49 +228,83 @@ async function processOrchestration(
       : '';
 
     if (!fullResponse) {
-      throw new Error('No response generated from OpenAI');
+      throw new OrchestrationError(
+        'No response generated from OpenAI',
+        'OPENAI_EMPTY_RESPONSE',
+        { response: data }
+      );
     }
 
-    // Save the agent response using user client for proper attribution
+    console.log(`✅ [PHASE4] OpenAI response generated (${fullResponse.length} characters)`);
+
+    // Phase 5: Save Agent Response with proper attribution
+    console.log(`💾 [PHASE5] Saving agent response to database`);
+    const messageData = {
+      deliberation_id: deliberationId,
+      user_id: message.user_id, // Maintain the same user_id for proper RLS
+      content: fullResponse,
+      message_type: selectedAgent.agent_type,
+      agent_context: {
+        agent_id: selectedAgent.id,
+        agent_name: selectedAgent.name,
+        agent_type: selectedAgent.agent_type,
+        processing_mode: mode,
+        processing_method: 'enhanced_orchestration',
+        system_prompt_length: systemPrompt.length,
+        response_length: fullResponse.length,
+        processing_time_ms: Date.now() - startTime
+      },
+      parent_message_id: messageId
+    };
+
     const { data: insertedMessage, error: insertError } = await userClient
       .from('messages')
-      .insert({
-        deliberation_id: deliberationId,
-        user_id: message.user_id,
-        content: fullResponse,
-        message_type: selectedAgent.agent_type,
-        agent_context: {
-          agent_type: selectedAgent.agent_type,
-          processing_mode: mode,
-          processing_method: 'json_orchestration'
-        },
-        parent_message_id: messageId
-      })
+      .insert(messageData)
       .select()
       .single();
 
     if (insertError) {
-      console.error('Failed to save agent response:', insertError);
-      throw new Error(`Database save error: ${insertError.message}`);
+      throw new OrchestrationError(
+        `Database save error: ${insertError.message}`,
+        'DATABASE_SAVE_ERROR',
+        { error: insertError, messageData }
+      );
     }
 
-    console.log(`✅ Orchestration completed successfully`);
+    const totalTime = Date.now() - startTime;
+    console.log(`🎉 [SUCCESS] Orchestration completed in ${totalTime}ms`);
     
     return {
       success: true,
       data: {
         message: insertedMessage,
         agentType: selectedAgent.agent_type,
-        processingMode: mode
+        agentName: selectedAgent.name,
+        processingMode: mode,
+        processingTimeMs: totalTime,
+        systemPromptLength: systemPrompt.length,
+        responseLength: fullResponse.length
       }
     };
 
   } catch (error) {
-    console.error('❌ Orchestration error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
+    const totalTime = Date.now() - startTime;
+    
+    if (error instanceof OrchestrationError) {
+      console.error(`❌ [${error.type}] ${error.message}`, error.details);
+      return {
+        success: false,
+        error: error.message,
+        errorType: error.type
+      };
+    } else {
+      console.error('❌ [UNKNOWN_ERROR] Orchestration failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorType: 'UNKNOWN_ERROR'
+      };
+    }
   }
 }
 

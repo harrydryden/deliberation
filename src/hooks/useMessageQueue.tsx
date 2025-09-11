@@ -86,6 +86,8 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
   }, []); // Remove unstable dependency
 
   const updateMessageStatus = useCallback((messageId: string, status: QueuedMessage['status'], error?: string) => {
+    console.log(`🔄 [QUEUE] Updating message ${messageId} status: ${status}${error ? ` (error: ${error})` : ''}`);
+    
     setQueueState(prev => {
       const message = prev.queue.find(msg => msg.id === messageId);
       if (!message) {
@@ -94,7 +96,7 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
           logger.debug('Timeout fired for already-removed message (expected)', { messageId, status });
           return prev;
         }
-        logger.warn('Message not found for status update', { messageId, status });
+        console.warn(`⚠️ [QUEUE] Message ${messageId} not found in queue for status update`);
         return prev;
       }
 
@@ -113,20 +115,24 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
       };
 
       if (!isValidTransition(message.status, status)) {
-        logger.warn('Invalid state transition blocked', { 
-          messageId, 
-          from: message.status, 
-          to: status,
-          timestamp: new Date().toISOString()
-        });
+        console.warn(`🚫 [QUEUE] Invalid state transition blocked: ${message.status} -> ${status} for message ${messageId}`);
         return prev;
       }
 
-      const updatedQueue = prev.queue.map(msg => 
-        msg.id === messageId 
-          ? { ...msg, status, error, retries: error ? msg.retries + 1 : msg.retries }
-          : msg
-      );
+      // Enhanced status handling with exponential backoff for retries
+      const updatedQueue = prev.queue.map(msg => {
+        if (msg.id !== messageId) return msg;
+        
+        return {
+          ...msg,
+          status,
+          error: status === 'failed' ? error : undefined,
+          retries: status === 'failed' ? msg.retries + 1 : msg.retries,
+          timestamp: status === 'failed' && msg.retries < 2 
+            ? new Date(Date.now() + Math.pow(2, msg.retries + 1) * 1000) // Exponential backoff
+            : msg.timestamp
+        };
+      }).filter(Boolean) as QueuedMessage[];
 
       const newProcessing = new Set(prev.processing);
       
@@ -138,34 +144,30 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
         if (timeout) {
           clearTimeout(timeout);
           processingTimeouts.current.delete(messageId);
-          logger.debug('Cleared processing timeout', { messageId, status });
+          console.log(`⏰ [QUEUE] Cleared processing timeout for ${messageId}`);
+        }
+        
+        if (status === 'completed') {
+          console.log(`✅ [QUEUE] Message ${messageId} completed successfully`);
         }
       } else if (status === 'processing') {
         // RACE CONDITION FIX: Only add to processing if not already there
         if (!newProcessing.has(messageId)) {
           newProcessing.add(messageId);
-          logger.debug('Added to processing set', { messageId, processingCount: newProcessing.size });
+          console.log(`⚙️ [QUEUE] Message ${messageId} started processing (${newProcessing.size} total)`);
           
-          // ENHANCED TIMEOUT: Shorter timeout with better error handling
+          // ENHANCED TIMEOUT: Better timeout with proper error handling
           const timeout = setTimeout(() => {
             setQueueState(currentState => {
               const stillExists = currentState.queue.find(msg => msg.id === messageId);
               const stillProcessing = currentState.processing.has(messageId);
               
               if (!stillExists || !stillProcessing) {
-                logger.debug('Queue timeout: message no longer processing', { 
-                  messageId, 
-                  stillExists: !!stillExists,
-                  stillProcessing 
-                });
+                console.log(`⏰ [QUEUE] Timeout cleanup: message ${messageId} no longer processing`);
                 return currentState;
               }
               
-              logger.warn('Queue processing timeout - message stuck', { 
-                messageId, 
-                timeoutSeconds: 90,
-                timestamp: new Date().toISOString()
-              });
+              console.warn(`⏰ [QUEUE] Message ${messageId} timed out during processing (60s)`);
               
               // Direct state update with enhanced cleanup
               const timeoutQueue = currentState.queue.map(msg => 
@@ -173,7 +175,7 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
                   ? { 
                       ...msg, 
                       status: 'failed' as const, 
-                      error: 'Processing timeout after 90 seconds - message may be stuck',
+                      error: 'Processing timeout after 60 seconds - message may be stuck',
                       retries: msg.retries + 1 
                     }
                   : msg
@@ -188,13 +190,15 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
                 processing: timeoutProcessing
               };
             });
-          }, 90000); // Increased to 90s to prevent premature timeouts
+          }, 60000); // 60 second timeout
           
           processingTimeouts.current.set(messageId, timeout);
         } else {
-          logger.debug('Message already in processing state', { messageId });
+          console.log(`⚠️ [QUEUE] Message ${messageId} already in processing state`);
         }
       }
+
+      console.log(`📊 [QUEUE] Queue state: ${updatedQueue.length} total, ${newProcessing.size} processing`);
 
       return {
         ...prev,
@@ -206,18 +210,11 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
     // ENHANCED COMPLETION CLEANUP: Remove completed messages faster
     if (status === 'completed') {
       const completionTimeout = setTimeout(() => {
-        logger.debug('Auto-removing completed message', { messageId });
+        console.log(`🧹 [QUEUE] Auto-removing completed message ${messageId}`);
         removeFromQueue(messageId);
-      }, 3000); // Reduced back to 3s for faster cleanup
+      }, 5000); // 5 second cleanup delay
       completionTimeouts.current.set(messageId, completionTimeout);
     }
-
-    logger.info('🔄 Queue message status updated', { 
-      messageId, 
-      status, 
-      error: error?.substring(0, 100), // Truncate long errors
-      timestamp: new Date().toISOString()
-    });
   }, [removeFromQueue]);
 
   const getNextQueuedMessage = useCallback((): QueuedMessage | null => {
