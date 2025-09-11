@@ -100,8 +100,8 @@ const OptimizedDeliberationChat = () => {
   chatModeRef.current = uiState.chatMode;
   deliberationRef.current = dataState.deliberation;
 
-  // Initialize message queue system
-  const messageQueue = useMessageQueue(3); // max 3 concurrent messages
+  // Initialize message queue system with stable instance
+  const messageQueue = useMemo(() => useMessageQueue(3), []); // max 3 concurrent messages
 
   const {
     messages,
@@ -118,30 +118,21 @@ const OptimizedDeliberationChat = () => {
   const filteredMessages = useFilteredMessages(messages, uiState.viewMode, user?.id, isAdmin);
 
 
-  // PERFORMANCE OPTIMIZATION: Stable sendMessage with enhanced queue integration
+  // PERFORMANCE OPTIMIZATION: Stable sendMessage with enhanced queue integration and error boundaries
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
-    console.log('🚀 [DEBUG] sendMessageWithQueue called', { 
-      content: content.substring(0, 50) + '...', 
-      mode, 
-      hasQueue: !!messageQueue,
-      queueStats: messageQueue?.getQueueStats
-    });
-    
-    if (!content.trim()) {
-      console.warn('⚠️ [DEBUG] Empty message content, aborting');
-      return;
-    }
-    
-    // Enhanced logging to track mode parameter flow
-    logger.info('sendMessage called with mode parameter', { 
-      mode,
-      isLearnMode: mode === 'learn',
-      contentLength: content.length,
-      chatModeFromUI: uiState.chatMode
-    });
-    
-    // Add to queue with proper error handling
     try {
+      console.log('🚀 [DEBUG] sendMessageWithQueue called', { 
+        content: content.substring(0, 50) + '...', 
+        mode, 
+        hasQueue: !!messageQueue,
+        queueStats: messageQueue?.getQueueStats
+      });
+      
+      if (!content.trim()) {
+        console.warn('⚠️ [DEBUG] Empty message content, aborting');
+        return;
+      }
+      
       if (!messageQueue) {
         console.error('❌ [DEBUG] No message queue available!');
         toast({
@@ -151,6 +142,14 @@ const OptimizedDeliberationChat = () => {
         });
         return;
       }
+      
+      // Enhanced logging to track mode parameter flow
+      logger.info('sendMessage called with mode parameter', { 
+        mode,
+        isLearnMode: mode === 'learn',
+        contentLength: content.length,
+        chatModeFromUI: uiState.chatMode
+      });
       
       const messageId = messageQueue.addToQueue(content, undefined, mode);
       console.log('✅ [DEBUG] Message added to queue successfully', { 
@@ -179,7 +178,7 @@ const OptimizedDeliberationChat = () => {
         variant: "destructive"
       });
     }
-  }, [messageQueue, toast, uiState.chatMode, logger]); // Enhanced dependencies for proper error handling
+  }, [messageQueue, toast, uiState.chatMode, logger]);
 
   // setMessageText function for voice interface
   const setMessageText = useCallback((text: string) => {

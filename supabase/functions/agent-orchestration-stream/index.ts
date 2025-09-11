@@ -147,6 +147,14 @@ async function processOrchestration(
       };
     }
 
+    // Build conversation context for both modes (needed for system prompt generation)
+    const { data: recentMessages } = await userClient
+      .from('messages')
+      .select('message_type, created_at')
+      .eq('deliberation_id', deliberationId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
     // Mode-aware agent selection
     if (mode === 'learn') {
       console.log(`🎯 [PHASE2] Learn mode detected - selecting Bill (policy_agent)`);
@@ -164,14 +172,6 @@ async function processOrchestration(
       }
     } else {
       console.log(`🎯 [PHASE2] Chat mode - using orchestration algorithm`);
-
-      // Build conversation context
-      const { data: recentMessages } = await userClient
-        .from('messages')
-        .select('message_type, created_at')
-        .eq('deliberation_id', deliberationId)
-        .order('created_at', { ascending: false })
-        .limit(10);
 
       const conversationContext = {
         messageCount: recentMessages?.length || 0,
@@ -199,6 +199,7 @@ async function processOrchestration(
     }
 
     console.log(`🎯 [PHASE2] Final selection: ${selectedAgent.name} (${selectedAgentType}) - Mode: ${mode}`);
+    console.log(`✅ [PHASE2] Orchestrated selection: ${selectedAgent.name} (${selectedAgentType})`);
 
     // Phase 3: System Prompt Construction using orchestrator
     console.log(`📝 [PHASE3] Building system prompt with orchestrator`);

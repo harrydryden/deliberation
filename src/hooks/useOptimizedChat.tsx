@@ -336,15 +336,20 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
         processingCount: stats.processing
       });
 
-      await processQueuedMessage(nextMessage);
+      try {
+        await processQueuedMessage(nextMessage);
+      } catch (error) {
+        logger.error('Failed to process message from queue', error as Error);
+        messageQueue.updateMessageStatus(nextMessage.id, 'failed', 'Processing failed');
+      }
     };
     
-    // Trigger immediate processing when queue has items
+    // Trigger immediate processing when queue has items - stabilized
     const stats = messageQueue.getQueueStats;
     if (stats.queued > 0 && stats.canProcess) {
       processNextMessage();
     }
-  }, [messageQueue, user, deliberationId, processQueuedMessage, messageQueue?.getQueueStats]);
+  }, [messageQueue?.queue?.length, messageQueue?.processing?.size, user, deliberationId, processQueuedMessage]);
   
   // Effect for loading messages and setting up real-time
   useEffect(() => {
