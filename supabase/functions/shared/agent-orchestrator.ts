@@ -92,9 +92,25 @@ export class AgentOrchestrator {
     
     // Pattern 4: "hear from others" / "what do others think"
     const pattern4 = /\b(?:hear\s+(?:from\s+)?(?:what\s+)?(?:others?|people)|what\s+(?:do\s+)?(?:others?|people)\s+think)\b/gi;
+
+    // Pattern 5: explicit handling for "what issues other people have raised (so far)"
+    const pattern5 = /\b(?:what\s+(?:issues?|points?|concerns?|topics?)\s+(?:have\s+)?(?:other\s+)?(?:others?|people|participants?|members?)\s+(?:have\s+)?(?:raised|mentioned|said)(?:\s+so\s+far)?)\b/gi;
+
+    // Pattern 6: general "other people have raised/said/mentioned"
+    const pattern6 = /\bother\s+(?:people|participants?|members?)\s+(?:have\s+)?(?:raised|mentioned|said)\b/gi;
     
-    const patterns = [pattern1, pattern2, pattern3, pattern4];
-    return patterns.some(pattern => pattern.test(contentLower));
+    const patterns = [pattern1, pattern2, pattern3, pattern4, pattern5, pattern6];
+
+    // Log which pattern matched (use non-stateful test by resetting lastIndex)
+    for (let i = 0; i < patterns.length; i++) {
+      const p = patterns[i];
+      p.lastIndex = 0;
+      if (p.test(contentLower)) {
+        console.log(`🎯 [DETECT] Participant request matched pattern${i + 1}`);
+        return true;
+      }
+    }
+    return false;
   }
 
   // Standardized model selection - always use flagship model
@@ -435,7 +451,15 @@ export class AgentOrchestrator {
       .filter(([_, score]) => score >= 0)
       .sort(([,a], [,b]) => b - a);
 
-    const finalSelection = sortedAgents.length > 0 ? sortedAgents[0][0] : 'flow_agent';
+    let finalSelection = sortedAgents.length > 0 ? sortedAgents[0][0] : 'flow_agent';
+
+    // Participant request hard override
+    let overrideUsed = false;
+    if (isParticipantRequest && availableAgents.peer_agent && finalSelection !== 'peer_agent') {
+      console.log('🚨 [OVERRIDE] Participant request detected, forcing selection of peer_agent');
+      finalSelection = 'peer_agent';
+      overrideUsed = true;
+    }
 
     console.log(`🔬 Enhanced agent scoring results:`, {
       scores: { bill_agent: billScore, peer_agent: peerScore, flow_agent: flowScore },
@@ -453,6 +477,7 @@ export class AgentOrchestrator {
         ibisNodeCount
       },
       selected: finalSelection,
+      overrideUsed,
       ibisNodeCount,
       availableConfigs: Object.fromEntries(
         Object.entries(availableAgents).map(([key, agent]) => [key, !!agent])
@@ -897,7 +922,7 @@ export class AgentOrchestrator {
       'participant_input': 'participant', 
       'policy_expertise': 'policy',
       'question_clarification': 'question',
-      'argument_perspective': 'perspective',
+      'argument_perspective': 'argument',
       // Base categories (pass through unchanged)
       'policy': 'policy',
       'legal': 'legal', 
