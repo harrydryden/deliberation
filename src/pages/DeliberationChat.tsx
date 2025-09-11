@@ -25,6 +25,7 @@ import { productionLogger } from "@/utils/productionLogger";
 import { supabase } from "@/integrations/supabase/client";
 
 import { useParticipationSync } from '@/hooks/useParticipationSync';
+import { useSessionTracking } from '@/hooks/useSessionTracking';
 
 const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({
   default: m.IbisMapVisualization
@@ -60,6 +61,9 @@ const OptimizedDeliberationChat = () => {
   const deliberationService = useOptimizedDeliberationService();
   const { messageService, agentService } = useServices();
   const isMobile = useIsMobile();
+  
+  // Session tracking hook
+  const { sessionMetrics } = useSessionTracking();
   
   // Ref for MessageInput to access setMessage function
   const messageInputRef = useRef<MessageInputRef>(null);
@@ -235,7 +239,7 @@ const OptimizedDeliberationChat = () => {
           setUserMetrics({
             engagement: deliberationMessages.length,
             shares: ibisSubmissions.length,
-            sessions: 1,
+            sessions: sessionMetrics?.totalSessions || 0,
             stanceScore: stanceData?.stance_score || 0
           });
         } catch (error) {
@@ -250,7 +254,7 @@ const OptimizedDeliberationChat = () => {
       });
       setDataState(prev => ({ ...prev, loading: false }));
     }
-  }, [deliberationId, user, deliberationService, agentService, messageService, toast, isAdmin]); // Stable dependencies
+  }, [deliberationId, user, deliberationService, agentService, messageService, toast, isAdmin, sessionMetrics]); // Stable dependencies
 
   // ENHANCED: Comprehensive join handler with state validation and error handling
   const handleJoinDeliberation = useCallback(async () => {
@@ -417,6 +421,16 @@ const OptimizedDeliberationChat = () => {
       setUiState(prev => ({ ...prev, viewMode: 'chat' }));
     }
   }, [isMobile, uiState.viewMode]); // Minimal dependencies
+
+  // Update user metrics when session metrics change
+  useEffect(() => {
+    if (sessionMetrics) {
+      setUserMetrics(prev => ({
+        ...prev,
+        sessions: sessionMetrics.totalSessions || 0
+      }));
+    }
+  }, [sessionMetrics?.totalSessions]);
 
   // PERFORMANCE OPTIMIZATION: Memoized status color to prevent recalculation
   const getStatusColor = useCallback((status: string) => {
