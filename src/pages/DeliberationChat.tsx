@@ -22,6 +22,8 @@ import { useMessageQueue } from "@/hooks/useMessageQueue";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/utils/logger";
 import { supabase } from "@/integrations/supabase/client";
+import { ParticipationDebugPanel } from '@/components/admin/ParticipationDebugPanel';
+import { useParticipationSync } from '@/hooks/useParticipationSync';
 
 const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({
   default: m.IbisMapVisualization
@@ -77,6 +79,7 @@ const OptimizedDeliberationChat = () => {
     deliberation: null as Deliberation | null,
     isParticipant: false,
     agentConfigs: [] as Array<{agent_type: string; name: string; description?: string;}>,
+    joiningDeliberation: false,
   });
 
   const [userMetrics, setUserMetrics] = useState({
@@ -116,6 +119,16 @@ const OptimizedDeliberationChat = () => {
 
   // Filter messages based on view mode and user context
   const filteredMessages = useFilteredMessages(messages, uiState.viewMode, user?.id, isAdmin);
+
+  // Participation sync hook to ensure state consistency
+  const { forceSyncParticipation } = useParticipationSync({
+    deliberationId: deliberationId || '',
+    userId: user?.id || '',
+    isParticipant: dataState.isParticipant,
+    onParticipationUpdate: (isParticipant: boolean) => {
+      setDataState(prev => ({ ...prev, isParticipant }));
+    }
+  });
 
 
   // PERFORMANCE OPTIMIZATION: Stable sendMessage with enhanced queue integration and error boundaries
@@ -204,10 +217,21 @@ const OptimizedDeliberationChat = () => {
         hasDescription: !!deliberationData.description,
         hasNotion: !!deliberationData.notion,
         description: deliberationData.description?.slice(0, 100) + '...',
-        notion: deliberationData.notion
+        notion: deliberationData.notion,
+        participantCount: deliberationData.participants?.length || 0,
+        userId: user.id
       });
 
-      const isUserParticipant = deliberationData.participants?.some((p: any) => p.user_id === user.id) || false;
+      // Enhanced participant detection with comprehensive logging
+      const participants = deliberationData.participants || [];
+      const isUserParticipant = participants.some((p: any) => p.user_id === user.id);
+      
+      logger.info('Participant detection:', {
+        userId: user.id,
+        participantIds: participants.map((p: any) => p.user_id),
+        isParticipant: isUserParticipant,
+        participantCount: participants.length
+      });
       
       const mappedConfigs = agentsData.map(agent => ({
         agent_type: agent.agent_type,
@@ -258,26 +282,87 @@ const OptimizedDeliberationChat = () => {
     }
   }, [deliberationId, user, deliberationService, agentService, messageService, toast, isAdmin]); // Stable dependencies
 
-  // PERFORMANCE OPTIMIZATION: Stable join handler
+  // ENHANCED: Comprehensive join handler with state validation and error handling
   const handleJoinDeliberation = useCallback(async () => {
-    if (!deliberationId || !user) return;
+    if (!deliberationId || !user) {
+      logger.warn('Join deliberation: Missing required data', { deliberationId, userId: user?.id });
+      return;
+    }
+    
+    // Check if already a participant
+    if (dataState.isParticipant) {
+      logger.info('User already participant, skipping join', { userId: user.id, deliberationId });
+      toast({
+        title: "Already Joined",
+        description: "You are already a participant in this deliberation"
+      });
+      return;
+    }
+
+    // Prevent multiple concurrent join attempts
+    if (dataState.joiningDeliberation) {
+      logger.warn('Join already in progress, ignoring duplicate request');
+      return;
+    }
     
     try {
+      logger.info('Attempting to join deliberation', { userId: user.id, deliberationId });
+      setDataState(prev => ({ ...prev, joiningDeliberation: true }));
+      
       await deliberationService.joinDeliberation(deliberationId);
-      setDataState(prev => ({ ...prev, isParticipant: true }));
+      
+      logger.info('Successfully joined deliberation', { userId: user.id, deliberationId });
+      
+      // Update state optimistically
+      setDataState(prev => ({ 
+        ...prev, 
+        isParticipant: true,
+        joiningDeliberation: false 
+      }));
+      
       toast({
         title: "Success",
-        description: "You have joined the deliberation"
+        description: "You have joined the deliberation successfully"
       });
-      loadDeliberation();
-    } catch (error) {
+      
+      // Reload to ensure data consistency
+      await loadDeliberation();
+      
+    } catch (error: any) {
+      logger.error('Failed to join deliberation', { 
+        error: error?.message || error, 
+        userId: user.id, 
+        deliberationId,
+        errorDetails: error 
+      });
+      
+      setDataState(prev => ({ ...prev, joiningDeliberation: false }));
+      
+      // Enhanced error messaging based on error type
+      let errorMessage = "Failed to join deliberation";
+      let errorTitle = "Join Failed";
+      
+      if (error?.message?.includes('already')) {
+        errorTitle = "Already Joined";
+        errorMessage = "You are already a participant in this deliberation";
+        // Update state if server confirms participation
+        setDataState(prev => ({ ...prev, isParticipant: true }));
+        await loadDeliberation();
+      } else if (error?.message?.includes('full')) {
+        errorMessage = "This deliberation is full and cannot accept more participants";
+      } else if (error?.message?.includes('closed') || error?.message?.includes('concluded')) {
+        errorMessage = "This deliberation is no longer accepting new participants";
+      } else if (error?.message?.includes('permission')) {
+        errorMessage = "You do not have permission to join this deliberation";
+      }
+      
       toast({
-        title: "Error", 
-        description: "Failed to join deliberation",
-        variant: "destructive"
+        title: errorTitle,
+        description: errorMessage,
+        variant: errorTitle === "Already Joined" ? "default" : "destructive"
       });
     }
-  }, [deliberationId, user, deliberationService, toast, loadDeliberation]);
+  }, [deliberationId, user, deliberationService, toast, loadDeliberation, dataState.isParticipant, dataState.joiningDeliberation]);
 
   // PERFORMANCE OPTIMIZATION: Stable IBIS handlers with minimal state updates
   const handleAddToIbis = useCallback((messageId: string, messageContent: string) => {
@@ -418,6 +503,74 @@ const OptimizedDeliberationChat = () => {
 
   // Early return for missing data
   if (!user || !dataState.deliberation) return null;
+
+  // Show join screen if user is not a participant
+  if (!dataState.isParticipant && !isAdmin) {
+    return (
+      <div className="h-[calc(100vh-120px)] flex items-center justify-center bg-background">
+        <div className="max-w-2xl mx-auto p-6 text-center space-y-6">
+          <div className="space-y-4">
+            <h1 className="text-3xl font-bold text-foreground">
+              {dataState.deliberation.title}
+            </h1>
+            <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white text-sm`}>
+              {dataState.deliberation.status}
+            </Badge>
+          </div>
+          
+          {dataState.deliberation.description && (
+            <div className="bg-card border rounded-lg p-4 text-left">
+              <h3 className="font-semibold text-primary mb-2">Description</h3>
+              <p className="text-card-foreground text-sm">
+                {dataState.deliberation.description}
+              </p>
+            </div>
+          )}
+          
+          {dataState.deliberation.notion && (
+            <div className="bg-card border rounded-lg p-4 text-left">
+              <h3 className="font-semibold text-primary mb-2">Notion Statement</h3>
+              <p className="text-card-foreground text-sm">
+                {dataState.deliberation.notion}
+              </p>
+            </div>
+          )}
+          
+          <div className="bg-muted/30 border rounded-lg p-4">
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-2">
+              <Users className="h-4 w-4" />
+              <span>{dataState.deliberation.participant_count || 0} participants</span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Created {new Date(dataState.deliberation.created_at).toLocaleDateString()}
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <Button 
+              onClick={handleJoinDeliberation}
+              disabled={dataState.joiningDeliberation}
+              className="bg-democratic-blue hover:bg-democratic-blue/90 text-white px-8 py-3 text-lg"
+              size="lg"
+            >
+              {dataState.joiningDeliberation ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Joining...
+                </>
+              ) : (
+                "Join Deliberation"
+              )}
+            </Button>
+            
+            <p className="text-xs text-muted-foreground">
+              You need to join this deliberation to participate in the discussion
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // CRITICAL FIX: Move admin check to JSX render instead of early return
   // This prevents hooks inconsistency errors
@@ -665,6 +818,20 @@ const OptimizedDeliberationChat = () => {
           )}
         </div>
       )}
+      
+      {/* Development Debug Panel */}
+      <ParticipationDebugPanel
+        userId={user.id}
+        deliberationId={deliberationId || ''}
+        isParticipant={dataState.isParticipant}
+        joiningDeliberation={dataState.joiningDeliberation}
+        participants={dataState.deliberation?.participants || []}
+        deliberationData={dataState.deliberation}
+        onRefresh={() => {
+          loadDeliberation();
+          forceSyncParticipation();
+        }}
+      />
     </>
   );
 };
