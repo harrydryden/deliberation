@@ -232,9 +232,9 @@ async function processOrchestration(
       stream: false
     };
 
-    // CRITICAL: Convert character limit to proper token count using ModelConfigManager
+    // CRITICAL: Convert character limit to proper token count with larger budget
     const characterLimit = selectedAgent.max_response_characters || 2000;
-    const tokenLimit = Math.floor(characterLimit / 3); // Conservative 3:1 char-to-token ratio
+    const tokenLimit = Math.floor(characterLimit / 2); // Less conservative 2:1 ratio for more response space
     
     // Add proper token limits based on model type
     if (selectedModel.startsWith('gpt-5') || selectedModel.startsWith('gpt-4.1') || selectedModel.startsWith('o3') || selectedModel.startsWith('o4')) {
