@@ -13,6 +13,9 @@ import {
   parseAndValidateRequest
 } from '../shared/edge-function-utils.ts';
 
+// Import the sophisticated AgentOrchestrator
+import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
+
 // Enhanced authentication-aware client creation
 function createAuthenticatedClients(request: Request) {
   const { supabase: serviceClient } = validateAndGetEnvironment();
@@ -165,13 +168,84 @@ async function processOrchestration(
 
     console.log(`✅ [PHASE2] Found ${agents.length} active agents`);
 
-    // Enhanced agent selection - prefer default agent or most recent
-    const selectedAgent = agents.find(agent => agent.is_default) || agents[0];
-    console.log(`🎯 [PHASE2] Selected agent: ${selectedAgent.name} (${selectedAgent.agent_type}) - Default: ${selectedAgent.is_default}`);
+    // Initialize AgentOrchestrator for sophisticated selection
+    const orchestrator = new AgentOrchestrator(serviceClient);
+    let selectedAgent;
+    let selectedAgentType: string;
 
-    // Phase 3: System Prompt Construction
-    console.log(`📝 [PHASE3] Building system prompt`);
-    const systemPrompt = buildSystemPrompt(selectedAgent);
+    // Mode-aware agent selection
+    if (mode === 'learn') {
+      console.log(`🎯 [PHASE2] Learn mode detected - selecting Bill (policy_agent)`);
+      selectedAgentType = 'bill_agent';
+      
+      // Get Bill's configuration
+      const billConfig = await orchestrator.getAgentConfig('bill_agent', deliberationId);
+      if (billConfig) {
+        selectedAgent = billConfig;
+        console.log(`✅ [PHASE2] Bill agent configured and selected`);
+      } else {
+        console.warn(`⚠️ [PHASE2] Bill agent not configured, falling back to available agents`);
+        selectedAgent = agents.find(agent => agent.is_default) || agents[0];
+        selectedAgentType = selectedAgent.agent_type;
+      }
+    } else {
+      console.log(`🎯 [PHASE2] Chat mode - using orchestration algorithm`);
+      
+      // Analyze the message for sophisticated agent selection
+      const openAIApiKey = getOpenAIKey();
+      let messageAnalysis;
+      
+      try {
+        messageAnalysis = await orchestrator.analyzeMessage(message.content, openAIApiKey);
+        console.log(`🔍 [PHASE2] Message analysis complete:`, messageAnalysis);
+      } catch (error) {
+        console.warn(`⚠️ [PHASE2] Message analysis failed, using defaults:`, error);
+        messageAnalysis = {
+          intent: 'general',
+          complexity: 0.5,
+          topicRelevance: 0.5,
+          requiresExpertise: false
+        };
+      }
+
+      // Build conversation context
+      const { data: recentMessages } = await userClient
+        .from('messages')
+        .select('message_type, created_at')
+        .eq('deliberation_id', deliberationId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const conversationContext = {
+        messageCount: recentMessages?.length || 0,
+        recentMessages: recentMessages || [],
+        lastAgentType: recentMessages?.[0]?.message_type
+      };
+
+      // Use sophisticated agent selection
+      selectedAgentType = await orchestrator.selectOptimalAgent(
+        messageAnalysis,
+        conversationContext,
+        deliberationId
+      );
+
+      // Get the selected agent's configuration
+      const agentConfig = await orchestrator.getAgentConfig(selectedAgentType, deliberationId);
+      if (agentConfig) {
+        selectedAgent = agentConfig;
+        console.log(`✅ [PHASE2] Orchestrated selection: ${selectedAgent.name} (${selectedAgent.agent_type})`);
+      } else {
+        console.warn(`⚠️ [PHASE2] Selected agent ${selectedAgentType} not configured, falling back`);
+        selectedAgent = agents.find(agent => agent.is_default) || agents[0];
+        selectedAgentType = selectedAgent.agent_type;
+      }
+    }
+
+    console.log(`🎯 [PHASE2] Final selection: ${selectedAgent.name} (${selectedAgentType}) - Mode: ${mode}`);
+
+    // Phase 3: System Prompt Construction using orchestrator
+    console.log(`📝 [PHASE3] Building system prompt with orchestrator`);
+    const systemPrompt = await orchestrator.generateSystemPrompt(selectedAgent, selectedAgentType);
     console.log(`✅ [PHASE3] System prompt built (${systemPrompt.length} characters)`);
 
     // Phase 4: OpenAI API Call with enhanced error handling
@@ -185,8 +259,17 @@ async function processOrchestration(
       );
     }
 
+    // Use orchestrator for optimal model selection
+    const messageAnalysis = {
+      intent: 'general',
+      complexity: 0.5,
+      topicRelevance: 0.5,
+      requiresExpertise: false
+    };
+    const optimalModel = orchestrator.selectOptimalModel(messageAnalysis, selectedAgent);
+
     const openAIRequest = {
-      model: 'gpt-5-2025-08-07',
+      model: optimalModel,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: message.content }
@@ -243,7 +326,7 @@ async function processOrchestration(
       deliberation_id: deliberationId,
       user_id: message.user_id, // Maintain the same user_id for proper RLS
       content: fullResponse,
-      message_type: selectedAgent.agent_type,
+      message_type: selectedAgentType,
       agent_context: {
         agent_id: selectedAgent.id,
         agent_name: selectedAgent.name,
@@ -278,7 +361,7 @@ async function processOrchestration(
       success: true,
       data: {
         message: insertedMessage,
-        agentType: selectedAgent.agent_type,
+        agentType: selectedAgentType,
         agentName: selectedAgent.name,
         processingMode: mode,
         processingTimeMs: totalTime,
