@@ -591,7 +591,7 @@ const OptimizedDeliberationChat = () => {
                            title="Click to view full description">
                            <p className="text-sm text-card-foreground">
                              <span className="font-semibold text-primary group-hover:text-accent-foreground">Description:</span> 
-                            <span className="ml-1 group-hover:text-accent-foreground">{dataState.deliberation.description?.length > 100 ? `${dataState.deliberation.description.slice(0, 100)}...` : dataState.deliberation.description}</span>
+                            <span className="ml-1 group-hover:text-accent-foreground">{dataState.deliberation.description?.length > 90 ? `${dataState.deliberation.description.slice(0, 90)}...` : dataState.deliberation.description}</span>
                            </p>
                          </button>
                        </div>
@@ -605,7 +605,7 @@ const OptimizedDeliberationChat = () => {
                            title="Click to view full notion statement">
                            <p className="text-sm text-card-foreground">
                              <span className="font-semibold text-primary group-hover:text-accent-foreground">Notion:</span> 
-                            <span className="ml-1 group-hover:text-accent-foreground">{dataState.deliberation.notion?.length > 100 ? `${dataState.deliberation.notion.slice(0, 100)}...` : dataState.deliberation.notion}</span>
+                            <span className="ml-1 group-hover:text-accent-foreground">{dataState.deliberation.notion?.length > 90 ? `${dataState.deliberation.notion.slice(0, 90)}...` : dataState.deliberation.notion}</span>
                            </p>
                          </button>
                        </div>
