@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useOptimizedAI } from '@/hooks/useOptimizedAI';
+import { useOptimizedAI } from '@/hooks/useOptimizedAsync';
 import { logger } from '@/utils/logger';
 
 interface AIAnalysisOptions {

@@ -106,7 +106,6 @@ export class AgentOrchestrator {
       const p = patterns[i];
       p.lastIndex = 0;
       if (p.test(contentLower)) {
-        console.log(`🎯 [DETECT] Participant request matched pattern${i + 1}`);
         return true;
       }
     }
@@ -456,7 +455,6 @@ export class AgentOrchestrator {
     // Participant request hard override
     let overrideUsed = false;
     if (isParticipantRequest && availableAgents.peer_agent && finalSelection !== 'peer_agent') {
-      console.log('🚨 [OVERRIDE] Participant request detected, forcing selection of peer_agent');
       finalSelection = 'peer_agent';
       overrideUsed = true;
     }

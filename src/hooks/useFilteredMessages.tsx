@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { ChatMessage } from "@/types/index";
 import type { ViewMode } from "@/components/chat/ViewModeSelector";
+import { logger } from '@/utils/logger';
 
 export const useFilteredMessages = (
   messages: ChatMessage[], 
@@ -22,13 +23,13 @@ export const useFilteredMessages = (
     if (!currentUserId) return safeMessages;
     
     // Debug logging for message filtering
-    console.log('Filtering messages for user:', currentUserId, 'viewMode:', viewMode);
-    console.log('Total messages:', safeMessages.length);
+    logger.debug('Filtering messages for user:', { currentUserId, viewMode });
+    logger.debug('Total messages:', { count: safeMessages.length });
     
     const filtered = safeMessages.filter(msg => {
       // Include user's own messages (not submitted to IBIS - those are for IBIS context)
       if (msg.message_type === 'user' && msg.user_id === currentUserId && !msg.submitted_to_ibis) {
-        console.log('Including user message:', msg.id);
+        logger.debug('Including user message:', { messageId: msg.id });
         return true;
       }
       
@@ -36,7 +37,7 @@ export const useFilteredMessages = (
       if (msg.message_type !== 'user' && msg.parent_message_id) {
         const parentMessage = safeMessages.find(m => m.id === msg.parent_message_id);
         const shouldInclude = parentMessage?.user_id === currentUserId;
-        console.log('Agent message:', msg.id, 'parent:', msg.parent_message_id, 'parentFound:', !!parentMessage, 'shouldInclude:', shouldInclude);
+        logger.debug('Agent message:', { messageId: msg.id, parentId: msg.parent_message_id, parentFound: !!parentMessage, shouldInclude });
         return shouldInclude;
       }
       
@@ -47,7 +48,7 @@ export const useFilteredMessages = (
         if (messageIndex > 0) {
           const previousMessage = safeMessages[messageIndex - 1];
           const shouldInclude = previousMessage?.message_type === 'user' && previousMessage?.user_id === currentUserId;
-          console.log('Agent message without parent:', msg.id, 'previousMessage:', previousMessage?.id, 'shouldInclude:', shouldInclude);
+          logger.debug('Agent message without parent:', { messageId: msg.id, previousMessageId: previousMessage?.id, shouldInclude });
           return shouldInclude;
         }
       }
@@ -55,7 +56,7 @@ export const useFilteredMessages = (
       return false;
     });
     
-    console.log('Filtered messages count:', filtered.length);
+    logger.debug('Filtered messages count:', { count: filtered.length });
     return filtered;
   }, [messages, viewMode, currentUserId, isAdmin]);
 };

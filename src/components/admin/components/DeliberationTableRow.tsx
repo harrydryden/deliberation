@@ -13,7 +13,7 @@ import { NotionEditor } from '../NotionEditor';
 import { serviceContainer } from '@/services/domain/container';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
-import { useOptimizedApiCalls } from '@/hooks/useOptimizedApiCalls';
+import { useOptimizedApiCalls } from '@/hooks/useOptimizedAsync';
 
 interface DeliberationTableRowProps {
   deliberation: Deliberation;

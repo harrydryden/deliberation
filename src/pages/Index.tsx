@@ -7,7 +7,7 @@ import { MessageSquare, Users, Vote, Brain, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 import { supabase } from "@/integrations/supabase/client";
-import { logError } from '@/utils/consoleLogger';
+import { logger } from '@/utils/logger';
 const Index = () => {
   const {
     user
@@ -35,7 +35,7 @@ const Index = () => {
       // If no messages found, load available deliberations for the landing page
       loadDeliberations();
     } catch (error) {
-      logError('Failed to check for last deliberation', error);
+      logger.error('Failed to check for last deliberation', error);
       loadDeliberations();
     }
   };
@@ -69,7 +69,7 @@ const Index = () => {
       const data = await deliberationService.getDeliberations();
       setDeliberations(data);
     } catch (error) {
-      logError('Failed to load deliberations', error);
+      logger.error('Failed to load deliberations', error);
       setDeliberations([]);
     }
   };
