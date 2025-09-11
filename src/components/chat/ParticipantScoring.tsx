@@ -108,19 +108,22 @@ export const ParticipantScoring = ({
     <div className="flex flex-col gap-2 w-full">
       {scores.map(score => (
         <div key={score.label} className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             <score.icon className={`h-3 w-3 flex-shrink-0 ${score.customIconColor || 'text-muted-foreground'}`} />
-            <Popover>
-              <PopoverTrigger asChild>
-                <span className="text-xs font-medium text-foreground cursor-help hover:text-primary">{score.label}</span>
-              </PopoverTrigger>
-              <PopoverContent side="top" className="w-auto p-2 text-xs">
-                <div>
-                  <p className="font-medium">{score.description}</p>
-                  <p className="text-muted-foreground">{score.tooltip}</p>
-                </div>
-              </PopoverContent>
-            </Popover>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 min-w-0 flex-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <span className="text-xs font-medium text-foreground cursor-help hover:text-primary whitespace-nowrap">{score.label}</span>
+                </PopoverTrigger>
+                <PopoverContent side="top" className="w-auto p-2 text-xs">
+                  <div>
+                    <p className="font-medium">{score.description}</p>
+                    <p className="text-muted-foreground">{score.tooltip}</p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <span className="hidden sm:inline text-xs text-muted-foreground truncate">{score.description}</span>
+            </div>
           </div>
           <div className="flex items-center gap-1">
             {score.renderMethod === 'stance' ? renderStanceLine() : renderStars(score.stars)}
