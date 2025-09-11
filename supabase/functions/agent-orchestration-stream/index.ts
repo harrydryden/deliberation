@@ -52,48 +52,6 @@ function createAuthenticatedClients(request: Request) {
   return { serviceClient, userClient };
 }
 
-// Enhanced system prompt builder
-function buildSystemPrompt(agent: any): string {
-  console.log(`🔧 Building system prompt for agent: ${agent.name}`);
-  
-  let systemPrompt = '';
-  
-  // Start with base prompt from overrides or construct default
-  if (agent.prompt_overrides?.system_prompt) {
-    systemPrompt = agent.prompt_overrides.system_prompt;
-    console.log(`📝 Using override system prompt (${systemPrompt.length} chars)`);
-  } else {
-    // Construct comprehensive default prompt
-    systemPrompt = `You are ${agent.name}, a ${agent.agent_type} agent.`;
-    
-    if (agent.description) {
-      systemPrompt += `\n\nDescription: ${agent.description}`;
-    }
-    
-    if (agent.goals && Array.isArray(agent.goals) && agent.goals.length > 0) {
-      systemPrompt += `\n\nYour goals are:\n${agent.goals.map((goal: string, i: number) => `${i + 1}. ${goal}`).join('\n')}`;
-    }
-    
-    if (agent.response_style) {
-      systemPrompt += `\n\nResponse style: ${agent.response_style}`;
-    }
-    
-    console.log(`🏗️ Built default system prompt (${systemPrompt.length} chars)`);
-  }
-  
-  // Add facilitator configuration if present
-  if (agent.facilitator_config && Object.keys(agent.facilitator_config).length > 0) {
-    console.log(`🎯 Adding facilitator config`);
-    if (agent.facilitator_config.guidelines) {
-      systemPrompt += `\n\nFacilitator Guidelines: ${agent.facilitator_config.guidelines}`;
-    }
-    if (agent.facilitator_config.intervention_triggers) {
-      systemPrompt += `\n\nIntervention Triggers: ${JSON.stringify(agent.facilitator_config.intervention_triggers)}`;
-    }
-  }
-  
-  return systemPrompt;
-}
 
 // Enhanced error handling with specific error types
 class OrchestrationError extends Error {
@@ -172,6 +130,22 @@ async function processOrchestration(
     const orchestrator = new AgentOrchestrator(serviceClient);
     let selectedAgent;
     let selectedAgentType: string;
+    let messageAnalysis;
+
+    // Analyze the message for sophisticated operations (needed for both modes)
+    const openAIApiKey = getOpenAIKey();
+    try {
+      messageAnalysis = await orchestrator.analyzeMessage(message.content, openAIApiKey);
+      console.log(`🔍 [ANALYSIS] Message analysis complete:`, messageAnalysis);
+    } catch (error) {
+      console.warn(`⚠️ [ANALYSIS] Message analysis failed, using defaults:`, error);
+      messageAnalysis = {
+        intent: 'general',
+        complexity: 0.5,
+        topicRelevance: 0.5,
+        requiresExpertise: false
+      };
+    }
 
     // Mode-aware agent selection
     if (mode === 'learn') {
@@ -190,23 +164,6 @@ async function processOrchestration(
       }
     } else {
       console.log(`🎯 [PHASE2] Chat mode - using orchestration algorithm`);
-      
-      // Analyze the message for sophisticated agent selection
-      const openAIApiKey = getOpenAIKey();
-      let messageAnalysis;
-      
-      try {
-        messageAnalysis = await orchestrator.analyzeMessage(message.content, openAIApiKey);
-        console.log(`🔍 [PHASE2] Message analysis complete:`, messageAnalysis);
-      } catch (error) {
-        console.warn(`⚠️ [PHASE2] Message analysis failed, using defaults:`, error);
-        messageAnalysis = {
-          intent: 'general',
-          complexity: 0.5,
-          topicRelevance: 0.5,
-          requiresExpertise: false
-        };
-      }
 
       // Build conversation context
       const { data: recentMessages } = await userClient
@@ -245,7 +202,15 @@ async function processOrchestration(
 
     // Phase 3: System Prompt Construction using orchestrator
     console.log(`📝 [PHASE3] Building system prompt with orchestrator`);
-    const systemPrompt = await orchestrator.generateSystemPrompt(selectedAgent, selectedAgentType);
+    const systemPrompt = await orchestrator.generateSystemPrompt(
+      selectedAgent, 
+      selectedAgentType,
+      {
+        deliberationId,
+        messageAnalysis,
+        conversationLength: recentMessages?.length || 0
+      }
+    );
     console.log(`✅ [PHASE3] System prompt built (${systemPrompt.length} characters)`);
 
     // Phase 4: OpenAI API Call with enhanced error handling
@@ -259,26 +224,27 @@ async function processOrchestration(
       );
     }
 
-    // Use orchestrator for optimal model selection
-    const messageAnalysis = {
-      intent: 'general',
-      complexity: 0.5,
-      topicRelevance: 0.5,
-      requiresExpertise: false
-    };
-    const optimalModel = orchestrator.selectOptimalModel(messageAnalysis, selectedAgent);
+    // Use orchestrator for optimal model selection with real analysis data
+    const selectedModel = orchestrator.selectOptimalModel(messageAnalysis, selectedAgent);
 
     const openAIRequest = {
-      model: optimalModel,
+      model: selectedModel,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: message.content }
       ],
-      max_completion_tokens: selectedAgent.max_response_characters || 1000,
       stream: false
     };
 
-    console.log(`📤 [PHASE4] OpenAI request configured - model: ${openAIRequest.model}, max_tokens: ${openAIRequest.max_completion_tokens}`);
+    // Add proper token limits based on model type
+    if (selectedModel.startsWith('gpt-5') || selectedModel.startsWith('gpt-4.1') || selectedModel.startsWith('o3') || selectedModel.startsWith('o4')) {
+      openAIRequest.max_completion_tokens = selectedAgent.max_response_characters || 2000;
+    } else {
+      openAIRequest.max_tokens = selectedAgent.max_response_characters || 2000;
+      openAIRequest.temperature = 0.7;
+    }
+
+    console.log(`📤 [PHASE4] OpenAI request configured - model: ${openAIRequest.model}, max_tokens: ${openAIRequest.max_tokens || openAIRequest.max_completion_tokens}`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
