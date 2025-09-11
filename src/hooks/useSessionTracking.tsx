@@ -141,18 +141,32 @@ export const useSessionTracking = (): UseSessionTrackingReturn => {
     }
   }, [user, session, currentSession, createSession, endCurrentSession, loadSessionMetrics]);
 
-  // Handle page unload
+  // Handle page lifecycle events (modern replacement for deprecated beforeunload)
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    const handlePageHide = () => {
       if (currentSession) {
-        // Use navigator.sendBeacon for reliable session ending on page unload
+        // Use navigator.sendBeacon for reliable session ending on page hide
         const sessionData = JSON.stringify({ sessionId: currentSession.id });
         navigator.sendBeacon('/api/end-session', sessionData);
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && currentSession) {
+        // Page is being hidden, likely navigating away or closing
+        const sessionData = JSON.stringify({ sessionId: currentSession.id });
+        navigator.sendBeacon('/api/end-session', sessionData);
+      }
+    };
+
+    // Modern page lifecycle events
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
   }, [currentSession]);
 
   // Periodic session metrics refresh
