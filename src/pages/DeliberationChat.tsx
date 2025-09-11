@@ -718,7 +718,7 @@ const OptimizedDeliberationChat = () => {
                       onModeChange={(v) => v && setUiState(prev => ({ ...prev, viewMode: v }))} 
                     />
                   </div>
-                  <div className="rounded-lg border bg-muted/40 p-2 flex-1">
+                  <div className="rounded-lg border bg-muted/40 p-2 w-80">
                      <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
                        <VoiceInterfaceLazy 
                          deliberationId={dataState.deliberation?.id || ''} 
@@ -728,7 +728,7 @@ const OptimizedDeliberationChat = () => {
                        />
                      </Suspense>
                   </div>
-                  <div className="rounded-lg border bg-muted/40 px-3 py-2 flex flex-col justify-center">
+                  <div className="rounded-lg border bg-muted/40 px-3 py-2 flex flex-col justify-center flex-1">
                     <ParticipantScoring {...userMetrics} />
                   </div>
                 </div>
