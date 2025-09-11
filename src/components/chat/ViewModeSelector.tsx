@@ -1,7 +1,7 @@
 import React, { memo } from "react";
 import { MessageSquare, GitBranch, Table } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { performanceMonitor } from "@/utils/performanceMonitor";
+import { productionLogger } from "@/utils/productionLogger";
 export type ViewMode = 'chat' | 'ibis' | 'table';
 interface ViewModeSelectorProps {
   mode: ViewMode;
@@ -11,11 +11,6 @@ export const ViewModeSelector = memo(({
   mode,
   onModeChange
 }: ViewModeSelectorProps) => {
-  // Performance tracking
-  const startTime = performance.now();
-  React.useEffect(() => {
-    performanceMonitor.trackRender('ViewModeSelector', startTime);
-  });
 
   const modes = [
     { key: 'chat', label: 'Message', icon: MessageSquare },

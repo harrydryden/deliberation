@@ -4,7 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Send, HelpCircle, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { performanceMonitor } from "@/utils/performanceMonitor";
+import { productionLogger } from "@/utils/productionLogger";
 
 interface EnhancedMessageInputProps {
   onSendMessage: (message: string, type: 'QUESTION' | 'STATEMENT' | 'OTHER') => void;
@@ -12,11 +12,6 @@ interface EnhancedMessageInputProps {
 }
 
 export const EnhancedMessageInput = memo(({ onSendMessage, disabled }: EnhancedMessageInputProps) => {
-  // Performance tracking
-  const startTime = performance.now();
-  useEffect(() => {
-    performanceMonitor.trackRender('EnhancedMessageInput', startTime);
-  });
 
   const [message, setMessage] = useState("");
   const [inputType, setInputType] = useState<'QUESTION' | 'STATEMENT' | 'OTHER'>('OTHER');

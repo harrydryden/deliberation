@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+import { productionLogger } from '@/utils/productionLogger';
 import { useToast } from '@/hooks/use-toast';
 import { systemMonitor } from '@/services/system-monitoring.service';
 import { streamHealthMonitor } from '@/utils/streamHealthMonitor';
@@ -50,7 +51,7 @@ export const useAgentOrchestrationTrigger = () => {
       const duration = Date.now() - startTime;
       
       if (error) {
-        console.error(`❌ [TRIGGER] Agent orchestration failed in ${currentPhase}:`, error);
+        productionLogger.error(`Agent orchestration failed in ${currentPhase}`, error);
         
         // Enhanced error handling based on error type
         let errorMessage = 'Failed to generate agent response';
@@ -92,7 +93,7 @@ export const useAgentOrchestrationTrigger = () => {
 
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      console.error(`❌ [TRIGGER] Agent orchestration error in ${currentPhase}:`, error);
+      productionLogger.error(`Agent orchestration error in ${currentPhase}`, error);
       
       // Handle specific error types
       let errorMessage = 'Failed to generate agent response';

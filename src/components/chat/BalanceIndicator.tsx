@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { performanceMonitor } from "@/utils/performanceMonitor";
+import { productionLogger } from "@/utils/productionLogger";
 
 interface BalanceIndicatorProps {
   supportive: number;
@@ -18,11 +18,6 @@ export const BalanceIndicator = memo(({
   neutral, 
   className 
 }: BalanceIndicatorProps) => {
-  // Performance tracking
-  const startTime = performance.now();
-  React.useEffect(() => {
-    performanceMonitor.trackRender('BalanceIndicator', startTime);
-  });
 
   // Memoize calculations
   const stats = useMemo(() => {

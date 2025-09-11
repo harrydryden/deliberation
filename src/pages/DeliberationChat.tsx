@@ -21,6 +21,7 @@ import { useOptimizedChat } from "@/hooks/useOptimizedChat";
 import { useMessageQueue } from "@/hooks/useMessageQueue";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/utils/logger";
+import { productionLogger } from "@/utils/productionLogger";
 import { supabase } from "@/integrations/supabase/client";
 
 import { useParticipationSync } from '@/hooks/useParticipationSync';
@@ -132,20 +133,12 @@ const OptimizedDeliberationChat = () => {
   // PERFORMANCE OPTIMIZATION: Stable sendMessage with enhanced queue integration and error boundaries
   const sendMessage = useCallback(async (content: string, mode: 'chat' | 'learn' = 'chat') => {
     try {
-      console.log('🚀 [DEBUG] sendMessageWithQueue called', { 
-        content: content.substring(0, 50) + '...', 
-        mode, 
-        hasQueue: !!messageQueue,
-        queueStats: messageQueue?.getQueueStats
-      });
-      
       if (!content.trim()) {
-        console.warn('⚠️ [DEBUG] Empty message content, aborting');
         return;
       }
       
       if (!messageQueue) {
-        console.error('❌ [DEBUG] No message queue available!');
+        productionLogger.error('No message queue available');
         toast({
           title: "Error",
           description: "Message queue not available. Please refresh the page.",
@@ -154,42 +147,21 @@ const OptimizedDeliberationChat = () => {
         return;
       }
       
-      // Enhanced logging to track mode parameter flow
-      logger.info('sendMessage called with mode parameter', { 
-        mode,
-        isLearnMode: mode === 'learn',
-        contentLength: content.length,
-        chatModeFromUI: uiState.chatMode
-      });
-      
       const messageId = messageQueue.addToQueue(content, undefined, mode);
-      console.log('✅ [DEBUG] Message added to queue successfully', { 
-        messageId: messageId.substring(0, 8),
-        mode,
-        content: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
-        newStats: messageQueue.getQueueStats
-      });
-      
-      logger.info('Message added to queue successfully', { 
-        messageId: messageId.substring(0, 8),
-        mode,
-        content: content.substring(0, 50) + (content.length > 50 ? '...' : '')
-      });
       
       setUserMetrics(prev => ({
         ...prev,
         engagement: prev.engagement + 1
       }));
     } catch (error) {
-      console.error('❌ [DEBUG] Failed to add message to queue', error);
-      logger.error('Failed to add message to queue', error as Error);
+      productionLogger.error('Failed to add message to queue', error);
       toast({
         title: "Error",
         description: "Failed to queue message. Please try again.",
         variant: "destructive"
       });
     }
-  }, [messageQueue, toast, uiState.chatMode, logger]);
+  }, [messageQueue, toast]);
 
   // setMessageText function for voice interface
   const setMessageText = useCallback((text: string) => {
