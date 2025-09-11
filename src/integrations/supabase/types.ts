@@ -219,6 +219,39 @@ export type Database = {
           },
         ]
       }
+      analysis_metrics: {
+        Row: {
+          created_at: string
+          deliberation_id: string | null
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          model_used: string | null
+          operation_type: string
+          success: boolean
+        }
+        Insert: {
+          created_at?: string
+          deliberation_id?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          model_used?: string | null
+          operation_type: string
+          success: boolean
+        }
+        Update: {
+          created_at?: string
+          deliberation_id?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          model_used?: string | null
+          operation_type?: string
+          success?: boolean
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -246,6 +279,30 @@ export type Database = {
           record_id?: string | null
           table_name?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      circuit_breaker_state: {
+        Row: {
+          failure_count: number
+          id: string
+          is_open: boolean
+          last_failure_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          failure_count?: number
+          id: string
+          is_open?: boolean
+          last_failure_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          failure_count?: number
+          id?: string
+          is_open?: boolean
+          last_failure_time?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

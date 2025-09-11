@@ -33,15 +33,15 @@ export interface ConversationContext {
   userEngagement?: any;
 }
 
-// Agent configuration cache with 15-minute TTL (increased from 5 minutes)
+// Agent configuration cache with proper cache management
 interface AgentCacheEntry {
   agent: AgentConfig | null;
   timestamp: number;
 }
 
 const agentConfigCache = new Map<string, AgentCacheEntry>();
-const AGENT_CACHE_DURATION = 1000 * 60 * 15; // 15 minutes (increased from 5)
-const MAX_AGENT_CACHE_SIZE = 200; // Increased cache size
+const AGENT_CACHE_DURATION = 1000 * 60 * 15; // 15 minutes
+const MAX_AGENT_CACHE_SIZE = 200;
 
 export class AgentOrchestrator {
   private supabase: any;
@@ -61,20 +61,14 @@ export class AgentOrchestrator {
     return 'gpt-5-2025-08-07';
   }
 
-  // UNIFIED AGENT CONFIGURATION FETCHING
+  // UNIFIED AGENT CONFIGURATION FETCHING with optimized caching
   async getAgentConfig(agentType: string, deliberationId?: string): Promise<AgentConfig | null> {
-    // USE CURRENT TIMESTAMP TO BUST CACHE - CRITICAL DEBUG
-    const timestamp = Date.now();
-    const cacheKey = `${agentType}:${deliberationId || 'global'}:${timestamp}`;
+    const cacheKey = `${agentType}:${deliberationId || 'global'}`;
     
-    console.log(`🔄 FORCE FETCHING agent config: ${agentType} for deliberation: ${deliberationId} (cache busted with timestamp: ${timestamp})`);
+    console.log(`🔄 Fetching agent config: ${agentType} for deliberation: ${deliberationId}`);
     
-    // Force cache invalidation for this specific agent
-    console.log('🧹 Clearing agent cache for debugging...');
-    agentConfigCache.clear();
-    
-    // Check cache first (should be empty now)
-    const cached = agentConfigCache.get(`${agentType}:${deliberationId || 'global'}`);
+    // Check cache first - proper cache behavior
+    const cached = agentConfigCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < AGENT_CACHE_DURATION) {
       console.log(`🚀 Agent config cache hit: ${agentType}`);
       return cached.agent;
@@ -125,17 +119,15 @@ export class AgentOrchestrator {
         }
       }
       
-      // Cache the result (including null) with original cache key
-      const originalCacheKey = `${agentType}:${deliberationId || 'global'}`;
-      this.cacheAgentConfig(originalCacheKey, agentConfig);
+      // Cache the result (including null)
+      this.cacheAgentConfig(cacheKey, agentConfig);
       
       return agentConfig;
       
     } catch (error) {
       console.error(`Failed to fetch ${agentType} agent configuration:`, error);
       // Cache null result to avoid repeated failures
-      const originalCacheKey = `${agentType}:${deliberationId || 'global'}`;
-      this.cacheAgentConfig(originalCacheKey, null);
+      this.cacheAgentConfig(cacheKey, null);
       return null;
     }
   }
@@ -405,37 +397,36 @@ export class AgentOrchestrator {
     return selectedAgent;
   }
 
-  // Circuit breaker state for message analysis
-  private static analysisFailureCount = 0;
-  private static lastAnalysisFailure = 0;
+  // Circuit breaker configuration - persistent via database
+  private static readonly CIRCUIT_BREAKER_ID = 'message_analysis';
   private static readonly CIRCUIT_BREAKER_THRESHOLD = 3;
   private static readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute
 
-  // ENHANCED MESSAGE ANALYSIS with Model Fallback and Circuit Breaker
-  async analyzeMessage(content: string, openAIApiKey: string): Promise<AnalysisResult> {
+  // ENHANCED MESSAGE ANALYSIS with Persistent Circuit Breaker
+  async analyzeMessage(content: string, openAIApiKey: string, deliberationId?: string): Promise<AnalysisResult> {
     const startTime = Date.now();
     
-    // Circuit breaker check
-    if (this.isCircuitBreakerOpen()) {
+    // Circuit breaker check - persistent via database
+    if (await this.isCircuitBreakerOpen()) {
       console.warn('🚫 Circuit breaker OPEN - skipping analysis, using intelligent defaults');
+      await this.recordAnalysisMetrics('analysis', null, false, Date.now() - startTime, 'Circuit breaker open', deliberationId);
       return this.generateIntelligentDefaults(content);
     }
 
     const safeContent = content || '';
     const contentPreview = safeContent.length > 0 ? safeContent.substring(0, 100) + '...' : '[empty content]';
     
-    console.log(`🔍 [ANALYSIS] Starting message analysis for: "${contentPreview}"`);
+    console.log(`🔍 [ANALYSIS] Starting optimized analysis for: "${contentPreview}"`);
 
-    // Model fallback hierarchy
+    // Streamlined model hierarchy - only 2 models for performance
     const modelHierarchy = [
       'gpt-5-2025-08-07',
-      'gpt-4.1-2025-04-14', 
-      'gpt-4o-mini'  // Legacy fallback
+      'gpt-4o-mini'  // Direct fallback for reliability
     ];
 
     let lastError: any = null;
     
-    // Try each model in the hierarchy
+    // Try each model with 8 second total timeout
     for (const modelName of modelHierarchy) {
       try {
         console.log(`🤖 [ANALYSIS] Attempting with model: ${modelName}`);
@@ -446,157 +437,136 @@ export class AgentOrchestrator {
           modelName,
           startTime
         );
-        
-        // Success - reset circuit breaker
-        AgentOrchestrator.analysisFailureCount = 0;
-        const duration = Date.now() - startTime;
-        console.log(`✅ [ANALYSIS] Success with ${modelName} in ${duration}ms:`, result);
-        
-        return result;
-        
+
+        if (result) {
+          const duration = Date.now() - startTime;
+          console.log(`✅ [ANALYSIS] Success with ${modelName} in ${duration}ms`);
+          await this.recordAnalysisMetrics('analysis', modelName, true, duration, null, deliberationId);
+          return result;
+        }
       } catch (error) {
         lastError = error;
-        console.error(`❌ [ANALYSIS] Model ${modelName} failed:`, error.message);
-        
-        // Continue to next model unless it's the last one
-        if (modelName !== modelHierarchy[modelHierarchy.length - 1]) {
-          console.log(`🔄 [ANALYSIS] Falling back to next model...`);
-          continue;
-        }
+        console.warn(`⚠️ [ANALYSIS] ${modelName} failed:`, error.message);
+        continue; // Try next model
       }
     }
 
-    // All models failed - update circuit breaker and return defaults
-    this.recordAnalysisFailure();
+    // All models failed - record failure and use intelligent fallback
     const duration = Date.now() - startTime;
-    console.error(`❌ [ANALYSIS] All models failed in ${duration}ms, using intelligent defaults:`, lastError?.message);
+    console.error('❌ [ANALYSIS] All models failed, recording failure and using intelligent defaults');
+    await this.recordAnalysisFailure();
+    await this.recordAnalysisMetrics('analysis', 'all_failed', false, duration, lastError?.message, deliberationId);
     
     return this.generateIntelligentDefaults(content);
   }
 
+  // Streamlined analysis attempt with 8-second total timeout
   private async attemptAnalysisWithModel(
     content: string, 
     openAIApiKey: string, 
     modelName: string,
     startTime: number
   ): Promise<AnalysisResult> {
-    const timeoutMs = 12000; // Increased from 8s to 12s
-    const maxRetries = 2;
+    const totalTimeoutMs = 8000; // Total timeout for all attempts
+    const remainingTime = Math.max(1000, totalTimeoutMs - (Date.now() - startTime));
     
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`🎯 [ANALYSIS] Model ${modelName}, attempt ${attempt}/${maxRetries}`);
+    console.log(`🎯 [ANALYSIS] Model ${modelName}, ${remainingTime}ms remaining`);
 
-        const systemMessage = await this.getSystemMessage('message_analysis_system_message');
-        console.log(`📝 [ANALYSIS] System message length: ${systemMessage.length} chars`);
+    const systemMessage = await this.getSystemMessage('message_analysis_system_message');
+    console.log(`📝 [ANALYSIS] System message length: ${systemMessage.length} chars`);
 
-        // Use ModelConfigManager for proper parameter handling
-        const { ModelConfigManager } = await import('./model-config.ts');
-        
-        const messages = [
-          { role: 'system', content: systemMessage },
-          { role: 'user', content: content.trim() }
-        ];
+    // Use ModelConfigManager for proper parameter handling
+    const { ModelConfigManager } = await import('./model-config.ts');
+    
+    const messages = [
+      { role: 'system', content: systemMessage },
+      { role: 'user', content: content.trim() }
+    ];
 
-        // Generate API params with proper model configuration
-        const apiParams = ModelConfigManager.generateAPIParams(modelName, messages, {
-          stream: false
-        });
+    // Generate API params with proper model configuration
+    const apiParams = ModelConfigManager.generateAPIParams(modelName, messages, {
+      stream: false
+    });
 
-        // Remove response_format for newer models to avoid compatibility issues
-        if (!ModelConfigManager.supportsFeature(modelName, 'temperature')) {
-          // For newer models, use text response and parse manually 
-          console.log(`🔧 [ANALYSIS] Using text response for model ${modelName}`);
-        } else {
-          // Legacy models can use JSON format
-          apiParams.response_format = { type: "json_object" };
-          console.log(`🔧 [ANALYSIS] Using JSON response for legacy model ${modelName}`);
-        }
-
-        console.log(`📤 [ANALYSIS] API request params:`, {
-          model: apiParams.model,
-          tokens: apiParams.max_tokens || apiParams.max_completion_tokens,
-          hasResponseFormat: !!apiParams.response_format,
-          hasTemperature: !!apiParams.temperature
-        });
-
-        // Make the API call with timeout
-        const analysisPromise = fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(apiParams),
-        });
-
-        const response = await Promise.race([
-          analysisPromise,
-          new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error(`Analysis timeout after ${timeoutMs}ms`)), timeoutMs)
-          )
-        ]);
-
-        const elapsed = Date.now() - startTime;
-        console.log(`📡 [ANALYSIS] Response received: ${response.status} in ${elapsed}ms`);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`❌ [ANALYSIS] OpenAI error ${response.status}:`, errorText.substring(0, 200));
-          throw new Error(`OpenAI API error: ${response.status} - ${errorText.substring(0, 100)}`);
-        }
-
-        const data = await response.json();
-        const analysisContent = data.choices?.[0]?.message?.content;
-        
-        console.log(`📄 [ANALYSIS] Raw response:`, analysisContent?.substring(0, 200) + '...');
-
-        if (!analysisContent || analysisContent.trim() === '') {
-          throw new Error('Empty analysis content received from OpenAI');
-        }
-
-        // Parse response (handle both JSON and text responses)
-        let parsedResult: any;
-        
-        if (apiParams.response_format?.type === "json_object") {
-          // Parse JSON response
-          try {
-            parsedResult = JSON.parse(analysisContent);
-          } catch (parseError) {
-            console.error(`❌ [ANALYSIS] JSON parse error:`, parseError);
-            throw new Error(`Invalid JSON response from ${modelName}: ${analysisContent.substring(0, 100)}`);
-          }
-        } else {
-          // Parse text response for newer models
-          parsedResult = this.parseTextAnalysisResponse(analysisContent);
-        }
-
-        console.log(`🔧 [ANALYSIS] Parsed result:`, parsedResult);
-
-        // Validate and format the result
-        const result: AnalysisResult = {
-          intent: this.validateIntent(parsedResult.intent) || 'general',
-          complexity: this.validateNumber(parsedResult.complexity, 0, 1) ?? 0.5,
-          topicRelevance: this.validateNumber(parsedResult.topicRelevance, 0, 1) ?? 0.5,
-          requiresExpertise: Boolean(parsedResult.requiresExpertise),
-          confidence: this.validateNumber(parsedResult.confidence, 0, 1) ?? 0.8
-        };
-
-        console.log(`✅ [ANALYSIS] Validated result:`, result);
-        return result;
-
-      } catch (error) {
-        console.error(`❌ [ANALYSIS] Attempt ${attempt} failed:`, error.message);
-        
-        if (attempt < maxRetries) {
-          const delay = attempt * 1000; // 1s, 2s delays
-          console.log(`🔄 [ANALYSIS] Retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        } else {
-          throw error; // Re-throw on final attempt
-        }
-      }
+    // Enhanced response validation for newer models
+    if (!ModelConfigManager.supportsFeature(modelName, 'temperature')) {
+      console.log(`🔧 [ANALYSIS] Using text response for newer model ${modelName}`);
+    } else {
+      apiParams.response_format = { type: "json_object" };
+      console.log(`🔧 [ANALYSIS] Using JSON response for legacy model ${modelName}`);
     }
+
+    console.log(`📤 [ANALYSIS] API request params:`, {
+      model: apiParams.model,
+      tokens: apiParams.max_tokens || apiParams.max_completion_tokens,
+      hasResponseFormat: !!apiParams.response_format,
+      hasTemperature: !!apiParams.temperature
+    });
+
+    // Make the API call with remaining time timeout
+    const analysisPromise = fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(apiParams),
+    });
+
+    const response = await Promise.race([
+      analysisPromise,
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error(`Analysis timeout after ${remainingTime}ms`)), remainingTime)
+      )
+    ]);
+
+    const elapsed = Date.now() - startTime;
+    console.log(`📡 [ANALYSIS] Response received: ${response.status} in ${elapsed}ms`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ [ANALYSIS] OpenAI error ${response.status}:`, errorText.substring(0, 200));
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText.substring(0, 100)}`);
+    }
+
+    const data = await response.json();
+    const analysisContent = data.choices?.[0]?.message?.content;
+    
+    console.log(`📄 [ANALYSIS] Raw response:`, analysisContent?.substring(0, 200) + '...');
+
+    // Enhanced response validation
+    if (!analysisContent || analysisContent.trim().length === 0) {
+      console.warn(`❌ Empty/invalid response from ${modelName}`);
+      throw new Error('Empty analysis content received from OpenAI');
+    }
+
+    // Parse response (handle both JSON and text responses)
+    let parsedResult: any;
+    
+    if (apiParams.response_format?.type === "json_object") {
+      try {
+        parsedResult = JSON.parse(analysisContent);
+      } catch (parseError) {
+        console.error(`❌ [ANALYSIS] JSON parse error:`, parseError);
+        throw new Error(`Invalid JSON response from ${modelName}: ${analysisContent.substring(0, 100)}`);
+      }
+    } else {
+      parsedResult = this.parseTextAnalysisResponse(analysisContent);
+    }
+
+    console.log(`🔧 [ANALYSIS] Parsed result:`, parsedResult);
+
+    // Validate and format the result
+    const result: AnalysisResult = {
+      intent: this.validateIntent(parsedResult.intent) || 'general',
+      complexity: this.validateNumber(parsedResult.complexity, 0, 1) ?? 0.5,
+      topicRelevance: this.validateNumber(parsedResult.topicRelevance, 0, 1) ?? 0.5,
+      requiresExpertise: Boolean(parsedResult.requiresExpertise),
+      confidence: this.validateNumber(parsedResult.confidence, 0, 1) ?? 0.8
+    };
+
+    console.log(`✅ [ANALYSIS] Validated result:`, result);
+    return result;
   }
 
   private parseTextAnalysisResponse(content: string): any {
@@ -639,33 +609,133 @@ export class AgentOrchestrator {
     }
   }
 
-  private isCircuitBreakerOpen(): boolean {
-    const now = Date.now();
-    
-    if (AgentOrchestrator.analysisFailureCount >= AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD) {
-      const timeSinceLastFailure = now - AgentOrchestrator.lastAnalysisFailure;
-      
-      if (timeSinceLastFailure < AgentOrchestrator.CIRCUIT_BREAKER_TIMEOUT) {
-        return true; // Circuit is open
-      } else {
-        // Reset circuit breaker after timeout
-        console.log(`🔄 [CIRCUIT-BREAKER] Resetting after ${timeSinceLastFailure}ms`);
-        AgentOrchestrator.analysisFailureCount = 0;
+  // Persistent Circuit breaker management via database
+  private async isCircuitBreakerOpen(): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase
+        .from('circuit_breaker_state')
+        .select('*')
+        .eq('id', AgentOrchestrator.CIRCUIT_BREAKER_ID)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('Circuit breaker state check failed, assuming closed:', error);
         return false;
       }
+
+      if (!data) {
+        // No circuit breaker record, it's closed
+        return false;
+      }
+
+      const now = Date.now();
+      const lastFailureTime = new Date(data.last_failure_time).getTime();
+      
+      if (data.failure_count >= AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD) {
+        const timeSinceLastFailure = now - lastFailureTime;
+        
+        if (timeSinceLastFailure < AgentOrchestrator.CIRCUIT_BREAKER_TIMEOUT) {
+          return true; // Circuit is still open
+        } else {
+          // Reset circuit breaker after timeout
+          console.log('🔄 Circuit breaker timeout reached, resetting');
+          await this.resetCircuitBreaker();
+          return false;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.warn('Circuit breaker check failed, assuming closed:', error);
+      return false;
     }
-    
-    return false; // Circuit is closed
   }
 
-  private recordAnalysisFailure(): void {
-    AgentOrchestrator.analysisFailureCount++;
-    AgentOrchestrator.lastAnalysisFailure = Date.now();
-    
-    console.log(`⚠️ [CIRCUIT-BREAKER] Failure count: ${AgentOrchestrator.analysisFailureCount}/${AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD}`);
-    
-    if (AgentOrchestrator.analysisFailureCount >= AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD) {
-      console.warn(`🚫 [CIRCUIT-BREAKER] OPENED - Analysis disabled for ${AgentOrchestrator.CIRCUIT_BREAKER_TIMEOUT}ms`);
+  private async recordAnalysisFailure(): Promise<void> {
+    try {
+      const now = new Date();
+      
+      // Get current state
+      const { data: currentState } = await this.supabase
+        .from('circuit_breaker_state')
+        .select('failure_count')
+        .eq('id', AgentOrchestrator.CIRCUIT_BREAKER_ID)
+        .maybeSingle();
+
+      const newFailureCount = (currentState?.failure_count || 0) + 1;
+      
+      // Upsert circuit breaker state with incremented failure count
+      const { error } = await this.supabase
+        .from('circuit_breaker_state')
+        .upsert({
+          id: AgentOrchestrator.CIRCUIT_BREAKER_ID,
+          failure_count: newFailureCount,
+          last_failure_time: now,
+          is_open: newFailureCount >= AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD,
+          updated_at: now
+        }, {
+          onConflict: 'id'
+        });
+
+      if (error) {
+        console.error('Failed to record analysis failure:', error);
+      } else {
+        console.log(`📊 Analysis failure recorded: ${newFailureCount}/${AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD}`);
+        
+        if (newFailureCount >= AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD) {
+          console.warn('🚫 Circuit breaker ACTIVATED - analysis disabled for 1 minute');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to record analysis failure:', error);
+    }
+  }
+
+  private async resetCircuitBreaker(): Promise<void> {
+    try {
+      const { error } = await this.supabase
+        .from('circuit_breaker_state')
+        .update({
+          failure_count: 0,
+          is_open: false,
+          updated_at: new Date()
+        })
+        .eq('id', AgentOrchestrator.CIRCUIT_BREAKER_ID);
+
+      if (error) {
+        console.error('Failed to reset circuit breaker:', error);
+      }
+    } catch (error) {
+      console.error('Failed to reset circuit breaker:', error);
+    }
+  }
+
+  // Analysis metrics tracking
+  private async recordAnalysisMetrics(
+    operationType: string,
+    model: string | null,
+    success: boolean,
+    durationMs: number,
+    errorMessage?: string | null,
+    deliberationId?: string
+  ): Promise<void> {
+    try {
+      const { error } = await this.supabase
+        .from('analysis_metrics')
+        .insert({
+          operation_type: operationType,
+          model_used: model,
+          success: success,
+          duration_ms: durationMs,
+          error_message: errorMessage,
+          deliberation_id: deliberationId
+        });
+
+      if (error) {
+        console.warn('Failed to record analysis metrics:', error);
+      }
+    } catch (error) {
+      console.warn('Failed to record analysis metrics:', error);
     }
   }
 
@@ -685,115 +755,108 @@ export class AgentOrchestrator {
     return null;
   }
 
-  generateIntelligentDefaults(content: string): AnalysisResult {
-    const lowerContent = content.toLowerCase();
+  // Enhanced intelligent defaults with improved keyword analysis
+  public generateIntelligentDefaults(content: string): AnalysisResult {
+    const contentLength = content.length;
+    const contentLower = content.toLowerCase();
     const wordCount = content.split(/\s+/).length;
+    const sentenceCount = (content.match(/[.!?]+/g) || []).length;
+    const questionCount = (content.match(/\?/g) || []).length;
     
-    console.log(`🧠 [DEFAULTS] Generating intelligent defaults for ${content.length} chars, ${wordCount} words`);
+    console.log(`🧠 [DEFAULTS] Generating optimized defaults for ${contentLength} chars, ${wordCount} words`);
     
-    // Enhanced intent detection using keywords
+    // Enhanced keyword analysis with weighted scoring
+    const keywords = {
+      policy: { 
+        pattern: /\b(policy|policies|law|laws|legal|legislation|bill|congress|senate|government|regulation|act|constitutional|federal|state|local)\b/gi,
+        weight: 0.9
+      },
+      question: { 
+        pattern: /\b(what|why|how|when|where|who|can you|could you|would you|\?|help me understand|explain)\b/gi,
+        weight: 0.7
+      },
+      complex: { 
+        pattern: /\b(analyze|analysis|complex|comprehensive|detailed|intricate|sophisticated|nuanced|multifaceted|implications|consequences)\b/gi,
+        weight: 0.8
+      },
+      expertise: { 
+        pattern: /\b(expert|professional|technical|specialized|advanced|academic|research|study|studies|scientific|evidence|data)\b/gi,
+        weight: 0.85
+      },
+      argument: { 
+        pattern: /\b(argue|argument|debate|disagree|oppose|support|claim|assert|contend|position|stance|counter|refute)\b/gi,
+        weight: 0.75
+      },
+      participant: { 
+        pattern: /\b(participant|member|stakeholder|citizen|community|public|people|individual|group|voters|constituents)\b/gi,
+        weight: 0.6
+      },
+      perspective: { 
+        pattern: /\b(perspective|viewpoint|opinion|view|belief|think|feel|consider|believe|personally|my view)\b/gi,
+        weight: 0.65
+      },
+      clarify: { 
+        pattern: /\b(clarify|explain|elaborate|detail|specify|expand|unclear|confused|understand|help me|can you help)\b/gi,
+        weight: 0.7
+      }
+    };
+
+    // Count weighted matches for each category
+    const matches = Object.entries(keywords).reduce((acc, [key, config]) => {
+      const found = (contentLower.match(config.pattern) || []).length;
+      acc[key] = { count: found, score: found * config.weight };
+      return acc;
+    }, {} as Record<string, { count: number; score: number }>);
+
+    // Determine intent based on weighted scores with priority order
     let intent = 'general';
-    let intentConfidence = 0.3;
+    const totalScore = Object.values(matches).reduce((sum, m) => sum + m.score, 0);
     
-    // Policy/Legal keywords (high confidence)
-    if (lowerContent.match(/\b(policy|policies|bill|legislation|regulation|statute|law|legal|governance|government)\b/)) {
-      intent = 'policy';
-      intentConfidence = 0.9;
-    } 
-    // Question keywords (medium confidence)
-    else if (lowerContent.match(/\b(what|how|why|when|where|who|should|could|would)\b/) || content.includes('?')) {
-      intent = 'question';
-      intentConfidence = 0.7;
-    }
-    // Participant/Perspective keywords (medium confidence)
-    else if (lowerContent.match(/\b(participant|people|others|perspective|view|opinion|think|believe|feel)\b/)) {
-      intent = 'participant';
-      intentConfidence = 0.6;
-    }
-    // Clarification keywords (medium confidence)
-    else if (lowerContent.match(/\b(clarify|explain|understand|confus|unclear|mean|definition)\b/)) {
-      intent = 'clarify';
-      intentConfidence = 0.7;
+    if (matches.policy.score > 0.5 || matches.expertise.score > 1) {
+      intent = 'policy_expertise';
+    } else if (matches.question.score > 0.3 || matches.clarify.score > 0.4) {
+      intent = 'question_clarification';  
+    } else if (matches.argument.score > 0.4 || matches.perspective.score > 0.5) {
+      intent = 'argument_perspective';
+    } else if (matches.participant.score > 0.3) {
+      intent = 'participant_input';
     }
 
-    // Enhanced complexity estimation with multiple factors
-    let complexity = 0.2; // Lower base complexity
-    
-    // Length-based complexity
-    if (content.length > 300) complexity += 0.3;
-    else if (content.length > 150) complexity += 0.2;
-    else if (content.length > 75) complexity += 0.1;
-    
-    // Word count complexity
-    if (wordCount > 100) complexity += 0.3;
-    else if (wordCount > 50) complexity += 0.2;
-    else if (wordCount > 25) complexity += 0.1;
-    
-    // Complexity keywords
-    const complexityKeywords = ['complex', 'complicated', 'detailed', 'nuanced', 'multifaceted', 'intricate', 'sophisticated', 'comprehensive'];
-    const foundComplexityKeywords = complexityKeywords.filter(keyword => lowerContent.includes(keyword));
-    complexity += foundComplexityKeywords.length * 0.15;
-    
-    // Technical/domain-specific terms
-    const technicalTerms = ['implementation', 'framework', 'methodology', 'analysis', 'assessment', 'evaluation', 'consideration'];
-    const foundTechnicalTerms = technicalTerms.filter(term => lowerContent.includes(term));
-    complexity += foundTechnicalTerms.length * 0.1;
-    
-    // Sentence complexity (multiple clauses, conjunctions)
-    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
-    const avgSentenceLength = sentences.length > 0 ? content.length / sentences.length : 0;
-    if (avgSentenceLength > 120) complexity += 0.2;
-    else if (avgSentenceLength > 80) complexity += 0.1;
-    
-    complexity = Math.min(complexity, 1.0);
+    // Calculate complexity based on weighted factors (0.0 to 1.0)
+    const complexityFactors = [
+      Math.min(1.0, contentLength / 500), // Length factor
+      Math.min(1.0, matches.complex.score / 2), // Complex keywords weighted
+      Math.min(1.0, matches.expertise.score / 1.5), // Expertise keywords weighted  
+      sentenceCount > 5 ? 0.3 : 0.1, // Sentence structure
+      questionCount > 2 ? 0.2 : 0.0 // Multiple questions
+    ];
+    const complexity = Math.min(1.0, complexityFactors.reduce((sum, factor) => sum + factor, 0) / complexityFactors.length);
 
-    // Enhanced topic relevance with context awareness
-    let topicRelevance = 0.2; // Lower base relevance
-    
-    // High relevance for policy/legal content
-    if (intent === 'policy' || intent === 'legal') {
-      topicRelevance = 0.85;
-    }
-    // Medium-high relevance for deliberation-specific terms
-    else if (lowerContent.match(/\b(deliberation|discussion|debate|forum|consensus|decision|stakeholder|citizen)\b/)) {
-      topicRelevance = 0.7;
-    }
-    // Medium relevance for civic engagement terms
-    else if (lowerContent.match(/\b(public|community|civic|municipal|city|county|state|federal|democracy)\b/)) {
-      topicRelevance = 0.6;
-    }
-    // Lower relevance for questions and clarifications (still valuable but less topic-specific)
-    else if (intent === 'question' || intent === 'clarify') {
-      topicRelevance = 0.4;
-    }
-    // Adjust based on content length and substance
-    if (wordCount > 20 && !lowerContent.match(/\b(hi|hello|thanks|okay|yes|no)\b/)) {
-      topicRelevance += 0.1;
-    }
+    // Calculate topic relevance based on weighted scores (0.0 to 1.0)
+    const normalizedScore = Math.min(1.0, totalScore / Math.max(1, contentLength / 40));
+    const topicRelevance = Math.max(0.3, normalizedScore); // Minimum relevance of 0.3
 
-    // Enhanced expertise requirement logic
-    const requiresExpertise = 
-      (intent === 'policy' || intent === 'legal') ||  // Policy/legal always requires expertise
-      complexity > 0.7 ||                            // High complexity content
-      (complexity > 0.5 && topicRelevance > 0.6) ||  // Medium-high complexity + relevance
-      lowerContent.match(/\b(technical|specification|requirement|compliance|regulatory|administrative)\b/) !== null;
+    // Determine if expertise is required based on weighted thresholds
+    const requiresExpertise = matches.policy.score > 0.5 || matches.expertise.score > 1.2 || 
+                             matches.complex.score > 1.0 || complexity > 0.7;
 
     const result: AnalysisResult = {
       intent,
       complexity: Math.round(complexity * 100) / 100,
       topicRelevance: Math.round(topicRelevance * 100) / 100,
       requiresExpertise,
-      confidence: Math.round(intentConfidence * 100) / 100
+      confidence: 0.8
     };
 
-    console.log(`🧠 [DEFAULTS] Generated:`, {
+    console.log(`🧠 [DEFAULTS] Optimized result:`, {
       ...result,
       factors: {
-        contentLength: content.length,
+        contentLength,
         wordCount,
-        complexityKeywords: foundComplexityKeywords,
-        technicalTerms: foundTechnicalTerms,
-        avgSentenceLength: Math.round(avgSentenceLength)
+        totalScore,
+        weightedMatches: Object.fromEntries(
+          Object.entries(matches).map(([k, v]) => [k, v.score])
+        )
       }
     });
     

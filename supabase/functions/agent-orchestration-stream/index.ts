@@ -132,13 +132,13 @@ async function processOrchestration(
     let selectedAgentType: string;
     let messageAnalysis;
 
-    // Analyze the message for sophisticated operations (needed for both modes)
+    // Analyze the message with optimized analysis (needed for both modes)
     const openAIApiKey = getOpenAIKey();
     try {
-      messageAnalysis = await orchestrator.analyzeMessage(message.content, openAIApiKey);
-      console.log(`🔍 [ANALYSIS] Message analysis complete:`, messageAnalysis);
+      messageAnalysis = await orchestrator.analyzeMessage(message.content, openAIApiKey, deliberationId);
+      console.log(`🔍 [ANALYSIS] Optimized analysis complete:`, messageAnalysis);
     } catch (error) {
-      console.warn(`⚠️ [ANALYSIS] Message analysis failed, using enhanced defaults:`, error);
+      console.warn(`⚠️ [ANALYSIS] Analysis failed, using enhanced defaults:`, error);
       messageAnalysis = orchestrator.generateIntelligentDefaults(message.content);
       console.log(`🧠 [FALLBACK] Using intelligent defaults:`, messageAnalysis);
     }
