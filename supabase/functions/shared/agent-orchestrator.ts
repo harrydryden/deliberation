@@ -24,6 +24,8 @@ export interface AnalysisResult {
   topicRelevance: number;
   requiresExpertise: boolean;
   confidence?: number;
+  originalIntent?: string; // Store original intent for flag derivation
+  content?: string; // Store content for participant request detection
 }
 
 export interface ConversationContext {
@@ -48,6 +50,51 @@ export class AgentOrchestrator {
   
   constructor(supabase: any) {
     this.supabase = supabase;
+  }
+
+  // Intent validation and normalization
+  private validateIntent(intent: string): string {
+    const intentMappings: Record<string, string> = {
+      'participant_request': 'participant',
+      'participant_input': 'participant', 
+      'question_clarification': 'question',
+      'policy_expertise': 'policy',
+      'argument_perspective': 'argument'
+    };
+    
+    return intentMappings[intent] || intent;
+  }
+
+  private deriveRequestFlags(intent: string, originalIntent: string, content: string): { isParticipantRequest: boolean, isQuestion: boolean } {
+    const isParticipantRequest = originalIntent === 'participant_request' || 
+                                this.detectParticipantRequest(content);
+    const isQuestion = intent === 'question' || originalIntent === 'question_clarification';
+    
+    return { isParticipantRequest, isQuestion };
+  }
+
+  private detectParticipantRequest(content: string): boolean {
+    const contentLower = content.toLowerCase();
+    
+    // Enhanced proximity-based detection using word groups
+    const participantsGroup = ['others?', 'people', 'participants?', 'members?', 'stakeholders?', 'citizens?', 'community', 'public', 'individuals?', 'groups?', 'voters?', 'constituents?'];
+    const actionsGroup = ['said', 'mentioned', 'think', 'thought', 'contributed?', 'shared?', 'expressed?', 'raised?', 'brought up', 'discussed?', 'talked about'];
+    const unitsGroup = ['issues?', 'points?', 'concerns?', 'problems?', 'topics?', 'matters?', 'questions?', 'perspectives?', 'viewpoints?', 'opinions?'];
+    
+    // Pattern 1: "what have others said" / "what others have said"
+    const pattern1 = /\b(?:what\s+(?:have\s+)?(?:others?|people|participants?)\s+(?:have\s+)?(?:said|mentioned|contributed|shared|expressed|raised|discussed))\b/gi;
+    
+    // Pattern 2: "what issues others raised" / "issues people mentioned"
+    const pattern2 = new RegExp(`\\b(?:(?:what\\s+)?(?:${unitsGroup.join('|')})\\s+(?:have\\s+)?(?:${participantsGroup.join('|')})\\s+(?:have\\s+)?(?:${actionsGroup.join('|')}))\\b`, 'gi');
+    
+    // Pattern 3: "others raised issues" / "people mentioned concerns"
+    const pattern3 = new RegExp(`\\b(?:(?:${participantsGroup.join('|')})\\s+(?:have\\s+)?(?:${actionsGroup.join('|')})\\s+(?:${unitsGroup.join('|')}))\\b`, 'gi');
+    
+    // Pattern 4: "hear from others" / "what do others think"
+    const pattern4 = /\b(?:hear\s+(?:from\s+)?(?:what\s+)?(?:others?|people)|what\s+(?:do\s+)?(?:others?|people)\s+think)\b/gi;
+    
+    const patterns = [pattern1, pattern2, pattern3, pattern4];
+    return patterns.some(pattern => pattern.test(contentLower));
   }
 
   // Standardized model selection - always use flagship model
@@ -294,11 +341,23 @@ export class AgentOrchestrator {
       flow_agent: 0
     };
 
+    // Derive request flags from analysis
+    const { isParticipantRequest, isQuestion } = this.deriveRequestFlags(
+      analysis.intent, 
+      (analysis as any).originalIntent || analysis.intent, 
+      (analysis as any).content || ''
+    );
+    
+    console.log(`🔍 [SCORING] Request flags - isParticipantRequest: ${isParticipantRequest}, isQuestion: ${isQuestion}`);
+
     // Enhanced scoring with agent configuration awareness
     const factors = {
       complexity: analysis.complexity || 0.5,
       requiresExpertise: analysis.requiresExpertise || false,
       intent: analysis.intent || 'general',
+      originalIntent: (analysis as any).originalIntent || analysis.intent,
+      isParticipantRequest,
+      isQuestion,
       topicRelevance: analysis.topicRelevance || 0.5,
       messageCount: conversationContext.messageCount || 0,
       recentMessageTypes: this.getRecentMessageTypes(conversationContext.recentMessages || []),
@@ -306,107 +365,102 @@ export class AgentOrchestrator {
       ibisNodeCount
     };
 
-    // Bill Agent scoring - normalized to max ~100 points
-    const billConfig = agentConfigs.get('bill_agent');
-    if (billConfig?.is_active !== false) {
-      scores.bill_agent += factors.complexity * 30;  // Reduced from 40
-      scores.bill_agent += factors.requiresExpertise ? 25 : 0;  // Reduced from 30
-      scores.bill_agent += factors.topicRelevance * 20;  // Reduced from 25
-      scores.bill_agent += factors.intent === 'policy_expertise' ? 15 : 0;  // Fixed intent comparison
-      scores.bill_agent += factors.hasKnowledge.bill_agent ? 10 : 0;  // Reduced from 15
-    }
+    // Base scoring based on agent characteristics and analysis
+    let billScore = 10 + (factors.complexity * 15); // Policy analysis baseline
+    let peerScore = 8 + (factors.topicRelevance * 12); // Community synthesis baseline  
+    let flowScore = 6 + (Math.min(factors.complexity, 0.6) * 10); // Process facilitation baseline
 
-    // Peer Agent scoring - gets stronger as IBIS grows
-    // Derive unified participant detection flag
-    const isParticipant = factors.intent === 'participant';
+    // Intent-based scoring adjustments with enhanced precision
+    if (factors.intent === 'policy' || factors.requiresExpertise) {
+      billScore += 18; // Strong boost for policy/expertise
+      console.log(`🎯 Policy/expertise boost: +18 points for ${factors.intent}`);
+    } else if (factors.intent === 'participant' || factors.intent === 'argument') {
+      peerScore += 12; // Strong boost for participant synthesis
+      console.log(`👥 Participant synthesis boost: +12 points for ${factors.intent}`);
+    } else if (factors.intent === 'question') {
+      // Conditional question boost - reduced for participant requests
+      const questionBoost = isParticipantRequest ? 2 : 8;
+      flowScore += questionBoost;
+      console.log(`❓ Process clarification boost: +${questionBoost} points for ${factors.intent}${isParticipantRequest ? ' (reduced due to participant request)' : ''}`);
+    }
     
-    const peerConfig = agentConfigs.get('peer_agent');
-    if (peerConfig?.is_active !== false) {
-      scores.peer_agent += factors.messageCount > 5 ? 25 : 0;  
-      scores.peer_agent += factors.messageCount >= 3 && factors.messageCount <= 5 ? 15 : 0;  
-      scores.peer_agent += isParticipant ? 45 : 0;  // UNIFIED: All participant intents get major boost
-      scores.peer_agent += factors.intent === 'perspective' ? 25 : 0;  // NORMALIZED: Base category
-      scores.peer_agent += this.getRecentBillAgentCount(factors.recentMessageTypes) > 2 ? 20 : 0;  
-      scores.peer_agent += factors.hasKnowledge.peer_agent ? 10 : 0;  
+    // CRITICAL: Participant request boost for peer agent
+    if (isParticipantRequest) {
+      peerScore += 25; // Massive boost for participant-focused requests
+      console.log(`🎯 [PARTICIPANT REQUEST] Peer agent boost: +25 points - prioritizing participant synthesis`);
+    }
+
+    // IBIS node count penalties/bonuses with enhanced logic
+    if (ibisNodeCount !== undefined) {
+      console.log(`📊 IBIS nodes in deliberation: ${ibisNodeCount}`);
       
-      // CRITICAL: Progressive scoring based on IBIS development with participant request override
-      if (factors.ibisNodeCount < 10) {
-        // Reduced penalty when participant request is detected - user needs synthesis even early
-        const reductionFactor = Math.max(0, (10 - factors.ibisNodeCount) / 10);  
-        const basePenalty = 15;
-        const penalty = isParticipant ? 
-          Math.floor(reductionFactor * (basePenalty * 0.4)) : // 60% penalty reduction for participant requests
-          Math.floor(reductionFactor * basePenalty);  
-        scores.peer_agent -= penalty;
-        
-        const penaltyType = isParticipant ? '(participant-focused override)' : '(building structure)';
-        console.log(`🚫 Peer agent penalty: -${penalty} points (${factors.ibisNodeCount}/10 nodes - ${penaltyType})`);
-      } else {
-        // Progressive boost as IBIS matures (10+ nodes = ready for peer synthesis)
-        const boostFactor = Math.min(1, (factors.ibisNodeCount - 10) / 20);  // 0-1 over next 20 nodes  
-        const boost = Math.floor(boostFactor * 25);  // Up to 25 point boost
-        scores.peer_agent += boost;
-        console.log(`🎯 Peer agent boost: +${boost} points (${factors.ibisNodeCount} nodes - mature for synthesis)`);
+      if (ibisNodeCount < 5) {
+        // Early map building phase - but reduce penalty for participant requests
+        if (!isParticipantRequest) {
+          const flowBoost = Math.max(8, 16 - (ibisNodeCount * 2)); // 16 points when 0 nodes, scaling down
+          flowScore += flowBoost;
+          console.log(`🚀 Flow agent boost: +${flowBoost} points (${ibisNodeCount}/10 nodes - building structure)`);
+          
+          // Reduced penalty for peer agent in early phases, none for participant requests
+          const peerPenalty = Math.max(2, 6 - (ibisNodeCount * 1)); // Much reduced penalty
+          peerScore -= peerPenalty;
+          console.log(`🚫 Peer agent penalty: -${peerPenalty} points (${ibisNodeCount}/10 nodes - building structure)`);
+        } else {
+          console.log(`🎯 [PARTICIPANT REQUEST] Skipping early-map penalties for peer agent`);
+        }
+      } else if (ibisNodeCount >= 8) {
+        // Rich discussion phase - boost peer agent for synthesis
+        const peerBoost = Math.min(15, 5 + ibisNodeCount); // Scale with node count
+        peerScore += peerBoost;
+        console.log(`🎭 Peer agent boost: +${peerBoost} points (${ibisNodeCount} nodes - rich discussion)`);
       }
     }
 
-    // Flow Agent scoring - dominates early conversation, reduces as IBIS matures
-    const flowConfig = agentConfigs.get('flow_agent');
-    if (flowConfig?.is_active !== false) {
-      scores.flow_agent += factors.messageCount < 3 ? 30 : 0;  
-      scores.flow_agent += factors.messageCount >= 3 && factors.messageCount <= 5 ? 20 : 0;  
-      
-      // UNIFIED: Reduce question boost when participant intent is detected (avoids mis-routing participant requests)
-      const questionBoost = isParticipant ? 15 : 25; // Reduced boost for participant-focused questions
-      scores.flow_agent += factors.intent === 'question' ? questionBoost : 0;  // NORMALIZED: Base category
-      scores.flow_agent += factors.complexity < 0.3 ? 20 : 0;  
-      scores.flow_agent += this.getRecentFlowAgentCount(factors.recentMessageTypes) === 0 ? 15 : 0;  
-      scores.flow_agent += factors.hasKnowledge.flow_agent ? 10 : 0;  
-      
-      if (questionBoost < 25) {
-        console.log(`🔄 Flow agent question boost reduced to ${questionBoost} (participant-focused request detected)`);
-      }
-      
-      // CRITICAL: Progressive scoring that favors structure-building early, then steps back
-      if (factors.ibisNodeCount < 10) {
-        // Strong boost when building initial structure
-        const boostFactor = Math.max(0, (10 - factors.ibisNodeCount) / 10);  
-        const boost = Math.floor(boostFactor * 20);  
-        scores.flow_agent += boost;
-        console.log(`🚀 Flow agent boost: +${boost} points (${factors.ibisNodeCount}/10 nodes - building structure)`);
-      } else {
-        // Gradual reduction as IBIS matures and peer agent takes over
-        const reductionFactor = Math.min(1, (factors.ibisNodeCount - 10) / 15);  // 0-1 over next 15 nodes
-        const penalty = Math.floor(reductionFactor * 20);  // Up to 20 point penalty  
-        scores.flow_agent -= penalty;
-        console.log(`📉 Flow agent reduction: -${penalty} points (${factors.ibisNodeCount} nodes - peer synthesis phase)`);
-      }
-    }
+    // Agent availability checks
+    const availableAgents = {
+      bill_agent: agentConfigs.get('bill_agent')?.is_active !== false,
+      peer_agent: agentConfigs.get('peer_agent')?.is_active !== false,
+      flow_agent: agentConfigs.get('flow_agent')?.is_active !== false
+    };
 
-    // Anti-repetition logic
-    const lastAgentType = this.getLastAgentType(factors.recentMessageTypes);
-    if (lastAgentType && scores[lastAgentType as keyof typeof scores] !== undefined) {
-      scores[lastAgentType as keyof typeof scores] -= 10;
-    }
+    // Final scores with availability filtering
+    const finalScores = {
+      bill_agent: availableAgents.bill_agent ? billScore : -1,
+      peer_agent: availableAgents.peer_agent ? peerScore : -1,
+      flow_agent: availableAgents.flow_agent ? flowScore : -1
+    };
 
-    // Select agent with highest score, defaulting to flow_agent
-    const selectedAgent = Object.entries(scores).reduce((max, [agent, score]) => 
-      score > max.score ? { agent, score } : max, 
-      { agent: 'flow_agent', score: -1 }
-    ).agent;
+    // Select highest scoring available agent
+    const sortedAgents = Object.entries(finalScores)
+      .filter(([_, score]) => score >= 0)
+      .sort(([,a], [,b]) => b - a);
+
+    const finalSelection = sortedAgents.length > 0 ? sortedAgents[0][0] : 'flow_agent';
 
     console.log(`🔬 Enhanced agent scoring results:`, {
-      scores,
-      factors,
-      selected: selectedAgent,
-      ibisNodeCount: factors.ibisNodeCount,
-      flowBoosted: factors.ibisNodeCount < 10,
+      scores: { bill_agent: billScore, peer_agent: peerScore, flow_agent: flowScore },
+      factors: {
+        complexity: factors.complexity,
+        requiresExpertise: factors.requiresExpertise,
+        intent: factors.intent,
+        originalIntent: factors.originalIntent,
+        isParticipantRequest,
+        isQuestion,
+        topicRelevance: factors.topicRelevance,
+        messageCount: factors.messageCount,
+        recentMessageTypes: factors.recentMessageTypes.slice(0, 5),
+        hasKnowledge: factors.hasKnowledge,
+        ibisNodeCount
+      },
+      selected: finalSelection,
+      ibisNodeCount,
       availableConfigs: Object.fromEntries(
-        Array.from(agentConfigs.entries()).map(([type, config]) => [type, !!config])
+        Object.entries(availableAgents).map(([key, agent]) => [key, !!agent])
       )
     });
 
-    return selectedAgent;
+    return finalSelection;
+  }
   }
 
   // Circuit breaker configuration - persistent via database
@@ -578,7 +632,9 @@ export class AgentOrchestrator {
       complexity: this.validateNumber(parsedResult.complexity, 0, 1) ?? 0.5,
       topicRelevance: this.validateNumber(parsedResult.topicRelevance, 0, 1) ?? 0.5,
       requiresExpertise: Boolean(parsedResult.requiresExpertise),
-      confidence: this.validateNumber(parsedResult.confidence, 0, 1) ?? 0.8
+      confidence: this.validateNumber(parsedResult.confidence, 0, 1) ?? 0.8,
+      originalIntent: parsedResult.intent, // Store original intent before normalization
+      content // Store content for participant request detection
     };
 
     // Enhanced logging with normalized intent
@@ -930,17 +986,7 @@ export class AgentOrchestrator {
     const totalScore = Object.values(matches).reduce((sum, m) => sum + m.score, 0);
     
     // ENHANCED: Detect participant-focused requests with high precision
-    const participantRequestPatterns = [
-      /\b(what\s+(?:have\s+)?others?\s+(?:have\s+)?said|what\s+(?:have\s+)?people\s+(?:have\s+)?said)\b/gi,
-      /\b(what\s+(?:have\s+)?participants?\s+(?:have\s+)?(?:said|mentioned|contributed|shared|expressed))\b/gi,
-      /\b(hear\s+(?:from\s+)?(?:what\s+)?others?|hear\s+(?:from\s+)?(?:what\s+)?people)\b/gi,
-      /\b(others?\s+(?:have\s+)?(?:mentioned|contributed|shared|expressed|think|thought))\b/gi,
-      /\b(what\s+(?:do\s+)?others?\s+think|what\s+(?:do\s+)?people\s+think)\b/gi
-    ];
-    
-    const hasParticipantRequest = participantRequestPatterns.some(pattern => 
-      pattern.test(contentLower)
-    );
+    const hasParticipantRequest = this.detectParticipantRequest(content);
     
     if (hasParticipantRequest) {
       console.log(`🎯 [INTENT] Participant-focused request detected: "${content.substring(0, 50)}..." - prioritizing peer synthesis`);
@@ -973,16 +1019,26 @@ export class AgentOrchestrator {
     const requiresExpertise = matches.policy.score > 0.5 || matches.expertise.score > 1.2 || 
                              matches.complex.score > 1.0 || complexity > 0.7;
 
+    // Store original intent for flag derivation
+    const originalIntent = intent;
+    
+    // Normalize intent to base categories
+    const normalizedIntent = this.validateIntent(intent);
+    
     const result: AnalysisResult = {
-      intent,
+      intent: normalizedIntent,
       complexity: Math.round(complexity * 100) / 100,
       topicRelevance: Math.round(topicRelevance * 100) / 100,
       requiresExpertise,
-      confidence: 0.8
+      confidence: 0.8,
+      originalIntent,
+      content
     };
 
     console.log(`🧠 [DEFAULTS] Optimized result:`, {
       ...result,
+      originalIntent,
+      normalizedIntent,
       factors: {
         contentLength,
         wordCount,

@@ -197,16 +197,41 @@ async function processOrchestration(
     console.log(`🎯 [PHASE2] Final selection: ${selectedAgent.name} (${selectedAgentType}) - Mode: ${mode}`);
     console.log(`✅ [PHASE2] Orchestrated selection: ${selectedAgent.name} (${selectedAgentType})`);
 
-    // Phase 3: System Prompt Construction using orchestrator
+    // Phase 3: System Prompt Construction with IBIS context for peer_agent
     console.log(`📝 [PHASE3] Building system prompt with orchestrator`);
+    
+    let context = {
+      deliberationId,
+      messageAnalysis,
+      conversationLength: recentMessages?.length || 0
+    };
+    
+    // Fetch IBIS nodes for peer_agent (Pia) to provide current deliberation context
+    if (selectedAgentType === 'peer_agent') {
+      console.log(`🔍 [PHASE3] Fetching IBIS nodes for peer agent context`);
+      try {
+        const { data: ibisNodes, error: ibisError } = await serviceClient
+          .from('ibis_nodes')
+          .select('id, title, description, node_type, created_at')
+          .eq('deliberation_id', deliberationId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        if (ibisError) {
+          console.warn(`⚠️ [PHASE3] Could not fetch IBIS nodes: ${ibisError.message}`);
+        } else {
+          context.similarNodes = ibisNodes || [];
+          console.log(`📋 [PHASE3] Retrieved ${ibisNodes?.length || 0} IBIS nodes for peer agent context`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ [PHASE3] IBIS node fetch failed:`, error);
+      }
+    }
+    
     const systemPrompt = await orchestrator.generateSystemPrompt(
       selectedAgent, 
       selectedAgentType,
-      {
-        deliberationId,
-        messageAnalysis,
-        conversationLength: recentMessages?.length || 0
-      }
+      context
     );
     console.log(`✅ [PHASE3] System prompt built (${systemPrompt.length} characters)`);
 
@@ -273,16 +298,71 @@ async function processOrchestration(
     }
 
     const data = await response.json();
-    const fullResponse = Array.isArray(data.choices) && data.choices.length > 0 
+    let fullResponse = Array.isArray(data.choices) && data.choices.length > 0 
       ? data.choices[0]?.message?.content || ''
       : '';
 
-    if (!fullResponse) {
-      throw new OrchestrationError(
-        'No response generated from OpenAI',
-        'OPENAI_EMPTY_RESPONSE',
-        { response: data }
-      );
+    // Handle empty responses with retry logic
+    if (!fullResponse || (data.choices?.[0]?.finish_reason === 'length' && fullResponse.length < 10)) {
+      console.warn(`⚠️ [PHASE4] Empty/truncated OpenAI response detected - finish_reason: ${data.choices?.[0]?.finish_reason}`);
+      
+      // Try one immediate retry with stricter instructions for length-constrained responses
+      if (data.choices?.[0]?.finish_reason === 'length') {
+        console.log(`🔄 [PHASE4] Retrying with increased token limit for length-constrained response`);
+        
+        const enhancedRequest = { ...openAIRequest };
+        // Double the token limit for retry
+        if (selectedModel.startsWith('gpt-5') || selectedModel.startsWith('gpt-4.1') || selectedModel.startsWith('o3') || selectedModel.startsWith('o4')) {
+          enhancedRequest.max_completion_tokens = tokenLimit * 2;
+        } else {
+          enhancedRequest.max_tokens = tokenLimit * 2;
+        }
+        
+        // Add strict length instruction to system prompt
+        enhancedRequest.messages[0].content += `\n\nCRITICAL: You MUST provide a complete response. Do not stop mid-sentence. Prioritize essential information and be concise but complete.`;
+        
+        try {
+          const retryResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openAIApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(enhancedRequest),
+          });
+          
+          if (retryResponse.ok) {
+            const retryData = await retryResponse.json();
+            const retryContent = retryData.choices?.[0]?.message?.content || '';
+            if (retryContent && retryContent.length > 10) {
+              fullResponse = retryContent;
+              console.log(`✅ [PHASE4] Retry successful - generated ${retryContent.length} characters`);
+            }
+          }
+        } catch (retryError) {
+          console.warn(`⚠️ [PHASE4] Retry failed:`, retryError);
+        }
+      }
+      
+      // If still empty, provide deterministic fallback for peer_agent
+      if (!fullResponse && selectedAgentType === 'peer_agent' && context.similarNodes?.length > 0) {
+        console.log(`🛟 [PHASE4] Providing deterministic IBIS summary fallback for peer agent`);
+        fullResponse = `Here are the key issues and points that participants have raised so far in this deliberation:\n\n` +
+          context.similarNodes.map((node, index) => 
+            `${index + 1}. **${node.title}** (${node.node_type})\n   ${node.description || 'No additional details provided'}`
+          ).join('\n\n') +
+          `\n\nThese ${context.similarNodes.length} points represent the current state of our deliberation. Would you like me to elaborate on any of these issues or help you contribute additional perspectives?`;
+      }
+      
+      // Final check - if still empty, throw error
+      if (!fullResponse) {
+        console.error(`❌ [OPENAI_EMPTY_RESPONSE] No response generated from OpenAI`, { response: data });
+        throw new OrchestrationError(
+          'No response generated from OpenAI',
+          'OPENAI_EMPTY_RESPONSE',
+          { response: data }
+        );
+      }
     }
 
     console.log(`✅ [PHASE4] OpenAI response generated (${fullResponse.length} characters)`);
