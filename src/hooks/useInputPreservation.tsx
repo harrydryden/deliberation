@@ -17,12 +17,16 @@ export const useInputPreservation = (options: UseInputPreservationOptions) => {
   const [isRestored, setIsRestored] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef<string>('');
+  const userClearTimeRef = useRef<number>(0);
 
   // Restore from localStorage on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey);
-      if (saved && saved.trim()) {
+      const timeSinceUserClear = Date.now() - userClearTimeRef.current;
+      
+      // Don't restore if user recently cleared input (within 5 seconds)
+      if (saved && saved.trim() && timeSinceUserClear > 5000) {
         setValue(saved);
         setIsRestored(true);
         logger.info('Input restored from localStorage', { 
@@ -64,6 +68,26 @@ export const useInputPreservation = (options: UseInputPreservationOptions) => {
       }
     };
   }, [value, storageKey, autoSaveDelay]);
+
+  // Custom setValue that detects user clear intent
+  const setValueWithClearDetection = useCallback((newValue: string) => {
+    const previousValue = value;
+    
+    // Detect if user intentionally cleared the input
+    if (previousValue && !newValue.trim()) {
+      // User cleared the input - immediately clear localStorage and mark time
+      try {
+        localStorage.removeItem(storageKey);
+        lastSavedRef.current = '';
+        userClearTimeRef.current = Date.now();
+        logger.debug('User cleared input - storage cleared', { storageKey });
+      } catch (error) {
+        logger.error('Failed to clear storage on user clear', error as Error);
+      }
+    }
+    
+    setValue(newValue);
+  }, [value, storageKey]);
 
   // Clear storage when input is successfully sent
   const clearStorage = useCallback(() => {
@@ -116,7 +140,7 @@ export const useInputPreservation = (options: UseInputPreservationOptions) => {
 
   return {
     value,
-    setValue,
+    setValue: setValueWithClearDetection,
     isRestored,
     clearStorage,
     saveToStorage
