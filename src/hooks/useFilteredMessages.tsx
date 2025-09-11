@@ -22,14 +22,11 @@ export const useFilteredMessages = (
     // For 'chat' view mode, filter to show only user's conversation thread
     if (!currentUserId) return safeMessages;
     
-    // Debug logging for message filtering
-    logger.debug('Filtering messages for user:', { currentUserId, viewMode });
-    logger.debug('Total messages:', { count: safeMessages.length });
     
     const filtered = safeMessages.filter(msg => {
       // Include user's own messages (not submitted to IBIS - those are for IBIS context)
       if (msg.message_type === 'user' && msg.user_id === currentUserId && !msg.submitted_to_ibis) {
-        logger.debug('Including user message:', { messageId: msg.id });
+        
         return true;
       }
       
@@ -37,7 +34,7 @@ export const useFilteredMessages = (
       if (msg.message_type !== 'user' && msg.parent_message_id) {
         const parentMessage = safeMessages.find(m => m.id === msg.parent_message_id);
         const shouldInclude = parentMessage?.user_id === currentUserId;
-        logger.debug('Agent message:', { messageId: msg.id, parentId: msg.parent_message_id, parentFound: !!parentMessage, shouldInclude });
+        
         return shouldInclude;
       }
       
@@ -48,7 +45,7 @@ export const useFilteredMessages = (
         if (messageIndex > 0) {
           const previousMessage = safeMessages[messageIndex - 1];
           const shouldInclude = previousMessage?.message_type === 'user' && previousMessage?.user_id === currentUserId;
-          logger.debug('Agent message without parent:', { messageId: msg.id, previousMessageId: previousMessage?.id, shouldInclude });
+          
           return shouldInclude;
         }
       }
@@ -56,7 +53,7 @@ export const useFilteredMessages = (
       return false;
     });
     
-    logger.debug('Filtered messages count:', { count: filtered.length });
+    
     return filtered;
   }, [messages, viewMode, currentUserId, isAdmin]);
 };

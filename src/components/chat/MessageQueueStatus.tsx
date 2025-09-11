@@ -5,15 +5,13 @@ import { Clock, AlertCircle, RotateCcw, Wifi, WifiOff, RefreshCw } from 'lucide-
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { QueuedMessage } from '@/hooks/useMessageQueue';
 import { performanceMonitor } from "@/utils/performanceMonitor";
-import { MessageQueueDebugPanel } from './MessageQueueDebugPanel';
+
 
 interface MessageQueueStatusProps {
   queuedMessages: QueuedMessage[];
   processingCount: number;
   onRetryMessage: (messageId: string) => void;
   onRemoveMessage: (messageId: string) => void;
-  messageQueue?: any; // For debug panel
-  recovery?: any; // For debug panel
   realtimeConnection?: {
     isConnected: boolean;
     status: string;
@@ -28,8 +26,6 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(
   processingCount,
   onRetryMessage,
   onRemoveMessage,
-  messageQueue,
-  recovery,
   realtimeConnection,
   onRefreshMessages,
   onForceReconnect
@@ -218,14 +214,6 @@ export const MessageQueueStatus: React.FC<MessageQueueStatusProps> = React.memo(
           </div>
         </PopoverContent>
       </Popover>
-      
-      {/* Debug Panel - Only show in development or when there are issues */}
-      {(process.env.NODE_ENV === 'development' || failedCount > 0) && messageQueue && (
-        <MessageQueueDebugPanel 
-          messageQueue={messageQueue}
-          recovery={recovery}
-        />
-      )}
     </div>
   );
 });

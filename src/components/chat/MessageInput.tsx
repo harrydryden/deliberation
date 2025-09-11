@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send } from "lucide-react";
 import { useInputPreservation } from "@/hooks/useInputPreservation";
-import { useRenderPerformanceTracker } from "@/utils/renderPerformanceMonitor";
+
 import { logger } from '@/utils/logger';
 
 interface MessageInputProps {
@@ -24,8 +24,6 @@ export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(
   mode = 'chat',
   deliberationId 
 }, ref) => {
-  // Performance tracking
-  useRenderPerformanceTracker('MessageInput');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);

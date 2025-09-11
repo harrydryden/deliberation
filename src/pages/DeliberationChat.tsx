@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ViewModeSelector, ViewMode } from "@/components/chat/ViewModeSelector";
 import { useFilteredMessages } from "@/hooks/useFilteredMessages";
 import { Users, ChevronDown, ChevronUp } from "lucide-react";
-import { useRenderPerformanceTracker } from "@/utils/renderPerformanceMonitor";
+
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { ParticipantScoring } from "@/components/chat/ParticipantScoring";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -22,7 +22,7 @@ import { useMessageQueue } from "@/hooks/useMessageQueue";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/utils/logger";
 import { supabase } from "@/integrations/supabase/client";
-import { ParticipationDebugPanel } from '@/components/admin/ParticipationDebugPanel';
+
 import { useParticipationSync } from '@/hooks/useParticipationSync';
 
 const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({
@@ -51,8 +51,6 @@ interface Deliberation {
 }
 
 const OptimizedDeliberationChat = () => {
-  // Performance tracking
-  useRenderPerformanceTracker('DeliberationChat');
   
   const { deliberationId } = useParams<{ deliberationId: string }>();
   const { user, isLoading, isAdmin } = useSupabaseAuth();
@@ -819,19 +817,6 @@ const OptimizedDeliberationChat = () => {
         </div>
       )}
       
-      {/* Development Debug Panel */}
-      <ParticipationDebugPanel
-        userId={user.id}
-        deliberationId={deliberationId || ''}
-        isParticipant={dataState.isParticipant}
-        joiningDeliberation={dataState.joiningDeliberation}
-        participants={dataState.deliberation?.participants || []}
-        deliberationData={dataState.deliberation}
-        onRefresh={() => {
-          loadDeliberation();
-          forceSyncParticipation();
-        }}
-      />
     </>
   );
 };
