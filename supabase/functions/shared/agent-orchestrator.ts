@@ -317,28 +317,29 @@ export class AgentOrchestrator {
     }
 
     // Peer Agent scoring - gets stronger as IBIS grows
+    // Derive unified participant detection flag
+    const isParticipant = factors.intent === 'participant';
+    
     const peerConfig = agentConfigs.get('peer_agent');
     if (peerConfig?.is_active !== false) {
       scores.peer_agent += factors.messageCount > 5 ? 25 : 0;  
       scores.peer_agent += factors.messageCount >= 3 && factors.messageCount <= 5 ? 15 : 0;  
-      scores.peer_agent += factors.intent === 'participant_input' ? 30 : 0;  // Fixed intent comparison
-      scores.peer_agent += factors.intent === 'participant_request' ? 45 : 0;  // ENHANCED: Higher boost for explicit participant requests
-      scores.peer_agent += factors.intent === 'argument_perspective' ? 25 : 0;  // Fixed intent comparison
+      scores.peer_agent += isParticipant ? 45 : 0;  // UNIFIED: All participant intents get major boost
+      scores.peer_agent += factors.intent === 'perspective' ? 25 : 0;  // NORMALIZED: Base category
       scores.peer_agent += this.getRecentBillAgentCount(factors.recentMessageTypes) > 2 ? 20 : 0;  
       scores.peer_agent += factors.hasKnowledge.peer_agent ? 10 : 0;  
       
       // CRITICAL: Progressive scoring based on IBIS development with participant request override
       if (factors.ibisNodeCount < 10) {
         // Reduced penalty when participant request is detected - user needs synthesis even early
-        const isParticipantFocused = factors.intent === 'participant_request' || factors.intent === 'participant_input';
         const reductionFactor = Math.max(0, (10 - factors.ibisNodeCount) / 10);  
         const basePenalty = 15;
-        const penalty = isParticipantFocused ? 
+        const penalty = isParticipant ? 
           Math.floor(reductionFactor * (basePenalty * 0.4)) : // 60% penalty reduction for participant requests
           Math.floor(reductionFactor * basePenalty);  
         scores.peer_agent -= penalty;
         
-        const penaltyType = isParticipantFocused ? '(participant-focused override)' : '(building structure)';
+        const penaltyType = isParticipant ? '(participant-focused override)' : '(building structure)';
         console.log(`🚫 Peer agent penalty: -${penalty} points (${factors.ibisNodeCount}/10 nodes - ${penaltyType})`);
       } else {
         // Progressive boost as IBIS matures (10+ nodes = ready for peer synthesis)
@@ -355,10 +356,9 @@ export class AgentOrchestrator {
       scores.flow_agent += factors.messageCount < 3 ? 30 : 0;  
       scores.flow_agent += factors.messageCount >= 3 && factors.messageCount <= 5 ? 20 : 0;  
       
-      // ENHANCED: Reduce question boost when participant intent is detected (avoids mis-routing participant requests)
-      const isParticipantFocused = factors.intent === 'participant_request' || factors.intent === 'participant_input';
-      const questionBoost = isParticipantFocused ? 15 : 25; // Reduced boost for participant-focused questions
-      scores.flow_agent += factors.intent === 'question_clarification' ? questionBoost : 0;  // Fixed intent comparison
+      // UNIFIED: Reduce question boost when participant intent is detected (avoids mis-routing participant requests)
+      const questionBoost = isParticipant ? 15 : 25; // Reduced boost for participant-focused questions
+      scores.flow_agent += factors.intent === 'question' ? questionBoost : 0;  // NORMALIZED: Base category
       scores.flow_agent += factors.complexity < 0.3 ? 20 : 0;  
       scores.flow_agent += this.getRecentFlowAgentCount(factors.recentMessageTypes) === 0 ? 15 : 0;  
       scores.flow_agent += factors.hasKnowledge.flow_agent ? 10 : 0;  
@@ -581,7 +581,12 @@ export class AgentOrchestrator {
       confidence: this.validateNumber(parsedResult.confidence, 0, 1) ?? 0.8
     };
 
-    console.log(`✅ [ANALYSIS] Validated result:`, result);
+    // Enhanced logging with normalized intent
+    console.log(`✅ [ANALYSIS] Validated result:`, {
+      ...result,
+      originalIntent: parsedResult.intent,
+      normalizedIntent: result.intent
+    });
     return result;
   }
 
@@ -827,11 +832,36 @@ export class AgentOrchestrator {
   }
 
   private validateIntent(intent: any): string | null {
-    const validIntents = ['policy', 'legal', 'legislation', 'participant', 'perspective', 'question', 'clarify', 'general'];
-    if (typeof intent === 'string' && validIntents.includes(intent.toLowerCase())) {
-      return intent.toLowerCase();
+    if (typeof intent !== 'string') return null;
+    
+    const normalizedIntent = intent.toLowerCase().trim();
+    
+    // Map modern intent labels to base categories for consistency
+    const intentMapping: Record<string, string> = {
+      'participant_request': 'participant',
+      'participant_input': 'participant', 
+      'policy_expertise': 'policy',
+      'question_clarification': 'question',
+      'argument_perspective': 'perspective',
+      // Base categories (pass through unchanged)
+      'policy': 'policy',
+      'legal': 'legal', 
+      'legislation': 'legislation',
+      'participant': 'participant',
+      'perspective': 'perspective',
+      'question': 'question',
+      'clarify': 'clarify',
+      'general': 'general'
+    };
+    
+    const mappedIntent = intentMapping[normalizedIntent];
+    
+    // Enhanced logging for intent normalization
+    if (mappedIntent && mappedIntent !== normalizedIntent) {
+      console.log(`🔄 [INTENT] Normalized "${normalizedIntent}" → "${mappedIntent}"`);
     }
-    return null;
+    
+    return mappedIntent || null; // Return null if no mapping found (will default to 'general')
   }
 
   private validateNumber(value: any, min: number, max: number): number | null {
