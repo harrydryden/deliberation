@@ -17,12 +17,12 @@ const MarkdownMessageComponent = ({ content, className }: MarkdownMessageProps) 
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       className={cn(
-        'prose prose-sm max-w-none',
-        'prose-headings:mt-4 prose-headings:mb-2 prose-headings:font-semibold',
-        'prose-h1:text-lg prose-h2:text-base prose-h3:text-sm',
-        'prose-p:my-2 prose-p:leading-relaxed',
-        'prose-ul:my-2 prose-ol:my-2',
-        'prose-li:my-1',
+        'prose prose-xs max-w-none text-sm',
+        'prose-headings:mt-3 prose-headings:mb-2 prose-headings:font-semibold',
+        'prose-h1:text-base prose-h2:text-sm prose-h3:text-xs',
+        'prose-p:my-1.5 prose-p:leading-normal',
+        'prose-ul:my-1.5 prose-ol:my-1.5',
+        'prose-li:my-0.5',
         'prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:bg-muted prose-code:text-foreground',
         'prose-pre:bg-muted prose-pre:border prose-pre:rounded-md prose-pre:p-3',
         'prose-blockquote:border-l-4 prose-blockquote:border-border prose-blockquote:pl-4 prose-blockquote:italic',
@@ -36,7 +36,7 @@ const MarkdownMessageComponent = ({ content, className }: MarkdownMessageProps) 
       components={{
         // Override default paragraph styling for better control
         p: ({ children, ...props }) => (
-          <p {...props} className="my-2 leading-relaxed">
+          <p {...props} className="my-1.5 leading-normal text-sm">
             {children}
           </p>
         ),
@@ -61,28 +61,28 @@ const MarkdownMessageComponent = ({ content, className }: MarkdownMessageProps) 
         },
         // Style headings
         h1: ({ children, ...props }) => (
-          <h1 {...props} className="text-lg font-semibold mt-4 mb-2 first:mt-0">
+          <h1 {...props} className="text-base font-semibold mt-3 mb-2 first:mt-0">
             {children}
           </h1>
         ),
         h2: ({ children, ...props }) => (
-          <h2 {...props} className="text-base font-semibold mt-4 mb-2 first:mt-0">
+          <h2 {...props} className="text-sm font-semibold mt-3 mb-2 first:mt-0">
             {children}
           </h2>
         ),
         h3: ({ children, ...props }) => (
-          <h3 {...props} className="text-sm font-semibold mt-3 mb-2 first:mt-0">
+          <h3 {...props} className="text-xs font-semibold mt-2 mb-1 first:mt-0">
             {children}
           </h3>
         ),
         // Style lists
         ul: ({ children, ...props }) => (
-          <ul {...props} className="my-2 pl-4 space-y-1 list-disc">
+          <ul {...props} className="my-1.5 pl-4 space-y-0.5 list-disc text-sm">
             {children}
           </ul>
         ),
         ol: ({ children, ...props }) => (
-          <ol {...props} className="my-2 pl-4 space-y-1 list-decimal">
+          <ol {...props} className="my-1.5 pl-4 space-y-0.5 list-decimal text-sm">
             {children}
           </ol>
         ),
