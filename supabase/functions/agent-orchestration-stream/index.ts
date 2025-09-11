@@ -215,7 +215,6 @@ async function processOrchestration(
 
     // Phase 4: OpenAI API Call with enhanced error handling
     console.log(`🧠 [PHASE4] Calling OpenAI API`);
-    const openAIApiKey = getOpenAIKey();
     
     if (!openAIApiKey) {
       throw new OrchestrationError(
