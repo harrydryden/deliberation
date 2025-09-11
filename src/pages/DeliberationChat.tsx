@@ -100,8 +100,8 @@ const OptimizedDeliberationChat = () => {
   chatModeRef.current = uiState.chatMode;
   deliberationRef.current = dataState.deliberation;
 
-  // Initialize message queue system with stable reference
-  const messageQueue = useMemo(() => useMessageQueue(3), []); // max 3 concurrent messages
+  // Initialize message queue system
+  const messageQueue = useMessageQueue(3); // max 3 concurrent messages
 
   const {
     messages,
