@@ -441,6 +441,10 @@ export class AgentOrchestrator {
         if (result) {
           const duration = Date.now() - startTime;
           console.log(`✅ [ANALYSIS] Success with ${modelName} in ${duration}ms`);
+          
+          // SUCCESS-BASED RECOVERY: Reset circuit breaker on successful analysis
+          await this.resetCircuitBreakerOnSuccess();
+          
           await this.recordAnalysisMetrics('analysis', modelName, true, duration, null, deliberationId);
           return result;
         }
@@ -609,7 +613,7 @@ export class AgentOrchestrator {
     }
   }
 
-  // Persistent Circuit breaker management via database
+  // Enhanced Circuit breaker management with smart recovery
   private async isCircuitBreakerOpen(): Promise<boolean> {
     try {
       const { data, error } = await this.supabase
@@ -634,11 +638,19 @@ export class AgentOrchestrator {
       if (data.failure_count >= AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD) {
         const timeSinceLastFailure = now - lastFailureTime;
         
-        if (timeSinceLastFailure < AgentOrchestrator.CIRCUIT_BREAKER_TIMEOUT) {
+        // Smart adaptive timeout - faster recovery for fewer failures
+        const adaptiveTimeout = Math.min(
+          AgentOrchestrator.CIRCUIT_BREAKER_TIMEOUT,
+          Math.max(30000, AgentOrchestrator.CIRCUIT_BREAKER_TIMEOUT / Math.max(1, data.failure_count - 2))
+        );
+        
+        if (timeSinceLastFailure < adaptiveTimeout) {
+          const remainingSeconds = Math.ceil((adaptiveTimeout - timeSinceLastFailure) / 1000);
+          console.log(`🚫 Circuit breaker OPEN - ${remainingSeconds}s remaining (adaptive timeout)`);
           return true; // Circuit is still open
         } else {
-          // Reset circuit breaker after timeout
-          console.log('🔄 Circuit breaker timeout reached, resetting');
+          // Reset circuit breaker after adaptive timeout
+          console.log(`🔄 Circuit breaker adaptive timeout reached (${adaptiveTimeout}ms) - resetting`);
           await this.resetCircuitBreaker();
           return false;
         }
@@ -691,6 +703,67 @@ export class AgentOrchestrator {
     }
   }
 
+  // Enhanced circuit breaker reset with success-based recovery
+  private async resetCircuitBreakerOnSuccess(): Promise<void> {
+    try {
+      // Get current circuit breaker state
+      const { data: currentState } = await this.supabase
+        .from('circuit_breaker_state')
+        .select('failure_count, is_open')
+        .eq('id', AgentOrchestrator.CIRCUIT_BREAKER_ID)
+        .maybeSingle();
+
+      // Only reset if there were previous failures or breaker was open
+      if (currentState && (currentState.failure_count > 0 || currentState.is_open)) {
+        const { error } = await this.supabase
+          .from('circuit_breaker_state')
+          .update({
+            failure_count: 0,
+            is_open: false,
+            updated_at: new Date()
+          })
+          .eq('id', AgentOrchestrator.CIRCUIT_BREAKER_ID);
+
+        if (error) {
+          console.error('Failed to reset circuit breaker on success:', error);
+        } else {
+          console.log('🔄 Circuit breaker RESET - analysis succeeding again');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to reset circuit breaker on success:', error);
+    }
+  }
+
+  // Progressive failure reduction for sustained success
+  private async reduceFailureCount(): Promise<void> {
+    try {
+      const { data: currentState } = await this.supabase
+        .from('circuit_breaker_state')
+        .select('failure_count, is_open')
+        .eq('id', AgentOrchestrator.CIRCUIT_BREAKER_ID)
+        .maybeSingle();
+
+      if (currentState && currentState.failure_count > 0 && !currentState.is_open) {
+        const newCount = Math.max(0, currentState.failure_count - 1);
+        
+        const { error } = await this.supabase
+          .from('circuit_breaker_state')
+          .update({
+            failure_count: newCount,
+            updated_at: new Date()
+          })
+          .eq('id', AgentOrchestrator.CIRCUIT_BREAKER_ID);
+
+        if (!error && newCount < currentState.failure_count) {
+          console.log(`📉 Progressive recovery: failure count reduced to ${newCount}`);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to reduce failure count:', error);
+    }
+  }
+
   private async resetCircuitBreaker(): Promise<void> {
     try {
       const { error } = await this.supabase
@@ -704,6 +777,8 @@ export class AgentOrchestrator {
 
       if (error) {
         console.error('Failed to reset circuit breaker:', error);
+      } else {
+        console.log('🔄 Circuit breaker manually RESET');
       }
     } catch (error) {
       console.error('Failed to reset circuit breaker:', error);
