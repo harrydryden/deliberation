@@ -405,53 +405,131 @@ export class AgentOrchestrator {
     return selectedAgent;
   }
 
-  // UNIFIED MESSAGE ANALYSIS with enhanced timeout and retry logic
-  async analyzeMessage(content: string, openAIApiKey: string): Promise<AnalysisResult> {
-    const maxRetries = 2; // Reduced retries from 3 to 2 for faster response
-    const timeoutMs = 8000; // 8 second timeout per attempt
-    let lastError: any = null;
+  // Circuit breaker state for message analysis
+  private static analysisFailureCount = 0;
+  private static lastAnalysisFailure = 0;
+  private static readonly CIRCUIT_BREAKER_THRESHOLD = 3;
+  private static readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute
 
-    // Ensure content is defined and handle null/undefined cases
+  // ENHANCED MESSAGE ANALYSIS with Model Fallback and Circuit Breaker
+  async analyzeMessage(content: string, openAIApiKey: string): Promise<AnalysisResult> {
+    const startTime = Date.now();
+    
+    // Circuit breaker check
+    if (this.isCircuitBreakerOpen()) {
+      console.warn('🚫 Circuit breaker OPEN - skipping analysis, using intelligent defaults');
+      return this.generateIntelligentDefaults(content);
+    }
+
     const safeContent = content || '';
     const contentPreview = safeContent.length > 0 ? safeContent.substring(0, 100) + '...' : '[empty content]';
     
-    console.log(`🔧 DEBUG: Starting message analysis for content: "${contentPreview}"`);
+    console.log(`🔍 [ANALYSIS] Starting message analysis for: "${contentPreview}"`);
 
+    // Model fallback hierarchy
+    const modelHierarchy = [
+      'gpt-5-2025-08-07',
+      'gpt-4.1-2025-04-14', 
+      'gpt-4o-mini'  // Legacy fallback
+    ];
+
+    let lastError: any = null;
+    
+    // Try each model in the hierarchy
+    for (const modelName of modelHierarchy) {
+      try {
+        console.log(`🤖 [ANALYSIS] Attempting with model: ${modelName}`);
+        
+        const result = await this.attemptAnalysisWithModel(
+          safeContent, 
+          openAIApiKey, 
+          modelName,
+          startTime
+        );
+        
+        // Success - reset circuit breaker
+        AgentOrchestrator.analysisFailureCount = 0;
+        const duration = Date.now() - startTime;
+        console.log(`✅ [ANALYSIS] Success with ${modelName} in ${duration}ms:`, result);
+        
+        return result;
+        
+      } catch (error) {
+        lastError = error;
+        console.error(`❌ [ANALYSIS] Model ${modelName} failed:`, error.message);
+        
+        // Continue to next model unless it's the last one
+        if (modelName !== modelHierarchy[modelHierarchy.length - 1]) {
+          console.log(`🔄 [ANALYSIS] Falling back to next model...`);
+          continue;
+        }
+      }
+    }
+
+    // All models failed - update circuit breaker and return defaults
+    this.recordAnalysisFailure();
+    const duration = Date.now() - startTime;
+    console.error(`❌ [ANALYSIS] All models failed in ${duration}ms, using intelligent defaults:`, lastError?.message);
+    
+    return this.generateIntelligentDefaults(content);
+  }
+
+  private async attemptAnalysisWithModel(
+    content: string, 
+    openAIApiKey: string, 
+    modelName: string,
+    startTime: number
+  ): Promise<AnalysisResult> {
+    const timeoutMs = 12000; // Increased from 8s to 12s
+    const maxRetries = 2;
+    
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`🔍 Message analysis attempt ${attempt}/${maxRetries} for content: "${contentPreview}"`);
+        console.log(`🎯 [ANALYSIS] Model ${modelName}, attempt ${attempt}/${maxRetries}`);
 
         const systemMessage = await this.getSystemMessage('message_analysis_system_message');
-        console.log(`🔧 DEBUG: Got system message for analysis: "${systemMessage.substring(0, 100)}..."`);
-        console.log(`🔧 DEBUG: System message contains 'json': ${systemMessage.toLowerCase().includes('json')}`);
+        console.log(`📝 [ANALYSIS] System message length: ${systemMessage.length} chars`);
 
-        // Add timeout wrapper for each attempt
+        // Use ModelConfigManager for proper parameter handling
+        const { ModelConfigManager } = await import('./model-config.ts');
+        
+        const messages = [
+          { role: 'system', content: systemMessage },
+          { role: 'user', content: content.trim() }
+        ];
+
+        // Generate API params with proper model configuration
+        const apiParams = ModelConfigManager.generateAPIParams(modelName, messages, {
+          stream: false
+        });
+
+        // Remove response_format for newer models to avoid compatibility issues
+        if (!ModelConfigManager.supportsFeature(modelName, 'temperature')) {
+          // For newer models, use text response and parse manually 
+          console.log(`🔧 [ANALYSIS] Using text response for model ${modelName}`);
+        } else {
+          // Legacy models can use JSON format
+          apiParams.response_format = { type: "json_object" };
+          console.log(`🔧 [ANALYSIS] Using JSON response for legacy model ${modelName}`);
+        }
+
+        console.log(`📤 [ANALYSIS] API request params:`, {
+          model: apiParams.model,
+          tokens: apiParams.max_tokens || apiParams.max_completion_tokens,
+          hasResponseFormat: !!apiParams.response_format,
+          hasTemperature: !!apiParams.temperature
+        });
+
+        // Make the API call with timeout
         const analysisPromise = fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${openAIApiKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            model: 'gpt-5-2025-08-07',
-            messages: [
-              {
-                role: 'system',
-                content: systemMessage
-              },
-              {
-                role: 'user',
-                content: safeContent.trim()
-              }
-            ],
-            max_completion_tokens: 150, // Reduced from 200 for faster response
-            response_format: { type: "json_object" }
-          }),
+          body: JSON.stringify(apiParams),
         });
 
-        console.log(`🔧 DEBUG: Making OpenAI API call for message analysis...`);
-
-        // Apply timeout to the entire request
         const response = await Promise.race([
           analysisPromise,
           new Promise<never>((_, reject) => 
@@ -459,62 +537,136 @@ export class AgentOrchestrator {
           )
         ]);
 
-        console.log(`📡 OpenAI API response status: ${response.status}`);
+        const elapsed = Date.now() - startTime;
+        console.log(`📡 [ANALYSIS] Response received: ${response.status} in ${elapsed}ms`);
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`❌ OpenAI API error ${response.status}:`, errorText);
-          throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+          console.error(`❌ [ANALYSIS] OpenAI error ${response.status}:`, errorText.substring(0, 200));
+          throw new Error(`OpenAI API error: ${response.status} - ${errorText.substring(0, 100)}`);
         }
 
         const data = await response.json();
         const analysisContent = data.choices?.[0]?.message?.content;
         
-        console.log(`📄 Raw analysis response:`, analysisContent);
+        console.log(`📄 [ANALYSIS] Raw response:`, analysisContent?.substring(0, 200) + '...');
 
-        if (!analysisContent) {
-          throw new Error('No analysis content received from OpenAI');
+        if (!analysisContent || analysisContent.trim() === '') {
+          throw new Error('Empty analysis content received from OpenAI');
         }
 
-        // Parse and validate the JSON response
+        // Parse response (handle both JSON and text responses)
         let parsedResult: any;
-        try {
-          parsedResult = JSON.parse(analysisContent);
-          console.log(`🔧 DEBUG: Parsed analysis result:`, parsedResult);
-        } catch (parseError) {
-          console.error(`❌ JSON parse error:`, parseError);
-          throw new Error(`Invalid JSON response: ${analysisContent}`);
+        
+        if (apiParams.response_format?.type === "json_object") {
+          // Parse JSON response
+          try {
+            parsedResult = JSON.parse(analysisContent);
+          } catch (parseError) {
+            console.error(`❌ [ANALYSIS] JSON parse error:`, parseError);
+            throw new Error(`Invalid JSON response from ${modelName}: ${analysisContent.substring(0, 100)}`);
+          }
+        } else {
+          // Parse text response for newer models
+          parsedResult = this.parseTextAnalysisResponse(analysisContent);
         }
 
-        // Validate required fields and types
+        console.log(`🔧 [ANALYSIS] Parsed result:`, parsedResult);
+
+        // Validate and format the result
         const result: AnalysisResult = {
           intent: this.validateIntent(parsedResult.intent) || 'general',
           complexity: this.validateNumber(parsedResult.complexity, 0, 1) ?? 0.5,
           topicRelevance: this.validateNumber(parsedResult.topicRelevance, 0, 1) ?? 0.5,
-          requiresExpertise: Boolean(parsedResult.requiresExpertise)
+          requiresExpertise: Boolean(parsedResult.requiresExpertise),
+          confidence: this.validateNumber(parsedResult.confidence, 0, 1) ?? 0.8
         };
 
-        console.log(`✅ Message analysis successful:`, result);
+        console.log(`✅ [ANALYSIS] Validated result:`, result);
         return result;
 
       } catch (error) {
-        lastError = error;
-        console.error(`❌ Message analysis attempt ${attempt} failed:`, error);
-        console.error(`❌ Error stack:`, error.stack);
+        console.error(`❌ [ANALYSIS] Attempt ${attempt} failed:`, error.message);
         
         if (attempt < maxRetries) {
-          const delay = attempt * 500; // Reduced delay from 1000ms to 500ms
-          console.log(`🔄 Retrying in ${delay}ms...`);
+          const delay = attempt * 1000; // 1s, 2s delays
+          console.log(`🔄 [ANALYSIS] Retrying in ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw error; // Re-throw on final attempt
         }
       }
     }
+  }
 
-    // All retries failed, return intelligent defaults based on content analysis
-    console.error(`❌ All message analysis attempts failed, using intelligent defaults:`, lastError);
-    const defaults = this.generateIntelligentDefaults(content);
-    console.log(`🔧 DEBUG: Using intelligent defaults:`, defaults);
-    return defaults;
+  private parseTextAnalysisResponse(content: string): any {
+    // Extract JSON from text response for newer models
+    try {
+      // Look for JSON object in the response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      
+      // Fallback: parse structured text response
+      const lines = content.split('\n').map(l => l.trim()).filter(l => l);
+      const result: any = {};
+      
+      for (const line of lines) {
+        if (line.includes('intent')) {
+          const match = line.match(/intent.*?[:=]\s*"?([^"]+)"?/i);
+          if (match) result.intent = match[1].trim();
+        }
+        if (line.includes('complexity')) {
+          const match = line.match(/complexity.*?[:=]\s*([0-9.]+)/i);
+          if (match) result.complexity = parseFloat(match[1]);
+        }
+        if (line.includes('topicRelevance') || line.includes('topic_relevance')) {
+          const match = line.match(/topic[_\s]?relevance.*?[:=]\s*([0-9.]+)/i);
+          if (match) result.topicRelevance = parseFloat(match[1]);
+        }
+        if (line.includes('requiresExpertise') || line.includes('requires_expertise')) {
+          const match = line.match(/requires[_\s]?expertise.*?[:=]\s*(true|false)/i);
+          if (match) result.requiresExpertise = match[1].toLowerCase() === 'true';
+        }
+      }
+      
+      console.log(`🔧 [ANALYSIS] Parsed from text:`, result);
+      return result;
+    } catch (error) {
+      console.error(`❌ [ANALYSIS] Text parsing failed:`, error);
+      throw new Error(`Failed to parse text analysis response: ${content.substring(0, 100)}`);
+    }
+  }
+
+  private isCircuitBreakerOpen(): boolean {
+    const now = Date.now();
+    
+    if (AgentOrchestrator.analysisFailureCount >= AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD) {
+      const timeSinceLastFailure = now - AgentOrchestrator.lastAnalysisFailure;
+      
+      if (timeSinceLastFailure < AgentOrchestrator.CIRCUIT_BREAKER_TIMEOUT) {
+        return true; // Circuit is open
+      } else {
+        // Reset circuit breaker after timeout
+        console.log(`🔄 [CIRCUIT-BREAKER] Resetting after ${timeSinceLastFailure}ms`);
+        AgentOrchestrator.analysisFailureCount = 0;
+        return false;
+      }
+    }
+    
+    return false; // Circuit is closed
+  }
+
+  private recordAnalysisFailure(): void {
+    AgentOrchestrator.analysisFailureCount++;
+    AgentOrchestrator.lastAnalysisFailure = Date.now();
+    
+    console.log(`⚠️ [CIRCUIT-BREAKER] Failure count: ${AgentOrchestrator.analysisFailureCount}/${AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD}`);
+    
+    if (AgentOrchestrator.analysisFailureCount >= AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD) {
+      console.warn(`🚫 [CIRCUIT-BREAKER] OPENED - Analysis disabled for ${AgentOrchestrator.CIRCUIT_BREAKER_TIMEOUT}ms`);
+    }
   }
 
   private validateIntent(intent: any): string | null {
@@ -533,41 +685,118 @@ export class AgentOrchestrator {
     return null;
   }
 
-  private generateIntelligentDefaults(content: string): AnalysisResult {
+  generateIntelligentDefaults(content: string): AnalysisResult {
     const lowerContent = content.toLowerCase();
+    const wordCount = content.split(/\s+/).length;
     
-    // Basic intent detection using keywords
+    console.log(`🧠 [DEFAULTS] Generating intelligent defaults for ${content.length} chars, ${wordCount} words`);
+    
+    // Enhanced intent detection using keywords
     let intent = 'general';
-    if (lowerContent.includes('policy') || lowerContent.includes('bill') || lowerContent.includes('legislation')) {
+    let intentConfidence = 0.3;
+    
+    // Policy/Legal keywords (high confidence)
+    if (lowerContent.match(/\b(policy|policies|bill|legislation|regulation|statute|law|legal|governance|government)\b/)) {
       intent = 'policy';
-    } else if (lowerContent.includes('legal') || lowerContent.includes('law')) {
-      intent = 'legal';  
-    } else if (lowerContent.includes('what') || lowerContent.includes('how') || lowerContent.includes('?')) {
+      intentConfidence = 0.9;
+    } 
+    // Question keywords (medium confidence)
+    else if (lowerContent.match(/\b(what|how|why|when|where|who|should|could|would)\b/) || content.includes('?')) {
       intent = 'question';
-    } else if (lowerContent.includes('other') || lowerContent.includes('participant') || lowerContent.includes('people')) {
+      intentConfidence = 0.7;
+    }
+    // Participant/Perspective keywords (medium confidence)
+    else if (lowerContent.match(/\b(participant|people|others|perspective|view|opinion|think|believe|feel)\b/)) {
       intent = 'participant';
+      intentConfidence = 0.6;
+    }
+    // Clarification keywords (medium confidence)
+    else if (lowerContent.match(/\b(clarify|explain|understand|confus|unclear|mean|definition)\b/)) {
+      intent = 'clarify';
+      intentConfidence = 0.7;
     }
 
-    // Basic complexity estimation
-    let complexity = 0.3; // Lower default
-    if (content.length > 200) complexity += 0.2;
-    if (lowerContent.includes('complex') || lowerContent.includes('detailed') || lowerContent.includes('nuanced')) complexity += 0.3;
-    if (content.split(' ').length > 50) complexity += 0.2;
+    // Enhanced complexity estimation with multiple factors
+    let complexity = 0.2; // Lower base complexity
+    
+    // Length-based complexity
+    if (content.length > 300) complexity += 0.3;
+    else if (content.length > 150) complexity += 0.2;
+    else if (content.length > 75) complexity += 0.1;
+    
+    // Word count complexity
+    if (wordCount > 100) complexity += 0.3;
+    else if (wordCount > 50) complexity += 0.2;
+    else if (wordCount > 25) complexity += 0.1;
+    
+    // Complexity keywords
+    const complexityKeywords = ['complex', 'complicated', 'detailed', 'nuanced', 'multifaceted', 'intricate', 'sophisticated', 'comprehensive'];
+    const foundComplexityKeywords = complexityKeywords.filter(keyword => lowerContent.includes(keyword));
+    complexity += foundComplexityKeywords.length * 0.15;
+    
+    // Technical/domain-specific terms
+    const technicalTerms = ['implementation', 'framework', 'methodology', 'analysis', 'assessment', 'evaluation', 'consideration'];
+    const foundTechnicalTerms = technicalTerms.filter(term => lowerContent.includes(term));
+    complexity += foundTechnicalTerms.length * 0.1;
+    
+    // Sentence complexity (multiple clauses, conjunctions)
+    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const avgSentenceLength = sentences.length > 0 ? content.length / sentences.length : 0;
+    if (avgSentenceLength > 120) complexity += 0.2;
+    else if (avgSentenceLength > 80) complexity += 0.1;
+    
     complexity = Math.min(complexity, 1.0);
 
-    // Basic topic relevance
-    let topicRelevance = 0.3; // Lower default
-    if (intent === 'policy' || intent === 'legal') topicRelevance = 0.8;
-    else if (lowerContent.includes('deliberation') || lowerContent.includes('discussion')) topicRelevance = 0.6;
+    // Enhanced topic relevance with context awareness
+    let topicRelevance = 0.2; // Lower base relevance
+    
+    // High relevance for policy/legal content
+    if (intent === 'policy' || intent === 'legal') {
+      topicRelevance = 0.85;
+    }
+    // Medium-high relevance for deliberation-specific terms
+    else if (lowerContent.match(/\b(deliberation|discussion|debate|forum|consensus|decision|stakeholder|citizen)\b/)) {
+      topicRelevance = 0.7;
+    }
+    // Medium relevance for civic engagement terms
+    else if (lowerContent.match(/\b(public|community|civic|municipal|city|county|state|federal|democracy)\b/)) {
+      topicRelevance = 0.6;
+    }
+    // Lower relevance for questions and clarifications (still valuable but less topic-specific)
+    else if (intent === 'question' || intent === 'clarify') {
+      topicRelevance = 0.4;
+    }
+    // Adjust based on content length and substance
+    if (wordCount > 20 && !lowerContent.match(/\b(hi|hello|thanks|okay|yes|no)\b/)) {
+      topicRelevance += 0.1;
+    }
 
-    const result = {
+    // Enhanced expertise requirement logic
+    const requiresExpertise = 
+      (intent === 'policy' || intent === 'legal') ||  // Policy/legal always requires expertise
+      complexity > 0.7 ||                            // High complexity content
+      (complexity > 0.5 && topicRelevance > 0.6) ||  // Medium-high complexity + relevance
+      lowerContent.match(/\b(technical|specification|requirement|compliance|regulatory|administrative)\b/) !== null;
+
+    const result: AnalysisResult = {
       intent,
       complexity: Math.round(complexity * 100) / 100,
       topicRelevance: Math.round(topicRelevance * 100) / 100,
-      requiresExpertise: intent === 'policy' || intent === 'legal' || complexity > 0.7
+      requiresExpertise,
+      confidence: Math.round(intentConfidence * 100) / 100
     };
 
-    console.log(`🧠 Intelligent defaults generated:`, result);
+    console.log(`🧠 [DEFAULTS] Generated:`, {
+      ...result,
+      factors: {
+        contentLength: content.length,
+        wordCount,
+        complexityKeywords: foundComplexityKeywords,
+        technicalTerms: foundTechnicalTerms,
+        avgSentenceLength: Math.round(avgSentenceLength)
+      }
+    });
+    
     return result;
   }
 

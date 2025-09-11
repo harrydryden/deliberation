@@ -138,13 +138,9 @@ async function processOrchestration(
       messageAnalysis = await orchestrator.analyzeMessage(message.content, openAIApiKey);
       console.log(`🔍 [ANALYSIS] Message analysis complete:`, messageAnalysis);
     } catch (error) {
-      console.warn(`⚠️ [ANALYSIS] Message analysis failed, using defaults:`, error);
-      messageAnalysis = {
-        intent: 'general',
-        complexity: 0.5,
-        topicRelevance: 0.5,
-        requiresExpertise: false
-      };
+      console.warn(`⚠️ [ANALYSIS] Message analysis failed, using enhanced defaults:`, error);
+      messageAnalysis = orchestrator.generateIntelligentDefaults(message.content);
+      console.log(`🧠 [FALLBACK] Using intelligent defaults:`, messageAnalysis);
     }
 
     // Build conversation context for both modes (needed for system prompt generation)
