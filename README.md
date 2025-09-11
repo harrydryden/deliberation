@@ -53,10 +53,19 @@ npm install
 ```
 
 3. Set up environment variables
+
+Copy the example environment file and configure it with your Supabase project details:
+
 ```bash
 cp .env.example .env
-# Edit .env with your Supabase credentials
+# Edit .env with your Supabase project URL and keys
 ```
+
+**Required environment variables:**
+- `VITE_SUPABASE_URL` - Your Supabase project URL
+- `VITE_SUPABASE_PUBLISHABLE_KEY` - Your Supabase anon/publishable key
+
+See [Environment Setup Guide](docs/ENVIRONMENT_SETUP.md) for detailed configuration instructions.
 
 4. Start the development server
 ```bash
@@ -65,11 +74,20 @@ npm run dev
 
 The application will be available at `http://localhost:8080`.
 
+### Production Deployment
+
+This application is ready for production deployment and self-hosting. See our comprehensive guides:
+
+- **[Environment Setup Guide](docs/ENVIRONMENT_SETUP.md)** - Configure environment variables
+- **[Production Deployment Guide](docs/PRODUCTION_DEPLOYMENT.md)** - Complete deployment instructions
+- **[Self-Hosting Guide](docs/PRODUCTION_DEPLOYMENT.md#self-hosting)** - Deploy on your own infrastructure
+
 ### Database Setup
 
-1. Create a new Supabase project
-2. Run the migrations in the `supabase/migrations/` folder
-3. Set up your environment variables with the Supabase URL and keys
+1. Create a new Supabase project at [supabase.com](https://supabase.com)
+2. Run the database migrations from the `supabase/migrations/` folder
+3. Configure your environment variables with the Supabase URL and keys
+4. The application includes Row Level Security (RLS) policies for data protection
 
 ## Project Structure
 

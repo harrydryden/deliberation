@@ -4,18 +4,6 @@ import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  // Conditional import for Lovable development compatibility
-  let componentTagger = null;
-  if (mode === 'development') {
-    try {
-      const { componentTagger: tagger } = eval('require("lovable-tagger")');
-      componentTagger = tagger;
-    } catch {
-      // Gracefully handle missing dependency
-      componentTagger = null;
-    }
-  }
-
   return {
   server: {
     host: "::",
@@ -23,8 +11,7 @@ export default defineConfig(({ mode }) => {
   },
   plugins: [
     react(),
-    componentTagger && componentTagger(),
-  ].filter(Boolean),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

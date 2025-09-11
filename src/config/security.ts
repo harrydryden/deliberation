@@ -46,7 +46,7 @@ export const SECURITY_CONFIG = {
     'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
     'font-src': ["'self'", 'https://fonts.gstatic.com'],
     'img-src': ["'self'", 'data:', 'https:'],
-    'connect-src': ["'self'", 'https://*.supabase.co'],
+    'connect-src': ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co'],
     'object-src': ["'none'"],
     'base-uri': ["'self'"],
     'form-action': ["'self'"],

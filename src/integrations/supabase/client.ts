@@ -1,28 +1,18 @@
 import { createClient } from '@supabase/supabase-js'
 import { networkTracker } from '@/utils/networkTracker'
+import { getSupabaseUrl, getSupabaseAnonKey } from '@/config/environment'
 
-// Environment-based configuration with fallbacks for Lovable compatibility
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 
-                   (typeof process !== 'undefined' ? process.env.SUPABASE_URL : null) || 
-                   'https://iowsxuxkgvpgrvvklwyt.supabase.co'
-
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 
-                       import.meta.env.VITE_SUPABASE_ANON_KEY ||
-                       (typeof process !== 'undefined' ? process.env.SUPABASE_ANON_KEY : null) || 
-                       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlvd3N4dXhrZ3ZwZ3J2dmtsd3l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzMDAwOTYsImV4cCI6MjA2ODg3NjA5Nn0.WSXdI12OCdcJ-3ktEjdY9G5wHzzmD-98kBlJxPg1yhM'
-
-// Validate required environment variables
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing required Supabase configuration')
-}
+// Get validated configuration
+const supabaseUrl = getSupabaseUrl()
+const supabaseAnonKey = getSupabaseAnonKey()
 
 // F007 Fix: Create custom fetch that integrates with performance monitoring
 const performanceTrackedFetch = (url: RequestInfo | URL, options?: RequestInit): Promise<Response> => {
   const urlString = typeof url === 'string' ? url : url.toString()
   const method = options?.method || 'GET'
   
-  // Only track Supabase API calls
-  if (urlString.includes('supabase.co')) {
+  // Only track Supabase API calls (using domain detection)
+  if (urlString.includes('.supabase.co') || urlString.includes('supabase')) {
     const id = `supabase_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     
     networkTracker.startRequest(id, urlString, method, 'api')

@@ -1,4 +1,4 @@
-// Environment configuration utilities for Lovable-independent operation
+// Environment configuration utilities for self-hosting compatibility
 
 export const isProduction = () => {
   return import.meta.env.NODE_ENV === 'production' || 
@@ -11,7 +11,7 @@ export const isDevelopment = () => {
 
 // Get environment variable with multiple fallback sources
 export const getEnvVar = (viteKey: string, processKey?: string, fallback?: string): string => {
-  // Try Vite environment variables first (for Lovable compatibility)
+  // Try Vite environment variables first (for build-time compatibility)
   const viteValue = import.meta.env[viteKey];
   if (viteValue) return viteValue;
   
