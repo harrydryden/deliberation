@@ -103,8 +103,8 @@ const OptimizedDeliberationChat = () => {
   chatModeRef.current = uiState.chatMode;
   deliberationRef.current = dataState.deliberation;
 
-  // Initialize message queue system with stable instance
-  const messageQueue = useMemo(() => useMessageQueue(3), []); // max 3 concurrent messages
+  // Initialize message queue system - must be called at top level
+  const messageQueue = useMessageQueue(3); // max 3 concurrent messages
 
   const {
     messages,
@@ -703,10 +703,10 @@ const OptimizedDeliberationChat = () => {
                               className="w-full text-left p-3 rounded-lg border border-border bg-card hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-primary/50" 
                               onClick={() => setUiState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
                               title="Click to view full description">
-                              <p className="text-sm text-card-foreground">
-                                <span className="font-semibold text-primary group-hover:text-accent-foreground">Description:</span> 
-                                <span className="ml-1 group-hover:text-accent-foreground">{dataState.deliberation.description.length > 200 ? `${dataState.deliberation.description.slice(0, 200)}...` : dataState.deliberation.description}</span>
-                              </p>
+                               <p className="text-sm text-card-foreground">
+                                 <span className="font-semibold text-primary group-hover:text-accent-foreground">Description:</span> 
+                                 <span className="ml-1 group-hover:text-accent-foreground">{(dataState.deliberation.description?.length ?? 0) > 200 ? `${dataState.deliberation.description?.slice(0, 200)}...` : dataState.deliberation.description}</span>
+                               </p>
                             </button>
                           )}
                           {dataState.deliberation.notion && (
@@ -714,10 +714,10 @@ const OptimizedDeliberationChat = () => {
                               className="w-full text-left p-3 rounded-lg border border-border bg-card hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-primary/50" 
                               onClick={() => setUiState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
                               title="Click to view full notion statement">
-                              <p className="text-sm text-card-foreground">
-                                <span className="font-semibold text-primary group-hover:text-accent-foreground">Notion:</span> 
-                                <span className="ml-1 group-hover:text-accent-foreground">{dataState.deliberation.notion?.length > 200 ? `${dataState.deliberation.notion.slice(0, 200)}...` : dataState.deliberation.notion}</span>
-                              </p>
+                               <p className="text-sm text-card-foreground">
+                                 <span className="font-semibold text-primary group-hover:text-accent-foreground">Notion:</span> 
+                                 <span className="ml-1 group-hover:text-accent-foreground">{(dataState.deliberation.notion?.length ?? 0) > 200 ? `${dataState.deliberation.notion?.slice(0, 200)}...` : dataState.deliberation.notion}</span>
+                               </p>
                             </button>
                           )}
                         </div>
@@ -741,14 +741,14 @@ const OptimizedDeliberationChat = () => {
                     />
                   </div>
                   <div className="rounded-lg border bg-muted/40 p-2 flex-1">
-                    <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
-                      <VoiceInterfaceLazy 
-                        deliberationId={dataState.deliberation.id} 
-                        variant="panel" 
-                        sendMessage={sendMessage}
-                        setMessageText={setMessageText}
-                      />
-                    </Suspense>
+                     <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
+                       <VoiceInterfaceLazy 
+                         deliberationId={dataState.deliberation?.id || ''} 
+                         variant="panel" 
+                         sendMessage={sendMessage}
+                         setMessageText={setMessageText}
+                       />
+                     </Suspense>
                   </div>
                   <div className="rounded-lg border bg-muted/40 px-3 py-2 flex flex-col justify-center">
                     <ParticipantScoring {...userMetrics} />
@@ -764,9 +764,9 @@ const OptimizedDeliberationChat = () => {
                   <Users className="h-4 w-4" />
                   <span>{dataState.deliberation.participant_count || 0} participants</span>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  Created {new Date(dataState.deliberation.created_at).toLocaleDateString()}
-                </div>
+                 <div className="text-xs text-muted-foreground">
+                   Created {dataState.deliberation.created_at ? new Date(dataState.deliberation.created_at).toLocaleDateString() : 'Unknown'}
+                 </div>
               </div>
             </div>
 
@@ -795,26 +795,26 @@ const OptimizedDeliberationChat = () => {
             {uiState.viewMode === 'chat' ? (
               <ChatPanel />
             ) : uiState.viewMode === 'ibis' ? (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading map…</div></div>}>
-                <IbisMapVisualizationLazy deliberationId={dataState.deliberation.id} />
-              </Suspense>
-            ) : (
-              <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading table…</div></div>}>
-                <IbisTableViewLazy deliberationId={dataState.deliberation.id} />
-              </Suspense>
+               <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading map…</div></div>}>
+                 <IbisMapVisualizationLazy deliberationId={dataState.deliberation?.id || ''} />
+               </Suspense>
+             ) : (
+               <Suspense fallback={<div className="flex-1 flex items-center justify-center p-6"><div className="animate-pulse text-muted-foreground">Loading table…</div></div>}>
+                 <IbisTableViewLazy deliberationId={dataState.deliberation?.id || ''} />
+               </Suspense>
             )}
           </div>
           
           {/* IBIS Submission Modal */}
           {dataState.deliberation && (
-            <IbisSubmissionModal 
-              isOpen={ibisModal.isOpen} 
-              onClose={handleIbisModalClose} 
-              messageId={ibisModal.messageId} 
-              messageContent={ibisModal.messageContent} 
-              deliberationId={dataState.deliberation.id} 
-              onSuccess={handleIbisSuccess} 
-            />
+             <IbisSubmissionModal 
+               isOpen={ibisModal.isOpen} 
+               onClose={handleIbisModalClose} 
+               messageId={ibisModal.messageId} 
+               messageContent={ibisModal.messageContent} 
+               deliberationId={dataState.deliberation?.id || ''} 
+               onSuccess={handleIbisSuccess} 
+             />
           )}
         </div>
       )}
