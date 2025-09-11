@@ -23,7 +23,7 @@ export const ParticipantScoring = ({
     return Array.from({ length: 5 }, (_, i) => (
       <Star
         key={i}
-        className={`h-6 w-6 ${
+        className={`h-3 w-3 ${
           i < filledStars 
             ? 'fill-civic-gold text-civic-gold' 
             : 'text-muted-foreground'
@@ -76,7 +76,7 @@ export const ParticipantScoring = ({
     const position = ((displayStanceScore + 1) / 2) * 100;
     
     return (
-      <div className="relative w-40 h-4 flex items-center">
+      <div className="relative w-20 h-4 flex items-center">
         {/* Horizontal line */}
         <div className="absolute w-full h-0.5 bg-border"></div>
         {/* Center mark */}
