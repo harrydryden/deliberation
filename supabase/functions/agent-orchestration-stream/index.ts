@@ -84,10 +84,10 @@ async function processOrchestration(
       throw new Error(`Failed to get agents: ${agentsError.message}`);
     }
 
-    console.log(`🤖 Found ${agents?.length || 0} active agents`);
+    console.log(`🤖 Found ${Array.isArray(agents) ? agents.length : 0} active agents`);
 
     // Simple agent selection - pick the first active agent
-    const selectedAgent = agents?.[0];
+    const selectedAgent = Array.isArray(agents) && agents.length > 0 ? agents[0] : null;
     if (!selectedAgent) {
       throw new Error('No active agents found for this deliberation');
     }
@@ -122,7 +122,9 @@ async function processOrchestration(
     }
 
     const data = await response.json();
-    const fullResponse = data.choices?.[0]?.message?.content || '';
+    const fullResponse = Array.isArray(data.choices) && data.choices.length > 0 
+      ? data.choices[0]?.message?.content || ''
+      : '';
 
     if (!fullResponse) {
       throw new Error('No response generated from OpenAI');

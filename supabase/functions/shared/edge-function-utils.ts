@@ -183,7 +183,7 @@ export async function parseAndValidateRequest<T>(
     }), {})
   });
 
-  const missing = requiredFields.filter(field => !(field in body));
+  const missing = (requiredFields || []).filter(field => !(field in body));
   if (missing.length > 0) {
     console.error(`❌ [PHASE1] Required field validation failed`, {
       requestId,
