@@ -461,7 +461,6 @@ export class AgentOrchestrator {
 
     return finalSelection;
   }
-  }
 
   // Circuit breaker configuration - persistent via database
   private static readonly CIRCUIT_BREAKER_ID = 'message_analysis';
