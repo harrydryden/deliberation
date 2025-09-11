@@ -250,15 +250,31 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       });
       
       // Trigger agent orchestration after message is saved and verified
-      await triggerAgentOrchestration(saved.id, deliberationId, queuedMessage.mode, setTypingState);
-      
-      logger.info('✅ Agent orchestration completed successfully', { 
-        messageId: queuedMessage.id,
-        dbMessageId: saved.id
-      });
-      
-      // Update queue status to completed and force refresh
-      messageQueue.updateMessageStatus(queuedMessage.id, 'completed');
+      try {
+        await triggerAgentOrchestration(saved.id, deliberationId, queuedMessage.mode, setTypingState);
+        
+        logger.info('✅ Agent orchestration completed successfully', { 
+          messageId: queuedMessage.id,
+          dbMessageId: saved.id
+        });
+        
+        // Only mark as completed if orchestration actually succeeded
+        messageQueue.updateMessageStatus(queuedMessage.id, 'completed');
+        
+      } catch (orchestrationError) {
+        logger.error('🚨 Agent orchestration failed', orchestrationError as Error, {
+          messageId: queuedMessage.id,
+          dbMessageId: saved.id
+        });
+        
+        // Mark as failed so it can be retried
+        messageQueue.updateMessageStatus(queuedMessage.id, 'failed', 
+          orchestrationError instanceof Error ? orchestrationError.message : 'Orchestration failed'
+        );
+        
+        // Don't throw here - let the message stay in queue for retry
+        return;
+      }
       
       // Force refresh messages after agent response
       setTimeout(() => {

@@ -93,10 +93,17 @@ export const useAgentOrchestrationTrigger = () => {
           timestamp: new Date().toISOString()
         });
 
-        // Use supabase.functions.invoke like all other working functions
+        // Get current session to ensure authentication
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('Authentication required - please refresh and try again');
+        }
+
+        // Use supabase.functions.invoke with proper authentication
         const result = await supabase.functions.invoke('agent-orchestration-stream', {
           body: requestPayload,
           headers: {
+            'Authorization': `Bearer ${session.access_token}`,
             'X-Request-ID': requestId
           }
         });

@@ -41,10 +41,11 @@ export const useRealtimeConnection = (deliberationId?: string): RealtimeConnecti
   const performHealthCheck = useCallback(() => {
     const now = Date.now();
     const timeSinceLastActivity = now - state.lastActivity;
-    const staleThreshold = 60000; // 1 minute
+    const staleThreshold = 300000; // 5 minutes (increased from 1 minute)
 
-    if (timeSinceLastActivity > staleThreshold && state.isConnected) {
-      productionLogger.warn('Real-time connection appears stale', {
+    // Only mark as error if truly disconnected AND stale
+    if (timeSinceLastActivity > staleThreshold && !state.isConnected) {
+      productionLogger.warn('Real-time connection appears stale and disconnected', {
         timeSinceLastActivity,
         deliberationId
       });
@@ -52,7 +53,7 @@ export const useRealtimeConnection = (deliberationId?: string): RealtimeConnecti
       setState(prev => ({
         ...prev,
         status: 'error',
-        connectionError: 'Connection appears stale'
+        connectionError: 'Connection stale and disconnected'
       }));
     }
   }, [state.lastActivity, state.isConnected, deliberationId]);
@@ -113,7 +114,8 @@ export const useRealtimeConnection = (deliberationId?: string): RealtimeConnecti
               isConnected: true,
               status: 'connected',
               reconnectAttempts: 0,
-              connectionError: null
+              connectionError: null,
+              lastActivity: Date.now() // Update activity on successful subscription
             }));
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             setState(prev => ({
