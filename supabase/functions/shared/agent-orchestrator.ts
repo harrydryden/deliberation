@@ -231,13 +231,30 @@ export class AgentOrchestrator {
       const { data: templateData, error } = await this.supabase
         .rpc('get_prompt_template', { template_name: templateName });
 
-      if (templateData && templateData.length > 0) {
+      if (error) {
+        console.error(`RPC error getting template ${templateName}:`, error);
+        return this.getFallbackTemplate(templateName);
+      }
+
+      if (templateData && templateData.length > 0 && templateData[0].template_text) {
         return templateData[0].template_text;
       }
+
+      console.warn(`Template ${templateName} not found or empty, using fallback`);
+      return this.getFallbackTemplate(templateName);
     } catch (error) {
-      console.log(`Failed to fetch ${templateName} template:`, error);
-      throw new Error(`Template ${templateName} not available`);
+      console.error(`Failed to get template ${templateName}:`, error);
+      return this.getFallbackTemplate(templateName);
     }
+  }
+
+  private getFallbackTemplate(templateName: string): string {
+    const fallbacks = {
+      'message_analysis_system_message': 'Analyze the user message for intent, complexity, and topic relevance. Return JSON with: intent (general/question/issue/argument), complexity (0.0-1.0), topicRelevance (0.0-1.0), requiresExpertise (boolean).',
+      'default': 'You are a helpful AI assistant. Provide a thoughtful response to the user.'
+    };
+    
+    return fallbacks[templateName] || fallbacks['default'];
   }
 
   // ENHANCED AGENT SELECTION ALGORITHM
