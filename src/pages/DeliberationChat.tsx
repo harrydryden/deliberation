@@ -649,10 +649,10 @@ const OptimizedDeliberationChat = () => {
                 <div className="flex-1 min-w-0 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="space-y-2">
-                      <h1 className="text-2xl font-bold text-foreground truncate">
+                      <h1 className="text-xl font-semibold text-foreground truncate">
                         {dataState.deliberation.title}
                       </h1>
-                       <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white w-fit`}>
+                       <Badge className={`${getStatusColor(dataState.deliberation.status)} text-white w-fit text-sm`}>
                          {dataState.deliberation.status}
                        </Badge>
                     </div>
@@ -681,10 +681,10 @@ const OptimizedDeliberationChat = () => {
                               className="flex-1 text-left p-3 rounded-lg border border-border bg-card hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-primary/50" 
                               onClick={() => setUiState(prev => ({ ...prev, modalContent: 'description', isDescriptionOpen: true }))} 
                               title="Click to view full description">
-                               <p className="text-sm text-card-foreground">
-                                 <span className="font-semibold text-primary group-hover:text-accent-foreground">Description:</span> 
-                                 <span className="ml-1 group-hover:text-accent-foreground">{(dataState.deliberation.description?.length ?? 0) > 200 ? `${dataState.deliberation.description?.slice(0, 200)}...` : dataState.deliberation.description}</span>
-                               </p>
+                                <p className="text-sm text-card-foreground">
+                                  <span className="font-medium text-primary group-hover:text-accent-foreground">Description:</span> 
+                                  <span className="ml-1 group-hover:text-accent-foreground">{(dataState.deliberation.description?.length ?? 0) > 200 ? `${dataState.deliberation.description?.slice(0, 200)}...` : dataState.deliberation.description}</span>
+                                </p>
                             </button>
                           )}
                           {dataState.deliberation.notion && (
@@ -692,10 +692,10 @@ const OptimizedDeliberationChat = () => {
                               className="flex-1 text-left p-3 rounded-lg border border-border bg-card hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200 group focus:outline-none focus:ring-2 focus:ring-primary/50" 
                               onClick={() => setUiState(prev => ({ ...prev, modalContent: 'notion', isDescriptionOpen: true }))} 
                               title="Click to view full notion statement">
-                               <p className="text-sm text-card-foreground">
-                                 <span className="font-semibold text-primary group-hover:text-accent-foreground">Notion:</span> 
-                                 <span className="ml-1 group-hover:text-accent-foreground">{(dataState.deliberation.notion?.length ?? 0) > 200 ? `${dataState.deliberation.notion?.slice(0, 200)}...` : dataState.deliberation.notion}</span>
-                               </p>
+                                <p className="text-sm text-card-foreground">
+                                  <span className="font-medium text-primary group-hover:text-accent-foreground">Notion:</span> 
+                                  <span className="ml-1 group-hover:text-accent-foreground">{(dataState.deliberation.notion?.length ?? 0) > 200 ? `${dataState.deliberation.notion?.slice(0, 200)}...` : dataState.deliberation.notion}</span>
+                                </p>
                             </button>
                           )}
                         </div>
