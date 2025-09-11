@@ -61,26 +61,29 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
       id: messageId,
       content: content.trim(),
       status: 'queued',
-      queuePosition: queueState.queue.length,
+      queuePosition: 0, // Will be set by setQueueState
       parentMessageId,
       timestamp: new Date(),
       retries: 0,
       mode
     };
 
-    setQueueState(prev => ({
-      ...prev,
-      queue: [...prev.queue, queuedMessage]
-    }));
+    setQueueState(prev => {
+      const newQueue = [...prev.queue, { ...queuedMessage, queuePosition: prev.queue.length }];
+      return {
+        ...prev,
+        queue: newQueue
+      };
+    });
 
     logger.info('📋 Message added to queue', { 
       messageId, 
       queuePosition: queuedMessage.queuePosition,
-      queueLength: queueState.queue.length + 1
+      mode
     });
 
     return messageId;
-  }, [queueState.queue.length]);
+  }, []); // Remove unstable dependency
 
   const updateMessageStatus = useCallback((messageId: string, status: QueuedMessage['status'], error?: string) => {
     setQueueState(prev => {
@@ -333,7 +336,7 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
     return () => clearInterval(cleanupInterval);
   }, [clearFailedMessages, clearStaleMessages]);
 
-  // Highly optimized queue statistics - only recalculate when necessary
+  // Memoize queue statistics to prevent re-renders
   const getQueueStats = useMemo(() => {
     const messages = queueState.queue;
     const processingSize = queueState.processing.size;
@@ -358,9 +361,10 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
       canProcess: processingSize < queueState.maxConcurrent,
       isEmpty: totalActive === 0
     };
-  }, [queueState.queue.length, queueState.processing.size, queueState.queue]);
+  }, [queueState.queue, queueState.processing.size, queueState.maxConcurrent]);
 
-  return {
+  // Memoize the return object to prevent re-renders
+  const memoizedReturn = useMemo(() => ({
     queue: queueState.queue,
     processing: queueState.processing,
     addToQueue,
@@ -372,5 +376,19 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
     clearFailedMessages,
     clearStaleMessages,
     getQueueStats
-  };
+  }), [
+    queueState.queue,
+    queueState.processing,
+    addToQueue,
+    updateMessageStatus,
+    getNextQueuedMessage,
+    removeFromQueue,
+    retryMessage,
+    clearQueue,
+    clearFailedMessages,
+    clearStaleMessages,
+    getQueueStats
+  ]);
+
+  return memoizedReturn;
 };

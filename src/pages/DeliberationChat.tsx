@@ -100,18 +100,8 @@ const OptimizedDeliberationChat = () => {
   chatModeRef.current = uiState.chatMode;
   deliberationRef.current = dataState.deliberation;
 
-  // Initialize message queue system
-  const messageQueue = useMessageQueue(3); // max 3 concurrent messages
-  
-  // DEBUG: Add logging to verify queue initialization
-  useEffect(() => {
-    console.log('🔧 [DEBUG] Message queue initialized:', {
-      hasQueue: !!messageQueue,
-      queueStats: messageQueue?.getQueueStats,
-      deliberationId,
-      timestamp: new Date().toISOString()
-    });
-  }, [messageQueue, deliberationId]);
+  // Initialize message queue system with stable reference
+  const messageQueue = useMemo(() => useMessageQueue(3), []); // max 3 concurrent messages
 
   const {
     messages,
