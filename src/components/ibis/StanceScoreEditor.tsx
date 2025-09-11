@@ -86,17 +86,37 @@ export const StanceScoreEditor: React.FC<StanceScoreEditorProps> = ({
 
     setIsLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
-      // This would typically analyze the user's messages in the deliberation
-      // For now, we'll use a placeholder implementation
-      const { stanceScore: calculatedStance, confidenceScore: calculatedConfidence } = 
+      // Analyze the user's messages in the deliberation using AI
+      const { stanceScore: calculatedStance, confidenceScore: calculatedConfidence, semanticAnalysis } = 
         await stanceService.calculateStanceFromSemantic(user.id, deliberationId, '');
 
-      await handleStanceUpdate(calculatedStance, calculatedConfidence);
+      // Update the stance score with the AI analysis
+      const updatedScore = await stanceService.updateStanceScore(
+        user.id,
+        deliberationId,
+        calculatedStance,
+        calculatedConfidence,
+        semanticAnalysis
+      );
+
+      setStanceScore(updatedScore);
+      
+      // Show success message with analysis details
+      const messageCount = typeof semanticAnalysis?.messageCount === 'number' ? semanticAnalysis.messageCount : 0;
+      setSuccess(
+        messageCount > 0 
+          ? `Stance recalculated based on ${messageCount} messages` 
+          : 'Stance calculated (no messages found - using neutral stance)'
+      );
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccess(null), 5000);
     } catch (err) {
       logger.error('[StanceScoreEditor] Error calculating stance automatically', { error: err, deliberationId });
-      setError('Failed to calculate stance automatically');
+      setError('Failed to calculate stance automatically. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -199,7 +219,7 @@ export const StanceScoreEditor: React.FC<StanceScoreEditorProps> = ({
                   onClick={handleAutoCalculate}
                   disabled={isLoading}
                 >
-                  Recalculate Automatically
+                  {isLoading ? 'Analyzing Messages...' : 'Recalculate Automatically'}
                 </Button>
               </div>
             </div>

@@ -217,7 +217,7 @@ export class StanceService {
   }
 
   /**
-   * Calculate stance score from semantic analysis
+   * Calculate stance score from semantic analysis using AI
    */
   async calculateStanceFromSemantic(
     userId: string,
@@ -225,58 +225,78 @@ export class StanceService {
     content: string
   ): Promise<{ stanceScore: number; confidenceScore: number; semanticAnalysis: Record<string, unknown> }> {
     try {
-      // This would typically call an AI service for semantic analysis
-      // For now, we'll use a simplified approach
-      
-      // Simulate AI analysis (replace with actual AI call)
-      const analysis = await this.performSemanticAnalysis(content);
-      
-      // Calculate stance score based on analysis
-      const stanceScore = this.calculateStanceScore(analysis);
-      const confidenceScore = this.calculateConfidenceScore(analysis);
-      
+      logger.info('[StanceService] Calculating stance from user messages', { userId, deliberationId });
+
+      // Call the AI-powered stance calculation edge function
+      const { data, error } = await supabase.functions.invoke('calculate-user-stance', {
+        body: { 
+          userId, 
+          deliberationId 
+        }
+      });
+
+      if (error) {
+        logger.error('[StanceService] Error calling stance calculation function', { error, userId, deliberationId });
+        throw new Error(`Failed to calculate stance: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error('No data returned from stance calculation');
+      }
+
+      logger.info('[StanceService] Stance calculation completed', { 
+        userId, 
+        deliberationId, 
+        stanceScore: data.stanceScore,
+        confidenceScore: data.confidenceScore,
+        messageCount: data.messageCount 
+      });
+
       return {
-        stanceScore,
-        confidenceScore,
-        semanticAnalysis: analysis
+        stanceScore: data.stanceScore,
+        confidenceScore: data.confidenceScore,
+        semanticAnalysis: {
+          reasoning: data.reasoning,
+          keyIndicators: data.keyIndicators || [],
+          messageCount: data.messageCount,
+          analysisTimestamp: data.analysisTimestamp,
+          analysisDetails: data.analysisDetails,
+          aiModel: 'gpt-5-2025-08-07'
+        }
       };
     } catch (error) {
       logger.error('[StanceService] Error calculating stance from semantic analysis', { error, userId, deliberationId });
-      throw error;
+      
+      // Fallback to existing stance if available
+      try {
+        const existingStance = await this.getUserStanceScore(userId, deliberationId);
+        if (existingStance) {
+          logger.info('[StanceService] Using existing stance as fallback', { userId, deliberationId });
+          return {
+            stanceScore: existingStance.stanceScore,
+            confidenceScore: existingStance.confidenceScore,
+            semanticAnalysis: {
+              ...existingStance.semanticAnalysis,
+              fallbackReason: 'AI analysis failed, using existing stance',
+              error: error.message
+            }
+          };
+        }
+      } catch (fallbackError) {
+        logger.error('[StanceService] Fallback also failed', { fallbackError, userId, deliberationId });
+      }
+
+      // Final fallback to neutral if everything fails
+      return {
+        stanceScore: 0.0,
+        confidenceScore: 0.3,
+        semanticAnalysis: {
+          error: error.message,
+          fallbackReason: 'AI analysis failed, using neutral default',
+          analysisTimestamp: new Date().toISOString()
+        }
+      };
     }
   }
 
-  /**
-   * Perform semantic analysis on content
-   */
-  private async performSemanticAnalysis(content: string): Promise<Record<string, unknown>> {
-    // This would call OpenAI or similar service
-    // For now, return a mock analysis
-    return {
-      sentiment: 'neutral',
-      topics: ['general'],
-      confidence: 0.7,
-      analysis_timestamp: new Date().toISOString(),
-      content_length: content.length,
-      // Add more semantic analysis fields as needed
-    };
-  }
-
-  /**
-   * Calculate stance score from semantic analysis
-   */
-  private calculateStanceScore(analysis: Record<string, unknown>): number {
-    // This would use the actual semantic analysis results
-    // For now, return a neutral score
-    return 0.0;
-  }
-
-  /**
-   * Calculate confidence score from semantic analysis
-   */
-  private calculateConfidenceScore(analysis: Record<string, unknown>): number {
-    // This would use the actual semantic analysis results
-    // For now, return a moderate confidence
-    return 0.7;
-  }
 }
