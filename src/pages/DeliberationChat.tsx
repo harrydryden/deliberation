@@ -25,7 +25,7 @@ import { productionLogger } from "@/utils/productionLogger";
 import { supabase } from "@/integrations/supabase/client";
 
 import { useParticipationSync } from '@/hooks/useParticipationSync';
-import { useSessionTracking } from '@/hooks/useSessionTracking';
+import { useLoginCounter } from '@/hooks/useLoginCounter';
 
 const IbisMapVisualizationLazy = lazy(() => import("@/components/ibis/IbisMapVisualization").then(m => ({
   default: m.IbisMapVisualization
@@ -62,8 +62,8 @@ const OptimizedDeliberationChat = () => {
   const { messageService, agentService } = useServices();
   const isMobile = useIsMobile();
   
-  // Session tracking hook
-  const { sessionMetrics } = useSessionTracking();
+  // Login counter hook
+  const { loginMetrics } = useLoginCounter();
   
   // Ref for MessageInput to access setMessage function
   const messageInputRef = useRef<MessageInputRef>(null);
@@ -239,7 +239,7 @@ const OptimizedDeliberationChat = () => {
           setUserMetrics({
             engagement: deliberationMessages.length,
             shares: ibisSubmissions.length,
-            sessions: sessionMetrics?.totalSessions || 0,
+            sessions: loginMetrics?.totalLogins || 0,
             stanceScore: stanceData?.stance_score || 0
           });
         } catch (error) {
@@ -254,7 +254,7 @@ const OptimizedDeliberationChat = () => {
       });
       setDataState(prev => ({ ...prev, loading: false }));
     }
-  }, [deliberationId, user, deliberationService, agentService, messageService, toast, isAdmin, sessionMetrics]); // Stable dependencies
+  }, [deliberationId, user, deliberationService, agentService, messageService, toast, isAdmin, loginMetrics]); // Stable dependencies
 
   // ENHANCED: Comprehensive join handler with state validation and error handling
   const handleJoinDeliberation = useCallback(async () => {
@@ -422,15 +422,15 @@ const OptimizedDeliberationChat = () => {
     }
   }, [isMobile, uiState.viewMode]); // Minimal dependencies
 
-  // Update user metrics when session metrics change
+  // Update user metrics when login metrics change
   useEffect(() => {
-    if (sessionMetrics) {
+    if (loginMetrics) {
       setUserMetrics(prev => ({
         ...prev,
-        sessions: sessionMetrics.totalSessions || 0
+        sessions: loginMetrics.totalLogins || 0
       }));
     }
-  }, [sessionMetrics?.totalSessions]);
+  }, [loginMetrics?.totalLogins]);
 
   // PERFORMANCE OPTIMIZATION: Memoized status color to prevent recalculation
   const getStatusColor = useCallback((status: string) => {

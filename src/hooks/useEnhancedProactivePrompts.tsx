@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
-import { useSessionTracking } from './useSessionTracking';
 
 interface ProactivePrompt {
   question: string;
@@ -23,32 +22,15 @@ export const useEnhancedProactivePrompts = ({
   const [currentPrompt, setCurrentPrompt] = useState<ProactivePrompt | null>(null);
   const [facilitatorSession, setFacilitatorSession] = useState<any>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
-  
-  const { sessionMetrics, currentSession, updateActivity } = useSessionTracking();
 
-  // Calculate adaptive prompt timing based on session patterns
+  // Simple prompt timing - 5 minutes for all users
   const calculatePromptTiming = useCallback(() => {
-    if (!sessionMetrics) return 5 * 60 * 1000; // Default 5 minutes
-
-    const { averageSessionDuration, totalSessions } = sessionMetrics;
-    
-    // For new users (< 3 sessions), use shorter intervals to guide them
-    if (totalSessions < 3) {
-      return 3 * 60 * 1000; // 3 minutes for new users
-    }
-    
-    // For experienced users, adapt based on their typical session duration
-    const adaptiveTiming = Math.min(
-      averageSessionDuration * 0.25, // 25% of average session duration
-      8 * 60 * 1000 // Maximum 8 minutes
-    );
-    
-    return Math.max(adaptiveTiming, 2 * 60 * 1000); // Minimum 2 minutes
-  }, [sessionMetrics]);
+    return 5 * 60 * 1000; // 5 minutes
+  }, []);
 
   // Create or update facilitator session
   const initializeFacilitatorSession = useCallback(async () => {
-    if (!userId || !deliberationId || !currentSession) return;
+    if (!userId || !deliberationId) return;
 
     try {
       // Check for existing facilitator session
@@ -66,10 +48,7 @@ export const useEnhancedProactivePrompts = ({
           .update({
             last_activity_time: new Date().toISOString(),
             session_state: {
-              currentSessionId: currentSession.id,
-              sessionStartedAt: currentSession.created_at,
-              totalSessions: sessionMetrics?.totalSessions || 1,
-              averageSessionDuration: sessionMetrics?.averageSessionDuration || 0
+              totalSessions: 1
             }
           })
           .eq('id', existingSession.id)
@@ -100,10 +79,7 @@ export const useEnhancedProactivePrompts = ({
             deliberation_id: deliberationId,
             agent_config_id: defaultAgent.id,
             session_state: {
-              currentSessionId: currentSession.id,
-              sessionStartedAt: currentSession.created_at,
-              totalSessions: sessionMetrics?.totalSessions || 1,
-              averageSessionDuration: sessionMetrics?.averageSessionDuration || 0,
+              totalSessions: 1,
               proactivePromptsCount: 0,
               optedOutOfPrompts: false
             },
@@ -117,32 +93,23 @@ export const useEnhancedProactivePrompts = ({
     } catch (error) {
       logger.error('[EnhancedProactivePrompts] Error initializing facilitator session', { error, userId, deliberationId });
     }
-  }, [userId, deliberationId, currentSession, sessionMetrics]);
+  }, [userId, deliberationId]);
 
-  // Generate enhanced proactive prompt with session context
+  // Generate enhanced proactive prompt
   const generateEnhancedPrompt = useCallback(async () => {
-    if (!enabled || !facilitatorSession || !sessionMetrics) return;
+    if (!enabled || !facilitatorSession) return;
 
     try {
       logger.info('[EnhancedProactivePrompts] Generating enhanced proactive prompt', { 
         userId, 
-        deliberationId,
-        sessionContext: {
-          totalSessions: sessionMetrics.totalSessions,
-          averageSessionDuration: sessionMetrics.averageSessionDuration,
-          currentSessionAge: Date.now() - new Date(currentSession?.created_at || 0).getTime()
-        }
+        deliberationId
       });
 
-      // Enhanced session context for AI
+      // Simple session context for AI
       const sessionContext = {
-        totalSessions: sessionMetrics.totalSessions,
-        averageSessionDuration: sessionMetrics.averageSessionDuration,
-        currentSessionAge: Date.now() - new Date(currentSession?.created_at || 0).getTime(),
-        isNewUser: sessionMetrics.totalSessions < 3,
-        isLongSession: currentSession && (Date.now() - new Date(currentSession.created_at).getTime()) > sessionMetrics.averageSessionDuration,
-        promptsSentThisSession: facilitatorSession.session_state?.proactivePromptsCount || 0,
-        previousEngagement: facilitatorSession.session_state?.topicsEngaged || []
+        totalSessions: 1,
+        isNewUser: true,
+        promptsSentThisSession: facilitatorSession.session_state?.proactivePromptsCount || 0
       };
 
       const { data, error } = await supabase.functions.invoke('generate-proactive-prompt', {
@@ -161,7 +128,7 @@ export const useEnhancedProactivePrompts = ({
         setCurrentPrompt({
           question: data.prompt.question,
           context: data.prompt.context,
-          urgency: sessionContext.isLongSession ? 'high' : 'medium'
+          urgency: 'medium'
         });
 
         // Update facilitator session with prompt sent
@@ -180,8 +147,7 @@ export const useEnhancedProactivePrompts = ({
         logger.info('[EnhancedProactivePrompts] Enhanced proactive prompt generated and shown', { 
           userId, 
           deliberationId,
-          promptContext: data.prompt.context,
-          sessionAge: sessionContext.currentSessionAge
+          promptContext: data.prompt.context
         });
       }
     } catch (error) {
@@ -191,7 +157,7 @@ export const useEnhancedProactivePrompts = ({
         deliberationId 
       });
     }
-  }, [enabled, facilitatorSession, sessionMetrics, userId, deliberationId, currentSession]);
+  }, [enabled, facilitatorSession, userId, deliberationId]);
 
   // Handle prompt response with session tracking
   const handlePromptResponse = useCallback(async (response: string) => {
@@ -233,7 +199,6 @@ export const useEnhancedProactivePrompts = ({
         .eq('id', facilitatorSession.id);
 
       setCurrentPrompt(null);
-      updateActivity(); // Reset activity tracking
     } catch (error) {
       logger.error('[EnhancedProactivePrompts] Error submitting enhanced proactive prompt response', { 
         error, 
@@ -241,7 +206,7 @@ export const useEnhancedProactivePrompts = ({
         deliberationId 
       });
     }
-  }, [currentPrompt, facilitatorSession, userId, deliberationId, updateActivity]);
+  }, [currentPrompt, facilitatorSession, userId, deliberationId]);
 
   // Handle opt-out with persistent storage
   const handlePromptOptOut = useCallback(async () => {
@@ -266,7 +231,7 @@ export const useEnhancedProactivePrompts = ({
 
   // Activity-based prompt scheduling
   useEffect(() => {
-    if (!enabled || !facilitatorSession || !sessionMetrics) return;
+    if (!enabled || !facilitatorSession) return;
 
     // Check if user has opted out
     if (facilitatorSession.session_state?.optedOutOfPrompts) return;
@@ -288,14 +253,14 @@ export const useEnhancedProactivePrompts = ({
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [enabled, facilitatorSession, sessionMetrics, calculatePromptTiming, generateEnhancedPrompt]);
+  }, [enabled, facilitatorSession, calculatePromptTiming, generateEnhancedPrompt]);
 
   // Initialize facilitator session when dependencies are ready
   useEffect(() => {
-    if (userId && deliberationId && currentSession) {
+    if (userId && deliberationId) {
       initializeFacilitatorSession();
     }
-  }, [userId, deliberationId, currentSession, initializeFacilitatorSession]);
+  }, [userId, deliberationId, initializeFacilitatorSession]);
 
   return {
     currentPrompt,

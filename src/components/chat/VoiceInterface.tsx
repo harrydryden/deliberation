@@ -3,16 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
-import { useSessionTracking } from '@/hooks/useSessionTracking';
-import { useRealtimeActivityTracking } from '@/hooks/useRealtimeActivityTracking';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown, Type, AudioLines, Clock } from 'lucide-react';
+import { Mic, MicOff, Waves, GitBranch, GraduationCap, ChevronDown, Type, AudioLines } from 'lucide-react';
 import { RealtimeRTC } from '@/utils/realtimeRtc';
-import { SessionManager } from '@/utils/sessionManager';
-import { isProduction } from '@/utils/productionConfig';
 import { logger } from '@/utils/logger';
-// Local interface for voice events
+
 interface VoiceEvent {
   type: string;
   error?: {
@@ -28,6 +24,7 @@ interface VoiceEvent {
     };
   };
 }
+
 interface VoiceInterfaceProps {
   deliberationId: string;
   preferredBillAgentId?: string;
@@ -37,15 +34,17 @@ interface VoiceInterfaceProps {
   setMessageText?: (text: string) => void;
 }
 
-const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferredBillAgentId, className, variant = 'default', sendMessage: sendChatMessage, setMessageText }) => {
+const SimpleVoiceInterface: React.FC<VoiceInterfaceProps> = ({ 
+  deliberationId, 
+  preferredBillAgentId, 
+  className, 
+  variant = 'default', 
+  sendMessage: sendChatMessage, 
+  setMessageText 
+}) => {
   const { user } = useSupabaseAuth();
   const { toast } = useToast();
-  const { currentSession, updateActivity } = useSessionTracking();
-  const { recordVoiceInteraction } = useRealtimeActivityTracking({
-    userId: user?.id,
-    deliberationId,
-    enabled: !!currentSession
-  });
+  
   const [connected, setConnected] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [mode, setMode] = useState<'idle' | 'bill' | 'ibis' | 'stt'>('idle');
@@ -59,13 +58,6 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   const sttChunksRef = useRef<BlobPart[]>([]);
   const [sttBusy, setSttBusy] = useState(false);
 
-  // Session management
-  const sessionManagerRef = useRef<SessionManager | null>(null);
-  const [sessionStatus, setSessionStatus] = useState({
-    remainingTime: 0,
-    needsRenewal: false,
-    sessionAge: 0
-  });
   const selectPreferred = async (next: 'bill' | 'ibis' | 'stt') => {
     setPreferred(next);
     if (mode !== 'idle') {
@@ -116,89 +108,6 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     }
   };
 
-  const analyzeDeliberationComplexity = async (delibId: string): Promise<{ 
-    duration: string; 
-    maxItems: number; 
-    totalNodes: number;
-    instructions: string;
-  }> => {
-    try {
-      const [nodesResult, promptsResult] = await Promise.all([
-        supabase
-          .from('ibis_nodes')
-          .select('id, title, description, node_type, created_at')
-          .eq('deliberation_id', delibId)
-          .order('created_at', { ascending: true }),
-        supabase
-          .from('prompt_templates')
-          .select('name, content')
-          .in('name', ['voice_interface_short', 'voice_interface_medium', 'voice_interface_long', 'voice_interface_fallback'])
-      ]);
-
-      if (nodesResult.error) throw nodesResult.error;
-      if (promptsResult.error) throw promptsResult.error;
-
-      const nodes = nodesResult.data || [];
-      const prompts = promptsResult.data || [];
-      const totalNodes = nodes.length;
-      
-      // Create prompt lookup map
-      const promptMap = prompts.reduce((acc, p) => ({ ...acc, [p.name]: p.content }), {} as Record<string, string>);
-      
-      // Calculate dynamic duration and content based on complexity
-      let duration: string;
-      let maxItems: number;
-      let instructions: string;
-
-      if (totalNodes < 10) {
-        // Small deliberation: 30-60 seconds
-        duration = "30–60 seconds";
-        maxItems = 5;
-        instructions = promptMap['voice_interface_short'];
-      } else if (totalNodes < 50) {
-        // Medium deliberation: 2-3 minutes
-        duration = "2–3 minutes";
-        maxItems = 15;
-        instructions = promptMap['voice_interface_medium'];
-      } else {
-        // Large deliberation: 5-7 minutes
-        duration = "5–7 minutes";
-        maxItems = 30;
-        instructions = promptMap['voice_interface_long'];
-      }
-      
-      if (!instructions) {
-        // Fallback system: Use hardcoded instructions if database templates are missing
-        const fallbackInstructions = getFallbackInstructions(totalNodes);
-        return { duration, maxItems, totalNodes, instructions: fallbackInstructions };
-      }
-
-      return { duration, maxItems, totalNodes, instructions };
-    } catch (err) {
-      logger.error('complexity analysis error', err as Error);
-      
-      // Return comprehensive fallback instead of throwing
-      const fallbackInstructions = getFallbackInstructions(0); // Default to small deliberation fallback
-      return { 
-        duration: "30-60 seconds", 
-        maxItems: 5, 
-        totalNodes: 0, 
-        instructions: fallbackInstructions 
-      };
-    }
-  };
-
-  // Fallback instructions when database templates are unavailable
-  const getFallbackInstructions = (nodeCount: number): string => {
-    if (nodeCount < 10) {
-      return 'You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a clear, concise spoken summary in 30-60 seconds. Focus on the most important issues and positions. Use British English spelling and grammar throughout.';
-    } else if (nodeCount < 50) {
-      return 'You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a comprehensive spoken summary in 2-3 minutes. Cover key issues, major positions, and significant arguments. Use British English spelling and grammar throughout.';
-    } else {
-      return 'You are a civic deliberation assistant. Always speak responses. When asked for IBIS highlights or a summary, provide a thorough spoken analysis in 5-7 minutes. Discuss all major issues, positions, arguments, and their relationships. Use British English spelling and grammar throughout.';
-    }
-  };
-
   const doGetIbisContext = async (delibId: string, maxItems: number = 10): Promise<string> => {
     try {
       const { data: nodes, error } = await supabase
@@ -211,17 +120,12 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       const issues = (nodes || []).filter((n: any) => n.node_type === 'issue');
       const positions = (nodes || []).filter((n: any) => n.node_type === 'position');
       const argumentsN = (nodes || []).filter((n: any) => n.node_type === 'argument');
-      
-      // Enhanced content retrieval based on maxItems
-      const selectedIssues = issues.slice(0, Math.min(maxItems, issues.length));
-      const selectedPositions = positions.slice(0, Math.min(maxItems, positions.length));
-      const selectedArguments = argumentsN.slice(0, Math.min(maxItems, argumentsN.length));
 
-      const issueDetails = selectedIssues.map((i: any) => 
+      const issueDetails = issues.slice(0, maxItems).map((i: any) => 
         `- ${i.title}${i.description ? `: ${i.description.substring(0, 100)}...` : ''}`
       ).join('\n');
 
-      const positionDetails = selectedPositions.map((p: any) => 
+      const positionDetails = positions.slice(0, maxItems).map((p: any) => 
         `- ${p.title}${p.description ? `: ${p.description.substring(0, 100)}...` : ''}`
       ).join('\n');
 
@@ -233,7 +137,7 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
         `Positions (${positions.length}):`,
         positionDetails || '- (none)',
         `Arguments: ${argumentsN.length}`,
-        maxItems > 10 ? 'Provide a comprehensive spoken summary covering all major themes and relationships.' : 'Provide a clear spoken summary for participants.'
+        'Provide a clear spoken summary for participants.'
       ].join('\n');
     } catch (err) {
       logger.error('get_ibis_context error', err as Error);
@@ -260,33 +164,22 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   };
 
   const handleEvent = (event: VoiceEvent) => {
-    // Update session activity for any event
-    updateActivity();
-    recordVoiceInteraction('message', undefined);
-    
-    // Handle session expired and other critical errors
     if (event?.type === 'error') {
       const errorCode = event?.error?.code;
       const errorMessage = event?.error?.message;
       
-      // Record error in session manager
-      sessionManagerRef.current?.recordError();
-      
       if (errorCode === 'session_expired') {
         logger.warn('Session expired, forcing cleanup');
         toast({ title: 'Session expired', description: 'Voice session expired. Click to restart.', variant: 'destructive' });
-        // Force immediate cleanup and reset
         void stop();
         return;
       }
       
-      // Handle other errors
       logger.error('RTC Error', new Error(event?.error?.message || 'Unknown RTC error'), { event });
       toast({ title: 'Voice error', description: errorMessage || 'Voice connection error', variant: 'destructive' });
       return;
     }
 
-    // Minimal speaking indicator using response lifecycle
     if (event?.type === 'response.created') setSpeaking(true);
 
     if (event?.type === 'response.done') {
@@ -309,10 +202,6 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   const ensureIdle = async () => {
     logger.debug('ensureIdle called', { currentMode: mode });
     
-    // Always force cleanup, regardless of current mode, to handle expired sessions
-    logger.debug('Forcing complete cleanup of any existing connections');
-    
-    // Force stop any RTC connections immediately
     if (rtcRef.current) {
       logger.debug('Disconnecting RTC immediately');
       try {
@@ -324,7 +213,6 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       rtcRef.current = null;
     }
     
-    // Clean up STT connections if any
     if (sttRecorderRef.current) {
       try {
         sttRecorderRef.current.stop();
@@ -343,76 +231,13 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       sttStreamRef.current = null;
     }
     
-    // Force reset all state
     setConnected(false);
     setSpeaking(false);
     setMode('idle');
     setSttBusy(false);
     
-    // Optimized cleanup timing for production
-    const cleanupDelay = isProduction ? 500 : 1500;
-    
-    // Wait for complete cleanup to handle session expiration
-    logger.debug('Waiting for complete cleanup...');
-    await new Promise((r) => setTimeout(r, cleanupDelay));
+    await new Promise((r) => setTimeout(r, 500));
     logger.debug('Cleanup complete, ready for new session');
-  };
-
-  const createSessionManager = () => {
-    return new SessionManager(
-      {
-        maxSessionAge: 25 * 60 * 1000, // 25 minutes
-        renewalThreshold: 5 * 60 * 1000, // Renew 5 minutes before expiry
-        maxRenewalAttempts: 2,
-        healthCheckInterval: 30 * 1000
-      },
-      {
-        onSessionExpired: () => {
-          logger.warn('Session manager detected expiration');
-          toast({ 
-            title: 'Session expired', 
-            description: 'Voice session expired. Please reconnect.', 
-            variant: 'destructive' 
-          });
-          void stop();
-        },
-        onSessionRenewed: async (sessionId) => {
-          logger.info('Session manager requesting renewal', { sessionId });
-          // Attempt graceful renewal by reconnecting
-          if (mode === 'bill') {
-            await gracefulReconnect(() => startBill());
-          } else if (mode === 'ibis') {
-            await gracefulReconnect(() => startIbis());
-          }
-        }
-      }
-    );
-  };
-
-  const gracefulReconnect = async (reconnectFn: () => Promise<void>) => {
-    const wasConnected = connected;
-    const currentMode = mode;
-    
-    if (!wasConnected) return;
-    
-    try {
-      logger.info('Starting graceful reconnection', { currentMode });
-      toast({ title: 'Reconnecting...', description: 'Refreshing voice session' });
-      
-      await ensureIdle();
-      await reconnectFn();
-      
-      logger.info('Graceful reconnection successful');
-      toast({ title: 'Reconnected', description: 'Voice session refreshed successfully' });
-    } catch (err: unknown) {
-      const error = err as Error;
-      logger.error('Graceful reconnection failed', error);
-      toast({ 
-        title: 'Reconnection failed', 
-        description: 'Please manually restart the voice session', 
-        variant: 'destructive' 
-      });
-    }
   };
 
   const startBill = async () => {
@@ -420,102 +245,43 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       await ensureIdle();
       await ensureBillAgentId();
       
-      // Record voice interaction start
-      recordVoiceInteraction('start');
-      
-      // Initialize session manager
-      sessionManagerRef.current = createSessionManager();
-      sessionManagerRef.current.startSession(`bill_${Date.now()}`);
-      
       rtcRef.current = new RealtimeRTC();
       await rtcRef.current.init({ onEvent: handleEvent, onToolCall: toolHandler });
       setConnected(true);
       setMode('bill');
       
-      // Start session status updates
-      startSessionStatusUpdates();
-      
       toast({ title: 'Bill voice connected', description: 'Two-way with knowledge tools enabled.' });
     } catch (err: unknown) {
       const error = err as Error;
       logger.error('Start Bill error', error);
-      sessionManagerRef.current?.recordError();
       toast({ title: 'Error', description: error.message || 'Failed to start Bill', variant: 'destructive' });
     }
-  };
-
-  const startSessionStatusUpdates = () => {
-    const interval = setInterval(() => {
-      if (!sessionManagerRef.current) {
-        clearInterval(interval);
-        return;
-      }
-      
-      const status = sessionManagerRef.current.getSessionStatus();
-      setSessionStatus({
-        remainingTime: status.remainingTime,
-        needsRenewal: status.needsRenewal,
-        sessionAge: status.sessionAge
-      });
-      
-      if (!status.isActive) {
-        clearInterval(interval);
-      }
-    }, 5000); // Update every 5 seconds
-    
-    // Store interval for cleanup
-    return interval;
-  };
-
-  const formatTimeRemaining = (ms: number): string => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const startIbis = async () => {
     try {
       await ensureIdle();
       
-      // Analyze deliberation complexity for dynamic duration
-      const complexity = await analyzeDeliberationComplexity(deliberationId);
-      
-      // Initialize session manager
-      sessionManagerRef.current = createSessionManager();
-      sessionManagerRef.current.startSession(`ibis_${Date.now()}`);
-      
       rtcRef.current = new RealtimeRTC();
       await rtcRef.current.init({ 
         onEvent: handleEvent, 
-        onToolCall: toolHandler,
-        dynamicInstructions: complexity.instructions
+        onToolCall: toolHandler
       });
       setConnected(true);
       setMode('ibis');
 
-      // Start session status updates
-      startSessionStatusUpdates();
-
-      // Fetch IBIS context with appropriate detail level
-      const ctx = await doGetIbisContext(deliberationId, complexity.maxItems);
-      const prompt = `${ctx}\n\nPlease speak a ${complexity.duration} summary covering the deliberation's key insights.`;
+      const ctx = await doGetIbisContext(deliberationId, 10);
+      const prompt = `${ctx}\n\nPlease speak a 2-3 minute summary covering the deliberation's key insights.`;
       rtcRef.current.sendText(prompt);
 
-      toast({ 
-        title: 'IBIS summary', 
-        description: complexity.totalNodes === 0 
-          ? 'Generating summary for new deliberation...'
-          : `Generating ${complexity.duration} summary for ${complexity.totalNodes} nodes...` 
-      });
+      toast({ title: 'IBIS summary', description: 'Generating deliberation summary...' });
     } catch (err: unknown) {
       const error = err as Error;
       logger.error('Start IBIS error', error);
-      sessionManagerRef.current?.recordError();
       toast({ title: 'Error', description: error.message || 'Failed to start IBIS summary', variant: 'destructive' });
     }
   };
 
-  // Helper to base64-encode Blob
   const blobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
     try {
       const reader = new FileReader();
@@ -535,7 +301,6 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
     try {
       logger.debug('Starting STT mode');
       await ensureIdle();
-      logger.debug('Idle ensured, starting STT recording');
       
       sttChunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -545,29 +310,27 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       rec.ondataavailable = (e: BlobEvent) => {
         if (e.data && e.data.size > 0) sttChunksRef.current.push(e.data);
       };
+      
       rec.onstop = async () => {
         try {
           setSttBusy(true);
           const blob = new Blob(sttChunksRef.current, { type: 'audio/webm' });
           const b64 = await blobToBase64(blob);
           if (!b64) throw new Error('Empty recording');
+          
           const { data, error } = await supabase.functions.invoke('voice-to-text', { body: { audio: b64 } });
           if (error) throw error;
+          
           const text = (data?.text || '').toString().trim();
-          logger.debug('STT transcription received', { text, setMessageTextAvailable: !!setMessageText, sendChatMessageAvailable: !!sendChatMessage });
           
           if (text.length > 0) {
-            // STT mode should ONLY transcribe to message input, never send
             if (setMessageText) {
-              logger.debug('Setting message text only, not sending');
               setMessageText(text);
               toast({ title: 'Text transcribed', description: 'Voice transcription added to message input.' });
             } else {
-              logger.error('No setMessageText function provided');
               toast({ title: 'Error', description: 'No setMessageText function provided for dictation', variant: 'destructive' });
             }
           } else {
-            logger.debug('No speech detected');
             toast({ title: 'No speech detected', description: 'Nothing was transcribed.', variant: 'destructive' });
           }
         } catch (err: unknown) {
@@ -606,7 +369,6 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
         return;
       }
       if (cancel) {
-        // Stop without sending
         try { rec.stop(); } catch {}
         sttChunksRef.current = [];
         try { sttStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
@@ -629,16 +391,6 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       logger.debug('stop called', { mode });
       const wasConnected = connected;
       
-      // Record voice interaction end with duration  
-      const sessionStartTime = sessionManagerRef.current?.getSessionStatus().sessionAge || 0;
-      recordVoiceInteraction('end', sessionStartTime);
-      
-      // Stop session manager
-      if (sessionManagerRef.current) {
-        sessionManagerRef.current.stopSession();
-        sessionManagerRef.current = null;
-      }
-      
       if (rtcRef.current) {
         logger.debug('Disconnecting RTC');
         rtcRef.current.disconnect();
@@ -648,7 +400,6 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
       setConnected(false);
       setSpeaking(false);
       setMode('idle');
-      setSessionStatus({ remainingTime: 0, needsRenewal: false, sessionAge: 0 });
       
       if (wasConnected) {
         toast({ title: 'Voice disconnected', description: 'Session ended.' });
@@ -662,15 +413,8 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   useEffect(() => {
     return () => {
       void stop();
-      
-      // Cleanup STT resources
       try { sttRecorderRef.current?.stop(); } catch {}
       try { sttStreamRef.current?.getTracks().forEach(t => t.stop()); } catch {}
-      
-      // Cleanup session manager
-      if (sessionManagerRef.current) {
-        sessionManagerRef.current.stopSession();
-      }
     };
   }, []);
 
@@ -736,58 +480,45 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
         </div>
       ) : (
         variant === 'panel' ? (
-          <>
-            <div className="flex items-center justify-between">
-              {connected && sessionStatus.remainingTime > 0 && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span className={sessionStatus.needsRenewal ? 'text-amber-500' : ''}>
-                    {formatTimeRemaining(sessionStatus.remainingTime)}
-                  </span>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col gap-1">
-              <Button
-                onClick={() => { mode === 'bill' ? void stop() : void startBill(); }}
-                variant={mode === 'bill' ? 'default' : 'secondary'}
-                size="sm"
-                aria-label="Chat to Policy"
-                aria-pressed={mode === 'bill'}
-                className="w-full h-8 text-xs"
-              >
-                <Mic className="h-3 w-3 mr-1" />
-                Chat to Policy
-                {mode === 'bill' && speaking && <Waves className="h-3 w-3 ml-1" />}
-              </Button>
+          <div className="flex flex-col gap-1">
+            <Button
+              onClick={() => { mode === 'bill' ? void stop() : void startBill(); }}
+              variant={mode === 'bill' ? 'default' : 'secondary'}
+              size="sm"
+              aria-label="Chat to Policy"
+              aria-pressed={mode === 'bill'}
+              className="w-full h-8 text-xs"
+            >
+              <Mic className="h-3 w-3 mr-1" />
+              Chat to Policy
+              {mode === 'bill' && speaking && <Waves className="h-3 w-3 ml-1" />}
+            </Button>
 
-              <Button
-                onClick={() => { mode === 'ibis' ? void stop() : void startIbis(); }}
-                variant={mode === 'ibis' ? 'default' : 'secondary'}
-                size="sm"
-                aria-label="Deliberation Summary"
-                aria-pressed={mode === 'ibis'}
-                className="w-full h-8 text-xs"
-              >
-                <AudioLines className="h-3 w-3 mr-1" />
-                Deliberation Summary
-                {mode === 'ibis' && speaking && <Waves className="h-3 w-3 ml-1" />}
-              </Button>
+            <Button
+              onClick={() => { mode === 'ibis' ? void stop() : void startIbis(); }}
+              variant={mode === 'ibis' ? 'default' : 'secondary'}
+              size="sm"
+              aria-label="Deliberation Summary"
+              aria-pressed={mode === 'ibis'}
+              className="w-full h-8 text-xs"
+            >
+              <AudioLines className="h-3 w-3 mr-1" />
+              Deliberation Summary
+              {mode === 'ibis' && speaking && <Waves className="h-3 w-3 ml-1" />}
+            </Button>
 
-              <Button
-                onClick={() => { mode === 'stt' ? void stopStt() : void startStt(); }}
-                variant={mode === 'stt' ? 'default' : 'secondary'}
-                size="sm"
-                aria-label="Dictate to text"
-                aria-pressed={mode === 'stt'}
-                className="w-full h-8 text-xs"
-              >
-                <Type className="h-3 w-3 mr-1" />
-                Dictate to Text
-              </Button>
-            </div>
-          </>
-        
+            <Button
+              onClick={() => { mode === 'stt' ? void stopStt() : void startStt(); }}
+              variant={mode === 'stt' ? 'default' : 'secondary'}
+              size="sm"
+              aria-label="Dictate to text"
+              aria-pressed={mode === 'stt'}
+              className="w-full h-8 text-xs"
+            >
+              <Type className="h-3 w-3 mr-1" />
+              Dictate to Text
+            </Button>
+          </div>
         ) : (
           <div className="flex items-center gap-2">
             <Button
@@ -830,4 +561,4 @@ const VoiceInterface: React.FC<VoiceInterfaceProps> = ({ deliberationId, preferr
   );
 };
 
-export default VoiceInterface;
+export default SimpleVoiceInterface;

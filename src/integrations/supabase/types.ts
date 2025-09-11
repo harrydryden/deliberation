@@ -576,6 +576,24 @@ export type Database = {
           },
         ]
       }
+      login_events: {
+        Row: {
+          id: string
+          login_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          login_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          login_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       message_processing_locks: {
         Row: {
           created_at: string
@@ -778,78 +796,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      user_activity_logs: {
-        Row: {
-          activity_data: Json | null
-          activity_type: string
-          deliberation_id: string | null
-          id: string
-          session_id: string | null
-          user_id: string
-        }
-        Insert: {
-          activity_data?: Json | null
-          activity_type: string
-          deliberation_id?: string | null
-          id?: string
-          session_id?: string | null
-          user_id: string
-        }
-        Update: {
-          activity_data?: Json | null
-          activity_type?: string
-          deliberation_id?: string | null
-          id?: string
-          session_id?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_activity_logs_deliberation_id_fkey"
-            columns: ["deliberation_id"]
-            isOneToOne: false
-            referencedRelation: "deliberations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "user_activity_logs_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "user_sessions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_sessions: {
-        Row: {
-          created_at: string | null
-          expires_at: string | null
-          id: string
-          is_active: boolean | null
-          recently_active: boolean | null
-          session_token_hash: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          expires_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          recently_active?: boolean | null
-          session_token_hash: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          expires_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          recently_active?: boolean | null
-          session_token_hash?: string
-          user_id?: string
-        }
-        Relationships: []
       }
       user_stance_scores: {
         Row: {
