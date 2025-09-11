@@ -312,9 +312,7 @@ export class AgentOrchestrator {
       scores.bill_agent += factors.complexity * 30;  // Reduced from 40
       scores.bill_agent += factors.requiresExpertise ? 25 : 0;  // Reduced from 30
       scores.bill_agent += factors.topicRelevance * 20;  // Reduced from 25
-      scores.bill_agent += factors.intent.includes('policy') ? 15 : 0;  // Reduced from 20
-      scores.bill_agent += factors.intent.includes('legal') ? 15 : 0;  // Reduced from 20
-      scores.bill_agent += factors.intent.includes('legislation') ? 20 : 0;  // Reduced from 25
+      scores.bill_agent += factors.intent === 'policy_expertise' ? 15 : 0;  // Fixed intent comparison
       scores.bill_agent += factors.hasKnowledge.bill_agent ? 10 : 0;  // Reduced from 15
     }
 
@@ -323,18 +321,25 @@ export class AgentOrchestrator {
     if (peerConfig?.is_active !== false) {
       scores.peer_agent += factors.messageCount > 5 ? 25 : 0;  
       scores.peer_agent += factors.messageCount >= 3 && factors.messageCount <= 5 ? 15 : 0;  
-      scores.peer_agent += factors.intent.includes('participant') ? 30 : 0;  
-      scores.peer_agent += factors.intent.includes('perspective') ? 25 : 0;  
+      scores.peer_agent += factors.intent === 'participant_input' ? 30 : 0;  // Fixed intent comparison
+      scores.peer_agent += factors.intent === 'participant_request' ? 45 : 0;  // ENHANCED: Higher boost for explicit participant requests
+      scores.peer_agent += factors.intent === 'argument_perspective' ? 25 : 0;  // Fixed intent comparison
       scores.peer_agent += this.getRecentBillAgentCount(factors.recentMessageTypes) > 2 ? 20 : 0;  
       scores.peer_agent += factors.hasKnowledge.peer_agent ? 10 : 0;  
       
-      // CRITICAL: Progressive scoring based on IBIS development
+      // CRITICAL: Progressive scoring based on IBIS development with participant request override
       if (factors.ibisNodeCount < 10) {
-        // Penalty when IBIS is underdeveloped
+        // Reduced penalty when participant request is detected - user needs synthesis even early
+        const isParticipantFocused = factors.intent === 'participant_request' || factors.intent === 'participant_input';
         const reductionFactor = Math.max(0, (10 - factors.ibisNodeCount) / 10);  
-        const penalty = Math.floor(reductionFactor * 15);  
+        const basePenalty = 15;
+        const penalty = isParticipantFocused ? 
+          Math.floor(reductionFactor * (basePenalty * 0.4)) : // 60% penalty reduction for participant requests
+          Math.floor(reductionFactor * basePenalty);  
         scores.peer_agent -= penalty;
-        console.log(`🚫 Peer agent penalty: -${penalty} points (${factors.ibisNodeCount}/10 nodes - building structure)`);
+        
+        const penaltyType = isParticipantFocused ? '(participant-focused override)' : '(building structure)';
+        console.log(`🚫 Peer agent penalty: -${penalty} points (${factors.ibisNodeCount}/10 nodes - ${penaltyType})`);
       } else {
         // Progressive boost as IBIS matures (10+ nodes = ready for peer synthesis)
         const boostFactor = Math.min(1, (factors.ibisNodeCount - 10) / 20);  // 0-1 over next 20 nodes  
@@ -349,11 +354,18 @@ export class AgentOrchestrator {
     if (flowConfig?.is_active !== false) {
       scores.flow_agent += factors.messageCount < 3 ? 30 : 0;  
       scores.flow_agent += factors.messageCount >= 3 && factors.messageCount <= 5 ? 20 : 0;  
-      scores.flow_agent += factors.intent.includes('question') ? 25 : 0;  
-      scores.flow_agent += factors.intent.includes('clarify') ? 30 : 0;  
+      
+      // ENHANCED: Reduce question boost when participant intent is detected (avoids mis-routing participant requests)
+      const isParticipantFocused = factors.intent === 'participant_request' || factors.intent === 'participant_input';
+      const questionBoost = isParticipantFocused ? 15 : 25; // Reduced boost for participant-focused questions
+      scores.flow_agent += factors.intent === 'question_clarification' ? questionBoost : 0;  // Fixed intent comparison
       scores.flow_agent += factors.complexity < 0.3 ? 20 : 0;  
       scores.flow_agent += this.getRecentFlowAgentCount(factors.recentMessageTypes) === 0 ? 15 : 0;  
       scores.flow_agent += factors.hasKnowledge.flow_agent ? 10 : 0;  
+      
+      if (questionBoost < 25) {
+        console.log(`🔄 Flow agent question boost reduced to ${questionBoost} (participant-focused request detected)`);
+      }
       
       // CRITICAL: Progressive scoring that favors structure-building early, then steps back
       if (factors.ibisNodeCount < 10) {
@@ -863,7 +875,7 @@ export class AgentOrchestrator {
         weight: 0.75
       },
       participant: { 
-        pattern: /\b(participant|member|stakeholder|citizen|community|public|people|individual|group|voters|constituents)\b/gi,
+        pattern: /\b(participant|member|stakeholder|citizen|community|public|people|individual|group|voters|constituents|others?|participants?|said|mentioned|think|contributed?|shared?|expressed?)\b/gi,
         weight: 0.6
       },
       perspective: { 
@@ -887,7 +899,23 @@ export class AgentOrchestrator {
     let intent = 'general';
     const totalScore = Object.values(matches).reduce((sum, m) => sum + m.score, 0);
     
-    if (matches.policy.score > 0.5 || matches.expertise.score > 1) {
+    // ENHANCED: Detect participant-focused requests with high precision
+    const participantRequestPatterns = [
+      /\b(what\s+(?:have\s+)?others?\s+(?:have\s+)?said|what\s+(?:have\s+)?people\s+(?:have\s+)?said)\b/gi,
+      /\b(what\s+(?:have\s+)?participants?\s+(?:have\s+)?(?:said|mentioned|contributed|shared|expressed))\b/gi,
+      /\b(hear\s+(?:from\s+)?(?:what\s+)?others?|hear\s+(?:from\s+)?(?:what\s+)?people)\b/gi,
+      /\b(others?\s+(?:have\s+)?(?:mentioned|contributed|shared|expressed|think|thought))\b/gi,
+      /\b(what\s+(?:do\s+)?others?\s+think|what\s+(?:do\s+)?people\s+think)\b/gi
+    ];
+    
+    const hasParticipantRequest = participantRequestPatterns.some(pattern => 
+      pattern.test(contentLower)
+    );
+    
+    if (hasParticipantRequest) {
+      console.log(`🎯 [INTENT] Participant-focused request detected: "${content.substring(0, 50)}..." - prioritizing peer synthesis`);
+      intent = 'participant_request';
+    } else if (matches.policy.score > 0.5 || matches.expertise.score > 1) {
       intent = 'policy_expertise';
     } else if (matches.question.score > 0.3 || matches.clarify.score > 0.4) {
       intent = 'question_clarification';  
