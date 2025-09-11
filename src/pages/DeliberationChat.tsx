@@ -707,7 +707,7 @@ const OptimizedDeliberationChat = () => {
 
               {!uiState.isHeaderCollapsed && (
                 <div className="flex flex-wrap gap-3">
-                  <div className="rounded-lg border bg-muted/40 p-2 flex flex-col gap-3 justify-center">
+                  <div className="rounded-lg border bg-muted/40 p-2 flex flex-col gap-3 justify-center flex-1">
                     <ChatModeSelector 
                       mode={uiState.chatMode} 
                       onModeChange={(mode) => setUiState(prev => ({ ...prev, chatMode: mode }))} 
@@ -718,7 +718,7 @@ const OptimizedDeliberationChat = () => {
                       onModeChange={(v) => v && setUiState(prev => ({ ...prev, viewMode: v }))} 
                     />
                   </div>
-                  <div className="rounded-lg border bg-muted/40 p-2 w-80">
+                  <div className="rounded-lg border bg-muted/40 p-2 flex-1">
                      <Suspense fallback={<div className="text-xs text-muted-foreground">Loading voice…</div>}>
                        <VoiceInterfaceLazy 
                          deliberationId={dataState.deliberation?.id || ''} 
