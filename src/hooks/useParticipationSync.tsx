@@ -22,6 +22,7 @@ export const useParticipationSync = ({
 
   // Sync participation status with database
   const syncParticipationStatus = useCallback(async () => {
+    // Early return if no required data
     if (!deliberationId || !userId) return;
 
     try {
@@ -83,6 +84,7 @@ export const useParticipationSync = ({
 
   // Set up periodic sync
   useEffect(() => {
+    // Don't set up sync if we don't have required data
     if (!deliberationId || !userId) return;
 
     // Initial sync after a short delay

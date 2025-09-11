@@ -120,7 +120,7 @@ const OptimizedDeliberationChat = () => {
   // Filter messages based on view mode and user context
   const filteredMessages = useFilteredMessages(messages, uiState.viewMode, user?.id, isAdmin);
 
-  // Participation sync hook to ensure state consistency
+  // Participation sync hook to ensure state consistency - must be called unconditionally
   const { forceSyncParticipation } = useParticipationSync({
     deliberationId: deliberationId || '',
     userId: user?.id || '',
