@@ -564,6 +564,10 @@ const OptimizedDeliberationChat = () => {
                    </Badge>
                 </div>
                 <div className="flex items-center gap-2">
+                 <div className="flex items-center gap-1 text-xs text-foreground bg-muted/50 px-2 py-1 rounded border">
+                   <Users className="h-3 w-3" />
+                   <span className="font-medium">{dataState.deliberation.participant_count || 0}</span>
+                 </div>
                  <MessageQueueStatus {...queueStatusProps} />
                   <Button
                     variant="default"
