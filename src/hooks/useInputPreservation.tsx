@@ -9,7 +9,7 @@ interface UseInputPreservationOptions {
 
 /**
  * Hook to preserve user input across component re-renders and navigation
- * Provides automatic backup to localStorage and restoration
+ * Provides automatic backup to localStorage and restoration with race condition prevention
  */
 export const useInputPreservation = (options: UseInputPreservationOptions) => {
   const { storageKey, autoSaveDelay = 1000, preserveOnUnmount = true } = options;
@@ -18,36 +18,78 @@ export const useInputPreservation = (options: UseInputPreservationOptions) => {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedRef = useRef<string>('');
   const userClearTimeRef = useRef<number>(0);
+  const mountedRef = useRef(true);
+  const initialValueRef = useRef('');
 
-  // Restore from localStorage on mount
+  // Helper functions for sessionStorage "clearedAt" tracking
+  const getClearedAtKey = (key: string) => `${key}_cleared_at`;
+  
+  const setUserClearedTimestamp = useCallback((timestamp: number) => {
+    try {
+      sessionStorage.setItem(getClearedAtKey(storageKey), timestamp.toString());
+      userClearTimeRef.current = timestamp;
+    } catch (error) {
+      logger.error('Failed to set cleared timestamp in sessionStorage', error as Error);
+    }
+  }, [storageKey]);
+
+  const getUserClearedTimestamp = useCallback((): number => {
+    try {
+      const stored = sessionStorage.getItem(getClearedAtKey(storageKey));
+      return stored ? parseInt(stored, 10) : userClearTimeRef.current;
+    } catch (error) {
+      logger.error('Failed to get cleared timestamp from sessionStorage', error as Error);
+      return userClearTimeRef.current;
+    }
+  }, [storageKey]);
+
+  const cancelAutoSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Restore from localStorage on mount with enhanced protection
   useEffect(() => {
+    if (!mountedRef.current) return;
+    
     try {
       const saved = localStorage.getItem(storageKey);
-      const timeSinceUserClear = Date.now() - userClearTimeRef.current;
+      const clearedTimestamp = getUserClearedTimestamp();
+      const timeSinceUserClear = Date.now() - clearedTimestamp;
       
-      // Don't restore if user recently cleared input (within 5 seconds)
-      if (saved && saved.trim() && timeSinceUserClear > 5000) {
+      // Enhanced protection: Don't restore if user recently cleared input (within 10 seconds)
+      // or if the saved value is the same as what was cleared
+      if (saved && saved.trim() && timeSinceUserClear > 10000) {
         setValue(saved);
         setIsRestored(true);
+        initialValueRef.current = saved;
         logger.info('Input restored from localStorage', { 
           storageKey, 
-          length: saved.length 
+          length: saved.length,
+          timeSinceUserClear 
         });
+      } else if (saved) {
+        // Clear potentially stale data if user recently cleared
+        localStorage.removeItem(storageKey);
+        logger.debug('Cleared stale localStorage data due to recent user clear', { storageKey });
       }
     } catch (error) {
       logger.error('Failed to restore input from localStorage', error as Error);
     }
-  }, [storageKey]);
+  }, [storageKey, getUserClearedTimestamp]);
 
-  // Auto-save to localStorage with debouncing
+  // Auto-save to localStorage with enhanced debouncing and cleanup
   useEffect(() => {
-    if (!value || value === lastSavedRef.current) return;
+    if (!mountedRef.current || !value || value === lastSavedRef.current) return;
 
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+    // Cancel any existing timer
+    cancelAutoSave();
 
     saveTimeoutRef.current = setTimeout(() => {
+      if (!mountedRef.current) return; // Guard against unmounted components
+      
       try {
         if (value.trim()) {
           localStorage.setItem(storageKey, value);
@@ -62,47 +104,56 @@ export const useInputPreservation = (options: UseInputPreservationOptions) => {
       }
     }, autoSaveDelay);
 
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, [value, storageKey, autoSaveDelay]);
+    return cancelAutoSave;
+  }, [value, storageKey, autoSaveDelay, cancelAutoSave]);
 
-  // Custom setValue that detects user clear intent
+  // Enhanced setValue with proper race condition prevention
   const setValueWithClearDetection = useCallback((newValue: string) => {
     const previousValue = value;
     
     // Detect if user intentionally cleared the input
     if (previousValue && !newValue.trim()) {
-      // User cleared the input - immediately clear localStorage and mark time
+      // Cancel any pending auto-save to prevent race conditions
+      cancelAutoSave();
+      
+      const clearTimestamp = Date.now();
+      
+      // Atomically clear storage and mark timestamp
       try {
         localStorage.removeItem(storageKey);
+        setUserClearedTimestamp(clearTimestamp);
         lastSavedRef.current = '';
-        userClearTimeRef.current = Date.now();
-        logger.debug('User cleared input - storage cleared', { storageKey });
+        logger.debug('User cleared input - storage and timers cleared', { 
+          storageKey, 
+          clearTimestamp 
+        });
       } catch (error) {
         logger.error('Failed to clear storage on user clear', error as Error);
       }
     }
     
     setValue(newValue);
-  }, [value, storageKey]);
+  }, [value, storageKey, cancelAutoSave, setUserClearedTimestamp]);
 
-  // Clear storage when input is successfully sent
+  // Enhanced storage clearing with timer cancellation
   const clearStorage = useCallback(() => {
+    // Cancel any pending auto-save operations
+    cancelAutoSave();
+    
     try {
       localStorage.removeItem(storageKey);
       lastSavedRef.current = '';
-      logger.debug('Input storage cleared', { storageKey });
+      // Set cleared timestamp to prevent restoration
+      setUserClearedTimestamp(Date.now());
+      logger.debug('Input storage cleared with timer cancellation', { storageKey });
     } catch (error) {
       logger.error('Failed to clear input storage', error as Error);
     }
-  }, [storageKey]);
+  }, [storageKey, cancelAutoSave, setUserClearedTimestamp]);
 
-  // Manual save
+  // Enhanced manual save with proper error handling
   const saveToStorage = useCallback(() => {
-    if (value.trim()) {
+    if (value.trim() && mountedRef.current) {
       try {
         localStorage.setItem(storageKey, value);
         lastSavedRef.current = value;
@@ -116,27 +167,32 @@ export const useInputPreservation = (options: UseInputPreservationOptions) => {
     }
   }, [value, storageKey]);
 
-  // Cleanup on unmount
+  // Proper cleanup on unmount using refs to prevent re-execution
   useEffect(() => {
+    const currentValue = value;
+    const currentLastSaved = lastSavedRef.current;
+    
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      mountedRef.current = false;
+      cancelAutoSave();
       
-      // Save final state if preserveOnUnmount is true
-      if (preserveOnUnmount && value.trim() && value !== lastSavedRef.current) {
+      // Only save if preserveOnUnmount is true AND we have unsaved changes AND not empty
+      if (preserveOnUnmount && 
+          currentValue.trim() && 
+          currentValue !== currentLastSaved &&
+          currentValue !== initialValueRef.current) {
         try {
-          localStorage.setItem(storageKey, value);
+          localStorage.setItem(storageKey, currentValue);
           logger.debug('Input preserved on unmount', { 
             storageKey, 
-            length: value.length 
+            length: currentValue.length 
           });
         } catch (error) {
           logger.error('Failed to preserve input on unmount', error as Error);
         }
       }
     };
-  }, [value, storageKey, preserveOnUnmount]);
+  }, [storageKey, preserveOnUnmount, cancelAutoSave]); // Stable dependencies only
 
   return {
     value,
