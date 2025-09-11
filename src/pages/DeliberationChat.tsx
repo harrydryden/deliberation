@@ -653,6 +653,10 @@ const OptimizedDeliberationChat = () => {
                        </Badge>
                     </div>
                      <div className="flex items-center gap-2">
+                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                         <Users className="h-4 w-4" />
+                         <span>{dataState.deliberation.participant_count || 0} participants</span>
+                       </div>
                        <MessageQueueStatus {...queueStatusProps} />
                        <Button
                         variant="default"
@@ -725,19 +729,6 @@ const OptimizedDeliberationChat = () => {
                   </div>
                 </div>
               )}
-            </div>
-            
-            {/* Participant Count */}
-            <div className="bg-muted/30 border-t border-border/50">
-              <div className="px-4 py-2 flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  <span>{dataState.deliberation.participant_count || 0} participants</span>
-                </div>
-                 <div className="text-xs text-muted-foreground">
-                   Created {dataState.deliberation.created_at ? new Date(dataState.deliberation.created_at).toLocaleDateString() : 'Unknown'}
-                 </div>
-              </div>
             </div>
 
             {/* Description Modal */}
