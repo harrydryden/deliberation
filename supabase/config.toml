@@ -19,118 +19,118 @@ port = 54324
 # Canonical function entries
 [functions.pdf_processor]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.relationship_evaluator]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.realtime_session]
 verify_jwt = false
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.admin_get_users]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.agent_orchestration_stream]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.classify_message]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.ibis_embeddings]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.link_similar_ibis_issues]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.generate_notion_statement]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.knowledge_query]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.voice_to_text]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.generate_issue_recommendations]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.generate_proactive_prompt]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.calculate_user_stance]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 # Compatibility alias function entries (forwarders to canonical names)
 [functions.agent-orchestration-stream]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.classify-message]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.generate-issue-recommendations]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.generate-notion-statement]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.knowledge-query]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.relationship-evaluator]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.voice-to-text]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.realtime-session]
 verify_jwt = false
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.admin-get-users]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.link-similar-ibis-issues]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.ibis-embeddings]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.calculate-user-stance]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 # Legacy underscored names used in prompts/docs (forwarders)
 [functions.compute_ibis_embeddings]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.langchain_query_knowledge]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"
 
 [functions.evaluate_ibis_relationships]
 verify_jwt = true
-import_map = "functions/import_map.json"
+import_map = "import_map.json"

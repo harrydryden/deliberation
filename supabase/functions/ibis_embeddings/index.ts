@@ -73,7 +73,6 @@ async function validateAndGetEnvironment() {
     throw new Error('Missing Supabase environment variables');
   }
 
-  const { createClient } = await import('@supabase/supabase-js');
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   
   return { supabase };
