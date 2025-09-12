@@ -96,7 +96,7 @@ serve(async (req) => {
     const { deliberationId, nodeId, force = false, nodeType } = body || {};
 
     // Get environment and clients with caching
-    const { supabase } = validateAndGetEnvironment();
+    const { supabase } = await validateAndGetEnvironment();
     const openAIApiKey = getOpenAIKey();
     
     // Build query to select target nodes of a given type
