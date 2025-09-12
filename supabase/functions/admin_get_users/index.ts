@@ -99,7 +99,7 @@ serve(async (req) => {
     const { data: profiles, error: profilesError } = await adminSupabase
       .from('profiles')
       .select('*')
-      .neq('archived', true);
+      .neq('is_archived', true);
 
     if (profilesError) {
       throw new Error(`Failed to fetch profiles: ${profilesError.message}`);
@@ -138,11 +138,12 @@ serve(async (req) => {
         id: profile.id,
         email: authUser?.email || 'N/A',
         role: profile.user_role,
-        access_code_1: profile.access_code_1,
-        access_code_2: profile.access_code_2,
-        created_at: profile.created_at,
-        last_sign_in: authUser?.last_sign_in_at,
-        email_confirmed_at: authUser?.email_confirmed_at,
+        accessCode1: profile.access_code_1,
+        accessCode2: profile.access_code_2,
+        isArchived: profile.is_archived || false,
+        createdAt: profile.created_at,
+        lastSignIn: authUser?.last_sign_in_at,
+        emailConfirmedAt: authUser?.email_confirmed_at,
         deliberations: userParticipations.map(p => ({
           id: p.deliberation_id,
           title: p.deliberations?.title || 'Unknown',

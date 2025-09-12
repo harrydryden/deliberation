@@ -58,7 +58,9 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
         headers
       });
       
-      if (response.error) throw new Error(response.error.message);
+      if (response.error) {
+        throw new Error(`Edge Function returned a non-2xx status code: ${response.error.message || 'Unknown error'}`);
+      }
       return response.data?.users || [];
     }
   );

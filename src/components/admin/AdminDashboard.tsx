@@ -33,7 +33,8 @@ export const AdminDashboard = () => {
           adminData.fetchStats(),
           adminData.fetchDeliberations(),
           adminData.fetchLocalAgents(),
-          adminData.fetchAgents()
+          adminData.fetchAgents(),
+          adminData.fetchUsers()
         ]);
         logger.component.mount('AdminDashboard', { message: 'Admin dashboard initialized successfully' });
       }, 'admin dashboard initialization');
