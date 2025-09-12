@@ -71,3 +71,7 @@ import_map = "functions/import_map.json"
 [functions.calculate_user_stance]
 verify_jwt = true
 import_map = "functions/import_map.json"
+
+[functions.test_entrypoint]
+verify_jwt = false
+import_map = "functions/import_map.json"
