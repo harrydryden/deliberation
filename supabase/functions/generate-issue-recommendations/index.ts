@@ -102,7 +102,7 @@ serve(async (req) => {
             role: 'user',
             content: aiPrompt
           }
-        ], { maxTokens: 1000 })
+        ])
       }),
     });
 
