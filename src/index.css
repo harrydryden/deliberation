@@ -54,12 +54,6 @@ All colors MUST be HSL.
 
     /* Democratic Theme Colors */
     --democratic-blue: 212 92% 46%;
-    
-    /* IBIS Colors */
-    --ibis-issue: 0 84% 60%;
-    --ibis-position: 45 93% 47%;
-    --ibis-argument: 140 70% 42%;
-    --ibis-rel-relates: 212 92% 46%;
     --democratic-green: 140 70% 42%;
     --civic-gold: 45 93% 47%;
     --deliberation-bg: 246 100% 98%;
@@ -97,8 +91,8 @@ All colors MUST be HSL.
     --ibis-issue: 0 84% 60%;            /* red-500 (#ef4444) */
     --ibis-position: 217 91% 60%;       /* blue-500 (#3b82f6) */
     --ibis-argument: 142 71% 45%;       /* green-500 (#22c55e) */
-    --ibis-rel-supports: 142 71% 45%;
-    --ibis-rel-opposes: 0 84% 60%;
+    --ibis-rel-supports: 142 71% 45%;   /* green-500 for supports */
+    --ibis-rel-opposes: 0 84% 60%;      /* red-500 for opposes */
     --ibis-rel-relates: 258 90% 66%;    /* violet-500 (#8b5cf6) */
     --ibis-rel-responds: 38 92% 50%;    /* amber-500 (#f59e0b) */
     --ibis-edge-hierarchy: 215 20% 65%; /* slate-ish (#94a3b8) */

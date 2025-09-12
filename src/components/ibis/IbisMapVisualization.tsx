@@ -95,10 +95,10 @@ const nodeTypeConfig = {
 };
 
 const relationshipConfig = {
-  supports: { color: 'hsl(var(--ibis-rel-supports))', style: 'solid', label: 'Supports' },
-  opposes: { color: 'hsl(var(--ibis-rel-opposes))', style: 'solid', label: 'Opposes' },
-  relates_to: { color: 'hsl(var(--ibis-rel-relates))', style: 'solid', label: 'Relates to' },
-  responds_to: { color: 'hsl(var(--ibis-rel-responds))', style: 'solid', label: 'Responds to' },
+  supports: { color: '#22c55e', style: 'solid', label: 'Supports' }, // green-500
+  opposes: { color: '#ef4444', style: 'solid', label: 'Opposes' }, // red-500
+  relates_to: { color: '#8b5cf6', style: 'solid', label: 'Relates to' }, // violet-500
+  responds_to: { color: '#f59e0b', style: 'solid', label: 'Responds to' }, // amber-500
 };
 
 export const IbisMapVisualization = ({ deliberationId }: IbisMapVisualizationProps) => {
@@ -465,6 +465,17 @@ const { user, isAdmin } = useSupabaseAuth();
       // Only create edges if both source and target nodes are in filtered set
       if (filteredNodeIds.has(relationship.source_node_id) && filteredNodeIds.has(relationship.target_node_id)) {
         const config = relationshipConfig[relationship.relationship_type];
+        
+        if (process.env.NODE_ENV === 'development') {
+          logger.debug('🔗 Creating edge:', {
+            id: relationship.id,
+            source: relationship.source_node_id,
+            target: relationship.target_node_id,
+            type: relationship.relationship_type,
+            color: config.color
+          });
+        }
+        
         flowEdges.push({
           id: relationship.id,
           source: relationship.source_node_id,
@@ -473,7 +484,7 @@ const { user, isAdmin } = useSupabaseAuth();
           animated: false,
           style: { 
             stroke: config.color, 
-            strokeWidth: 2,
+            strokeWidth: 4,
             strokeDasharray: config.style === 'dashed' ? '5,5' : undefined
           },
           markerEnd: { 
@@ -500,6 +511,15 @@ const { user, isAdmin } = useSupabaseAuth();
       }
     });
 
+
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('🎯 Final flow data created:', {
+        nodesCount: flowNodes.length,
+        edgesCount: flowEdges.length,
+        relationships: flowEdges.filter(e => e.data?.type === 'relationship').length,
+        hierarchyEdges: flowEdges.filter(e => e.data?.type === 'hierarchy').length
+      });
+    }
 
     setNodes(flowNodes);
     setEdges(flowEdges);
