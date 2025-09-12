@@ -1,4 +1,3 @@
-import "xhr";
 import { serve } from "std/http/server.ts";
 
 // Import shared utilities for performance and consistency

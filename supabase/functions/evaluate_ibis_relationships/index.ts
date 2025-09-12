@@ -1,4 +1,3 @@
-import "xhr";
 import { serve } from "std/http/server.ts";
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
