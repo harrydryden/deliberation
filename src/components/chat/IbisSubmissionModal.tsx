@@ -410,10 +410,6 @@ export const IbisSubmissionModal = ({
           {/* Enhanced Relationship Selector - Smart + Manual Connections */}
           {existingNodes.length > 0 ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <span>🚀 Enhanced Relationship Selector Active</span>
-                <Badge variant="outline">Smart + Manual</Badge>
-              </div>
               <EnhancedRelationshipSelector
                 key={`enhanced-rel-${modalKey}`}
                 deliberationId={deliberationId}
