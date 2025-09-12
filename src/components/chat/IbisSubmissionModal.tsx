@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { Lightbulb, CheckCircle } from "lucide-react";
+import { Lightbulb, CheckCircle, RotateCcw } from "lucide-react";
 import { EnhancedRelationshipSelector } from './EnhancedRelationshipSelector';
 import { IssueRecommendations } from '@/components/ibis/IssueRecommendations';
 import SimilarIbisNodes from './SimilarIbisNodes';
@@ -86,6 +86,16 @@ export const IbisSubmissionModal = ({
     deliberationId,
     isOpen
   );
+
+  // Auto-populate description with message content when modal opens
+  useEffect(() => {
+    if (isOpen && messageContent) {
+      setFormData(prev => ({
+        ...prev,
+        description: messageContent
+      }));
+    }
+  }, [isOpen, messageContent]);
 
   // Load existing nodes when modal opens
   useEffect(() => {
@@ -326,14 +336,42 @@ export const IbisSubmissionModal = ({
 
           {/* Description Field */}
           <div className="space-y-2">
-            <Label htmlFor="description">Description (Optional)</Label>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="description">Description (Optional)</Label>
+                <Badge variant="outline" className="text-xs">
+                  Auto-filled from message
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {formData.description.length} characters
+                </span>
+                {formData.description !== messageContent && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFormData(prev => ({ ...prev, description: messageContent }))}
+                    className="h-6 text-xs"
+                    title="Reset to original message"
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Reset
+                  </Button>
+                )}
+              </div>
+            </div>
             <Textarea
               id="description"
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Add additional context or details"
-              rows={3}
+              placeholder="Your message content has been auto-filled. Add additional context if needed."
+              rows={4}
             />
+            <p className="text-xs text-muted-foreground">
+              Your message content is automatically copied here. You can edit or add more details.
+            </p>
           </div>
 
           {/* Issue Recommendations - AI-powered with relationship types */}
