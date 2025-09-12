@@ -57,6 +57,9 @@ import_map = "./supabase/functions/generate_notion_statement/import_map.json"
 verify_jwt = true
 import_map = "./supabase/functions/knowledge_query/import_map.json"
 
+[functions.voice_to_text]
+verify_jwt = true
+import_map = "./supabase/functions/voice_to_text/import_map.json"
 
 [functions.generate_issue_recommendations]
 verify_jwt = true

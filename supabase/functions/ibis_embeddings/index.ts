@@ -1,174 +1,134 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.52.1";
 
-// Import shared utilities for performance and consistency
-// Self-contained utilities (inlined to avoid path resolution issues)
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function handleCORSPreflight(request: Request): Response | null {
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-  return null;
-}
-
-function createErrorResponse(error: any, status: number = 500, context?: string): Response {
-  const errorId = crypto.randomUUID();
-  console.error(`[${errorId}] ${context || 'Edge Function'} Error:`, error);
-  
-  return new Response(
-    JSON.stringify({
-      error: error?.message || 'An unexpected error occurred',
-      errorId,
-      context,
-      timestamp: new Date().toISOString()
-    }),
-    {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    }
-  );
-}
-
-function createSuccessResponse(data: any): Response {
-  return new Response(
-    JSON.stringify(data),
-    {
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    }
-  );
-}
-
-async function parseAndValidateRequest<T>(request: Request, requiredFields: string[] = []): Promise<T> {
-  try {
-    const body = await request.json();
-    
-    for (const field of requiredFields) {
-      if (!(field in body) || body[field] === null || body[field] === undefined) {
-        throw new Error(`Missing required field: ${field}`);
-      }
-    }
-    
-    return body as T;
-  } catch (error: any) {
-    throw new Error(`Request parsing failed: ${error.message}`);
-  }
-}
-
-function getOpenAIKey(): string {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-  return apiKey;
-}
-
-async function validateAndGetEnvironment() {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Missing Supabase environment variables');
-  }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
-  
-  return { supabase };
-}
-
-interface RequestBody {
+interface EmbeddingRequest {
   deliberationId?: string;
   nodeId?: string;
+  nodeType?: string;
   force?: boolean;
-  nodeType?: 'issue' | 'position' | 'argument';
 }
 
 serve(async (req) => {
-  // Handle CORS preflight with shared utility - retry deployment 2025-01-10
-  const corsResponse = handleCORSPreflight(req);
-  if (corsResponse) return corsResponse;
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const body = await parseAndValidateRequest(req, ['deliberationId']);
-    const { deliberationId, nodeId, force = false, nodeType } = body || {};
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 
-    // Get environment and clients with caching
-    const { supabase } = await validateAndGetEnvironment();
-    const openAIApiKey = getOpenAIKey();
-    
-    // Build query to select target nodes of a given type
-    const TYPE = nodeType || 'issue';
+    if (!supabaseUrl || !supabaseServiceKey || !openaiApiKey) {
+      throw new Error('Missing required environment variables');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { deliberationId, nodeId, nodeType, force = false }: EmbeddingRequest = await req.json();
+
+    console.log('[ibis_embeddings] Processing request', { deliberationId, nodeId, nodeType, force });
+
     let query = supabase
-      .from("ibis_nodes")
-      .select("id, title, description, node_type, embedding")
-      .eq("node_type", TYPE);
+      .from('ibis_nodes')
+      .select('id, title, description, node_type, embedding');
 
-    if (deliberationId) query = query.eq("deliberation_id", deliberationId);
-    if (nodeId) query = query.eq("id", nodeId);
-
-    const { data: nodes, error: nodesError } = await query;
-    if (nodesError) throw nodesError;
-
-    const targets = (nodes || []).filter((n: any) => force || !n.embedding);
-
-    if (targets.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, processed: 0, skipped: nodes?.length || 0 }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Prepare embedding inputs
-    const inputs = targets.map((n: any) => {
-      const base = n.title || "";
-      const desc = n.description ? `\n\n${n.description}` : "";
-      // Keep prompt concise for embedding
-      return (base + desc).slice(0, 2000);
-    });
-
-    // Call OpenAI embeddings API in batches to be safe
-    const BATCH = 64; // text-embedding-3-small allows large batch; keep modest
-    const embeddings: number[][] = [];
-    for (let i = 0; i < inputs.length; i += BATCH) {
-      const batch = inputs.slice(i, i + BATCH);
-      const res = await fetch("https://api.openai.com/v1/embeddings", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${openAIApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ model: "text-embedding-3-small", input: batch }),
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(`OpenAI embeddings error: ${res.status} ${t}`);
+    if (nodeId) {
+      query = query.eq('id', nodeId);
+    } else if (deliberationId) {
+      query = query.eq('deliberation_id', deliberationId);
+      if (nodeType) {
+        query = query.eq('node_type', nodeType);
       }
-      const json = await res.json();
-      for (const item of json.data) embeddings.push(item.embedding as number[]);
+    } else {
+      throw new Error('Either nodeId or deliberationId must be provided');
     }
 
-    // Update rows with embeddings
-    let updated = 0;
-    for (let i = 0; i < targets.length; i++) {
-      const target = targets[i];
-      const vector = embeddings[i];
-      const { error } = await supabase
-        .from("ibis_nodes")
-        .update({ embedding: vector, updated_at: new Date().toISOString() })
-        .eq("id", target.id);
-      if (!error) updated++;
+    // Only process nodes without embeddings unless force is true
+    if (!force) {
+      query = query.is('embedding', null);
     }
 
-    return createSuccessResponse({ 
+    const { data: nodes, error: selectError } = await query;
+    if (selectError) throw selectError;
+
+    if (!nodes || nodes.length === 0) {
+      console.log('[ibis_embeddings] No nodes to process');
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'No nodes requiring embedding updates',
+        processed: 0 
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    console.log(`[ibis_embeddings] Processing ${nodes.length} nodes`);
+
+    const embeddings = [];
+    for (const node of nodes) {
+      try {
+        const text = `${node.title} ${node.description || ''}`.trim();
+        
+        const openaiResponse = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-3-small',
+            input: text,
+          }),
+        });
+
+        if (!openaiResponse.ok) {
+          const errorText = await openaiResponse.text();
+          console.error(`[ibis_embeddings] OpenAI API error for node ${node.id}:`, errorText);
+          continue;
+        }
+
+        const embeddingResult = await openaiResponse.json();
+        const embedding = embeddingResult.data[0].embedding;
+
+        // Update the node with its embedding
+        const { error: updateError } = await supabase
+          .from('ibis_nodes')
+          .update({ embedding })
+          .eq('id', node.id);
+
+        if (updateError) {
+          console.error(`[ibis_embeddings] Failed to update node ${node.id}:`, updateError);
+          continue;
+        }
+
+        embeddings.push({ nodeId: node.id, success: true });
+        console.log(`[ibis_embeddings] Generated embedding for node ${node.id}`);
+      } catch (error) {
+        console.error(`[ibis_embeddings] Error processing node ${node.id}:`, error);
+        embeddings.push({ nodeId: node.id, success: false, error: error.message });
+      }
+    }
+
+    return new Response(JSON.stringify({ 
       success: true, 
-      processed: updated, 
-      total: targets.length 
+      processed: embeddings.filter(e => e.success).length,
+      total: nodes.length,
+      embeddings 
+    }), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
+
   } catch (error) {
-    console.error("compute-ibis-embeddings error:", error);
-    return createErrorResponse(error, 500, 'compute-ibis-embeddings');
+    console.error('[ibis_embeddings] Function error:', error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      success: false 
+    }), { 
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
   }
 });
