@@ -289,7 +289,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
       {/* AI Suggestions Section */}
       {suggestions.length > 0 && (
         <div className="space-y-3">
-          <Label className="text-sm font-medium">AI Suggestions</Label>
+          <Label className="text-sm font-medium">Suggestions</Label>
           <div className="space-y-2 max-h-48 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
              {suggestions.slice(0, 8).map((suggestion, index) => {
                const key = `${suggestion.nodeId}-${suggestion.relationshipType}`;
