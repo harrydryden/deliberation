@@ -95,11 +95,11 @@ serve(async (req) => {
 
     console.log('Admin access verified for user:', user.id);
 
-    // Fetch all user profiles (non-archived)
+    // Fetch all user profiles (non-archived) - using correct column name
     const { data: profiles, error: profilesError } = await adminSupabase
       .from('profiles')
       .select('*')
-      .neq('is_archived', true);
+      .eq('is_archived', false);
 
     if (profilesError) {
       throw new Error(`Failed to fetch profiles: ${profilesError.message}`);

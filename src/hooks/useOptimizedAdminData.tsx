@@ -120,7 +120,11 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
   // Optimized actions with error handling
   const archiveUser = useCallback(async (userId: string, reason: string) => {
     try {
-      await adminService.archiveUser(userId, reason);
+      // Get current user for adminId parameter
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      await adminService.archiveUser(userId, user.id, reason);
       await fetchUsers(); // Refresh users
       toast({
         title: "Success",
