@@ -311,7 +311,7 @@ export const IbisSubmissionModal = ({
                   onClick={() => applyAiSuggestion('title', aiSuggestions.title)}
                   className="h-6 text-xs"
                 >
-                  Use AI suggestion
+                  Use suggestion
                 </Button>
               )}
             </div>
@@ -336,7 +336,7 @@ export const IbisSubmissionModal = ({
                   onClick={() => applyAiSuggestion('nodeType', aiSuggestions.nodeType)}
                   className="h-6 text-xs"
                 >
-                  Use AI suggestion: {aiSuggestions.nodeType}
+                  Use suggestion: {aiSuggestions.nodeType}
                 </Button>
               )}
             </div>
