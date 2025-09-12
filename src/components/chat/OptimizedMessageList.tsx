@@ -222,20 +222,25 @@ const OptimizedMessageItem = memo(({
                 </div>
               )}
               
-              {/* Integrated Share button for user messages */}
+              {/* Share button or Shared badge for user messages */}
               {isUser && (
                 <div className="absolute bottom-2 right-2 z-10">
-                  <Button
-                    variant={message.submitted_to_ibis ? "secondary" : "outline"}
-                    size="sm"
-                    onClick={message.submitted_to_ibis ? undefined : handleShare}
-                    disabled={message.submitted_to_ibis}
-                    className="text-xs h-6 bg-background border shadow-sm whitespace-nowrap"
-                    title={message.submitted_to_ibis ? "Already shared to IBIS" : "Share to IBIS - add descriptions and links"}
-                  >
-                    <Share2 className="h-3 w-3 mr-1" />
-                    {message.submitted_to_ibis ? "Submitted" : "Share"}
-                  </Button>
+                  {message.submitted_to_ibis ? (
+                    <Badge variant="secondary" className="text-xs bg-muted text-muted-foreground">
+                      Shared
+                    </Badge>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleShare}
+                      className="text-xs h-6 bg-background border shadow-sm whitespace-nowrap"
+                      title="Share to IBIS - add descriptions and links"
+                    >
+                      <Share2 className="h-3 w-3 mr-1" />
+                      Share
+                    </Button>
+                  )}
                 </div>
               )}
 

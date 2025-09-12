@@ -24,9 +24,8 @@ export const useFilteredMessages = (
     
     
     const filtered = safeMessages.filter(msg => {
-      // Include user's own messages (not submitted to IBIS - those are for IBIS context)
-      if (msg.message_type === 'user' && msg.user_id === currentUserId && !msg.submitted_to_ibis) {
-        
+      // Include user's own messages (including those submitted to IBIS)
+      if (msg.message_type === 'user' && msg.user_id === currentUserId) {
         return true;
       }
       
