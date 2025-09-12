@@ -8,6 +8,7 @@ import { convertApiMessagesToChatMessages, convertApiMessageToChatMessage } from
 import { getErrorMessage } from "@/utils/errors";
 import { logger } from '@/utils/logger';
 import { productionLogger } from '@/utils/productionLogger';
+import { optimizedRealtimeService } from '@/services/optimized-realtime.service';
 import { useToast } from '@/hooks/use-toast';
 import { cacheService } from '@/services/cache.service';
 import { useAgentOrchestrationTrigger } from '@/hooks/useAgentOrchestrationTrigger';
@@ -100,9 +101,9 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     }
     
     try {
-      // Real-time message handling with typing state management
-      const unsubscribe = realtimeService.subscribeToMessages((message) => {
-        // Filter messages for this deliberation
+      // Real-time message handling with optimized subscription management
+      const unsubscribe = optimizedRealtimeService.subscribeToMessages((message) => {
+        // Filter messages for this deliberation (additional safety check)
         if (message.deliberation_id !== deliberationId) return;
         
         const chatMessage = convertApiMessageToChatMessage(message);

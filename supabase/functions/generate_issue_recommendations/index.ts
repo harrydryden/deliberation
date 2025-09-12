@@ -149,36 +149,28 @@ serve(async (req) => {
       .replace(/\{\{existing_issues\}\}/g, issuesContext)
       .replace(/\{\{max_recommendations\}\}/g, maxRecommendations.toString());
 
-    // Call OpenAI API
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
-        messages: [
-          {
-            role: 'system',
-            content: await getSystemMessage(supabase, 'issue_recommendation_system_message')
-          },
-          {
-            role: 'user',
-            content: aiPrompt
-          }
-        ],
-        max_completion_tokens: 1000
-      }),
+// Call OpenAI API with enhanced client
+    const { createOpenAIClient } = await import('../shared/openai-client.ts');
+    const openAIClient = createOpenAIClient();
+    
+    const openAIData = await openAIClient.createChatCompletion({
+      model: 'gpt-5-2025-08-07',
+      messages: [
+        {
+          role: 'system',
+          content: await getSystemMessage(supabase, 'issue_recommendation_system_message')
+        },
+        {
+          role: 'user',
+          content: aiPrompt
+        }
+      ],
+      max_completion_tokens: 1000
+    }, {
+      timeoutMs: 30000, // 30 second timeout for this function
+      maxRetries: 2
     });
 
-    if (!openAIResponse.ok) {
-      const errorText = await openAIResponse.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${openAIResponse.status}`);
-    }
-
-    const openAIData = await openAIResponse.json();
     const aiResponseContent = openAIData.choices?.[0]?.message?.content;
 
     if (!aiResponseContent) {

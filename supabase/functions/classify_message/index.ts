@@ -157,31 +157,24 @@ serve(async (req) => {
 
     const { systemMessage, userPrompt } = await getClassificationTemplates(supabase, content, deliberationContext, deliberationNotion);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
-        messages: [
-          { 
-            role: 'system', 
-            content: systemMessage
-          },
-          { role: 'user', content: userPrompt }
-        ],
-        max_completion_tokens: 1500,
-      }),
+    // Use enhanced OpenAI client
+    const { createOpenAIClient } = await import('../shared/openai-client.ts');
+    const openAIClient = createOpenAIClient();
+    
+    const data = await openAIClient.createChatCompletion({
+      model: 'gpt-5-2025-08-07',
+      messages: [
+        { 
+          role: 'system', 
+          content: systemMessage
+        },
+        { role: 'user', content: userPrompt }
+      ],
+      max_completion_tokens: 1500
+    }, {
+      timeoutMs: 25000, // 25 second timeout
+      maxRetries: 2
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
     const result = data.choices[0].message.content;
 
     try {
