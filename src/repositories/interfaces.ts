@@ -20,6 +20,7 @@ export interface IUserRepository extends IRepository<User> {
 export interface IMessageRepository extends IRepository<Message> {
   findByDeliberation(deliberationId: string): Promise<Message[]>;
   findByUser(userId: string): Promise<Message[]>;
+  create(data: Omit<Message, 'id' | 'created_at' | 'updated_at'>, expectedUserId?: string): Promise<Message>;
 }
 
 export interface IAgentRepository extends IRepository<Agent> {

@@ -3,6 +3,7 @@ import { SupabaseBaseRepository } from './supabase-base.repository';
 import { IMessageRepository } from '../interfaces';
 import { Message } from '@/types/index';
 import { logger } from '@/utils/logger';
+import { userContextManager } from '@/utils/userContextManager';
 
 export class MessageRepository extends SupabaseBaseRepository implements IMessageRepository {
   
@@ -133,7 +134,7 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
     }
   }
 
-  async create(data: Omit<Message, 'id' | 'createdAt' | 'updatedAt'>): Promise<Message> {
+  async create(data: Omit<Message, 'id' | 'createdAt' | 'updatedAt'>, expectedUserId?: string): Promise<Message> {
     try {
       // CRITICAL: Input validation and sanitization
       if (!data.content || typeof data.content !== 'string') {
@@ -142,6 +143,30 @@ export class MessageRepository extends SupabaseBaseRepository implements IMessag
 
       if (!data.user_id) {
         throw new Error('User ID is required');
+      }
+
+      // CRITICAL: Additional user context validation if expectedUserId is provided
+      if (expectedUserId && data.user_id !== expectedUserId) {
+        logger.error('Repository: User ID mismatch detected', {
+          providedUserId: data.user_id.substring(0, 8),
+          expectedUserId: expectedUserId.substring(0, 8),
+          deliberationId: data.deliberation_id?.substring(0, 8)
+        });
+        throw new Error('User ID validation failed: provided user ID does not match expected user ID');
+      }
+
+      // Validate user context before creating message
+      if (data.deliberation_id) {
+        try {
+          await userContextManager.validateMessageCreation(data.user_id, data.deliberation_id);
+        } catch (contextError) {
+          logger.error('User context validation failed in repository', {
+            error: contextError,
+            userId: data.user_id.substring(0, 8),
+            deliberationId: data.deliberation_id.substring(0, 8)
+          });
+          throw new Error(`User context validation failed: ${contextError instanceof Error ? contextError.message : String(contextError)}`);
+        }
       }
 
       // Sanitize content for security

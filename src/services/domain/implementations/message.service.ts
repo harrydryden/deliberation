@@ -2,6 +2,8 @@ import { IMessageService } from '../interfaces';
 import { IMessageRepository } from '@/repositories/interfaces';
 import { Message } from '@/types/index';
 import { logger } from '@/utils/logger';
+import { userContextManager } from '@/utils/userContextManager';
+import { MessageAuditLogger } from '@/utils/messageAuditLogger';
 
 export class MessageService implements IMessageService {
   constructor(private messageRepository: IMessageRepository) {}
@@ -41,6 +43,17 @@ export class MessageService implements IMessageService {
       if (!userId) {
         throw new Error('User ID is required to send a message');
       }
+
+      // CRITICAL: Validate user context and session integrity
+      const userContext = await userContextManager.validateMessageCreation(userId, deliberationId);
+      
+      // Audit log the creation attempt
+      await MessageAuditLogger.logMessageCreationAttempt(
+        userId, 
+        userContext.userId, 
+        deliberationId, 
+        content?.length || 0
+      );
 
       // Validate mode parameter
       if (mode && !['chat', 'learn'].includes(mode)) {
@@ -91,10 +104,11 @@ export class MessageService implements IMessageService {
             hasProcessingMode: 'processing_mode' in messageData
           });
 
-          const message = await this.messageRepository.create(messageData);
+          const message = await this.messageRepository.create(messageData, userId);
           
           // PERSISTENCE VERIFICATION: Ensure message was actually saved
           if (!message || !message.id) {
+            await MessageAuditLogger.logMessageCreationFailure(userId, 'Message creation failed - no ID returned', deliberationId);
             throw new Error('Message creation failed - no ID returned');
           }
           
@@ -102,6 +116,7 @@ export class MessageService implements IMessageService {
           try {
             const verificationMessage = await this.messageRepository.findById(message.id);
             if (!verificationMessage) {
+              await MessageAuditLogger.logMessageCreationFailure(userId, `Message persistence verification failed - message ${message.id} not found`, deliberationId);
               throw new Error(`Message persistence verification failed - message ${message.id} not found`);
             }
             logger.info('Message persistence verified', { messageId: message.id });
@@ -110,8 +125,12 @@ export class MessageService implements IMessageService {
               messageId: message.id, 
               error: verificationError 
             });
+            await MessageAuditLogger.logMessageCreationFailure(userId, `Message was created but verification failed: ${verificationError}`, deliberationId);
             throw new Error(`Message was created but verification failed: ${verificationError}`);
           }
+          
+          // Audit log successful creation
+          await MessageAuditLogger.logMessageCreationSuccess(message.id, userId, deliberationId);
           
           logger.info('Message sent and verified successfully', { 
             messageId: message.id, 
@@ -136,6 +155,12 @@ export class MessageService implements IMessageService {
         deliberationId,
         userId 
       });
+      
+      // Audit log the failure
+      if (userId) {
+        await MessageAuditLogger.logMessageCreationFailure(userId, error instanceof Error ? error.message : String(error), deliberationId);
+      }
+      
       throw error;
     }
   }

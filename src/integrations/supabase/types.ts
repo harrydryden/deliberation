@@ -255,6 +255,7 @@ export type Database = {
       audit_logs: {
         Row: {
           action: string
+          created_at: string | null
           id: string
           new_values: Json | null
           old_values: Json | null
@@ -264,6 +265,7 @@ export type Database = {
         }
         Insert: {
           action: string
+          created_at?: string | null
           id?: string
           new_values?: Json | null
           old_values?: Json | null
@@ -273,6 +275,7 @@ export type Database = {
         }
         Update: {
           action?: string
+          created_at?: string | null
           id?: string
           new_values?: Json | null
           old_values?: Json | null
@@ -949,6 +952,19 @@ export type Database = {
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
+      }
+      detect_user_attribution_anomalies: {
+        Args: {
+          p_deliberation_id?: string
+          p_time_window_minutes?: number
+          p_user_id: string
+        }
+        Returns: {
+          anomaly_type: string
+          created_at: string
+          details: Json
+          message_id: string
+        }[]
       }
       generate_access_code_1: {
         Args: Record<PropertyKey, never>
