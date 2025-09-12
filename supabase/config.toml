@@ -78,7 +78,7 @@ import_map = "functions/import_map.json"
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.generate-proactive-prompt]
+[functions.generate_proactive_prompt]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
