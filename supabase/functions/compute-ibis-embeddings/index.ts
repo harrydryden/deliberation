@@ -2,16 +2,83 @@ import "xhr";
 import { serve } from "std/http/server.ts";
 
 // Import shared utilities for performance and consistency
-import { 
-  corsHeaders, 
-  validateAndGetEnvironment, 
-  createErrorResponse, 
-  createSuccessResponse,
-  handleCORSPreflight,
-  parseAndValidateRequest,
-  getOpenAIKey
-} from '../shared/edge-function-utils.ts';
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
+// Self-contained utilities (inlined to avoid path resolution issues)
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+function handleCORSPreflight(request: Request): Response | null {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+  return null;
+}
+
+function createErrorResponse(error: any, status: number = 500, context?: string): Response {
+  const errorId = crypto.randomUUID();
+  console.error(`[${errorId}] ${context || 'Edge Function'} Error:`, error);
+  
+  return new Response(
+    JSON.stringify({
+      error: error?.message || 'An unexpected error occurred',
+      errorId,
+      context,
+      timestamp: new Date().toISOString()
+    }),
+    {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  );
+}
+
+function createSuccessResponse(data: any): Response {
+  return new Response(
+    JSON.stringify(data),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  );
+}
+
+async function parseAndValidateRequest<T>(request: Request, requiredFields: string[] = []): Promise<T> {
+  try {
+    const body = await request.json();
+    
+    for (const field of requiredFields) {
+      if (!(field in body) || body[field] === null || body[field] === undefined) {
+        throw new Error(`Missing required field: ${field}`);
+      }
+    }
+    
+    return body as T;
+  } catch (error: any) {
+    throw new Error(`Request parsing failed: ${error.message}`);
+  }
+}
+
+function getOpenAIKey(): string {
+  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!apiKey) {
+    throw new Error('OpenAI API key not configured');
+  }
+  return apiKey;
+}
+
+async function validateAndGetEnvironment() {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  
+  return { supabase };
+}
 
 interface RequestBody {
   deliberationId?: string;

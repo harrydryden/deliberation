@@ -16,8 +16,6 @@ port = 54323
 enabled = true
 port = 54324
 
-
-
 [functions.robust-pdf-processor]
 verify_jwt = true
 import_map = "functions/import_map.json"
@@ -25,12 +23,6 @@ import_map = "functions/import_map.json"
 [functions.evaluate-ibis-relationships]
 verify_jwt = true
 import_map = "functions/import_map.json"
-
-# create-ibis-node function removed - functionality integrated into generate-ibis-roots
-
-# generate-ibis-roots function removed - replaced with manual admin interface
-
-# realtime-chat function removed - no frontend usage found
 
 [functions.realtime-session]
 verify_jwt = false
@@ -48,8 +40,6 @@ import_map = "functions/import_map.json"
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-# suggest-ibis-links function removed - no frontend usage found
-
 [functions.compute-ibis-embeddings]
 verify_jwt = true
 import_map = "functions/import_map.json"
@@ -65,10 +55,6 @@ import_map = "functions/import_map.json"
 [functions.langchain-query-knowledge]
 verify_jwt = true
 import_map = "functions/import_map.json"
-
-# query-agent-knowledge function removed - replaced by langchain-query-knowledge
-
-# secure-file-processor function removed - replaced by robust-pdf-processor
 
 [functions.voice-to-text]
 verify_jwt = true

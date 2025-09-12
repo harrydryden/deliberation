@@ -84,31 +84,8 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
       };
       const deliberation = await deliberationService.createDeliberation(createData);
       
-      // Generate IBIS roots if enabled
-      if (data.generate_ibis_roots && deliberation?.id) {
-        try {
-          const { data: rootsData, error: rootsError } = await supabase.functions.invoke('generate-ibis-roots', {
-            body: {
-              deliberationId: deliberation.id,
-              deliberationTitle: data.title,
-              deliberationDescription: data.description,
-              notion: data.notion
-            }
-          });
-
-          if (rootsError) {
-            logger.error('Error generating IBIS roots', rootsError as Error);
-            toast.error('Deliberation created but failed to generate initial IBIS nodes. You can add them manually.');
-          } else if (rootsData?.success) {
-            toast.success(`Deliberation created with ${rootsData.count} AI-generated root issues`);
-          }
-        } catch (rootsError) {
-          logger.error('Error generating IBIS roots', rootsError as Error);
-          toast.error('Deliberation created but failed to generate initial IBIS nodes');
-        }
-      } else {
-        toast.success('Deliberation created successfully');
-      }
+      // AI generation disabled - this feature has been replaced with manual IBIS node creation
+      toast.success('Deliberation created successfully. You can add IBIS nodes manually through the admin interface.');
       
       setCreateOpen(false);
       form.resetForm();

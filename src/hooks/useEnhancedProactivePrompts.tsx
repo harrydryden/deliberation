@@ -112,7 +112,7 @@ export const useEnhancedProactivePrompts = ({
         promptsSentThisSession: facilitatorSession.session_state?.proactivePromptsCount || 0
       };
 
-      const { data, error } = await supabase.functions.invoke('generate-proactive-prompt', {
+      const { data, error } = await supabase.functions.invoke('generate_proactive_prompt', {
         body: { 
           userId, 
           deliberationId, 
