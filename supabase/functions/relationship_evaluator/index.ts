@@ -178,59 +178,91 @@ Rate confidence naturally based on evidence strength, typically ranging 0.65-0.9
         throw new Error('Missing required field: title');
       }
 
-      // Fetch existing nodes in the deliberation
-      const { data: existingNodes, error: nodesError } = await supabase
-        .from('ibis_nodes')
-        .select('id, title, description, node_type')
-        .eq('deliberation_id', deliberationId)
-        .limit(20); // Limit to prevent too many API calls
-
-      if (nodesError) {
-        throw new Error(`Failed to fetch existing nodes: ${nodesError.message}`);
-      }
-
-      if (!existingNodes || existingNodes.length === 0) {
-        return createSuccessResponse({
-          success: true,
-          relationships: [],
-          message: 'No existing nodes to connect to'
-        });
-      }
-
+      // Compute embedding for the new content and find similar existing nodes using DB vector search
       const openai = new OpenAI({ apiKey: openaiKey });
 
-      // Analyze relationships with existing nodes
-      const relationshipPromises = existingNodes.map(async (existingNode) => {
+      const queryText = `${title}\n\n${content || ''}`.slice(0, 2000);
+      let queryEmbedding: number[] | null = null;
+      try {
+        const emb = await openai.embeddings.create({
+          model: 'text-embedding-3-small',
+          input: queryText,
+        });
+        queryEmbedding = emb.data?.[0]?.embedding as number[];
+      } catch (e) {
+        console.warn('Failed to compute query embedding, will fall back to LLM-only analysis:', e);
+      }
+
+      let matchedNodes: Array<{ id: string; title: string; description: string | null; node_type: string; similarity: number }> = [];
+
+      if (queryEmbedding) {
+        const { data: matches, error: matchError } = await supabase.rpc('match_ibis_nodes_for_query', {
+          query_embedding: queryEmbedding,
+          deliberation_uuid: deliberationId,
+          match_threshold: 0.6,
+          match_count: 12,
+        });
+
+        if (matchError) {
+          console.warn('match_ibis_nodes_for_query RPC failed, falling back to LLM-only analysis:', matchError);
+        } else {
+          matchedNodes = (matches || []).map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            description: m.description,
+            node_type: m.node_type,
+            similarity: m.similarity,
+          }));
+        }
+      }
+
+      // If we couldn't get vector matches (e.g., embeddings missing), fall back to fetching recent nodes
+      if (!matchedNodes.length) {
+        const { data: existingNodes, error: nodesError } = await supabase
+          .from('ibis_nodes')
+          .select('id, title, description, node_type')
+          .eq('deliberation_id', deliberationId)
+          .order('created_at', { ascending: false })
+          .limit(12);
+
+        if (nodesError) {
+          throw new Error(`Failed to fetch existing nodes: ${nodesError.message}`);
+        }
+
+        if (!existingNodes || existingNodes.length === 0) {
+          return createSuccessResponse({
+            success: true,
+            relationships: [],
+            message: 'No existing nodes to connect to'
+          });
+        }
+
+        matchedNodes = existingNodes.map((n: any) => ({
+          id: n.id,
+          title: n.title,
+          description: n.description,
+          node_type: n.node_type,
+          similarity: 0.0, // unknown without embeddings
+        }));
+      }
+
+      console.log(`[relationship_evaluator] Found ${matchedNodes.length} candidate nodes (vector match or fallback)`);
+
+      // Analyze relationships for the top candidates using the LLM
+      const topCandidates = matchedNodes
+        .sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0))
+        .slice(0, 8);
+
+      console.log('[relationship_evaluator] Top candidate similarities:', topCandidates.map(n => ({ id: n.id, sim: n.similarity })));
+
+      const relationshipPromises = topCandidates.map(async (existingNode) => {
         const systemPrompt = `You are an expert in IBIS (Issue-Based Information System) methodology. Analyze if a meaningful relationship exists between a new node and an existing node. Only suggest relationships with confidence > 0.6.`;
         
-        const userPrompt = `Analyze if there's a meaningful relationship between:
-
-NEW NODE (${nodeType}): "${title}"
-Content: ${content || 'No additional content'}
-
-EXISTING NODE (${existingNode.node_type}): "${existingNode.title}"
-Description: ${existingNode.description || 'No description'}
-
-Determine if there's a meaningful relationship and suggest the most appropriate type.
-Valid relationship types: supports, opposes, relates_to, responds_to
-
-Respond with ONLY a JSON object in this format:
-{
-  "hasRelationship": true/false,
-  "relationshipType": "supports|opposes|relates_to|responds_to",
-  "confidence": [rate from 0.0 to 1.0 based on your actual certainty],
-  "reasoning": "Brief explanation of why they're related"
-}
-
-Instructions for confidence scoring:
-- Use your actual assessment of the relationship strength
-- Vary confidence naturally between 0.6-0.95 based on evidence quality
-- Only set hasRelationship to true if confidence is > 0.6 and there's a clear logical connection
-- Be honest about uncertainty - don't default to specific values`;
+        const userPrompt = `Analyze if there's a meaningful relationship between:\n\nNEW NODE (${nodeType}): "${title}"\nContent: ${content || 'No additional content'}\n\nEXISTING NODE (${existingNode.node_type}): "${existingNode.title}"\nDescription: ${existingNode.description || 'No description'}\n\nContext: A semantic search found this existing node as potentially related.${existingNode.similarity ? ` Semantic similarity (0-1): ${existingNode.similarity.toFixed(2)}.` : ''}\n\nDetermine if there's a meaningful relationship and suggest the most appropriate type.\nValid relationship types: supports, opposes, relates_to, responds_to\n\nRespond with ONLY a JSON object in this format:\n{\n  "hasRelationship": true/false,\n  "relationshipType": "supports|opposes|relates_to|responds_to",\n  "confidence": [rate from 0.0 to 1.0 based on your actual certainty],\n  "reasoning": "Brief explanation of why they're related"\n}\n\nInstructions for confidence scoring:\n- Base confidence on your reasoning quality and evidence, NOT on the semantic similarity score\n- Vary confidence naturally between 0.6-0.95 (two decimals), avoid reusing the same numbers\n- Only set hasRelationship to true if confidence is > 0.6 and there's a clear logical connection\n- Be honest about uncertainty - don't default to specific values`;
 
         try {
           const response = await openai.chat.completions.create({
-            model: "gpt-4o-mini", 
+            model: 'gpt-4o-mini',
             temperature: 0.2,
             max_tokens: 200,
             messages: [
@@ -252,7 +284,7 @@ Instructions for confidence scoring:
               relationshipType: result.relationshipType,
               confidence: result.confidence,
               reasoning: result.reasoning,
-              semanticSimilarity: Math.min(0.95, result.confidence * 1.1) // Calculate separate similarity score based on confidence
+              semanticSimilarity: typeof existingNode.similarity === 'number' ? existingNode.similarity : undefined,
             };
           }
           
@@ -263,20 +295,19 @@ Instructions for confidence scoring:
         }
       });
 
-      // Execute all relationship analyses in parallel
       const results = await Promise.all(relationshipPromises);
-      const validRelationships = results.filter(r => r !== null);
+      const validRelationships = results.filter((r): r is NonNullable<typeof r> => r !== null);
 
       // Sort by confidence and take top suggestions
       validRelationships.sort((a, b) => b.confidence - a.confidence);
       const topRelationships = validRelationships.slice(0, 5);
 
-      console.log(`Found ${topRelationships.length} potential relationships`);
+      console.log(`Found ${topRelationships.length} potential relationships (after LLM validation)`);
 
       return createSuccessResponse({
         success: true,
         relationships: topRelationships,
-        totalAnalyzed: existingNodes.length,
+        totalAnalyzed: matchedNodes.length,
         timestamp: new Date().toISOString()
       });
     } else {
