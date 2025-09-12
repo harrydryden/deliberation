@@ -1129,6 +1129,21 @@ export type Database = {
           title: string
         }[]
       }
+      match_ibis_nodes_for_query: {
+        Args: {
+          deliberation_uuid: string
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          description: string
+          id: string
+          node_type: string
+          similarity: number
+          title: string
+        }[]
+      }
       sparsevec_out: {
         Args: { "": unknown }
         Returns: unknown

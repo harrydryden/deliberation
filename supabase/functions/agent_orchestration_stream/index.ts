@@ -328,25 +328,67 @@ async function processOrchestration(
       conversationLength: recentMessages?.length || 0
     };
     
-    // Fetch IBIS nodes for peer_agent (Pia) to provide current deliberation context
+    // Fetch relevant IBIS nodes for peer_agent (Pia) using semantic similarity
     if (selectedAgentType === 'peer_agent') {
-      console.log(`🔍 [PHASE3] Fetching IBIS nodes for peer agent context`);
+      console.log(`🔍 [PHASE3] Finding semantically relevant IBIS nodes for peer agent`);
       try {
-        const { data: ibisNodes, error: ibisError } = await serviceClient
-          .from('ibis_nodes')
-          .select('id, title, description, node_type, created_at')
-          .eq('deliberation_id', deliberationId)
-          .order('created_at', { ascending: false })
-          .limit(10);
-        
-        if (ibisError) {
-          console.warn(`⚠️ [PHASE3] Could not fetch IBIS nodes: ${ibisError.message}`);
+        // Generate embedding for the user's message
+        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-3-small',
+            input: message.content,
+            encoding_format: 'float'
+          }),
+        });
+
+        if (embeddingResponse.ok) {
+          const embeddingData = await embeddingResponse.json();
+          const queryEmbedding = embeddingData.data[0].embedding;
+          
+          // Find similar IBIS nodes using our new function
+          const { data: similarNodes, error: similarError } = await serviceClient
+            .rpc('match_ibis_nodes_for_query', {
+              query_embedding: queryEmbedding,
+              deliberation_uuid: deliberationId,
+              match_threshold: 0.75,
+              match_count: 5
+            });
+          
+          if (similarError) {
+            console.warn(`⚠️ [PHASE3] Similarity search failed: ${similarError.message}`);
+            // Fallback to recent nodes as backup
+            const { data: recentNodes } = await serviceClient
+              .from('ibis_nodes')
+              .select('id, title, description, node_type')
+              .eq('deliberation_id', deliberationId)
+              .order('created_at', { ascending: false })
+              .limit(3);
+            context.similarNodes = recentNodes || [];
+          } else {
+            context.similarNodes = (similarNodes || []).map(node => ({
+              ...node,
+              similarity: node.similarity
+            }));
+            console.log(`📋 [PHASE3] Found ${similarNodes?.length || 0} semantically relevant IBIS nodes (similarity > 0.75)`);
+          }
         } else {
-          context.similarNodes = ibisNodes || [];
-          console.log(`📋 [PHASE3] Retrieved ${ibisNodes?.length || 0} IBIS nodes for peer agent context`);
+          console.warn(`⚠️ [PHASE3] Embedding generation failed, using recent nodes fallback`);
+          const { data: recentNodes } = await serviceClient
+            .from('ibis_nodes')
+            .select('id, title, description, node_type')
+            .eq('deliberation_id', deliberationId)
+            .order('created_at', { ascending: false })
+            .limit(3);
+          context.similarNodes = recentNodes || [];
         }
       } catch (error) {
-        console.warn(`⚠️ [PHASE3] IBIS node fetch failed:`, error);
+        console.warn(`⚠️ [PHASE3] IBIS relevance search failed:`, error);
+        context.similarNodes = [];
       }
     }
     
@@ -452,14 +494,29 @@ async function processOrchestration(
         }
       }
       
-      // If still empty, provide deterministic fallback for peer_agent
-      if (!fullResponse && selectedAgentType === 'peer_agent' && context.similarNodes?.length > 0) {
-        console.log(`🛟 [PHASE4] Providing deterministic IBIS summary fallback for peer agent`);
-        fullResponse = `Here are the key issues and points that participants have raised so far in this deliberation:\n\n` +
-          context.similarNodes.map((node, index) => 
-            `${index + 1}. **${node.title}** (${node.node_type})\n   ${node.description || 'No additional details provided'}`
-          ).join('\n\n') +
-          `\n\nThese ${context.similarNodes.length} points represent the current state of our deliberation. Would you like me to elaborate on any of these issues or help you contribute additional perspectives?`;
+      // If still empty, provide intelligent fallback for peer_agent
+      if (!fullResponse && selectedAgentType === 'peer_agent') {
+        console.log(`🛟 [PHASE4] Providing intelligent IBIS fallback for peer agent`);
+        
+        if (context.similarNodes?.length > 0) {
+          // Show only relevant nodes with similarity scores
+          const relevantNodes = context.similarNodes.filter(node => 
+            node.similarity === undefined || node.similarity > 0.75
+          );
+          
+          if (relevantNodes.length > 0) {
+            fullResponse = `Based on your message, here are the most relevant viewpoints from our deliberation:\n\n` +
+              relevantNodes.slice(0, 3).map((node, index) => {
+                const similarityNote = node.similarity ? ` (${Math.round(node.similarity * 100)}% relevant)` : '';
+                return `${index + 1}. **${node.title}** (${node.node_type})${similarityNote}\n   ${node.description || 'No additional details provided'}`;
+              }).join('\n\n') +
+              `\n\nWould you like me to explore any of these perspectives further or help you add a new viewpoint to the discussion?`;
+          } else {
+            fullResponse = `I don't see any existing viewpoints that directly relate to your message. This could be a great opportunity to introduce a new perspective to our deliberation. Would you like me to help you structure your thoughts or explore related aspects of this topic?`;
+          }
+        } else {
+          fullResponse = `I don't have access to previous viewpoints in this deliberation right now. Could you tell me more about what specific aspect you'd like to discuss? I'm here to help you contribute meaningfully to the conversation.`;
+        }
       }
       
       // Final check - if still empty, throw error
