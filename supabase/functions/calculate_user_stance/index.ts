@@ -1,6 +1,6 @@
 import { serve } from "std/http/server.ts";
 import { createClient } from '@supabase/supabase-js';
-
+// touch: trigger redeploy
 // Inlined utilities to avoid cross-folder import issues
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
