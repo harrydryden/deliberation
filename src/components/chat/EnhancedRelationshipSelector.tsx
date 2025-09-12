@@ -18,7 +18,7 @@ interface RelationshipSuggestion {
   relationshipType: string;
   confidence: number;
   reasoning: string;
-  semanticSimilarity: number;
+  semanticSimilarity: number | null;
 }
 
 interface SelectedSuggestion extends RelationshipSuggestion {
@@ -369,13 +369,19 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                            {suggestion.reasoning}
                          </p>
                          
-                         {suggestion.semanticSimilarity && (
-                           <div className="mt-1">
-                             <Badge variant="secondary" className="text-xs">
-                               {Math.round(suggestion.semanticSimilarity * 100)}% similarity
-                             </Badge>
-                           </div>
-                         )}
+                          {suggestion.semanticSimilarity !== null && suggestion.semanticSimilarity !== undefined ? (
+                            <div className="mt-1">
+                              <Badge variant="secondary" className="text-xs">
+                                {Math.round(suggestion.semanticSimilarity * 100)}% similarity
+                              </Badge>
+                            </div>
+                          ) : (
+                            <div className="mt-1">
+                              <Badge variant="outline" className="text-xs opacity-60">
+                                Similarity N/A
+                              </Badge>
+                            </div>
+                          )}
                        </div>
                      </div>
                    </CardContent>

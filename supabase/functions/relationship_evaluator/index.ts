@@ -196,12 +196,32 @@ Rate confidence naturally based on evidence strength, typically ranging 0.65-0.9
       let matchedNodes: Array<{ id: string; title: string; description: string | null; node_type: string; similarity: number }> = [];
 
       if (queryEmbedding) {
-        const { data: matches, error: matchError } = await supabase.rpc('match_ibis_nodes_for_query', {
+        // Try with default threshold (0.35), then fallback to lower threshold if needed
+        let matches, matchError;
+        
+        const { data: primaryMatches, error: primaryError } = await supabase.rpc('match_ibis_nodes_for_query', {
           query_embedding: queryEmbedding,
           deliberation_uuid: deliberationId,
-          match_threshold: 0.6,
+          match_threshold: 0.35,
           match_count: 12,
         });
+
+        if (primaryError) {
+          console.warn('Primary vector search failed, trying lower threshold:', primaryError);
+          
+          const { data: fallbackMatches, error: fallbackError } = await supabase.rpc('match_ibis_nodes_for_query', {
+            query_embedding: queryEmbedding,
+            deliberation_uuid: deliberationId,
+            match_threshold: 0.2,
+            match_count: 12,
+          });
+          
+          matches = fallbackMatches;
+          matchError = fallbackError;
+        } else {
+          matches = primaryMatches;
+          matchError = primaryError;
+        }
 
         if (matchError) {
           console.warn('match_ibis_nodes_for_query RPC failed, falling back to LLM-only analysis:', matchError);
@@ -242,18 +262,23 @@ Rate confidence naturally based on evidence strength, typically ranging 0.65-0.9
           title: n.title,
           description: n.description,
           node_type: n.node_type,
-          similarity: 0.0, // unknown without embeddings
+          similarity: null, // null indicates no embedding-based similarity available
         }));
       }
 
       console.log(`[relationship_evaluator] Found ${matchedNodes.length} candidate nodes (vector match or fallback)`);
+      console.log(`[relationship_evaluator] Embedding coverage: ${matchedNodes.filter(n => n.similarity !== null).length}/${matchedNodes.length} nodes have embeddings`);
 
       // Analyze relationships for the top candidates using the LLM
       const topCandidates = matchedNodes
         .sort((a, b) => (b.similarity ?? 0) - (a.similarity ?? 0))
         .slice(0, 8);
 
-      console.log('[relationship_evaluator] Top candidate similarities:', topCandidates.map(n => ({ id: n.id, sim: n.similarity })));
+      console.log('[relationship_evaluator] Top candidate similarities:', topCandidates.map(n => ({ 
+        id: n.id, 
+        sim: n.similarity, 
+        hasEmbedding: n.similarity !== null 
+      })));
 
       const relationshipPromises = topCandidates.map(async (existingNode) => {
         const systemPrompt = `You are an expert in IBIS (Issue-Based Information System) methodology. Analyze if a meaningful relationship exists between a new node and an existing node. Only suggest relationships with confidence > 0.6.`;
@@ -284,7 +309,8 @@ Rate confidence naturally based on evidence strength, typically ranging 0.65-0.9
               relationshipType: result.relationshipType,
               confidence: result.confidence,
               reasoning: result.reasoning,
-              semanticSimilarity: typeof existingNode.similarity === 'number' ? existingNode.similarity : undefined,
+              // Use the actual vector similarity score, not a calculated one
+              semanticSimilarity: existingNode.similarity,
             };
           }
           
