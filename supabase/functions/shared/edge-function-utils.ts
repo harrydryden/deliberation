@@ -1,5 +1,5 @@
 // Shared utilities for edge functions - eliminates code duplication and improves performance
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
+import { createClient } from '@supabase/supabase-js';
 
 // Standard CORS headers for all functions
 export const corsHeaders = {

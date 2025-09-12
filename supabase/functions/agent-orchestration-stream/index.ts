@@ -1,6 +1,5 @@
 import "xhr";
 import { serve } from "std/http/server.ts";
-import { createClient } from '@supabase/supabase-js';
 
 // Import only the working shared utilities - removed streaming since we're using JSON
 import {
@@ -17,7 +16,7 @@ import {
 import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
 
 // Enhanced authentication-aware client creation
-function createAuthenticatedClients(request: Request) {
+async function createAuthenticatedClients(request: Request) {
   const { supabase: serviceClient } = validateAndGetEnvironment();
   
   // Extract user token for authenticated operations
@@ -31,7 +30,8 @@ function createAuthenticatedClients(request: Request) {
       const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
       
       if (supabaseUrl && supabaseAnonKey) {
-        // Create authenticated client with user's token
+        // Create authenticated client with user's token using mapped import
+        const { createClient } = await import('@supabase/supabase-js');
         userClient = createClient(supabaseUrl, supabaseAnonKey, {
           auth: { persistSession: false },
           global: {
@@ -441,7 +441,7 @@ serve(async (req) => {
     console.log(`📋 Request: messageId=${messageId}, deliberationId=${deliberationId}, mode=${mode || 'chat'}`);
 
     // Create authenticated clients using enhanced method
-    const { serviceClient, userClient } = createAuthenticatedClients(req);
+    const { serviceClient, userClient } = await createAuthenticatedClients(req);
 
     // Process orchestration and wait for completion - JSON response pattern
     const result = await processOrchestration(

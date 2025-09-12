@@ -1,7 +1,7 @@
 // Cache invalidation service for agent configurations and responses
 // Ensures cache coherency when configurations change
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.1';
+import { createClient } from '@supabase/supabase-js';
 
 export class CacheInvalidationService {
   private supabase: any;

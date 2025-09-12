@@ -1,6 +1,5 @@
 import "xhr";
 import { serve } from "std/http/server.ts";
-import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
 
 // Import shared utilities for performance and consistency

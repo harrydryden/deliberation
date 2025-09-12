@@ -3,7 +3,7 @@
 // Edge Function validation script
 // Validates that all functions use the import map correctly and that config.toml is in sync
 
-import { existsSync } from "https://deno.land/std@0.168.0/fs/mod.ts";
+import { existsSync } from "std/fs/mod.ts";
 
 interface FunctionConfig {
   name: string;
