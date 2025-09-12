@@ -324,7 +324,7 @@ export const IbisSubmissionModal = ({
               <SelectContent>
                 {NODE_TYPE_OPTIONS.map((type) => (
                   <SelectItem key={type.value} value={type.value}>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col text-left">
                       <span className="font-medium">{type.label}</span>
                       <span className="text-xs text-muted-foreground">{type.description}</span>
                     </div>
