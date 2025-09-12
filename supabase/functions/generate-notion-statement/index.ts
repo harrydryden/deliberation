@@ -10,9 +10,9 @@ import {
   handleCORSPreflight,
   parseAndValidateRequest,
   getOpenAIKey
-} from '../shared/edge-function-utils.ts';
-import { ModelConfigManager } from '../shared/model-config.ts';
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
+} from '../shared/edge-function-utils';
+import { ModelConfigManager } from '../shared/model-config';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger';
 
 
 serve(async (req) => {
@@ -57,7 +57,7 @@ serve(async (req) => {
       body: JSON.stringify({
         ...ModelConfigManager.generateAPIParams('gpt-5-2025-08-07', [
           { role: 'user', content: combinedPrompt }
-        ], { maxTokens: 150 })
+        ])
       }),
     });
 
