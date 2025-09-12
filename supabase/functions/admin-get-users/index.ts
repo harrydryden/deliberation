@@ -1,5 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "xhr";
+import { serve } from "std/http/server.ts";
 
 // Import shared utilities for performance and consistency
 import { 
@@ -28,7 +28,7 @@ serve(async (req) => {
     }
 
     // Create service role client
-    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Verify the requesting user is an admin

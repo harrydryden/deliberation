@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "std/http/server.ts";
 import {
   validateAndGetEnvironment,
   createErrorResponse,
@@ -149,7 +149,7 @@ async function extractWithPdfJs(fileUrl: string, fileName: string): Promise<PdfP
     const uint8Array = new Uint8Array(arrayBuffer);
 
     // Load PDF.js library
-    const pdfjsLib = await import('https://esm.sh/pdfjs-dist@4.0.379');
+    const pdfjsLib = await import('pdfjs-dist');
     
     // Configure PDF.js worker
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.min.js';
