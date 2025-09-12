@@ -169,7 +169,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
           Issue Recommendations
         </CardTitle>
         <CardDescription>
-          AI-suggested issues based on your submission
+          Suggested issues based on your submission
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
