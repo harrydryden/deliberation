@@ -10,18 +10,20 @@ This directory contains all Supabase Edge Functions for the deliberation platfor
 
 All functions in this directory are designed to deploy reliably without external dependencies:
 
-- `admin-get-users/` - Admin user management
-- `agent-orchestration-stream/` - AI agent orchestration  
-- `calculate-user-stance/` - User stance analysis
-- `classify-message/` - Message classification
-- `compute-ibis-embeddings/` - IBIS node embeddings
-- `evaluate-ibis-relationships/` - IBIS relationship evaluation
-- `generate-notion-statement/` - Notion statement generation
-- `langchain-query-knowledge/` - Knowledge base querying
-- `link-similar-ibis-issues/` - IBIS similarity linking
-- `realtime-session/` - OpenAI Realtime sessions
-- `robust-pdf-processor/` - PDF text extraction
-- `voice-to-text/` - Speech transcription
+- `admin_get_users/` - Admin user management
+- `agent_orchestration_stream/` - AI agent orchestration  
+- `calculate_user_stance/` - User stance analysis
+- `classify_message/` - Message classification
+- `ibis_embeddings/` - IBIS node embeddings
+- `link_similar_ibis_issues/` - IBIS similarity linking
+- `generate_notion_statement/` - Notion statement generation
+- `knowledge_query/` - Knowledge base querying
+- `generate_issue_recommendations/` - Issue recommendations
+- `generate_proactive_prompt/` - Proactive prompts
+- `realtime_session/` - OpenAI Realtime sessions
+- `pdf_processor/` - PDF text extraction
+- `voice_to_text/` - Speech transcription
+- `relationship_evaluator/` - Relationship evaluation
 
 ### Development Guidelines
 
@@ -61,7 +63,7 @@ Previously, this project used shared utilities via `../shared/` imports. Due to 
 
 ### Migration Complete
 
-All 12 active edge functions have been updated with:
+All 14 active edge functions have been validated and updated with:
 - ✅ Inlined shared utilities 
 - ✅ Absolute URL imports for external dependencies
 - ✅ Self-contained implementations

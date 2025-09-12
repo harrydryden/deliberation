@@ -1,9 +1,7 @@
 import { serve } from "std/http/server.ts";
-import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
-// touch: trigger redeploy
+import OpenAI from 'openai';
 
-// Inlined utilities to avoid cross-folder import issues
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -18,18 +16,17 @@ function handleCORSPreflight(request: Request): Response | null {
 
 function createErrorResponse(error: any, status: number = 500, context?: string): Response {
   const errorId = crypto.randomUUID();
-  console.error(`[${errorId}] ${context || 'Edge Function'} Error:`, error);
+  console.error(`[${errorId}] ${context || 'relationship_evaluator error'}:`, error);
   
   return new Response(
-    JSON.stringify({
-      error: error?.message || 'An unexpected error occurred',
+    JSON.stringify({ 
+      error: error?.message || 'Internal server error', 
       errorId,
-      context,
       timestamp: new Date().toISOString()
     }),
-    {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status 
     }
   );
 }
@@ -37,10 +34,27 @@ function createErrorResponse(error: any, status: number = 500, context?: string)
 function createSuccessResponse(data: any): Response {
   return new Response(
     JSON.stringify(data),
-    {
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200 
     }
   );
+}
+
+async function parseAndValidateRequest<T>(request: Request, requiredFields: string[] = []): Promise<T> {
+  if (request.method !== 'POST') {
+    throw new Error(`Method ${request.method} not allowed`);
+  }
+
+  const body = await request.json();
+  
+  for (const field of requiredFields) {
+    if (!(field in body) || body[field] === undefined || body[field] === null) {
+      throw new Error(`Missing required field: ${field}`);
+    }
+  }
+
+  return body as T;
 }
 
 function getOpenAIKey(): string {
@@ -54,316 +68,110 @@ function getOpenAIKey(): string {
 function validateAndGetEnvironment() {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-
-  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
     throw new Error('Missing required Supabase environment variables');
   }
 
-  return {
-    supabase: createClient(supabaseUrl, supabaseServiceKey),
-    userSupabase: createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
-    })
-  };
-}
-
-// Inlined timeout utility
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
-    promise.then(resolve, reject).finally(() => clearTimeout(timeout));
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false }
   });
-}
 
-// Inlined ModelConfigManager to avoid imports
-class ModelConfigManager {
-  static selectOptimalModel(params: any) {
-    return 'gpt-5-2025-08-07'; // Use latest model
-  }
-  
-  static generateAPIParams(model: string, messages: any[]) {
-    const baseParams = {
-      model,
-      messages,
-      max_completion_tokens: 1000
-    };
-    return baseParams;
-  }
-}
-
-const EdgeLogger = {
-  debug: (message: string, data?: any) => console.log(`🔍 ${message}`, data),
-  info: (message: string, data?: any) => console.log(`ℹ️ ${message}`, data),
-  error: (message: string, error?: any) => console.error(`❌ ${message}`, error),
-};
-
-// Helper function to get system message from template
-async function getSystemMessage(supabase: any, templateName: string): Promise<string> {
-  try {
-    const { data: templateData, error } = await supabase
-      .rpc('get_prompt_template', { template_name: templateName });
-
-    if (templateData && templateData.length > 0) {
-      return templateData[0].template_text;
-    }
-  } catch (error) {
-    EdgeLogger.error(`Failed to fetch ${templateName} template`, error);
-  }
-  
-  throw new Error(`Template ${templateName} not found in database`);
-}
-
-
-interface RequestBody {
-  deliberationId: string;
-  content: string;
-  title: string;
-  nodeType: "issue" | "position" | "argument";
-  notion?: string;
-  includeAllTypes?: boolean;
-}
-
-interface RelationshipSuggestion {
-  nodeId: string;
-  nodeTitle: string;
-  nodeType: string;
-  relationshipType: string;
-  confidence: number;
-  reasoning: string;
-  semanticSimilarity: number;
-}
-
-// Enhanced relationship types mapping
-const RELATIONSHIP_TYPES = {
-  // Issue relationships
-  'issue_to_issue': ['relates_to', 'causes', 'blocks', 'depends_on'],
-  'position_to_issue': ['responds_to', 'addresses', 'solves'],
-  'argument_to_issue': ['discusses', 'exemplifies', 'challenges'],
-  
-  // Position relationships  
-  'position_to_position': ['supports', 'opposes', 'alternative_to', 'builds_on'],
-  'issue_to_position': ['motivates', 'requires'],
-  'argument_to_position': ['supports', 'opposes', 'questions', 'refines'],
-  
-  // Argument relationships
-  'argument_to_argument': ['supports', 'counters', 'strengthens', 'contradicts'],
-  'issue_to_argument': ['necessitates', 'contextualizes'],
-  'position_to_argument': ['justifies', 'requires_defence_from']
-};
-
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (!a?.length || !b?.length || a.length !== b.length) return 0;
-  let dot = 0, normA = 0, normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+  return { supabase };
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const body = (await req.json()) as RequestBody;
-    const { deliberationId, content, title, nodeType, notion, includeAllTypes = true } = body;
-    
-    if (!deliberationId || !content || !nodeType) {
-      return new Response(JSON.stringify({ success: false, error: "Missing required fields" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    console.log('Relationship evaluator request received');
+
+    const { sourceNodeId, targetNodeId, deliberationId } = await parseAndValidateRequest(req, [
+      'sourceNodeId', 'targetNodeId', 'deliberationId'
+    ]);
+
+    const openaiKey = getOpenAIKey();
+    const { supabase } = validateAndGetEnvironment();
+
+    // Fetch the source and target nodes
+    const { data: nodes, error: nodesError } = await supabase
+      .from('ibis_nodes')
+      .select('id, title, description, node_type')
+      .in('id', [sourceNodeId, targetNodeId]);
+
+    if (nodesError) {
+      throw new Error(`Failed to fetch nodes: ${nodesError.message}`);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
-    
-    if (!openaiKey) {
-      return new Response(JSON.stringify({ success: false, error: "OPENAI_API_KEY not set" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!nodes || nodes.length !== 2) {
+      throw new Error('Could not find both source and target nodes');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
-    });
+    const sourceNode = nodes.find(n => n.id === sourceNodeId);
+    const targetNode = nodes.find(n => n.id === targetNodeId);
 
-    // Get deliberation context
-    const { data: deliberation } = await supabase
-      .from("deliberations")
-      .select("title, description, notion")
-      .eq("id", deliberationId)
-      .single();
-
-    // Fetch existing nodes with embeddings
-    const nodeTypesToFetch = includeAllTypes 
-      ? ['issue', 'position', 'argument']
-      : [nodeType];
-    
-    const { data: existingNodes, error: nodesError } = await supabase
-      .from("ibis_nodes")
-      .select("id, title, description, node_type, embedding")
-      .eq("deliberation_id", deliberationId)
-      .in("node_type", nodeTypesToFetch)
-      .not("embedding", "is", null)
-      .limit(100);
-
-    if (nodesError) throw nodesError;
-    if (!existingNodes?.length) {
-      return new Response(JSON.stringify({ 
-        success: true, 
-        relationships: [],
-        message: "No existing nodes found for relationship evaluation"
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (!sourceNode || !targetNode) {
+      throw new Error('Could not identify source and target nodes');
     }
 
-    // Generate embedding for new content with timeout
+    // Call OpenAI API for relationship evaluation
     const openai = new OpenAI({ apiKey: openaiKey });
-    const fullContent = `${title}\n\n${content}`;
     
-    const embedRes = await withTimeout(
-      openai.embeddings.create({
-        model: "text-embedding-3-small",
-        input: fullContent.slice(0, 8000),
-      }),
-      15000 // 15 second timeout for embedding
-    );
+    const systemPrompt = "You are an expert in IBIS (Issue-Based Information System) methodology. Analyze the relationship between two IBIS nodes and suggest the most appropriate relationship type.";
     
-    const newContentEmbedding = embedRes.data[0]?.embedding as number[];
+    const userPrompt = `Analyze the relationship between these IBIS nodes:
 
-    // Calculate semantic similarities
-    const semanticMatches = existingNodes
-      .map(node => ({
-        ...node,
-        semanticSimilarity: cosineSimilarity(newContentEmbedding, node.embedding as number[])
-      }))
-      .filter(node => node.semanticSimilarity > 0.3)
-      .sort((a, b) => b.semanticSimilarity - a.semanticSimilarity)
-      .slice(0, 10);
+Source Node (${sourceNode.node_type}): ${sourceNode.title}
+Description: ${sourceNode.description || 'N/A'}
 
-    if (semanticMatches.length === 0) {
-      return new Response(JSON.stringify({ 
-        success: true, 
-        relationships: [],
-        message: "No semantically similar nodes found"
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+Target Node (${targetNode.node_type}): ${targetNode.title}  
+Description: ${targetNode.description || 'N/A'}
 
-    // Get relationship evaluation prompt from template system
-    const { data: templateData, error: templateError } = await supabase
-      .rpc('get_prompt_template', { 
-        template_name: 'evaluate_ibis_relationships'
-      });
+Determine the most appropriate relationship type and provide a confidence score (0-1).
 
-    if (templateError || !templateData || templateData.length === 0) {
-      throw new Error(`Failed to get prompt template: ${templateError?.message || 'Template not found'}`);
-    }
+Respond with ONLY a JSON object in this format:
+{
+  "relationship": "supports|objects|questions|responds|generalizes|specializes|temporal_sequence|replaces",
+  "confidence": 0.85,
+  "reasoning": "Brief explanation"
+}`;
 
-    const template = templateData[0];
-    
-    // Prepare template variables
-    const existingContributions = semanticMatches.map((node, i) => `
-${i + 1}. [${node.node_type.toUpperCase()}] ${node.title}
-   ${node.description || 'No description'}
-`).join('\n');
-
-    const validRelationshipTypes = [
-      ...RELATIONSHIP_TYPES[`${nodeType}_to_issue` as keyof typeof RELATIONSHIP_TYPES] || [],
-      ...RELATIONSHIP_TYPES[`${nodeType}_to_position` as keyof typeof RELATIONSHIP_TYPES] || [],
-      ...RELATIONSHIP_TYPES[`${nodeType}_to_argument` as keyof typeof RELATIONSHIP_TYPES] || []
-    ].join(', ');
-
-    // Replace template variables with actual values
-    const relationshipPrompt = template.template_text
-      .replace(/\{\{deliberation_title\}\}/g, deliberation?.title || 'Unknown Topic')
-      .replace(/\{\{deliberation_notion\}\}/g, deliberation?.notion ? `Key Question: ${deliberation.notion}` : '')
-      .replace(/\{\{node_type\}\}/g, nodeType)
-      .replace(/\{\{title\}\}/g, title)
-      .replace(/\{\{content\}\}/g, content)
-      .replace(/\{\{existing_contributions\}\}/g, existingContributions)
-      .replace(/\{\{valid_relationship_types\}\}/g, validRelationshipTypes);
-
-    const selectedModel = ModelConfigManager.selectOptimalModel({
-      complexity: 0.8,
-      requiresReasoning: true,
-      maxTokensNeeded: 1500
+    const response = await openai.chat.completions.create({
+      model: "gpt-4",
+      temperature: 0.1,
+      max_tokens: 300,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
     });
 
-    const apiParams = ModelConfigManager.generateAPIParams(
-      selectedModel,
-      [
-        { 
-          role: "system", 
-          content: await getSystemMessage(supabase, 'ibis_relationship_system_message') 
-        },
-        { role: "user", content: relationshipPrompt }
-      ]
-    );
+    const content = response.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error('No response content from OpenAI');
+    }
 
-    console.log(`🤖 Using model: ${selectedModel} for relationship evaluation`);
-    
-    // Add timeout for AI response
-    const aiResponse = await withTimeout(
-      openai.chat.completions.create(apiParams),
-      30000 // 30 second timeout
-    );
-
-    let aiRelationships: any[] = [];
+    // Parse the JSON response
+    let result;
     try {
-      const aiResult = JSON.parse(aiResponse.choices[0]?.message?.content || '{"relationships": []}');
-      aiRelationships = aiResult.relationships || [];
+      result = JSON.parse(content);
     } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError);
+      throw new Error(`Failed to parse OpenAI response: ${content}`);
     }
 
-    // Combine AI analysis with semantic similarity
-    const relationshipSuggestions: RelationshipSuggestion[] = aiRelationships
-      .filter(rel => rel.nodeIndex > 0 && rel.nodeIndex <= semanticMatches.length)
-      .map(rel => {
-        const node = semanticMatches[rel.nodeIndex - 1];
-        return {
-          nodeId: node.id,
-          nodeTitle: node.title,
-          nodeType: node.node_type,
-          relationshipType: rel.relationshipType,
-          confidence: Math.min(rel.confidence * node.semanticSimilarity, 1.0), // Combine AI confidence with semantic similarity
-          reasoning: rel.reasoning,
-          semanticSimilarity: node.semanticSimilarity
-        };
-      })
-      .filter(rel => rel.confidence > 0.5)
-      .sort((a, b) => b.confidence - a.confidence)
-      .slice(0, 5);
+    console.log('Relationship evaluation completed successfully');
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      relationships: relationshipSuggestions,
-      totalEvaluated: semanticMatches.length,
-      deliberationContext: deliberation?.notion
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    return createSuccessResponse({
+      sourceNodeId,
+      targetNodeId,
+      relationship: result.relationship,
+      confidence: result.confidence,
+      reasoning: result.reasoning,
+      timestamp: new Date().toISOString()
     });
 
-  } catch (err) {
-    console.error("Enhanced relationship evaluation error:", err);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: String(err),
-      relationships: []
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  } catch (error) {
+    return createErrorResponse(error, 500, 'relationship_evaluator');
   }
 });

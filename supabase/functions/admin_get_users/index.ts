@@ -1,7 +1,6 @@
 import { serve } from "std/http/server.ts";
 import { createClient } from '@supabase/supabase-js';
 
-// Inlined utilities to avoid cross-folder import issues
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -16,18 +15,17 @@ function handleCORSPreflight(request: Request): Response | null {
 
 function createErrorResponse(error: any, status: number = 500, context?: string): Response {
   const errorId = crypto.randomUUID();
-  console.error(`[${errorId}] ${context || 'Edge Function'} Error:`, error);
+  console.error(`[${errorId}] ${context || 'admin_get_users error'}:`, error);
   
   return new Response(
-    JSON.stringify({
-      error: error?.message || 'An unexpected error occurred',
+    JSON.stringify({ 
+      error: error?.message || 'Internal server error', 
       errorId,
-      context,
       timestamp: new Date().toISOString()
     }),
-    {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status 
     }
   );
 }
@@ -35,189 +33,133 @@ function createErrorResponse(error: any, status: number = 500, context?: string)
 function createSuccessResponse(data: any): Response {
   return new Response(
     JSON.stringify(data),
-    {
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200 
     }
   );
 }
 
-const EdgeLogger = {
-  debug: (message: string, data?: any) => console.log(`🔍 ${message}`, data),
-  info: (message: string, data?: any) => console.log(`ℹ️ ${message}`, data),
-  error: (message: string, error?: any) => console.error(`❌ ${message}`, error),
-};
-
 serve(async (req) => {
-  // Handle CORS preflight with shared utility
   const corsResponse = handleCORSPreflight(req);
   if (corsResponse) return corsResponse;
 
   try {
-    EdgeLogger.debug('Admin get users function called');
-    
-    // Get environment variables
+    console.log('Admin get users request received');
+
+    // Initialize Supabase clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !serviceRoleKey) {
-      EdgeLogger.error('Missing environment variables');
-      return createErrorResponse('Service configuration error', 500);
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+
+    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
+      throw new Error('Missing required Supabase environment variables');
     }
 
-    // Create service role client
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    // Create admin client with service role for elevated permissions
+    const adminSupabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
 
-    // Verify the requesting user is an admin
-    EdgeLogger.debug('Checking authorization header');
+    // Create user client for JWT verification
+    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    // Verify JWT token and get user
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      EdgeLogger.error('No authorization header found');
-      return createErrorResponse('No authorization header', 401);
+      return createErrorResponse(new Error('Authorization header missing'), 401);
     }
 
-    // Extract token from Bearer format
-    EdgeLogger.debug('Extracting token from authorization header');
-    const token = authHeader.replace('Bearer ', '');
-    
-    // Verify the user token using proper JWT authentication
-    EdgeLogger.debug('Verifying user token');
-    const userAuthClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!);
-    
-    // Set the auth header and verify user
-    const { data: { user }, error: userError } = await userAuthClient.auth.getUser(token);
-    if (userError || !user) {
-      console.error('❌ Invalid user token:', userError);
-      return createErrorResponse('Invalid user token', 401);
+    const { data: { user }, error: authError } = await userSupabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (authError || !user) {
+      console.error('Authentication failed:', authError);
+      return createErrorResponse(new Error('Authentication failed'), 401);
     }
 
-    console.log('✅ User verified:', user.id);
-
-    // Check if user has admin role
-    console.log('🔍 Checking admin role for user:', user.id);
-    const { data: userProfile, error: roleError } = await supabase
+    // Check if user is admin
+    const { data: profile, error: profileError } = await adminSupabase
       .from('profiles')
       .select('user_role')
       .eq('id', user.id)
       .single();
 
-    console.log('📋 User profile query result:', { userProfile, roleError });
-
-    if (roleError || !userProfile || userProfile.user_role !== 'admin') {
-      console.error('❌ Admin access check failed:', { roleError, userProfile, userId: user.id });
-      return createErrorResponse('Admin access required', 403);
+    if (profileError || !profile || profile.user_role !== 'admin') {
+      console.warn('Non-admin user attempted access:', user.id);
+      return createErrorResponse(new Error('Admin access required'), 403);
     }
 
-    console.log('✅ Admin access verified for user:', user.id);
+    console.log('Admin access verified for user:', user.id);
 
-    // Get profiles first
-    const { data: profiles, error: profilesError } = await supabase
+    // Fetch all user profiles (non-archived)
+    const { data: profiles, error: profilesError } = await adminSupabase
       .from('profiles')
       .select('*')
-      .eq('is_archived', false);
+      .neq('archived', true);
 
     if (profilesError) {
-      console.error('❌ Failed to fetch profiles:', profilesError);
-      return createErrorResponse('Failed to fetch profiles', 500);
+      throw new Error(`Failed to fetch profiles: ${profilesError.message}`);
     }
 
-    if (!profiles || profiles.length === 0) {
-      console.log('📋 No profiles found, returning empty array');
-      return createSuccessResponse({ users: [] });
+    // Fetch all users from Supabase Auth using service role
+    const { data: { users }, error: usersError } = await adminSupabase.auth.admin.listUsers();
+
+    if (usersError) {
+      throw new Error(`Failed to fetch auth users: ${usersError.message}`);
     }
 
-    console.log(`📋 Found ${profiles.length} profiles`);
-
-    // Get auth users with service role to access metadata
-    console.log('🔐 Fetching auth users with service role...');
-    const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
-    
-    if (authError) {
-      console.error('❌ Failed to fetch auth users:', authError);
-    }
-    
-    // Create a map of auth user data
-    const authUsersMap = new Map();
-    if (authData?.users) {
-      authData.users.forEach((authUser) => {
-        authUsersMap.set(authUser.id, authUser);
-      });
-    }
-
-    console.log(`🔐 Found ${authUsersMap.size} auth users`);
-
-    // Get participants with deliberations
-    console.log('🔍 Fetching participants and deliberations...');
-    const userIds = profiles.map(p => p.id);
-    const { data: participants } = await supabase
+    // Fetch participant data to get deliberation associations
+    const { data: participants, error: participantsError } = await adminSupabase
       .from('participants')
       .select(`
         user_id,
-        role,
+        deliberation_id,
         deliberations (
           id,
-          title
+          title,
+          notion
         )
-      `)
-      .in('user_id', userIds.map(id => id.toString()));
+      `);
 
-    console.log(`👥 Found ${participants?.length || 0} participant entries`);
+    if (participantsError) {
+      console.warn('Failed to fetch participants:', participantsError);
+    }
 
-    // Create map for efficient lookups
-    const deliberationsMap = new Map();
-    
-    // Initialize deliberations map
-    profiles.forEach(profile => {
-      deliberationsMap.set(profile.id, []);
-    });
-
-    // Populate deliberations map
-    participants?.forEach((p) => {
-      const userId = p.user_id;
-      if (deliberationsMap.has(userId) && p.deliberations) {
-        deliberationsMap.get(userId).push({
-          id: p.deliberations.id,
-          title: p.deliberations.title,
-          role: p.role || 'participant'
-        });
-      }
-    });
-
-    // Map profiles to user data
-    console.log('🏗️ Building user data...');
-    const users = profiles.map(profile => {
-      const role = profile.user_role || 'user';
-      const deliberations = deliberationsMap.get(profile.id) || [];
-      const authUser = authUsersMap.get(profile.id);
+    // Combine and map the data
+    const combinedUsers = profiles?.map(profile => {
+      const authUser = users.find(u => u.id === profile.id);
+      const userParticipations = participants?.filter(p => p.user_id === profile.id) || [];
       
       return {
         id: profile.id,
-        email: authUser?.email || profile.access_code_1 || `user-${profile.id.slice(0, 8)}@example.com`,
-        emailConfirmedAt: profile.created_at,
-        createdAt: profile.created_at,
-        lastSignInAt: profile.updated_at,
-        role: role,
-        accessCode1: profile.access_code_1,
-        accessCode2: profile.access_code_2,
-        profile: {
-          displayName: profile.access_code_1 || `User ${profile.id.slice(0, 8)}`,
-          avatarUrl: '',
-          bio: '',
-          expertiseAreas: [],
-        },
-        deliberations: deliberations,
-        isArchived: profile.is_archived || false,
-        archivedAt: profile.archived_at,
-        archivedBy: profile.archived_by,
-        archiveReason: profile.archive_reason,
+        email: authUser?.email || 'N/A',
+        role: profile.user_role,
+        access_code_1: profile.access_code_1,
+        access_code_2: profile.access_code_2,
+        created_at: profile.created_at,
+        last_sign_in: authUser?.last_sign_in_at,
+        email_confirmed_at: authUser?.email_confirmed_at,
+        deliberations: userParticipations.map(p => ({
+          id: p.deliberation_id,
+          title: p.deliberations?.title || 'Unknown',
+          notion: p.deliberations?.notion
+        }))
       };
+    }) || [];
+
+    console.log(`Successfully retrieved ${combinedUsers.length} users`);
+
+    return createSuccessResponse({
+      users: combinedUsers,
+      total: combinedUsers.length,
+      timestamp: new Date().toISOString()
     });
 
-    console.log(`✅ Successfully processed ${users.length} users`);
-    return createSuccessResponse({ users });
-
   } catch (error) {
-    console.error('💥 Unexpected error in admin-get-users:', error);
-    return createErrorResponse(`Internal server error: ${error.message}`, 500);
+    return createErrorResponse(error, 500, 'admin_get_users');
   }
 });
