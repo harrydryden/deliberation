@@ -158,7 +158,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
         {isLoading && (
           <div className="flex items-center justify-center py-4">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            <span className="ml-2 text-sm text-muted-foreground">Analysis Message</span>
+            <span className="ml-2 text-sm text-muted-foreground">Analysing Message</span>
           </div>
         )}
 
