@@ -95,11 +95,10 @@ serve(async (req) => {
 
     console.log('Admin access verified for user:', user.id);
 
-    // Fetch all user profiles (non-archived) - using correct column name
+    // Fetch all user profiles - get all first, then filter in code if needed
     const { data: profiles, error: profilesError } = await adminSupabase
       .from('profiles')
-      .select('*')
-      .eq('is_archived', false);
+      .select('id, user_role, access_code_1, access_code_2, is_archived, created_at, archived_at, archived_by, archive_reason');
 
     if (profilesError) {
       throw new Error(`Failed to fetch profiles: ${profilesError.message}`);
@@ -140,8 +139,8 @@ serve(async (req) => {
       }
     }
 
-    // Combine and map the data
-    const combinedUsers = profiles?.map(profile => {
+    // Combine and map the data, filtering out archived users
+    const combinedUsers = profiles?.filter(profile => !profile.is_archived).map(profile => {
       const authUser = users.find(u => u.id === profile.id);
       const userParticipations = participants?.filter(p => p.user_id === profile.id) || [];
       
