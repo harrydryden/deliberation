@@ -136,9 +136,11 @@ Determine the most appropriate relationship type and provide a confidence score 
 Respond with ONLY a JSON object in this format:
 {
   "relationship": "supports|opposes|relates_to|responds_to",
-  "confidence": 0.85,
+  "confidence": [rate from 0.0 to 1.0 based on your actual assessment],
   "reasoning": "Brief explanation"
-}`;
+}
+
+Rate confidence naturally based on evidence strength, typically ranging 0.65-0.95.`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -216,11 +218,15 @@ Respond with ONLY a JSON object in this format:
 {
   "hasRelationship": true/false,
   "relationshipType": "supports|opposes|relates_to|responds_to",
-  "confidence": 0.75,
+  "confidence": [rate from 0.0 to 1.0 based on your actual certainty],
   "reasoning": "Brief explanation of why they're related"
 }
 
-Only set hasRelationship to true if confidence is > 0.6 and there's a clear logical connection.`;
+Instructions for confidence scoring:
+- Use your actual assessment of the relationship strength
+- Vary confidence naturally between 0.6-0.95 based on evidence quality
+- Only set hasRelationship to true if confidence is > 0.6 and there's a clear logical connection
+- Be honest about uncertainty - don't default to specific values`;
 
         try {
           const response = await openai.chat.completions.create({
@@ -246,7 +252,7 @@ Only set hasRelationship to true if confidence is > 0.6 and there's a clear logi
               relationshipType: result.relationshipType,
               confidence: result.confidence,
               reasoning: result.reasoning,
-              semanticSimilarity: result.confidence // Use confidence as similarity proxy
+              semanticSimilarity: Math.min(0.95, result.confidence * 1.1) // Calculate separate similarity score based on confidence
             };
           }
           

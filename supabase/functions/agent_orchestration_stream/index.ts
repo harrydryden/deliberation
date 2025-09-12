@@ -355,8 +355,8 @@ async function processOrchestration(
             .rpc('match_ibis_nodes_for_query', {
               query_embedding: queryEmbedding,
               deliberation_uuid: deliberationId,
-              match_threshold: 0.75,
-              match_count: 5
+              match_threshold: 0.65,
+              match_count: 8
             });
           
           if (similarError) {
@@ -374,7 +374,7 @@ async function processOrchestration(
               ...node,
               similarity: node.similarity
             }));
-            console.log(`📋 [PHASE3] Found ${similarNodes?.length || 0} semantically relevant IBIS nodes (similarity > 0.75)`);
+            console.log(`📋 [PHASE3] Found ${similarNodes?.length || 0} semantically relevant IBIS nodes (similarity > 0.65)`);
           }
         } else {
           console.warn(`⚠️ [PHASE3] Embedding generation failed, using recent nodes fallback`);
