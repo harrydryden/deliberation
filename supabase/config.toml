@@ -18,15 +18,13 @@ port = 54324
 
 
 
-
-
 [functions.robust-pdf-processor]
 verify_jwt = true
-import_map = "import_map.json"
-
+import_map = "../import_map.json"
 
 [functions.evaluate-ibis-relationships]
 verify_jwt = true
+import_map = "../import_map.json"
 
 # create-ibis-node function removed - functionality integrated into generate-ibis-roots
 
@@ -36,33 +34,37 @@ verify_jwt = true
 
 [functions.realtime-session]
 verify_jwt = false
+import_map = "../import_map.json"
 
 [functions.admin-get-users]
 verify_jwt = true
-import_map = "import_map.json"
+import_map = "../import_map.json"
 
 [functions.agent-orchestration-stream]
 verify_jwt = true
-import_map = "import_map.json"
+import_map = "../import_map.json"
 
 [functions.classify-message]
 verify_jwt = true
-import_map = "import_map.json"
+import_map = "../import_map.json"
 
 # suggest-ibis-links function removed - no frontend usage found
 
 [functions.compute-ibis-embeddings]
 verify_jwt = true
-import_map = "import_map.json"
+import_map = "../import_map.json"
 
 [functions.link-similar-ibis-issues]
 verify_jwt = true
+import_map = "../import_map.json"
 
 [functions.generate-notion-statement]
 verify_jwt = true
+import_map = "../import_map.json"
 
 [functions.langchain-query-knowledge]
 verify_jwt = true
+import_map = "../import_map.json"
 
 # query-agent-knowledge function removed - replaced by langchain-query-knowledge
 
@@ -70,13 +72,16 @@ verify_jwt = true
 
 [functions.voice-to-text]
 verify_jwt = true
+import_map = "../import_map.json"
 
 [functions.generate-issue-recommendations]
 verify_jwt = true
-import_map = "import_map.json"
+import_map = "../import_map.json"
 
 [functions.generate-proactive-prompt]
 verify_jwt = true
+import_map = "../import_map.json"
 
 [functions.calculate-user-stance]
 verify_jwt = true
+import_map = "../import_map.json"
