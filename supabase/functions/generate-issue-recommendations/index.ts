@@ -1,18 +1,82 @@
-import "xhr";
-import { serve } from "std/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from '@supabase/supabase-js';
 
-// Import shared utilities for performance and consistency
-import { 
-  corsHeaders, 
-  validateAndGetEnvironment, 
-  createErrorResponse, 
-  createSuccessResponse,
-  handleCORSPreflight,
-  parseAndValidateRequest,
-  getOpenAIKey
-} from '../shared/edge-function-utils.ts';
-import { ModelConfigManager } from '../shared/model-config.ts';
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
+// Self-contained utilities (inlined to avoid path resolution issues)
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+function handleCORSPreflight(request: Request): Response | null {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+  return null;
+}
+
+function createErrorResponse(error: any, status: number = 500, context?: string): Response {
+  const errorId = crypto.randomUUID();
+  console.error(`[${errorId}] ${context || 'Edge Function'} Error:`, error);
+  
+  return new Response(
+    JSON.stringify({
+      error: error?.message || 'An unexpected error occurred',
+      errorId,
+      context,
+      timestamp: new Date().toISOString()
+    }),
+    {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  );
+}
+
+function createSuccessResponse(data: any): Response {
+  return new Response(
+    JSON.stringify(data),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  );
+}
+
+async function parseAndValidateRequest<T>(request: Request, requiredFields: string[] = []): Promise<T> {
+  try {
+    const body = await request.json();
+    
+    for (const field of requiredFields) {
+      if (!(field in body) || body[field] === null || body[field] === undefined) {
+        throw new Error(`Missing required field: ${field}`);
+      }
+    }
+    
+    return body as T;
+  } catch (error: any) {
+    throw new Error(`Request parsing failed: ${error.message}`);
+  }
+}
+
+function getOpenAIKey(): string {
+  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!apiKey) {
+    throw new Error('OpenAI API key not configured');
+  }
+  return apiKey;
+}
+
+function validateAndGetEnvironment() {
+  const url = Deno.env.get('SUPABASE_URL');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  
+  if (!url || !serviceKey) {
+    throw new Error('Supabase environment variables not configured');
+  }
+  
+  const supabase = createClient(url, serviceKey);
+  return { supabase };
+}
 
 // Helper function to get system message from template
 async function getSystemMessage(supabase: any, templateName: string): Promise<string> {
@@ -24,7 +88,7 @@ async function getSystemMessage(supabase: any, templateName: string): Promise<st
       return templateData[0].template_text;
     }
   } catch (error) {
-    EdgeLogger.error(`Failed to fetch ${templateName} template`, error);
+    console.error(`Failed to fetch ${templateName} template`, error);
   }
   
   throw new Error(`Template ${templateName} not found in database`);
@@ -38,7 +102,7 @@ serve(async (req) => {
   try {
     const { userId, deliberationId, content, maxRecommendations = 2 } = await parseAndValidateRequest(req, ['userId', 'deliberationId', 'content']);
 
-    EdgeLogger.debug('Generating issue recommendations', { userId, deliberationId, contentLength: content.length });
+    console.log('Generating issue recommendations', { userId, deliberationId, contentLength: content.length });
 
     // Get environment and clients with caching
     const { supabase } = validateAndGetEnvironment();
@@ -93,7 +157,8 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        ...ModelConfigManager.generateAPIParams('gpt-5-2025-08-07', [
+        model: 'gpt-5-2025-08-07',
+        messages: [
           {
             role: 'system',
             content: await getSystemMessage(supabase, 'issue_recommendation_system_message')
@@ -102,7 +167,8 @@ serve(async (req) => {
             role: 'user',
             content: aiPrompt
           }
-        ])
+        ],
+        max_completion_tokens: 1000
       }),
     });
 

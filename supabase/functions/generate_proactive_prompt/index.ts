@@ -1,5 +1,5 @@
-import "xhr";
-import { serve } from "std/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from '@supabase/supabase-js';
 
 // Self-contained helpers (no cross-folder imports)
