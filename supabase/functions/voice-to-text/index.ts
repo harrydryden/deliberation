@@ -1,41 +1,139 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.52.1";
 
-const canonical = 'voice_to_text';
-
+// Import shared utilities for performance and consistency
+// Self-contained utilities (inlined to avoid path resolution issues)
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function handleCORSPreflight(request: Request): Response | null {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+  return null;
+}
+
+function createErrorResponse(error: any, status: number = 500, context?: string): Response {
+  const errorId = crypto.randomUUID();
+  console.error(`[${errorId}] ${context || 'Edge Function'} Error:`, error);
+  
+  return new Response(
+    JSON.stringify({
+      error: error?.message || 'An unexpected error occurred',
+      errorId,
+      context,
+      timestamp: new Date().toISOString()
+    }),
+    {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  );
+}
+
+function createSuccessResponse(data: any): Response {
+  return new Response(
+    JSON.stringify(data),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  );
+}
+
+async function parseAndValidateRequest<T>(request: Request, requiredFields: string[] = []): Promise<T> {
+  try {
+    const body = await request.json();
+    
+    for (const field of requiredFields) {
+      if (!(field in body) || body[field] === null || body[field] === undefined) {
+        throw new Error(`Missing required field: ${field}`);
+      }
+    }
+    
+    return body as T;
+  } catch (error: any) {
+    throw new Error(`Request parsing failed: ${error.message}`);
+  }
+}
+
+function getOpenAIKey(): string {
+  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!apiKey) {
+    throw new Error('OpenAI API key not configured');
+  }
+  return apiKey;
+}
+
+// Process base64 in chunks to prevent memory issues
+function processBase64Chunks(base64String: string, chunkSize = 32768) {
+  const chunks: Uint8Array[] = [];
+  let position = 0;
+
+  while (position < base64String.length) {
+    const chunk = base64String.slice(position, position + chunkSize);
+    const binaryChunk = atob(chunk);
+    const bytes = new Uint8Array(binaryChunk.length);
+
+    for (let i = 0; i < binaryChunk.length; i++) {
+      bytes[i] = binaryChunk.charCodeAt(i);
+    }
+
+    chunks.push(bytes);
+    position += chunkSize;
+  }
+
+  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  return result;
+}
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
-  const url = Deno.env.get('SUPABASE_URL');
-  const anon = Deno.env.get('SUPABASE_ANON_KEY');
-  if (!url || !anon) {
-    return new Response(JSON.stringify({ error: 'Supabase env not configured' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 });
+  try {
+    const { audio } = await parseAndValidateRequest(req, ['audio']);
+
+    // Get OpenAI API key with caching
+    const openAIApiKey = getOpenAIKey();
+
+    // Process audio in chunks
+    const binaryAudio = processBase64Chunks(audio);
+
+    // Prepare form data
+    const formData = new FormData();
+    const blob = new Blob([binaryAudio], { type: 'audio/webm' });
+    formData.append('file', blob, 'audio.webm');
+    formData.append('model', 'whisper-1');
+
+    // Send to OpenAI
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`OpenAI API error: ${errText}`);
+    }
+
+    const result = await response.json();
+
+    return createSuccessResponse({ text: result.text });
+
+  } catch (error: any) {
+    return createErrorResponse(error, 500, 'voice-to-text');
   }
-
-  const client = createClient(url, anon, { auth: { autoRefreshToken: false, persistSession: false } });
-  const method = req.method;
-  const auth = req.headers.get('Authorization') || undefined;
-
-  let body: any = undefined;
-  if (method !== 'GET' && method !== 'HEAD') {
-    try { body = await req.json(); } catch { body = undefined; }
-  }
-
-  console.log(`[alias] voice-to-text -> ${canonical}`, { method });
-
-  const { data, error } = await client.functions.invoke(canonical, {
-    method,
-    body,
-    headers: auth ? { Authorization: auth } : undefined,
-  });
-
-  if (error) {
-    return new Response(JSON.stringify({ error: error.message || String(error) }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 });
-  }
-  return new Response(JSON.stringify(data ?? { forwarded: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 });

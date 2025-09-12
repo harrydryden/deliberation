@@ -318,7 +318,7 @@ const SimpleVoiceInterface: React.FC<VoiceInterfaceProps> = ({
           const b64 = await blobToBase64(blob);
           if (!b64) throw new Error('Empty recording');
           
-          const { data, error } = await supabase.functions.invoke('voice_to_text', { body: { audio: b64 } });
+          const { data, error } = await supabase.functions.invoke('voice-to-text', { body: { audio: b64 } });
           if (error) throw error;
           
           const text = (data?.text || '').toString().trim();
