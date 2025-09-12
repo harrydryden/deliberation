@@ -133,16 +133,24 @@ interface SimilarityScore {
   similarity: number;
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (!a?.length || !b?.length || a.length !== b.length) return 0;
-  let dot = 0, normA = 0, normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
+// Conservative auto-linking constants
+const AUTO_LINK_THRESHOLD = 0.90; // Very high confidence required
+const MAX_AUTO_LINKS_PER_NODE = 2; // Maximum auto-generated relationships per node
+
+// Check if a node already has enough auto-generated relationships
+async function getAutoRelationshipCount(supabase: any, nodeId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from("ibis_relationships")
+    .select("id")
+    .or(`source_node_id.eq.${nodeId},target_node_id.eq.${nodeId}`)
+    .eq("created_by", null); // Auto-generated relationships have null created_by
+  
+  if (error) {
+    EdgeLogger.error("Error checking auto relationship count", error);
+    return 0;
   }
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+  
+  return data?.length || 0;
 }
 
 serve(async (req) => {
@@ -151,7 +159,16 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const { deliberationId, nodeId, threshold = 0.83, nodeType } = await parseAndValidateRequest(req);
+    const { deliberationId, nodeId, threshold = AUTO_LINK_THRESHOLD, nodeType } = await parseAndValidateRequest(req);
+
+    EdgeLogger.info("Starting auto-linking process", {
+      deliberationId,
+      nodeId,
+      threshold,
+      nodeType,
+      autoThreshold: AUTO_LINK_THRESHOLD,
+      maxLinksPerNode: MAX_AUTO_LINKS_PER_NODE
+    });
 
     // Get environment and clients with caching
     const { supabase } = validateAndGetEnvironment();
@@ -203,7 +220,9 @@ serve(async (req) => {
     }, {} as Record<string, any[]>);
 
     let created = 0;
-    for (const [deliberationId, groupNodes] of Object.entries(deliberationGroups)) {
+    let skipped = 0;
+    
+    for (const [currentDeliberationId, groupNodes] of Object.entries(deliberationGroups)) {
       if (groupNodes.length < 2) continue;
 
       // Calculate similarities within the group
@@ -221,49 +240,97 @@ serve(async (req) => {
         }
       }
 
-      // Create relationships
+      // Sort by similarity score (highest first) for conservative selection
+      similarities.sort((a, b) => b.similarity - a.similarity);
+      
+      EdgeLogger.info(`Found ${similarities.length} potential relationships above threshold`, {
+        deliberationId: currentDeliberationId,
+        threshold,
+        highestSim: similarities[0]?.similarity
+      });
+
+      // Conservative auto-linking: process only top similarities
       for (const { from, to, similarity } of similarities) {
         try {
-          const { data: existing } = await supabase
-            .from("ibis_relationships")
-            .select("id")
-            .or(`and(from_node_id.eq.${from.id},to_node_id.eq.${to.id}),and(from_node_id.eq.${to.id},to_node_id.eq.${from.id})`)
-            .limit(1);
-
-          if (existing && existing.length > 0) {
-            console.log(`Skipping existing relationship: ${from.id} <-> ${to.id}`);
+          // Check if both nodes already have enough auto-generated relationships
+          const fromAutoCount = await getAutoRelationshipCount(supabase, from.id);
+          const toAutoCount = await getAutoRelationshipCount(supabase, to.id);
+          
+          if (fromAutoCount >= MAX_AUTO_LINKS_PER_NODE || toAutoCount >= MAX_AUTO_LINKS_PER_NODE) {
+            EdgeLogger.debug(`Skipping - nodes have enough auto links`, {
+              from: from.title,
+              fromCount: fromAutoCount,
+              to: to.title,
+              toCount: toAutoCount,
+              maxAllowed: MAX_AUTO_LINKS_PER_NODE
+            });
+            skipped++;
             continue;
           }
 
+          // Check for existing relationships (use correct column names)
+          const { data: existing } = await supabase
+            .from("ibis_relationships")
+            .select("id")
+            .or(`and(source_node_id.eq.${from.id},target_node_id.eq.${to.id}),and(source_node_id.eq.${to.id},target_node_id.eq.${from.id})`)
+            .limit(1);
+
+          if (existing && existing.length > 0) {
+            EdgeLogger.debug(`Skipping existing relationship: ${from.title} <-> ${to.title}`);
+            skipped++;
+            continue;
+          }
+
+          // Create auto-generated relationship with correct schema
           const { error: insertError } = await supabase
             .from("ibis_relationships")
             .insert({
-              from_node_id: from.id,
-              to_node_id: to.id,
-              relationship_type: "similar_to",
-              confidence_score: similarity,
-              metadata: {
-                source: "auto_similarity",
-                similarity_score: similarity,
-                threshold: threshold
-              }
+              source_node_id: from.id,
+              target_node_id: to.id,
+              relationship_type: "relates_to", // Use valid relationship type
+              deliberation_id: currentDeliberationId,
+              created_by: null // NULL indicates auto-generated
             });
 
           if (!insertError) {
             created++;
-            console.log(`Created similarity link: ${from.title} -> ${to.title} (${similarity.toFixed(3)})`);
+            EdgeLogger.info(`Created auto-similarity link`, {
+              from: from.title,
+              to: to.title,
+              similarity: similarity.toFixed(3),
+              deliberationId: currentDeliberationId
+            });
+            
+            // Stop after creating MAX_AUTO_LINKS_PER_NODE relationships to be conservative
+            if (created >= MAX_AUTO_LINKS_PER_NODE * 2) {
+              EdgeLogger.info("Reached conservative auto-link limit, stopping");
+              break;
+            }
           } else {
-            console.error(`Failed to create relationship:`, insertError);
+            EdgeLogger.error(`Failed to create relationship:`, insertError);
           }
         } catch (error) {
-          console.error(`Error processing relationship ${from.id} -> ${to.id}:`, error);
+          EdgeLogger.error(`Error processing relationship ${from.id} -> ${to.id}:`, error);
         }
       }
     }
 
-    return createSuccessResponse({ success: true, created });
+    EdgeLogger.info("Auto-linking process completed", {
+      created,
+      skipped,
+      threshold,
+      maxLinksPerNode: MAX_AUTO_LINKS_PER_NODE
+    });
+
+    return createSuccessResponse({ 
+      success: true, 
+      created,
+      skipped,
+      threshold,
+      maxLinksPerNode: MAX_AUTO_LINKS_PER_NODE
+    });
   } catch (error) {
-    console.error("link-similar-ibis-issues error:", error);
+    EdgeLogger.error("link-similar-ibis-issues error:", error);
     return createErrorResponse(error, 500, 'link-similar-ibis-issues');
   }
 });
