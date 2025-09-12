@@ -262,14 +262,14 @@ const { user, isAdmin } = useSupabaseAuth();
         setEmbeddingBackfillTriggered(true);
         await Promise.all(
           missingTypes.map(t =>
-            supabase.functions.invoke('compute-ibis-embeddings', { body: { deliberationId, nodeType: t } })
+            supabase.functions.invoke('compute_ibis_embeddings', { body: { deliberationId, nodeType: t } })
           )
         );
       }
 
       // Link similar nodes for each type in parallel
       await Promise.all(
-        types.map(t => supabase.functions.invoke('link-similar-ibis-issues', { body: { deliberationId, nodeType: t } }))
+        types.map(t => supabase.functions.invoke('link_similar_ibis_issues', { body: { deliberationId, nodeType: t } }))
       );
 
       linkingTriggeredRef.current = true;

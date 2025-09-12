@@ -172,7 +172,7 @@ export const useEnhancedProactivePrompts = ({
       });
 
       // Submit message via message service
-      const { data, error } = await supabase.functions.invoke('agent-orchestration-stream', {
+      const { data, error } = await supabase.functions.invoke('agent_orchestration_stream', {
         body: {
           message: response,
           deliberationId,

@@ -37,7 +37,7 @@ export const useAgentOrchestrationTrigger = () => {
       const timeoutController = new AbortController();
       const timeoutId = setTimeout(() => timeoutController.abort(), 45000); // 45 second timeout
       
-      const { data, error } = await supabase.functions.invoke('agent-orchestration-stream', {
+      const { data, error } = await supabase.functions.invoke('agent_orchestration_stream', {
         body: { 
           messageId, 
           deliberationId,

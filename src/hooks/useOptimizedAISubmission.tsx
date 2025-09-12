@@ -25,7 +25,7 @@ export const useOptimizedAISubmission = () => {
       async () => {
         const { supabase } = await import('@/integrations/supabase/client');
         
-        const { data, error } = await supabase.functions.invoke('classify-message', {
+        const { data, error } = await supabase.functions.invoke('classify_message', {
           body: {
             content: messageContent,
             deliberationId
@@ -86,7 +86,7 @@ export const useOptimizedAISubmission = () => {
       async () => {
         const { supabase } = await import('@/integrations/supabase/client');
         
-        const { data, error } = await supabase.functions.invoke('evaluate-ibis-relationships', {
+        const { data, error } = await supabase.functions.invoke('evaluate_ibis_relationships', {
           body: {
             deliberationId,
             content,

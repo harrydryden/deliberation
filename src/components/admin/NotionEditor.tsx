@@ -92,7 +92,7 @@ export const NotionEditor = ({ deliberationId, currentNotion, onNotionUpdated, d
 
     setIsGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-notion-statement', {
+      const { data, error } = await supabase.functions.invoke('generate_notion_statement', {
         body: {
           title: deliberationTitle,
           description: deliberationDescription || ''

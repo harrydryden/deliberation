@@ -16,47 +16,47 @@ port = 54323
 enabled = true
 port = 54324
 
-[functions.robust-pdf-processor]
+[functions.robust_pdf_processor]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.evaluate-ibis-relationships]
+[functions.evaluate_ibis_relationships]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.realtime-session]
+[functions.realtime_session]
 verify_jwt = false
 import_map = "functions/import_map.json"
 
-[functions.admin-get-users]
+[functions.admin_get_users]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.agent-orchestration-stream]
+[functions.agent_orchestration_stream]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.classify-message]
+[functions.classify_message]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.compute-ibis-embeddings]
+[functions.compute_ibis_embeddings]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.link-similar-ibis-issues]
+[functions.link_similar_ibis_issues]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.generate-notion-statement]
+[functions.generate_notion_statement]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.langchain-query-knowledge]
+[functions.langchain_query_knowledge]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.voice-to-text]
+[functions.voice_to_text]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
@@ -68,6 +68,6 @@ import_map = "functions/import_map.json"
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.calculate-user-stance]
+[functions.calculate_user_stance]
 verify_jwt = true
 import_map = "functions/import_map.json"

@@ -94,7 +94,7 @@ const SimpleVoiceInterface: React.FC<VoiceInterfaceProps> = ({
     const finalAgentId = agentId || (await ensureBillAgentId());
     if (!finalAgentId) return 'No agent available for knowledge search.';
     try {
-      const { data, error } = await supabase.functions.invoke('langchain-query-knowledge', {
+      const { data, error } = await supabase.functions.invoke('langchain_query_knowledge', {
         body: { query, agentId: finalAgentId, maxResults },
       });
       if (error) throw error;
@@ -318,7 +318,7 @@ const SimpleVoiceInterface: React.FC<VoiceInterfaceProps> = ({
           const b64 = await blobToBase64(blob);
           if (!b64) throw new Error('Empty recording');
           
-          const { data, error } = await supabase.functions.invoke('voice-to-text', { body: { audio: b64 } });
+          const { data, error } = await supabase.functions.invoke('voice_to_text', { body: { audio: b64 } });
           if (error) throw error;
           
           const text = (data?.text || '').toString().trim();

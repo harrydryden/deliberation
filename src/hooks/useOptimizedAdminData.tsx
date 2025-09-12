@@ -53,7 +53,7 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
         'Content-Type': 'application/json'
       };
       
-      const response = await supabase.functions.invoke('admin-get-users', {
+      const response = await supabase.functions.invoke('admin_get_users', {
         method: 'GET',
         headers
       });

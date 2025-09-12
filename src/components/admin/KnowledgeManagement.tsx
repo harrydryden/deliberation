@@ -146,7 +146,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       }
       
       // Use the robust PDF processor function
-      const processingFunction = 'robust-pdf-processor';
+      const processingFunction = 'robust_pdf_processor';
       logger.component.update('KnowledgeManagement', { action: 'processingStart', function: processingFunction });
       
       logger.info('KnowledgeManagement: About to call edge function...');
@@ -226,7 +226,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
 
     setQuerying(true);
     try {
-              const { data, error } = await supabase.functions.invoke('langchain-query-knowledge', {
+              const { data, error } = await supabase.functions.invoke('langchain_query_knowledge', {
         body: {
           query: query.trim(),
           agentId: selectedAgent,

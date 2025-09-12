@@ -39,7 +39,7 @@ export const useIbisClassification = (
         contentLength: messageContent.length 
       });
 
-      const { data, error } = await supabase.functions.invoke('classify-message', {
+      const { data, error } = await supabase.functions.invoke('classify_message', {
         body: {
           content: messageContent,
           deliberationId: deliberationId

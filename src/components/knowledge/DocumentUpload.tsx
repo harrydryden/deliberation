@@ -130,7 +130,7 @@ export function DocumentUpload({ agents, onUploadSuccess }: DocumentUploadProps)
         const deliberationId = `default-${user.id}`; // Create a unique default deliberation
         
         try {
-          const response = await supabase.functions.invoke('robust-pdf-processor', {
+          const response = await supabase.functions.invoke('robust_pdf_processor', {
             body: {
               fileUrl: signed.signedUrl,
               fileName: file.name,

@@ -228,7 +228,7 @@ export class StanceService {
       logger.info('[StanceService] Calculating stance from user messages', { userId, deliberationId });
 
       // Call the AI-powered stance calculation edge function
-      const { data, error } = await supabase.functions.invoke('calculate-user-stance', {
+      const { data, error } = await supabase.functions.invoke('calculate_user_stance', {
         body: { 
           userId, 
           deliberationId 

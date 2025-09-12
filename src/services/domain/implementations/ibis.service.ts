@@ -154,7 +154,7 @@ export class IBISService {
 
       // Trigger embedding generation asynchronously
       try {
-        await supabase.functions.invoke('compute-ibis-embeddings', {
+        await supabase.functions.invoke('compute_ibis_embeddings', {
           body: {
             deliberationId: nodeData.deliberation_id,
             nodeId: inserted.id,

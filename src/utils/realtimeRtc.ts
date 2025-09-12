@@ -21,7 +21,7 @@ export class RealtimeRTC {
     this.onToolCall = opts?.onToolCall;
 
     // 1) Get ephemeral session from Edge Function with dynamic instructions
-    const { data, error } = await supabase.functions.invoke('realtime-session', {
+    const { data, error } = await supabase.functions.invoke('realtime_session', {
       body: { instructions: opts?.dynamicInstructions },
     });
     if (error) throw error;

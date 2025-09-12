@@ -110,12 +110,12 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
       const titleChanged = editingNode.title !== editForm.title;
       try {
         if (titleChanged) {
-          await supabase.functions.invoke('compute-ibis-embeddings', {
+          await supabase.functions.invoke('compute_ibis_embeddings', {
             body: { nodeId: editingNode.id, force: true, nodeType: editForm.node_type },
           });
         }
         // Link this node with similar ones in the same deliberation and type
-        await supabase.functions.invoke('link-similar-ibis-issues', {
+        await supabase.functions.invoke('link_similar_ibis_issues', {
           body: { nodeId: editingNode.id, deliberationId, nodeType: editForm.node_type },
         });
       } catch (e) {
