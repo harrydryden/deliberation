@@ -64,7 +64,11 @@ async function validateEdgeFunctions() {
     // 4. Validate import map consistency
     await validateImportMapConsistency(configText);
 
-    // 5. Check for orphaned function directories
+    // 5. Cross-check frontend invocations vs config and filesystem
+    const frontendOk = await validateFrontendInvocations(configText);
+    if (!frontendOk) hasErrors = true;
+
+    // 6. Check for orphaned function directories
     for await (const dirEntry of Deno.readDir('supabase/functions')) {
       if (dirEntry.isDirectory && dirEntry.name !== 'shared') {
         const isInConfig = functionBlocks.some(block => 
@@ -192,6 +196,79 @@ async function validateImportMapConsistency(configContent: string): Promise<void
   } catch (error) {
     console.error(`❌ Failed to validate import_map.json: ${error.message}`);
   }
+}
+
+async function validateFrontendInvocations(configContent: string): Promise<boolean> {
+  console.log('\n🔗 Validating frontend invocations...');
+  let ok = true;
+
+  const blocks = configContent.match(/\[functions\.([^\]]+)\]/g) || [];
+  const configNames = new Set(
+    blocks
+      .map((b) => b.match(/\[functions\.([^\]]+)\]/)?.[1])
+      .filter(Boolean) as string[],
+  );
+
+  const invokedNames = new Set<string>();
+
+  async function walkDir(dir: string): Promise<void> {
+    for await (const entry of Deno.readDir(dir)) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory) {
+        await walkDir(path);
+      } else if (
+        entry.isFile &&
+        (path.endsWith('.ts') ||
+          path.endsWith('.tsx') ||
+          path.endsWith('.js') ||
+          path.endsWith('.jsx'))
+      ) {
+        try {
+          const text = await Deno.readTextFile(path);
+          const regex = /supabase\\.functions\\.invoke\(['"]([^'\"]+)['"]\)/g;
+          let match: RegExpExecArray | null;
+          while ((match = regex.exec(text)) !== null) {
+            invokedNames.add(match[1]);
+          }
+        } catch (_) {
+          // ignore unreadable files
+        }
+      }
+    }
+  }
+
+  try {
+    await walkDir('src');
+  } catch (_) {
+    console.warn('⚠️ src directory not found, skipping frontend invoke validation');
+    return true;
+  }
+
+  console.log(`📣 Found ${invokedNames.size} invoked function(s) in frontend: ${[...invokedNames].join(', ')}`);
+
+  for (const name of invokedNames) {
+    if (!configNames.has(name)) {
+      console.error(`❌ Frontend invokes '${name}' but it is not in supabase/config.toml`);
+      ok = false;
+    }
+    const dirPath = `supabase/functions/${name}`;
+    const indexPath = `${dirPath}/index.ts`;
+    if (!existsSync(dirPath) || !existsSync(indexPath)) {
+      console.error(`❌ Frontend invokes '${name}' but missing entrypoint: ${indexPath}`);
+      ok = false;
+    }
+  }
+
+  for (const name of configNames) {
+    if (!invokedNames.has(name)) {
+      console.warn(`ℹ️ Function '${name}' is defined in config.toml but not invoked in frontend`);
+    }
+  }
+
+  if (ok) {
+    console.log('✅ Frontend invocations are consistent with config and filesystem');
+  }
+  return ok;
 }
 
 // Run validation
