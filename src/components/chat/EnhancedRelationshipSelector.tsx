@@ -257,7 +257,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
     <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
       <div className="flex items-center justify-between sticky top-0 bg-background z-10 pb-2">
         <Label className="flex items-center gap-2">
-          <Brain className="h-4 w-4" />
+          <Lightbulb className="h-4 w-4 text-yellow-500" />
           Other Relevant Viewpoints
         </Label>
         <div className="flex items-center gap-2">
