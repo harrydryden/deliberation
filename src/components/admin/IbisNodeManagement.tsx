@@ -110,7 +110,7 @@ export const IbisNodeManagement = ({ deliberationId, deliberationTitle, onBack }
       const titleChanged = editingNode.title !== editForm.title;
       try {
         if (titleChanged) {
-          await supabase.functions.invoke('compute_ibis_embeddings', {
+          await supabase.functions.invoke('ibis_embeddings', {
             body: { nodeId: editingNode.id, force: true, nodeType: editForm.node_type },
           });
         }

@@ -262,7 +262,7 @@ const { user, isAdmin } = useSupabaseAuth();
         setEmbeddingBackfillTriggered(true);
         await Promise.all(
           missingTypes.map(t =>
-            supabase.functions.invoke('compute_ibis_embeddings', { body: { deliberationId, nodeType: t } })
+            supabase.functions.invoke('ibis_embeddings', { body: { deliberationId, nodeType: t } })
           )
         );
       }

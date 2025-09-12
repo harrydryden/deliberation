@@ -40,7 +40,7 @@ import_map = "functions/import_map.json"
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.compute_ibis_embeddings]
+[functions.ibis_embeddings]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
