@@ -72,7 +72,7 @@ const EdgeLogger = {
   error: (message: string, error?: any) => console.error(`❌ ${message}`, error),
 };
 
-// Supabase Edge Function: realtime-session
+// Supabase Edge Function: realtime_session
 // Creates an ephemeral OpenAI Realtime session token with our desired defaults
 // - Public (no JWT) so the web app can call it directly
 // - Returns full JSON from OpenAI, including client_secret.value
