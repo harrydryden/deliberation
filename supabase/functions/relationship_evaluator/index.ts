@@ -1,6 +1,6 @@
-import { serve } from "std/http/server.ts";
-import { createClient } from '@supabase/supabase-js';
-import OpenAI from 'openai';
+import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.52.1";
+import OpenAI from "npm:openai@4.52.6";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

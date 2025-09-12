@@ -1,10 +1,10 @@
-import { serve } from "std/http/server.ts";
-import { createClient } from '@supabase/supabase-js';
-import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
-import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase';
-import { PromptTemplate } from '@langchain/core/prompts';
-import { createStuffDocumentsChain } from 'langchain/chains/combine_documents';
-import { createRetrievalChain } from 'langchain/chains/retrieval';
+import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.52.1";
+import { ChatOpenAI, OpenAIEmbeddings } from "https://esm.sh/@langchain/openai@0.6.3";
+import { SupabaseVectorStore } from "https://esm.sh/@langchain/community@0.3.49/vectorstores/supabase";
+import { PromptTemplate } from "https://esm.sh/@langchain/core@0.3.30/prompts";
+import { createStuffDocumentsChain } from "https://esm.sh/langchain@0.3.30/chains/combine_documents";
+import { createRetrievalChain } from "https://esm.sh/langchain@0.3.30/chains/retrieval";
 // Inlined utilities to avoid cross-folder import issues
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
