@@ -60,7 +60,7 @@ import_map = "functions/import_map.json"
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.generate-issue-recommendations]
+[functions.generate_issue_recommendations]
 verify_jwt = true
 import_map = "functions/import_map.json"
 

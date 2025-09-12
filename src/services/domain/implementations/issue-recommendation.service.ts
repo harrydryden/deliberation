@@ -122,7 +122,7 @@ export class IssueRecommendationService {
     try {
       logger.info('[IssueRecommendationService] Calling AI service for recommendations');
 
-      const { data, error } = await supabase.functions.invoke('generate-issue-recommendations', {
+      const { data, error } = await supabase.functions.invoke('generate_issue_recommendations', {
         body: {
           deliberationId: this.currentDeliberationId,
           content,
