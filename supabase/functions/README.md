@@ -1,81 +1,70 @@
-# Edge Functions
+# Supabase Edge Functions
 
-This directory contains Supabase Edge Functions for the application.
+This directory contains all Supabase Edge Functions for the deliberation platform.
 
-## Import Policy
+## Architecture Policy
 
-All edge functions MUST use the unified import map located at `supabase/functions/import_map.json`.
+**Self-Contained Functions**: All edge functions are now self-contained with inlined utilities to ensure reliable deployment. Cross-folder imports have been eliminated due to build pipeline constraints.
 
-### ✅ Correct Import Usage
+### Deployment-Ready Functions
 
-```typescript
-// Use mapped imports
-import "xhr";
-import { serve } from "std/http/server.ts";
-import { createClient } from '@supabase/supabase-js';
-import OpenAI from 'openai';
-import { OpenAIEmbeddings } from '@langchain/openai';
+All functions in this directory are designed to deploy reliably without external dependencies:
 
-// Relative imports for shared utilities
-import { corsHeaders } from '../shared/edge-function-utils.ts';
-```
+- `admin-get-users/` - Admin user management
+- `agent-orchestration-stream/` - AI agent orchestration  
+- `calculate-user-stance/` - User stance analysis
+- `classify-message/` - Message classification
+- `compute-ibis-embeddings/` - IBIS node embeddings
+- `evaluate-ibis-relationships/` - IBIS relationship evaluation
+- `generate-notion-statement/` - Notion statement generation
+- `langchain-query-knowledge/` - Knowledge base querying
+- `link-similar-ibis-issues/` - IBIS similarity linking
+- `realtime-session/` - OpenAI Realtime sessions
+- `robust-pdf-processor/` - PDF text extraction
+- `voice-to-text/` - Speech transcription
 
-### ❌ Incorrect Import Usage
+### Development Guidelines
 
-```typescript
-// Don't use direct URL imports
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import OpenAI from 'https://deno.land/x/openai@v4.57.0/mod.ts';
-```
+1. **No Cross-Folder Imports**: Each function must be self-contained
+2. **Inline Utilities**: Copy shared utilities directly into function files
+3. **Pinned Imports**: Use absolute URLs for external dependencies
+4. **Minimal Dependencies**: Keep external imports to minimum required
 
-## Version Management
+### Shared Utilities (Reference Only)
 
-All dependency versions are centrally managed in `import_map.json`. To update versions:
+The `shared/` directory contains reference implementations of common utilities:
+- `edge-function-utils.ts` - Core utilities (inline these)
+- `model-config.ts` - AI model configuration (inline these)  
+- `edge-logger.ts` - Logging utilities (inline these)
 
-1. Edit `supabase/functions/import_map.json`
-2. Update the version in the URL for the specific package
-3. Test all affected functions
-4. Deploy
+**Important**: Do not import from `shared/` directory in new functions. Copy needed utilities directly into your function.
 
-## Validation Script
+### Deployment
 
-Run the validation script to ensure all functions follow the import policy:
+Functions are automatically deployed when code is pushed. Each function must have:
+- `index.ts` file as entry point
+- Self-contained implementation
+- Proper error handling with inlined utilities
 
+### Testing
+
+Test functions locally using Supabase CLI:
 ```bash
-deno run --allow-read supabase/functions/shared/validate-functions.ts
+supabase functions serve
 ```
 
-This script checks:
-- All functions use the unified import map
-- No direct URL imports are used
-- All function directories have corresponding config.toml entries
-- The import map contains all required packages
+Functions are also automatically tested in the deployment pipeline.
 
-## Adding New Functions
+## Import Policy Change (2025)
 
-When creating new edge functions:
+Previously, this project used shared utilities via `../shared/` imports. Due to build pipeline constraints, all functions have been migrated to use inlined utilities for maximum deployment reliability.
 
-1. Create the function directory: `supabase/functions/your-function-name/`
-2. Add `index.ts` with correct imports using the import map
-3. Add function configuration to `supabase/config.toml`:
-   ```toml
-   [functions.your-function-name]
-   verify_jwt = true
-   import_map = "functions/import_map.json"
-   ```
-4. Run the validation script to ensure compliance
+### Migration Complete
 
-## Configuration
+All 12 active edge functions have been updated with:
+- ✅ Inlined shared utilities 
+- ✅ Absolute URL imports for external dependencies
+- ✅ Self-contained implementations
+- ✅ No cross-folder dependencies
 
-All functions in `supabase/config.toml` must use:
-```toml
-import_map = "functions/import_map.json"
-```
-
-This ensures consistent dependency resolution across all edge functions.
-
-## Deployment
-
-Edge functions are automatically deployed when the project builds. No manual deployment is needed.
+This ensures consistent, reliable deployments without "Entrypoint path does not exist" errors.

@@ -1,16 +1,125 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from '@supabase/supabase-js';
 
-// Import shared utilities for performance and consistency
-import { 
-  corsHeaders, 
-  validateAndGetEnvironment, 
-  createErrorResponse, 
-  createSuccessResponse,
-  handleCORSPreflight,
-  parseAndValidateRequest
-} from '../shared/edge-function-utils.ts';
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
+// Inlined utilities to avoid cross-folder import issues
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+function handleCORSPreflight(request: Request): Response | null {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+  return null;
+}
+
+function createErrorResponse(error: any, status: number = 500, context?: string): Response {
+  const errorId = crypto.randomUUID();
+  console.error(`[${errorId}] ${context || 'Edge Function'} Error:`, error);
+  
+  return new Response(
+    JSON.stringify({
+      error: error?.message || 'An unexpected error occurred',
+      errorId,
+      context,
+      timestamp: new Date().toISOString()
+    }),
+    {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  );
+}
+
+function createSuccessResponse(data: any): Response {
+  return new Response(
+    JSON.stringify(data),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  );
+}
+
+async function parseAndValidateRequest<T>(request: Request, requiredFields: string[] = []): Promise<T> {
+  try {
+    const body = await request.json();
+    
+    for (const field of requiredFields) {
+      if (!(field in body) || body[field] === null || body[field] === undefined) {
+        throw new Error(`Missing required field: ${field}`);
+      }
+    }
+    
+    return body as T;
+  } catch (error: any) {
+    throw new Error(`Request parsing failed: ${error.message}`);
+  }
+}
+
+function validateAndGetEnvironment() {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+
+  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
+    throw new Error('Missing required Supabase environment variables');
+  }
+
+  return {
+    supabase: createClient(supabaseUrl, supabaseServiceKey)
+  };
+}
+
+const EdgeLogger = {
+  debug: (message: string, data?: any) => console.log(`🔍 ${message}`, data),
+  info: (message: string, data?: any) => console.log(`ℹ️ ${message}`, data),
+  error: (message: string, error?: any) => console.error(`❌ ${message}`, error),
+};
+
+// Process base64 in chunks to prevent memory issues
+function processBase64Chunks(base64String: string, chunkSize = 32768) {
+  const chunks: Uint8Array[] = [];
+  let position = 0;
+
+  while (position < base64String.length) {
+    const chunk = base64String.slice(position, position + chunkSize);
+    const binaryChunk = atob(chunk);
+    const bytes = new Uint8Array(binaryChunk.length);
+
+    for (let i = 0; i < binaryChunk.length; i++) {
+      bytes[i] = binaryChunk.charCodeAt(i);
+    }
+
+    chunks.push(bytes);
+    position += chunkSize;
+  }
+
+  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  return result;
+}
+
+// Cosine similarity calculation
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (!a?.length || !b?.length || a.length !== b.length) return 0;
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
 
 interface RequestBody {
   deliberationId?: string;

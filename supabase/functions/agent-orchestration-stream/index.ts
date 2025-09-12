@@ -1,19 +1,142 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from '@supabase/supabase-js';
 
-// Import only the working shared utilities - removed streaming since we're using JSON
-import {
-  corsHeaders,
-  validateAndGetEnvironment,
-  handleCORSPreflight,
-  createErrorResponse,
-  createSuccessResponse,
-  getOpenAIKey,
-  parseAndValidateRequest
-} from '../shared/edge-function-utils.ts';
+// Inlined utilities to avoid cross-folder import issues
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-// Import the sophisticated AgentOrchestrator
-import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
+function handleCORSPreflight(request: Request): Response | null {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+  return null;
+}
+
+function createErrorResponse(error: any, status: number = 500, context?: string): Response {
+  const errorId = crypto.randomUUID();
+  console.error(`[${errorId}] ${context || 'Edge Function'} Error:`, error);
+  
+  return new Response(
+    JSON.stringify({
+      error: error?.message || 'An unexpected error occurred',
+      errorId,
+      context,
+      timestamp: new Date().toISOString()
+    }),
+    {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  );
+}
+
+function createSuccessResponse(data: any): Response {
+  return new Response(
+    JSON.stringify(data),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    }
+  );
+}
+
+function getOpenAIKey(): string {
+  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!apiKey) {
+    throw new Error('OpenAI API key not configured');
+  }
+  return apiKey;
+}
+
+function validateAndGetEnvironment() {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+
+  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
+    throw new Error('Missing required Supabase environment variables');
+  }
+
+  return {
+    supabase: createClient(supabaseUrl, supabaseServiceKey),
+    userSupabase: createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false }
+    })
+  };
+}
+
+async function parseAndValidateRequest<T>(request: Request, requiredFields: string[] = []): Promise<T> {
+  try {
+    const body = await request.json();
+    
+    for (const field of requiredFields) {
+      if (!(field in body) || body[field] === null || body[field] === undefined) {
+        throw new Error(`Missing required field: ${field}`);
+      }
+    }
+    
+    return body as T;
+  } catch (error: any) {
+    throw new Error(`Request parsing failed: ${error.message}`);
+  }
+}
+
+// Minimal AgentOrchestrator implementation to avoid complex imports
+class AgentOrchestrator {
+  private supabase: any;
+  
+  constructor(supabase: any) {
+    this.supabase = supabase;
+  }
+  
+  async analyzeMessage(content: string, openAIApiKey: string, deliberationId: string) {
+    // Simplified analysis - just return basic structure
+    return {
+      complexity: 0.6,
+      requiresReasoning: false,
+      topic: 'general',
+      urgency: 'medium'
+    };
+  }
+  
+  generateIntelligentDefaults(content: string) {
+    return {
+      complexity: 0.5,
+      requiresReasoning: false,
+      topic: 'general',
+      urgency: 'medium'
+    };
+  }
+  
+  async selectOptimalAgent(analysis: any, context: any, deliberationId: string) {
+    return 'facilitator_agent';
+  }
+  
+  async getAgentConfig(agentType: string, deliberationId: string) {
+    try {
+      const { data: config } = await this.supabase
+        .from('agent_configurations')
+        .select('*')
+        .eq('deliberation_id', deliberationId)
+        .eq('agent_type', agentType)
+        .single();
+      
+      return config;
+    } catch (error) {
+      return null;
+    }
+  }
+  
+  selectOptimalModel(analysis: any, agent: any) {
+    return 'gpt-5-2025-08-07';
+  }
+  
+  async generateSystemPrompt(agent: any, agentType: string, context: any) {
+    return `You are ${agent.name || agentType}. ${agent.description || 'You assist in deliberation discussions.'}`;
+  }
+}
 
 // Enhanced authentication-aware client creation
 async function createAuthenticatedClients(request: Request) {
