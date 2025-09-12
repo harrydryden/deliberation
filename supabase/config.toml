@@ -71,9 +71,6 @@ verify_jwt = true
 import_map = "./supabase/functions/calculate_user_stance/import_map.json"
 
 # Compatibility alias function entries (forwarders to canonical names)
-[functions.agent-orchestration-stream]
-verify_jwt = true
-import_map = "./supabase/functions/agent-orchestration-stream/import_map.json"
 
 [functions.generate-issue-recommendations]
 verify_jwt = true
