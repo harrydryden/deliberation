@@ -37,16 +37,14 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
   const recommendationService = new IssueRecommendationService();
 
-  // Reset state when reset is called
+  // Reset state when modal key changes (component re-mounts)
   useEffect(() => {
-    if (onReset) {
-      console.log('🔄 IssueRecommendations: Reset called');
-      setSelectedIssues(new Set());
-      setIssueRelationshipTypes(new Map());
-      setRecommendations([]);
-      setError(null);
-    }
-  }, [onReset]);
+    console.log('🔄 IssueRecommendations: Component mounted/reset');
+    setSelectedIssues(new Set());
+    setIssueRelationshipTypes(new Map());
+    setRecommendations([]);
+    setError(null);
+  }, []); // Only run on mount
 
   // Fetch recommendations when content changes (with debouncing)
   useEffect(() => {

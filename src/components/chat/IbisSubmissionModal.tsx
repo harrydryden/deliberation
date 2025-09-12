@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -180,13 +180,15 @@ export const IbisSubmissionModal = ({
     }));
   };
 
-  const handleSmartConnectionsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
+  const handleSmartConnectionsChange = useCallback((relationships: Array<{id: string, type: string, confidence: number}>) => {
+    console.log('🔗 IbisSubmissionModal: Smart connections changed:', relationships);
     setSmartConnections(relationships);
-  };
+  }, []);
 
-  const handleIssueRecommendationsChange = (relationships: Array<{id: string, type: string, confidence: number}>) => {
+  const handleIssueRecommendationsChange = useCallback((relationships: Array<{id: string, type: string, confidence: number}>) => {
+    console.log('📋 IbisSubmissionModal: Issue recommendations changed:', relationships);
     setIssueRecommendations(relationships);
-  };
+  }, []);
 
   const handleIssueSelected = (issueId: string) => {
     setSelectedIssueId(selectedIssueId === issueId ? null : issueId);
@@ -402,7 +404,6 @@ export const IbisSubmissionModal = ({
             userContent={messageContent}
             onIssueSelected={handleIssueSelected}
             onRelationshipsChange={handleIssueRecommendationsChange}
-            onReset={() => setIssueRecommendations([])}
             className="mb-4"
           />
 
@@ -420,7 +421,6 @@ export const IbisSubmissionModal = ({
                 title={formData.title}
                 nodeType={formData.nodeType as 'issue' | 'position' | 'argument'}
                 onRelationshipsChange={handleSmartConnectionsChange}
-                onReset={() => setSmartConnections([])}
               />
             </div>
           ) : (

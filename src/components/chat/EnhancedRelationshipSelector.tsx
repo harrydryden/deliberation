@@ -57,17 +57,15 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   // Calculate total connections more reliably
   const totalConnections = selectedRelationships.size + manualConnections.filter(c => c.nodeId && c.relationshipType).length;
 
-  // Reset state when reset is called
+  // Reset state when component mounts (via key change)
   useEffect(() => {
-    if (onReset) {
-      console.log('🔄 EnhancedRelationshipSelector: Reset called');
-      setSelectedRelationships(new Set());
-      setSuggestionRelationshipTypes(new Map());
-      setManualConnections([]);
-      setSuggestions([]);
-      setEvaluated(false);
-    }
-  }, [onReset]);
+    console.log('🔄 EnhancedRelationshipSelector: Component mounted/reset');
+    setSelectedRelationships(new Set());
+    setSuggestionRelationshipTypes(new Map());
+    setManualConnections([]);
+    setSuggestions([]);
+    setEvaluated(false);
+  }, []); // Only run on mount
 
   // Load existing nodes for manual connection
   useEffect(() => {
