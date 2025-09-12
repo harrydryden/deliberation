@@ -7,8 +7,8 @@ import {
   createErrorResponse, 
   createSuccessResponse,
   handleCORSPreflight
-} from '../shared/edge-function-utils.ts';
-import { EdgeLogger } from '../shared/edge-logger.ts';
+} from '../shared/edge-function-utils';
+import { EdgeLogger } from '../shared/edge-logger';
 
 serve(async (req) => {
   // Handle CORS preflight with shared utility
