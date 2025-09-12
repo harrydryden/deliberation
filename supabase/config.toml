@@ -47,6 +47,7 @@ import_map = "import_map.json"
 
 [functions.classify-message]
 verify_jwt = true
+import_map = "import_map.json"
 
 # suggest-ibis-links function removed - no frontend usage found
 
