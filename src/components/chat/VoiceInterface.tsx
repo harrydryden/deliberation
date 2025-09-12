@@ -94,7 +94,7 @@ const SimpleVoiceInterface: React.FC<VoiceInterfaceProps> = ({
     const finalAgentId = agentId || (await ensureBillAgentId());
     if (!finalAgentId) return 'No agent available for knowledge search.';
     try {
-      const { data, error } = await supabase.functions.invoke('langchain_query_knowledge', {
+      const { data, error } = await supabase.functions.invoke('knowledge_query', {
         body: { query, agentId: finalAgentId, maxResults },
       });
       if (error) throw error;

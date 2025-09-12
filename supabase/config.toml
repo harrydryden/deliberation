@@ -52,7 +52,7 @@ import_map = "functions/import_map.json"
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.langchain_query_knowledge]
+[functions.knowledge_query]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
