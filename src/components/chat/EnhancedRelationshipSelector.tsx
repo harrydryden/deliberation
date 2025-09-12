@@ -258,7 +258,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
       <div className="flex items-center justify-between sticky top-0 bg-background z-10 pb-2">
         <Label className="flex items-center gap-2">
           <Brain className="h-4 w-4" />
-          Connect to Existing Items
+          Other Relevant Viewpoints
         </Label>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
