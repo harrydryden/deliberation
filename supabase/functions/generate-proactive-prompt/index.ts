@@ -10,10 +10,10 @@ import {
   handleCORSPreflight,
   getOpenAIKey,
   parseAndValidateRequest
-} from '../shared/edge-function-utils.ts';
-import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
-import { ModelConfigManager } from '../shared/model-config.ts';
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
+} from '../shared/edge-function-utils';
+import { AgentOrchestrator } from '../shared/agent-orchestrator';
+import { ModelConfigManager } from '../shared/model-config';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger';
 
 // Remove the old duplicate cache/config functions - they're now in the shared orchestrator
 
