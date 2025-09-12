@@ -10,15 +10,15 @@ import {
   handleCORSPreflight,
   parseAndValidateRequest,
   getOpenAIKey
-} from '../shared/edge-function-utils';
+} from '../shared/edge-function-utils.ts';
 import { OpenAIEmbeddings } from 'https://esm.sh/@langchain/openai@0.6.3';
 import { ChatOpenAI } from 'https://esm.sh/@langchain/openai@0.6.3';
 import { SupabaseVectorStore } from 'https://esm.sh/@langchain/community@0.3.49/vectorstores/supabase';
 import { createRetrievalChain } from 'https://esm.sh/langchain@0.3.30/chains/retrieval';
 import { createStuffDocumentsChain } from 'https://esm.sh/langchain@0.3.30/chains/combine_documents';
 import { PromptTemplate } from 'https://esm.sh/@langchain/core@0.3.12/prompts';
-import { ModelConfigManager } from "../shared/model-config";
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger';
+import { ModelConfigManager } from "../shared/model-config.ts";
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 serve(async (req) => {
   EdgeLogger.debug('LANGCHAIN QUERY EDGE FUNCTION CALLED', { method: req.method });

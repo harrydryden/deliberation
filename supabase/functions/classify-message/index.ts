@@ -10,9 +10,9 @@ import {
   handleCORSPreflight,
   getOpenAIKey,
   parseAndValidateRequest
-} from '../shared/edge-function-utils';
-import { configCache, createCacheKey } from '../shared/cache-manager';
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger';
+} from '../shared/edge-function-utils.ts';
+import { configCache, createCacheKey } from '../shared/cache-manager.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 // Helper function to get classification templates from template system
 async function getClassificationTemplates(supabase: any, content: string, deliberationContext: string, deliberationNotion: string): Promise<{ systemMessage: string, userPrompt: string }> {

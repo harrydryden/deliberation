@@ -10,9 +10,9 @@ import {
   handleCORSPreflight,
   parseAndValidateRequest,
   getOpenAIKey
-} from '../shared/edge-function-utils';
-import { ModelConfigManager } from '../shared/model-config';
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger';
+} from '../shared/edge-function-utils.ts';
+import { ModelConfigManager } from '../shared/model-config.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 
 serve(async (req) => {

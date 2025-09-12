@@ -10,12 +10,28 @@ import {
   handleCORSPreflight,
   getOpenAIKey,
   parseAndValidateRequest
-} from '../shared/edge-function-utils';
-import { AgentOrchestrator } from '../shared/agent-orchestrator';
-import { ModelConfigManager } from '../shared/model-config';
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger';
+} from '../shared/edge-function-utils.ts';
+import { AgentOrchestrator } from '../shared/agent-orchestrator.ts';
+import { ModelConfigManager } from '../shared/model-config.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
-// Remove the old duplicate cache/config functions - they're now in the shared orchestrator
+// Helper function to get system message from template
+async function getProactivePromptSystemMessage(supabase: any, agentName: string): Promise<string> {
+  try {
+    const { data: templateData, error } = await supabase
+      .rpc('get_prompt_template', { 
+        template_name: 'proactive_prompt_system_message'
+      });
+
+    if (templateData && templateData.length > 0) {
+      return templateData[0].template_text.replace(/\{\{agent_name\}\}/g, agentName);
+    }
+  } catch (error) {
+    EdgeLogger.error('Failed to fetch proactive prompt system message template', error);
+  }
+  
+  return `You are ${agentName}, a thoughtful facilitator helping participants engage meaningfully in discussions. Generate prompts that encourage reflection and participation.`;
+}
 
 serve(async (req) => {
   // Handle CORS preflight with shared utility
@@ -216,7 +232,7 @@ ENHANCED SESSION CONTEXT:
       prompt: promptData,
       agentUsed: agentConfig ? {
         name: agentConfig.name,
-        type: floAgent ? 'local' : 'global',
+        type: 'local',
         hasCustomPrompt: !!agentConfig.prompt_overrides?.system_prompt
       } : 'fallback'
     });

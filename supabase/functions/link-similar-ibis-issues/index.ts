@@ -1,189 +1,161 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.52.1";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Import shared utilities for performance and consistency
+import { 
+  corsHeaders, 
+  validateAndGetEnvironment, 
+  createErrorResponse, 
+  createSuccessResponse,
+  handleCORSPreflight,
+  parseAndValidateRequest
+} from '../shared/edge-function-utils.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 interface RequestBody {
   deliberationId?: string;
   nodeId?: string;
-  threshold?: number; // cosine similarity threshold (0..1)
+  threshold?: number;
   nodeType?: 'issue' | 'position' | 'argument';
+  force?: boolean;
 }
 
-// Cosine similarity for numeric arrays
-function cosineSim(a: number[], b: number[]): number {
-  let dot = 0, na = 0, nb = 0;
-  const len = Math.min(a.length, b.length);
-  for (let i = 0; i < len; i++) {
-    const ai = a[i];
-    const bi = b[i];
-    dot += ai * bi;
-    na += ai * ai;
-    nb += bi * bi;
+interface SimilarityScore {
+  id: string;
+  similarity: number;
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (!a?.length || !b?.length || a.length !== b.length) return 0;
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
   }
-  return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  // Handle CORS preflight with shared utility
+  const corsResponse = handleCORSPreflight(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const body = await req.json();
-    const { deliberationId, nodeId, threshold = 0.83, nodeType } = body as RequestBody;
+    const { deliberationId, nodeId, threshold = 0.83, nodeType } = await parseAndValidateRequest(req);
 
-    // Get environment
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing required environment variables');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Get environment and clients with caching
+    const { supabase } = validateAndGetEnvironment();
 
     // Fetch target nodes with embeddings of the requested type
     const TYPE = nodeType || 'issue';
     let query = supabase
       .from("ibis_nodes")
-      .select("id, deliberation_id, node_type, embedding, created_by")
+      .select("id, title, description, node_type, embedding, deliberation_id")
       .eq("node_type", TYPE);
 
     if (deliberationId) query = query.eq("deliberation_id", deliberationId);
     if (nodeId) query = query.eq("id", nodeId);
 
-    const { data: targetNodes, error: targetErr } = await query;
-    if (targetErr) throw targetErr;
+    const { data: targetNodes, error: targetError } = await query;
+    if (targetError) throw targetError;
 
-    // If single node specified, also fetch its peers in the same deliberation
-    let peerNodes: any[] = [];
+    // Decide on the nodes to analyze
+    let nodes = targetNodes || [];
+    
+    // If a specific node is requested, compare it against all other nodes in its deliberation
     if (nodeId) {
       const deliberation = targetNodes?.[0]?.deliberation_id;
       if (!deliberation) {
-        return new Response(
-          JSON.stringify({ success: false, processed: 0, reason: "node_not_found" }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return createSuccessResponse({ success: false, processed: 0, reason: "node_not_found" });
       }
       const { data: others, error: othersErr } = await supabase
         .from("ibis_nodes")
-        .select("id, deliberation_id, node_type, embedding, created_by")
-        .eq("node_type", TYPE)
+        .select("id, title, description, node_type, embedding, deliberation_id")
         .eq("deliberation_id", deliberation)
+        .eq("node_type", TYPE)
         .neq("id", nodeId);
       if (othersErr) throw othersErr;
-      peerNodes = others || [];
+      nodes = [...targetNodes, ...(others || [])];
     }
 
-    const nodes: any[] = nodeId ? [...targetNodes, ...peerNodes] : (targetNodes || []);
     const nodesWithEmb = nodes.filter((n: any) => Array.isArray(n.embedding) && n.embedding.length > 0);
 
     if (nodesWithEmb.length < 2) {
-      return new Response(
-        JSON.stringify({ success: true, processed: 0, reason: "insufficient_embeddings" }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return createSuccessResponse({ success: true, processed: 0, reason: "insufficient_embeddings" });
     }
 
     // Group by deliberation to avoid cross-deliberation links
-    const byDelib = new Map<string, any[]>();
-    for (const n of nodesWithEmb) {
-      const key = n.deliberation_id;
-      if (!byDelib.has(key)) byDelib.set(key, []);
-      byDelib.get(key)!.push(n);
-    }
+    const deliberationGroups = nodesWithEmb.reduce((acc, node) => {
+      const key = node.deliberation_id;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(node);
+      return acc;
+    }, {} as Record<string, any[]>);
 
     let created = 0;
+    for (const [deliberationId, groupNodes] of Object.entries(deliberationGroups)) {
+      if (groupNodes.length < 2) continue;
 
-    for (const [delibId, list] of byDelib.entries()) {
-      const ids = list.map((n: any) => n.id);
-
-      // Fetch existing supportive relationships for these nodes to avoid duplicates (either direction)
-      const { data: existing, error: relErr } = await supabase
-        .from("ibis_relationships")
-        .select("source_node_id, target_node_id")
-        .eq("deliberation_id", delibId)
-        .eq("relationship_type", "supports")
-        .in("source_node_id", ids);
-      if (relErr) throw relErr;
-
-      // Also fetch where these nodes appear as target
-      const { data: existing2, error: relErr2 } = await supabase
-        .from("ibis_relationships")
-        .select("source_node_id, target_node_id")
-        .eq("deliberation_id", delibId)
-        .eq("relationship_type", "supports")
-        .in("target_node_id", ids);
-      if (relErr2) throw relErr2;
-
-      const existingPairs = new Set<string>();
-      for (const r of [...(existing || []), ...(existing2 || [])]) {
-        const a = r.source_node_id as string;
-        const b = r.target_node_id as string;
-        const key = a < b ? `${a}|${b}` : `${b}|${a}`;
-        existingPairs.add(key);
-      }
-
-      // Build candidate pairs above threshold
-      const inserts: any[] = [];
-      for (let i = 0; i < list.length; i++) {
-        for (let j = i + 1; j < list.length; j++) {
-          const ni = list[i];
-          const nj = list[j];
-          const sim = cosineSim(ni.embedding as number[], nj.embedding as number[]);
+      // Calculate similarities within the group
+      const similarities: Array<{ from: any; to: any; similarity: number }> = [];
+      
+      for (let i = 0; i < groupNodes.length; i++) {
+        for (let j = i + 1; j < groupNodes.length; j++) {
+          const node1 = groupNodes[i];
+          const node2 = groupNodes[j];
+          const sim = cosineSimilarity(node1.embedding, node2.embedding);
+          
           if (sim >= threshold) {
-            const key = ni.id < nj.id ? `${ni.id}|${nj.id}` : `${nj.id}|${ni.id}`;
-            if (!existingPairs.has(key)) {
-              // Create a single directed edge with canonical ordering to avoid duplicates
-              const source = ni.id < nj.id ? ni : nj;
-              const target = ni.id < nj.id ? nj : ni;
-              inserts.push({
-                source_node_id: source.id,
-                target_node_id: target.id,
-                relationship_type: "supports",
-                created_by: source.created_by || nj.created_by, // best effort
-                deliberation_id: delibId,
-              });
-            }
+            similarities.push({ from: node1, to: node2, similarity: sim });
           }
         }
       }
 
-      // Insert in batches
-      const BATCH = 500;
-      for (let i = 0; i < inserts.length; i += BATCH) {
-        const batch = inserts.slice(i, i + BATCH);
-        if (!batch.length) continue;
-        const { error: insErr, count } = await supabase
-          .from("ibis_relationships")
-          .insert(batch)
-          .select("id", { count: "exact" });
-        if (insErr) throw insErr;
-        created += count || batch.length;
+      // Create relationships
+      for (const { from, to, similarity } of similarities) {
+        try {
+          const { data: existing } = await supabase
+            .from("ibis_relationships")
+            .select("id")
+            .or(`and(from_node_id.eq.${from.id},to_node_id.eq.${to.id}),and(from_node_id.eq.${to.id},to_node_id.eq.${from.id})`)
+            .limit(1);
+
+          if (existing && existing.length > 0) {
+            console.log(`Skipping existing relationship: ${from.id} <-> ${to.id}`);
+            continue;
+          }
+
+          const { error: insertError } = await supabase
+            .from("ibis_relationships")
+            .insert({
+              from_node_id: from.id,
+              to_node_id: to.id,
+              relationship_type: "similar_to",
+              confidence_score: similarity,
+              metadata: {
+                source: "auto_similarity",
+                similarity_score: similarity,
+                threshold: threshold
+              }
+            });
+
+          if (!insertError) {
+            created++;
+            console.log(`Created similarity link: ${from.title} -> ${to.title} (${similarity.toFixed(3)})`);
+          } else {
+            console.error(`Failed to create relationship:`, insertError);
+          }
+        } catch (error) {
+          console.error(`Error processing relationship ${from.id} -> ${to.id}:`, error);
+        }
       }
     }
 
-    return new Response(
-      JSON.stringify({ success: true, created }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return createSuccessResponse({ success: true, created });
   } catch (error) {
     console.error("link-similar-ibis-issues error:", error);
-    return new Response(
-      JSON.stringify({ 
-        error: error?.message || 'An unexpected error occurred',
-        timestamp: new Date().toISOString()
-      }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+    return createErrorResponse(error, 500, 'link-similar-ibis-issues');
   }
 });

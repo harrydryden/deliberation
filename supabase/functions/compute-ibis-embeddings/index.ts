@@ -10,8 +10,8 @@ import {
   handleCORSPreflight,
   parseAndValidateRequest,
   getOpenAIKey
-} from '../shared/edge-function-utils';
-import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger';
+} from '../shared/edge-function-utils.ts';
+import { EdgeLogger, withTimeout, withRetry } from '../shared/edge-logger.ts';
 
 interface RequestBody {
   deliberationId?: string;

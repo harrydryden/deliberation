@@ -10,8 +10,8 @@ import {
   handleCORSPreflight,
   getOpenAIKey,
   parseAndValidateRequest
-} from '../shared/edge-function-utils';
-import { EdgeLogger } from '../shared/edge-logger';
+} from '../shared/edge-function-utils.ts';
+import { EdgeLogger } from '../shared/edge-logger.ts';
 
 serve(async (req) => {
   // Handle CORS preflight with shared utility
