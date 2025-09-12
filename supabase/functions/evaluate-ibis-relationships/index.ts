@@ -226,8 +226,7 @@ ${i + 1}. [${node.node_type.toUpperCase()}] ${node.title}
           content: await getSystemMessage(supabase, 'ibis_relationship_system_message') 
         },
         { role: "user", content: relationshipPrompt }
-      ],
-      { maxTokens: 1500 }
+      ]
     );
 
     console.log(`🤖 Using model: ${selectedModel} for relationship evaluation`);
