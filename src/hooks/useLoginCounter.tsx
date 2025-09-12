@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSupabaseAuth } from './useSupabaseAuth';
+import { productionLogger } from '@/utils/productionLogger';
 
 interface LoginMetrics {
   totalLogins: number;
@@ -37,7 +38,7 @@ export const useLoginCounter = (): UseLoginCounterReturn => {
           // Refresh metrics after login
           await loadLoginMetrics(session.user.id);
         } catch (error) {
-          console.error('Error recording login event:', error);
+          productionLogger.error('Error recording login event', error);
         } finally {
           setIsTracking(false);
         }
@@ -75,7 +76,7 @@ export const useLoginCounter = (): UseLoginCounterReturn => {
         loginsThisMonth: loginsThisMonth || 0
       });
     } catch (error) {
-      console.error('Error loading login metrics:', error);
+      productionLogger.error('Error loading login metrics', error);
       setLoginMetrics({
         totalLogins: 0,
         loginsThisMonth: 0

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useDeliberationService } from "@/hooks/useDeliberationService";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { productionLogger } from '@/utils/productionLogger';
 
 const Auth = () => {
   const { user, isLoading, isAdmin, signIn } = useSupabaseAuth();
@@ -84,7 +85,7 @@ const Auth = () => {
 
       return data.deliberation_id;
     } catch (error) {
-      console.warn('Failed to find last message deliberation:', error);
+      productionLogger.warn('Failed to find last message deliberation', error);
       return null;
     }
   };

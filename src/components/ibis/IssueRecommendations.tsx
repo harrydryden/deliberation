@@ -8,7 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Lightbulb, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { IssueRecommendationService, IssueRecommendation } from '@/services/domain/implementations/issue-recommendation.service';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import { logger } from '@/utils/logger';
+import { createComponentLogger } from '@/utils/productionLogger';
+
+const logger = createComponentLogger('IssueRecommendations');
 import { CONFIDENCE_LEVELS, RELATIONSHIP_TYPE_OPTIONS } from '@/constants/ibisTypes';
 
 interface IssueRecommendationsProps {
@@ -39,7 +41,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
   // Reset state when modal key changes (component re-mounts)
   useEffect(() => {
-    console.log('🔄 IssueRecommendations: Component mounted/reset');
+    logger.debug('Component mounted/reset');
     setSelectedIssues(new Set());
     setIssueRelationshipTypes(new Map());
     setRecommendations([]);
@@ -86,7 +88,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
   // Handle issue selection with logging
   const handleIssueSelect = (issueId: string) => {
-    console.log('🎯 IssueRecommendations: Issue selection toggled', { issueId, wasSelected: selectedIssues.has(issueId) });
+    logger.debug('Issue selection toggled', { issueId, wasSelected: selectedIssues.has(issueId) });
     
     const newSelected = new Set(selectedIssues);
     const newRelTypes = new Map(issueRelationshipTypes);
@@ -110,7 +112,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
   // Handle relationship type change with logging
   const handleRelationshipTypeChange = (issueId: string, relationshipType: string) => {
-    console.log('🔄 IssueRecommendations: Relationship type changed', { issueId, relationshipType });
+    logger.debug('Relationship type changed', { issueId, relationshipType });
     
     const newRelTypes = new Map(issueRelationshipTypes);
     newRelTypes.set(issueId, relationshipType);
@@ -119,7 +121,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
   // Notify parent when relationships change with improved logic
   useEffect(() => {
-    console.log('📢 IssueRecommendations: Relationships changed', { 
+    logger.debug('Relationships changed', { 
       selectedCount: selectedIssues.size, 
       relationshipTypesCount: issueRelationshipTypes.size 
     });
@@ -131,7 +133,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
         confidence: CONFIDENCE_LEVELS.AI_RECOMMENDATION
       }));
       
-      console.log('📤 IssueRecommendations: Sending relationships to parent:', relationships);
+      logger.debug('Sending relationships to parent:', { count: relationships.length });
       onRelationshipsChange(relationships);
     }
   }, [selectedIssues, issueRelationshipTypes, onRelationshipsChange]);
@@ -197,7 +199,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        console.log('🗑️ IssueRecommendations: Clearing all selections');
+                        logger.debug('Clearing all selections');
                         setSelectedIssues(new Set());
                         setIssueRelationshipTypes(new Map());
                       }}

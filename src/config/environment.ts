@@ -54,8 +54,9 @@ export const validateAndGetConfig = (): AppConfig => {
     projectId: projectId || undefined,
   };
 
-  // Development warnings
+  // Development warnings - only in non-production
   if (nodeEnv !== 'production') {
+    // Use console.info directly in non-production environments only
     console.info('🔧 Environment Configuration Loaded:', {
       supabaseUrl: config.supabaseUrl.replace(/\/\/.*\./, '//*****.'),
       hasProjectId: !!config.projectId,
@@ -84,12 +85,14 @@ export const validateStartup = (): void => {
   try {
     validateAndGetConfig();
     
+    // Only log validation messages in non-production
     if (isProduction()) {
-      console.info('✅ Production environment validated');
+      // Silent in production
     } else {
       console.info('🔧 Development environment validated');
     }
   } catch (error) {
+    // Always log critical errors
     console.error('❌ Environment validation failed:', error);
     throw error;
   }

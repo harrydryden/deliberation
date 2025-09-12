@@ -15,7 +15,9 @@ import { IBISService } from '@/services/domain/implementations/ibis.service';
 import { useIbisSubmission } from '@/hooks/useIbisSubmission';
 import { useIbisClassification } from '@/hooks/useIbisClassification';
 import { NODE_TYPE_OPTIONS } from '@/constants/ibisTypes';
-import { logger } from '@/utils/logger';
+import { createComponentLogger } from '@/utils/productionLogger';
+
+const logger = createComponentLogger('IbisSubmissionModal');
 
 interface IbisSubmissionModalProps {
   isOpen: boolean;
@@ -90,7 +92,7 @@ export const IbisSubmissionModal = ({
   // Reset and populate form when modal opens
   useEffect(() => {
     if (isOpen) {
-      console.log('📖 IbisSubmissionModal: Modal opened, resetting state');
+      logger.debug('Modal opened, resetting state');
       // Clear all relationship states for fresh start
       setSmartConnections([]);
       setIssueRecommendations([]);
@@ -128,7 +130,7 @@ export const IbisSubmissionModal = ({
   }, [aiSuggestions]);
 
   const resetForm = () => {
-    console.log('🔄 IbisSubmissionModal: Resetting form state');
+    logger.debug('Resetting form state');
     setFormData({
       title: '',
       description: messageContent,
@@ -181,12 +183,12 @@ export const IbisSubmissionModal = ({
   };
 
   const handleSmartConnectionsChange = useCallback((relationships: Array<{id: string, type: string, confidence: number}>) => {
-    console.log('🔗 IbisSubmissionModal: Smart connections changed:', relationships);
+    logger.debug('Smart connections changed:', { count: relationships.length });
     setSmartConnections(relationships);
   }, []);
 
   const handleIssueRecommendationsChange = useCallback((relationships: Array<{id: string, type: string, confidence: number}>) => {
-    console.log('📋 IbisSubmissionModal: Issue recommendations changed:', relationships);
+    logger.debug('Issue recommendations changed:', { count: relationships.length });
     setIssueRecommendations(relationships);
   }, []);
 
@@ -444,7 +446,7 @@ export const IbisSubmissionModal = ({
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    console.log('🗑️ IbisSubmissionModal: Clearing all relationships');
+                    logger.debug('Clearing all relationships');
                     setSmartConnections([]);
                     setIssueRecommendations([]);
                   }}
@@ -473,7 +475,7 @@ export const IbisSubmissionModal = ({
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          console.log('🗑️ IbisSubmissionModal: Removing relationship', rel);
+                          logger.debug('Removing relationship', { id: rel.id, type: rel.type });
                           if (isFromIssueRec) {
                             setIssueRecommendations(prev => prev.filter(ir => ir.id !== rel.id));
                           } else {

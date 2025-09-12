@@ -8,8 +8,10 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Brain, Zap, ArrowRight, CheckCircle2, XCircle, Lightbulb, Plus, Trash2 } from 'lucide-react';
-import { logger } from '@/utils/logger';
+import { createComponentLogger } from '@/utils/productionLogger';
 import { RELATIONSHIP_TYPE_OPTIONS } from '@/constants/ibisTypes';
+
+const logger = createComponentLogger('EnhancedRelationshipSelector');
 
 interface RelationshipSuggestion {
   nodeId: string;
@@ -59,7 +61,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
 
   // Reset state when component mounts (via key change)
   useEffect(() => {
-    console.log('🔄 EnhancedRelationshipSelector: Component mounted/reset');
+    logger.debug('Component mounted/reset');
     setSelectedRelationships(new Set());
     setSuggestionRelationshipTypes(new Map());
     setManualConnections([]);
@@ -94,7 +96,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
     const evaluateTimer = setTimeout(() => {
       // Only evaluate if user has provided meaningful input and hasn't evaluated yet
       if (title.trim().length > 3 && !evaluated) {
-        console.log('🔍 EnhancedRelationshipSelector: Auto-triggering evaluation for:', title);
+        logger.debug('Auto-triggering evaluation for:', { title });
         evaluateRelationships();
       }
     }, 1200); // Increased debounce to reduce aggressive calls
@@ -105,7 +107,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   const evaluateRelationships = async () => {
     if (!title.trim() || loading) return;
     
-    console.log('🔍 EnhancedRelationshipSelector: Evaluating relationships for:', title);
+    logger.debug('Evaluating relationships for:', { title });
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('relationship_evaluator', {
@@ -124,7 +126,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
         setSuggestions(data.relationships || []);
         setEvaluated(true);
         
-        console.log('✅ EnhancedRelationshipSelector: Found relationships:', data.relationships?.length || 0);
+        logger.debug('Found relationships:', { count: data.relationships?.length || 0 });
         
         // Show suggestions but don't auto-select them
         if (data.relationships?.length > 0) {
@@ -147,7 +149,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   };
 
   const toggleRelationship = (suggestion: RelationshipSuggestion) => {
-    console.log('🔗 EnhancedRelationshipSelector: Toggling relationship', { 
+    logger.debug('Toggling relationship', { 
       nodeId: suggestion.nodeId, 
       relationshipType: suggestion.relationshipType,
       wasSelected: selectedRelationships.has(`${suggestion.nodeId}-${suggestion.relationshipType}`)
@@ -214,7 +216,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   };
 
   const addManualConnection = () => {
-    console.log('➕ EnhancedRelationshipSelector: Adding manual connection');
+    logger.debug('Adding manual connection');
     
     if (selectedRelationships.size + manualConnections.length >= MAX_CONNECTIONS) {
       toast({
@@ -229,7 +231,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
   };
 
   const updateManualConnection = (index: number, field: 'nodeId' | 'relationshipType', value: string) => {
-    console.log('🔧 EnhancedRelationshipSelector: Updating manual connection', { index, field, value });
+    logger.debug('Updating manual connection', { index, field, value });
     
     setManualConnections(prev => {
       const updated = [...prev];
@@ -237,7 +239,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
       
       // Update parent when both fields are filled
       if (updated[index].nodeId && updated[index].relationshipType) {
-        console.log('✅ EnhancedRelationshipSelector: Manual connection complete, updating parent');
+        logger.debug('Manual connection complete, updating parent');
         updateParentWithCurrentSelections(selectedRelationships);
       }
       

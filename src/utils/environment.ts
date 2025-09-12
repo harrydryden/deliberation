@@ -1,4 +1,5 @@
 // Environment configuration utilities for self-hosting compatibility
+import { productionLogger } from './productionLogger';
 
 export const isProduction = () => {
   return import.meta.env.NODE_ENV === 'production' || 
@@ -34,7 +35,7 @@ export const validateEnvironment = (): boolean => {
     getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_ANON_KEY');
     return true;
   } catch (error) {
-    console.error('Environment validation failed:', error);
+    productionLogger.error('Environment validation failed', error);
     return false;
   }
 };
