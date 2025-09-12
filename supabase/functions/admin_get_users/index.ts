@@ -112,21 +112,32 @@ serve(async (req) => {
       throw new Error(`Failed to fetch auth users: ${usersError.message}`);
     }
 
-    // Fetch participant data to get deliberation associations
+    // Fetch participant data to get deliberation associations (without join to avoid FK requirement)
     const { data: participants, error: participantsError } = await adminSupabase
       .from('participants')
-      .select(`
-        user_id,
-        deliberation_id,
-        deliberations (
-          id,
-          title,
-          notion
-        )
-      `);
+      .select('user_id, deliberation_id');
 
     if (participantsError) {
       console.warn('Failed to fetch participants:', participantsError);
+    }
+
+    // Fetch deliberation titles for associated participations
+    const deliberationIds = Array.from(new Set((participants || []).map((p: any) => p.deliberation_id))).filter(Boolean);
+    let deliberationsMap: Record<string, { id: string; title: string; notion?: string }> = {};
+    if (deliberationIds.length > 0) {
+      const { data: deliberations, error: deliberationsError } = await adminSupabase
+        .from('deliberations')
+        .select('id, title, notion')
+        .in('id', deliberationIds);
+
+      if (deliberationsError) {
+        console.warn('Failed to fetch deliberations:', deliberationsError);
+      } else {
+        deliberationsMap = (deliberations || []).reduce((acc: any, d: any) => {
+          acc[d.id] = { id: d.id, title: d.title, notion: d.notion };
+          return acc;
+        }, {} as Record<string, { id: string; title: string; notion?: string }>);
+      }
     }
 
     // Combine and map the data
@@ -142,13 +153,16 @@ serve(async (req) => {
         accessCode2: profile.access_code_2,
         isArchived: profile.is_archived || false,
         createdAt: profile.created_at,
-        lastSignIn: authUser?.last_sign_in_at,
+        lastSignInAt: authUser?.last_sign_in_at,
         emailConfirmedAt: authUser?.email_confirmed_at,
-        deliberations: userParticipations.map(p => ({
-          id: p.deliberation_id,
-          title: p.deliberations?.title || 'Unknown',
-          notion: p.deliberations?.notion
-        }))
+        deliberations: userParticipations.map(p => {
+          const d = deliberationsMap[p.deliberation_id];
+          return {
+            id: p.deliberation_id,
+            title: d?.title || 'Unknown',
+            role: 'participant'
+          };
+        })
       };
     }) || [];
 
