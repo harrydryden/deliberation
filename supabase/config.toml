@@ -78,9 +78,6 @@ import_map = "./supabase/functions/calculate_user_stance/import_map.json"
 verify_jwt = true
 import_map = "./supabase/functions/agent-orchestration-stream/import_map.json"
 
-[functions.classify-message]
-verify_jwt = true
-import_map = "./supabase/functions/classify-message/import_map.json"
 
 [functions.generate-issue-recommendations]
 verify_jwt = true
