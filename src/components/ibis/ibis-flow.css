@@ -17,6 +17,42 @@
   stroke-width: 3px;
 }
 
+/* Enhanced edge visibility */
+.react-flow__edge-path {
+  stroke-width: 2px;
+}
+
+/* Relationship edge styling */
+.react-flow__edge[data-type="relationship"] .react-flow__edge-path {
+  stroke-width: 2px;
+}
+
+.react-flow__edge[data-type="relationship"]:hover .react-flow__edge-path {
+  stroke-width: 4px;
+}
+
+/* Hierarchy edge styling */
+.react-flow__edge[data-type="hierarchy"] .react-flow__edge-path {
+  stroke-width: 1.5px;
+  opacity: 0.6;
+}
+
+.react-flow__edge[data-type="hierarchy"]:hover .react-flow__edge-path {
+  stroke-width: 2.5px;
+  opacity: 0.8;
+}
+
+/* Edge labels */
+.react-flow__edge-text {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Ensure edge markers are visible */
+.react-flow__edge .react-flow__edge-path {
+  marker-end: attr(marker-end);
+}
+
 /* Custom MiniMap styling */
 .react-flow__minimap {
   background-color: var(--background);

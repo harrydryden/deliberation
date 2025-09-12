@@ -459,6 +459,47 @@ const { user, isAdmin } = useSupabaseAuth();
       }
     });
 
+    // Create IBIS relationship edges (supports, opposes, relates_to, responds_to)
+    const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
+    relationshipsData.forEach(relationship => {
+      // Only create edges if both source and target nodes are in filtered set
+      if (filteredNodeIds.has(relationship.source_node_id) && filteredNodeIds.has(relationship.target_node_id)) {
+        const config = relationshipConfig[relationship.relationship_type];
+        flowEdges.push({
+          id: relationship.id,
+          source: relationship.source_node_id,
+          target: relationship.target_node_id,
+          type: 'smoothstep',
+          animated: false,
+          style: { 
+            stroke: config.color, 
+            strokeWidth: 2,
+            strokeDasharray: config.style === 'dashed' ? '5,5' : undefined
+          },
+          markerEnd: { 
+            type: MarkerType.ArrowClosed, 
+            color: config.color,
+            width: 20,
+            height: 20
+          },
+          label: config.label,
+          labelStyle: { 
+            fontSize: '12px', 
+            fontWeight: 600,
+            fill: config.color
+          },
+          labelBgStyle: { 
+            fill: 'hsl(var(--background))', 
+            opacity: 0.9
+          },
+          data: { 
+            type: 'relationship',
+            relationshipType: relationship.relationship_type
+          },
+        });
+      }
+    });
+
 
     setNodes(flowNodes);
     setEdges(flowEdges);
@@ -652,119 +693,7 @@ const { user, isAdmin } = useSupabaseAuth();
     );
   }
 
-  // Render zone backgrounds using ReactFlow Panel for proper positioning
-  const renderZoneBackgrounds = () => {
-    if (!zones || !reactFlowRef.current) return null;
-    
-    const reactFlowBounds = reactFlowRef.current.getViewport();
-    const canvasWidth = 1600; // Our layout canvas size
-    const canvasHeight = 1000;
-    const center = { x: canvasWidth / 2, y: canvasHeight / 2 };
-    
-    return (
-      <>
-        {/* Zone background circles as ReactFlow Panel */}
-        <Panel position="top-left" className="pointer-events-none">
-          <svg 
-            width={canvasWidth} 
-            height={canvasHeight}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              pointerEvents: 'none',
-              zIndex: 0
-            }}
-          >
-            {/* Issue zone (center circle) */}
-            <circle
-              cx={center.x}
-              cy={center.y}
-              r={zones.issue.outerRadius}
-              fill={zones.issue.color}
-              stroke="hsl(var(--ibis-issue))"
-              strokeWidth="2"
-              strokeOpacity="0.3"
-              fillOpacity="0.15"
-            />
-            
-            {/* Position zone (middle ring) */}
-            <circle
-              cx={center.x}
-              cy={center.y}
-              r={zones.position.outerRadius}
-              fill={zones.position.color}
-              fillOpacity="0.08"
-              stroke="hsl(var(--ibis-position))"
-              strokeWidth="2"
-              strokeOpacity="0.25"
-              strokeDasharray="8,4"
-            />
-            <circle
-              cx={center.x}
-              cy={center.y}
-              r={zones.position.innerRadius}
-              fill="none"
-              stroke="hsl(var(--ibis-position))"
-              strokeWidth="1"
-              strokeOpacity="0.2"
-            />
-            
-            {/* Argument zone (outer ring) */}
-            <circle
-              cx={center.x}
-              cy={center.y}
-              r={zones.argument.outerRadius}
-              fill={zones.argument.color}
-              fillOpacity="0.08"
-              stroke="hsl(var(--ibis-argument))"
-              strokeWidth="2"
-              strokeOpacity="0.25"
-              strokeDasharray="12,6"
-            />
-            <circle
-              cx={center.x}
-              cy={center.y}
-              r={zones.argument.innerRadius}
-              fill="none"
-              stroke="hsl(var(--ibis-argument))"
-              strokeWidth="1"
-              strokeOpacity="0.2"
-            />
-            
-            {/* Zone labels */}
-            <text
-              x={center.x}
-              y={center.y - zones.issue.outerRadius + 30}
-              textAnchor="middle"
-              className="fill-[hsl(var(--ibis-issue))]"
-              style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
-            >
-              Issues
-            </text>
-            <text
-              x={center.x + zones.position.outerRadius - 50}
-              y={center.y}
-              textAnchor="middle"
-              className="fill-[hsl(var(--ibis-position))]"
-              style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
-            >
-              Positions
-            </text>
-            <text
-              x={center.x + zones.argument.outerRadius - 60}
-              y={center.y + 25}
-              textAnchor="middle"
-              className="fill-[hsl(var(--ibis-argument))]"
-              style={{ fontSize: '14px', fontWeight: 600, opacity: 0.7 }}
-            >
-              Arguments
-            </text>
-          </svg>
-        </Panel>
-      </>
-    );
-  };
+  // Zone backgrounds removed - they were causing visual misalignment
 
   return (
     <div className="h-full w-full relative">      
@@ -795,9 +724,6 @@ const { user, isAdmin } = useSupabaseAuth();
       >
         <Background color="hsl(var(--ibis-grid))" gap={20} />
         <Controls />
-        
-        {/* Render zone backgrounds */}
-        {renderZoneBackgrounds()}
         
         {/* Debug info panel at top */}
         <Panel position="top-left" className="bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-md">
