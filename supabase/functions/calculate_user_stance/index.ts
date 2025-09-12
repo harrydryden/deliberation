@@ -1,246 +1,198 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.52.1";
-// touch: trigger redeploy
-// Inlined utilities to avoid cross-folder import issues
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function handleCORSPreflight(request: Request): Response | null {
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-  return null;
+interface StanceRequest {
+  userId: string;
+  deliberationId: string;
 }
-
-function createErrorResponse(error: any, status: number = 500, context?: string): Response {
-  const errorId = crypto.randomUUID();
-  console.error(`[${errorId}] ${context || 'Edge Function'} Error:`, error);
-  
-  return new Response(
-    JSON.stringify({
-      error: error?.message || 'An unexpected error occurred',
-      errorId,
-      context,
-      timestamp: new Date().toISOString()
-    }),
-    {
-      status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    }
-  );
-}
-
-function createSuccessResponse(data: any): Response {
-  return new Response(
-    JSON.stringify(data),
-    {
-      headers: { ...corsHeaders, "Content-Type": "application/json" }
-    }
-  );
-}
-
-async function parseAndValidateRequest<T>(request: Request, requiredFields: string[] = []): Promise<T> {
-  try {
-    const body = await request.json();
-    
-    for (const field of requiredFields) {
-      if (!(field in body) || body[field] === null || body[field] === undefined) {
-        throw new Error(`Missing required field: ${field}`);
-      }
-    }
-    
-    return body as T;
-  } catch (error: any) {
-    throw new Error(`Request parsing failed: ${error.message}`);
-  }
-}
-
-function getOpenAIKey(): string {
-  const apiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured');
-  }
-  return apiKey;
-}
-
-function validateAndGetEnvironment() {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-
-  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
-    throw new Error('Missing required Supabase environment variables');
-  }
-
-  return {
-    supabase: createClient(supabaseUrl, supabaseServiceKey),
-    userSupabase: createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
-    })
-  };
-}
-
-const EdgeLogger = {
-  debug: (message: string, data?: any) => console.log(`🔍 ${message}`, data),
-  info: (message: string, data?: any) => console.log(`ℹ️ ${message}`, data),
-  error: (message: string, error?: any) => console.error(`❌ ${message}`, error),
-};
 
 serve(async (req) => {
-  // Handle CORS preflight with shared utility
-  const corsResponse = handleCORSPreflight(req);
-  if (corsResponse) return corsResponse;
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { userId, deliberationId } = await parseAndValidateRequest(req, ['userId', 'deliberationId']);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 
-    // Get environment and clients with caching
-    const { supabase } = validateAndGetEnvironment();
-    const openAIApiKey = getOpenAIKey();
+    if (!supabaseUrl || !supabaseServiceKey || !openaiApiKey) {
+      throw new Error('Missing required environment variables');
+    }
 
-    // Fetch deliberation context
-    const { data: deliberation } = await supabase
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { userId, deliberationId }: StanceRequest = await req.json();
+
+    console.log('[calculate_user_stance] Processing request', { userId, deliberationId });
+
+    // Get deliberation details for context
+    const { data: deliberation, error: deliberationError } = await supabase
       .from('deliberations')
-      .select('title, description, notion')
+      .select('title, description')
       .eq('id', deliberationId)
       .single();
 
-    if (!deliberation) {
-      throw new Error('Deliberation not found');
+    if (deliberationError || !deliberation) {
+      throw new Error(`Deliberation not found: ${deliberationId}`);
     }
 
-    // Fetch all user messages for this deliberation
+    // Get user's recent messages in this deliberation
     const { data: messages, error: messagesError } = await supabase
       .from('messages')
-      .select('content, created_at, message_type')
+      .select('content, created_at')
       .eq('user_id', userId)
       .eq('deliberation_id', deliberationId)
-      .eq('message_type', 'user') // Only analyze user messages, not agent responses
-      .order('created_at', { ascending: true });
+      .eq('message_type', 'user')
+      .order('created_at', { ascending: false })
+      .limit(20);
 
     if (messagesError) {
-      throw new Error(`Failed to fetch messages: ${messagesError.message}`);
+      throw new Error(`Failed to fetch user messages: ${messagesError.message}`);
     }
 
     if (!messages || messages.length === 0) {
-      return createSuccessResponse({
-        stanceScore: 0.0,
-        confidenceScore: 0.3,
-        messageCount: 0,
-        analysisDetails: {
-          reason: 'No user messages found for analysis',
-          analysisTimestamp: new Date().toISOString()
+      console.log('[calculate_user_stance] No messages found for user');
+      return new Response(JSON.stringify({ 
+        stanceScore: 0,
+        confidenceScore: 0.1,
+        semanticAnalysis: {
+          reason: 'No messages found',
+          messageCount: 0
         }
+      }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
-    // Build analysis context
-    const messageTexts = messages.map((msg, index) => 
-      `[Message ${index + 1} - ${new Date(msg.created_at).toLocaleDateString()}]: ${msg.content}`
-    ).join('\n\n');
+    // Combine recent messages for analysis
+    const combinedContent = messages
+      .map(m => m.content)
+      .join(' ')
+      .substring(0, 3000); // Limit for API
 
-    const deliberationContext = `Deliberation: "${deliberation.title}"
-Description: ${deliberation.description || 'No description provided'}
-Notion/Focus: ${deliberation.notion || 'No specific notion provided'}`;
+    console.log(`[calculate_user_stance] Analyzing ${messages.length} messages`);
 
-    // Create stance analysis prompt
-    const systemMessage = `You are an expert in analyzing political and social stances from written text. Your task is to analyze a user's complete message history in a deliberation and determine their overall stance on the topic.
+    // Create AI prompt for stance analysis
+    const systemPrompt = `You are a stance analyzer for deliberative discussions. 
+Analyze the user's messages to determine their stance on the deliberation topic.
 
-Analyze the user's stance on a scale from -1.0 (strongly negative/opposed) to +1.0 (strongly positive/supportive), with 0.0 being neutral.
+Stance Scale:
+-1.0: Strongly negative/opposed
+-0.5: Moderately negative/opposed  
+ 0.0: Neutral/balanced
++0.5: Moderately positive/supportive
++1.0: Strongly positive/supportive
 
-Also provide a confidence score from 0.0 (very uncertain) to 1.0 (very confident) based on:
-- Clarity of expressed positions
-- Consistency across messages
-- Strength of language used
-- Amount of content available for analysis
+Confidence Scale:
+0.0: No confidence (unclear/insufficient data)
+0.5: Moderate confidence 
+1.0: High confidence (clear indicators)
 
-Return your analysis in this exact JSON format:
+Return JSON with:
 {
-  "stanceScore": number,
-  "confidenceScore": number,
-  "reasoning": "Brief explanation of the stance analysis",
-  "keyIndicators": ["list", "of", "key", "phrases", "or", "themes"],
-  "messageCount": number,
-  "analysisTimestamp": "ISO timestamp"
+  "stanceScore": number (-1.0 to 1.0),
+  "confidenceScore": number (0.0 to 1.0),
+  "reasoning": "brief explanation",
+  "keyThemes": ["theme1", "theme2"]
 }`;
 
-    const userPrompt = `${deliberationContext}
+    const userPrompt = `Deliberation Topic: "${deliberation.title}"
+Description: "${deliberation.description || 'No description provided'}"
 
-Please analyze the following messages from a user to determine their overall stance on this deliberation topic:
+User Messages:
+${combinedContent}
 
-${messageTexts}
+Analyze the user's stance and return JSON:`;
 
-Total messages: ${messages.length}
-Date range: ${new Date(messages[0].created_at).toLocaleDateString()} to ${new Date(messages[messages.length - 1].created_at).toLocaleDateString()}`;
-
-    EdgeLogger.info('Analyzing user stance', { 
-      userId, 
-      deliberationId, 
-      messageCount: messages.length 
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.2,
+        max_tokens: 500,
+      }),
     });
 
-    // Use enhanced OpenAI client  
-    const { createOpenAIClient } = await import('../shared/openai-client.ts');
-    const openAIClient = createOpenAIClient();
-    
-    const data = await openAIClient.createChatCompletion({
-      model: 'gpt-5-2025-08-07',
-      messages: [
-        { role: 'system', content: systemMessage },
-        { role: 'user', content: userPrompt }
-      ],
-      max_completion_tokens: 1000
-    }, {
-      timeoutMs: 20000, // 20 second timeout
-      maxRetries: 2
-    });
-    const result = data.choices[0].message.content;
-
-    try {
-      const parsedResult = JSON.parse(result);
-      
-      // Validate the parsed result has required fields
-      const requiredFields = ['stanceScore', 'confidenceScore', 'reasoning'];
-      const missingFields = requiredFields.filter(field => !(field in parsedResult));
-      
-      if (missingFields.length > 0) {
-        throw new Error(`Missing required fields in stance analysis result: ${missingFields.join(', ')}`);
-      }
-
-      // Add analysis metadata
-      const analysisResult = {
-        ...parsedResult,
-        messageCount: messages.length,
-        analysisTimestamp: new Date().toISOString(),
-        analysisDetails: {
-          deliberationTitle: deliberation.title,
-          dateRange: {
-            start: messages[0].created_at,
-            end: messages[messages.length - 1].created_at
-          },
-          totalContent: messageTexts.length
-        }
-      };
-      
-      EdgeLogger.info('Stance analysis completed', { 
-        userId, 
-        deliberationId, 
-        stanceScore: analysisResult.stanceScore,
-        confidenceScore: analysisResult.confidenceScore 
-      });
-
-      return createSuccessResponse(analysisResult);
-      
-    } catch (parseError) {
-      EdgeLogger.error('JSON parsing error in stance analysis', parseError);
-      console.error('Raw result:', result);
-      throw new Error('Failed to parse stance analysis result as JSON');
+    if (!openaiResponse.ok) {
+      const errorText = await openaiResponse.text();
+      console.error('[calculate_user_stance] OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${errorText}`);
     }
 
+    const result = await openaiResponse.json();
+    const aiResponse = result.choices[0].message.content;
+
+    console.log('[calculate_user_stance] AI response:', aiResponse);
+
+    // Parse the JSON response
+    let analysis;
+    try {
+      // Extract JSON from response (handle potential markdown formatting)
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        analysis = JSON.parse(jsonMatch[0]);
+      } else {
+        analysis = JSON.parse(aiResponse);
+      }
+    } catch (parseError) {
+      console.error('[calculate_user_stance] Failed to parse AI response:', parseError);
+      // Fallback to neutral stance
+      analysis = {
+        stanceScore: 0,
+        confidenceScore: 0.1,
+        reasoning: 'Failed to parse AI analysis',
+        keyThemes: []
+      };
+    }
+
+    // Validate and clamp values
+    const stanceScore = Math.max(-1, Math.min(1, analysis.stanceScore || 0));
+    const confidenceScore = Math.max(0, Math.min(1, analysis.confidenceScore || 0.1));
+
+    const semanticAnalysis = {
+      reasoning: analysis.reasoning || 'No reasoning provided',
+      keyThemes: analysis.keyThemes || [],
+      messageCount: messages.length,
+      analysisTimestamp: new Date().toISOString()
+    };
+
+    console.log(`[calculate_user_stance] Calculated stance: ${stanceScore}, confidence: ${confidenceScore}`);
+
+    return new Response(JSON.stringify({ 
+      stanceScore,
+      confidenceScore,
+      semanticAnalysis
+    }), { 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
+
   } catch (error) {
-    EdgeLogger.error('Stance calculation error', error);
-    return createErrorResponse(error, 500, 'stance calculation');
+    console.error('[calculate_user_stance] Function error:', error);
+    
+    // Return neutral fallback stance
+    return new Response(JSON.stringify({ 
+      stanceScore: 0,
+      confidenceScore: 0.1,
+      semanticAnalysis: {
+        error: error.message,
+        fallback: true,
+        timestamp: new Date().toISOString()
+      }
+    }), { 
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
   }
 });
