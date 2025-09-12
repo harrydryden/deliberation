@@ -243,12 +243,12 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
     return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  const getNodeTypeIcon = (nodeType: string) => {
+  const getNodeTypeLabel = (nodeType: string) => {
     switch (nodeType) {
-      case 'issue': return '❓';
-      case 'position': return '💭';  
-      case 'argument': return '📝';
-      default: return '📄';
+      case 'issue': return 'Issue';
+      case 'position': return 'Position';  
+      case 'argument': return 'Argument';
+      default: return 'Node';
     }
   };
 
@@ -326,12 +326,14 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                        </div>
                        
                        <div className="flex-1 min-w-0">
-                         <div className="flex items-center gap-2 mb-1">
-                           <span className="text-lg">{getNodeTypeIcon(suggestion.nodeType)}</span>
-                           <span className="font-medium text-sm truncate">
-                             {suggestion.nodeTitle}
-                           </span>
-                         </div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                              {getNodeTypeLabel(suggestion.nodeType)}
+                            </Badge>
+                            <span className="font-medium text-sm truncate">
+                              {suggestion.nodeTitle}
+                            </span>
+                          </div>
                          
                          <div className="flex items-center gap-2 mb-2">
                            <Badge variant="outline" className="text-xs bg-muted/50">
@@ -436,12 +438,14 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                       </SelectTrigger>
                       <SelectContent className="bg-background border border-border shadow-lg z-50">
                         {existingNodes.map(node => (
-                          <SelectItem key={node.id} value={node.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{getNodeTypeIcon(node.node_type)}</span>
-                              <span className="truncate">{node.title}</span>
-                            </div>
-                          </SelectItem>
+                           <SelectItem key={node.id} value={node.id}>
+                             <div className="flex items-center gap-2">
+                               <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                                 {getNodeTypeLabel(node.node_type)}
+                               </Badge>
+                               <span className="truncate">{node.title}</span>
+                             </div>
+                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -486,13 +490,15 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                  const key = `${s.nodeId}-${s.relationshipType}`;
                  const selectedType = suggestionRelationshipTypes.get(key) || s.relationshipType;
                  return (
-                   <div key={key} className="flex items-center gap-2">
-                     <span>{getNodeTypeIcon(s.nodeType)}</span>
-                     <span className="font-medium">{s.nodeTitle.slice(0, 30)}...</span>
-                     <ArrowRight className="h-3 w-3 text-primary" />
-                     <span className="text-primary">{formatRelationshipType(selectedType)}</span>
-                     <Badge variant="outline" className="text-xs">AI</Badge>
-                   </div>
+                    <div key={key} className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                        {getNodeTypeLabel(s.nodeType)}
+                      </Badge>
+                      <span className="font-medium">{s.nodeTitle.slice(0, 30)}...</span>
+                      <ArrowRight className="h-3 w-3 text-primary" />
+                      <span className="text-primary">{formatRelationshipType(selectedType)}</span>
+                      <Badge variant="outline" className="text-xs">AI</Badge>
+                    </div>
                  );
                })}
              {manualConnections
@@ -500,13 +506,15 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
                .map((conn, index) => {
                  const node = existingNodes.find(n => n.id === conn.nodeId);
                  return (
-                   <div key={`manual-${index}`} className="flex items-center gap-2">
-                     <span>{node ? getNodeTypeIcon(node.node_type) : '📄'}</span>
-                     <span className="font-medium">{node ? node.title.slice(0, 30) + '...' : 'Unknown'}</span>
-                     <ArrowRight className="h-3 w-3 text-primary" />
-                     <span className="text-primary">{formatRelationshipType(conn.relationshipType)}</span>
-                     <Badge variant="outline" className="text-xs">Manual</Badge>
-                   </div>
+                    <div key={`manual-${index}`} className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                        {node ? getNodeTypeLabel(node.node_type) : 'Node'}
+                      </Badge>
+                      <span className="font-medium">{node ? node.title.slice(0, 30) + '...' : 'Unknown'}</span>
+                      <ArrowRight className="h-3 w-3 text-primary" />
+                      <span className="text-primary">{formatRelationshipType(conn.relationshipType)}</span>
+                      <Badge variant="outline" className="text-xs">Manual</Badge>
+                    </div>
                  );
                })}
            </div>
