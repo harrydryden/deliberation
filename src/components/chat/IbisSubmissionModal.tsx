@@ -302,48 +302,36 @@ export const IbisSubmissionModal = ({
           </div>
 
           {/* Node Type Selection */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Label htmlFor="nodeType">Type *</Label>
-                {aiSuggestions?.nodeType && formData.nodeType !== aiSuggestions.nodeType && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => applyAiSuggestion('nodeType', aiSuggestions.nodeType)}
-                    className="h-6 text-xs"
-                  >
-                    Use AI suggestion: {aiSuggestions.nodeType}
-                  </Button>
-                )}
-              </div>
-              <Select value={formData.nodeType} onValueChange={(value) => setFormData(prev => ({ ...prev, nodeType: value as NodeType }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select node type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {NODE_TYPE_OPTIONS.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{type.label}</span>
-                        <span className="text-xs text-muted-foreground">{type.description}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              {formData.nodeType && (
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm font-medium">Selected Type</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {getNodeTypeDescription(formData.nodeType)}
-                  </p>
-                </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="nodeType">Type *</Label>
+              {aiSuggestions?.nodeType && formData.nodeType !== aiSuggestions.nodeType && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => applyAiSuggestion('nodeType', aiSuggestions.nodeType)}
+                  className="h-6 text-xs"
+                >
+                  Use AI suggestion: {aiSuggestions.nodeType}
+                </Button>
               )}
             </div>
+            <Select value={formData.nodeType} onValueChange={(value) => setFormData(prev => ({ ...prev, nodeType: value as NodeType }))}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select node type" />
+              </SelectTrigger>
+              <SelectContent>
+                {NODE_TYPE_OPTIONS.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{type.label}</span>
+                      <span className="text-xs text-muted-foreground">{type.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Description Field */}
