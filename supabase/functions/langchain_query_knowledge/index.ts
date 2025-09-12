@@ -1,6 +1,10 @@
 import { serve } from "std/http/server.ts";
 import { createClient } from '@supabase/supabase-js';
-
+import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
+import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase';
+import { PromptTemplate } from '@langchain/core/prompts';
+import { createStuffDocumentsChain } from 'langchain/chains/combine_documents';
+import { createRetrievalChain } from 'langchain/chains/retrieval';
 // Inlined utilities to avoid cross-folder import issues
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -296,9 +300,6 @@ serve(async (req) => {
                      error.message.includes('initialization') ? 'INITIALIZATION' : 
                      error.message.includes('configuration') ? 'CONFIGURATION' : 'PROCESSING';
 
-    return createErrorResponse(error, 500, 'langchain-query-knowledge', {
-      errorType,
-      processingTimeMs: processingTime,
-    });
+    return createErrorResponse(new Error(`(${errorType}) ${error.message}`), 500, 'langchain-query-knowledge');
   }
 });
