@@ -16,6 +16,7 @@ interface IssueRecommendationsProps {
   userContent: string;
   onIssueSelected?: (issueId: string) => void;
   onRelationshipsChange?: (relationships: Array<{id: string, type: string, confidence: number}>) => void;
+  onReset?: () => void;
   className?: string;
 }
 
@@ -24,6 +25,7 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
   userContent,
   onIssueSelected,
   onRelationshipsChange,
+  onReset,
   className = ''
 }) => {
   const { user } = useSupabaseAuth();
@@ -35,10 +37,23 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
 
   const recommendationService = new IssueRecommendationService();
 
-  // Fetch recommendations when content changes
+  // Reset state when reset is called
+  useEffect(() => {
+    if (onReset) {
+      console.log('🔄 IssueRecommendations: Reset called');
+      setSelectedIssues(new Set());
+      setIssueRelationshipTypes(new Map());
+      setRecommendations([]);
+      setError(null);
+    }
+  }, [onReset]);
+
+  // Fetch recommendations when content changes (with debouncing)
   useEffect(() => {
     if (!user?.id || !userContent.trim()) {
       setRecommendations([]);
+      setSelectedIssues(new Set());
+      setIssueRelationshipTypes(new Map());
       return;
     }
 
@@ -67,12 +82,14 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
     };
 
     // Debounce the API call to avoid excessive requests
-    const timeoutId = setTimeout(fetchRecommendations, 500);
+    const timeoutId = setTimeout(fetchRecommendations, 800); // Increased debounce for less aggressive fetching
     return () => clearTimeout(timeoutId);
   }, [user?.id, deliberationId, userContent]);
 
-  // Handle issue selection
+  // Handle issue selection with logging
   const handleIssueSelect = (issueId: string) => {
+    console.log('🎯 IssueRecommendations: Issue selection toggled', { issueId, wasSelected: selectedIssues.has(issueId) });
+    
     const newSelected = new Set(selectedIssues);
     const newRelTypes = new Map(issueRelationshipTypes);
     
@@ -93,24 +110,33 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
     }
   };
 
-  // Handle relationship type change
+  // Handle relationship type change with logging
   const handleRelationshipTypeChange = (issueId: string, relationshipType: string) => {
+    console.log('🔄 IssueRecommendations: Relationship type changed', { issueId, relationshipType });
+    
     const newRelTypes = new Map(issueRelationshipTypes);
     newRelTypes.set(issueId, relationshipType);
     setIssueRelationshipTypes(newRelTypes);
   };
 
-  // Notify parent when relationships change
+  // Notify parent when relationships change with improved logic
   useEffect(() => {
-    if (onRelationshipsChange && (selectedIssues.size > 0 || issueRelationshipTypes.size > 0)) {
+    console.log('📢 IssueRecommendations: Relationships changed', { 
+      selectedCount: selectedIssues.size, 
+      relationshipTypesCount: issueRelationshipTypes.size 
+    });
+    
+    if (onRelationshipsChange) {
       const relationships = Array.from(selectedIssues).map(issueId => ({
         id: issueId,
         type: issueRelationshipTypes.get(issueId) || 'supports',
         confidence: CONFIDENCE_LEVELS.AI_RECOMMENDATION
       }));
+      
+      console.log('📤 IssueRecommendations: Sending relationships to parent:', relationships);
       onRelationshipsChange(relationships);
     }
-  }, [selectedIssues, issueRelationshipTypes]); // Removed onRelationshipsChange dependency
+  }, [selectedIssues, issueRelationshipTypes, onRelationshipsChange]);
 
   // Handle issue creation from recommendation
   const handleCreateFromRecommendation = async (recommendation: IssueRecommendation) => {
@@ -163,8 +189,32 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
         )}
 
         {!isLoading && recommendations.length > 0 && (
-          <div className="space-y-3">
-            {recommendations.map((recommendation) => (
+            <div className="space-y-3">
+              {selectedIssues.size > 0 && (
+                <div className="p-2 bg-primary/10 rounded border border-primary/20">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-primary">Selected for Linking</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        console.log('🗑️ IssueRecommendations: Clearing all selections');
+                        setSelectedIssues(new Set());
+                        setIssueRelationshipTypes(new Map());
+                      }}
+                      className="h-5 text-xs text-muted-foreground hover:text-destructive"
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {selectedIssues.size} issue{selectedIssues.size > 1 ? 's' : ''} selected for connection
+                  </div>
+                </div>
+              )}
+              
+              {recommendations.map((recommendation) => (
               <div
                 key={recommendation.issueId}
                 className={`p-3 border rounded-lg transition-colors ${
@@ -237,7 +287,10 @@ export const IssueRecommendations: React.FC<IssueRecommendationsProps> = ({
             ))}
 
             <div className="text-xs text-muted-foreground text-center pt-2">
-              Select an issue to link your submission, or create a new one
+              {selectedIssues.size > 0 
+                ? `${selectedIssues.size} issue${selectedIssues.size > 1 ? 's' : ''} selected for linking`
+                : 'Select an issue to link your submission, or create a new one'
+              }
             </div>
           </div>
         )}

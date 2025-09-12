@@ -87,13 +87,25 @@ export const IbisSubmissionModal = ({
     isOpen
   );
 
-  // Auto-populate description with message content when modal opens
+  // Reset and populate form when modal opens
   useEffect(() => {
-    if (isOpen && messageContent) {
-      setFormData(prev => ({
-        ...prev,
-        description: messageContent
-      }));
+    if (isOpen) {
+      console.log('📖 IbisSubmissionModal: Modal opened, resetting state');
+      // Clear all relationship states for fresh start
+      setSmartConnections([]);
+      setIssueRecommendations([]);
+      setSimilarNodes([]);
+      setSelectedIssueId(null);
+      setIsLinkingMode(false);
+      setModalKey(Date.now());
+      
+      // Populate description with message content
+      if (messageContent) {
+        setFormData(prev => ({
+          ...prev,
+          description: messageContent
+        }));
+      }
     }
   }, [isOpen, messageContent]);
 
@@ -116,6 +128,7 @@ export const IbisSubmissionModal = ({
   }, [aiSuggestions]);
 
   const resetForm = () => {
+    console.log('🔄 IbisSubmissionModal: Resetting form state');
     setFormData({
       title: '',
       description: messageContent,
@@ -123,9 +136,17 @@ export const IbisSubmissionModal = ({
       parentNodeId: ''
     });
     setSmartConnections([]);
+    setIssueRecommendations([]);
+    setSimilarNodes([]);
     setSelectedIssueId(null);
     setIsLinkingMode(false);
+    
+    // Reset child components via refs or state
+    setModalKey(Date.now()); // Force re-render to reset child states
   };
+
+  // Add modal key for forced resets
+  const [modalKey, setModalKey] = useState(Date.now());
 
   const loadExistingNodes = async () => {
     try {
@@ -376,10 +397,12 @@ export const IbisSubmissionModal = ({
 
           {/* Issue Recommendations - AI-powered with relationship types */}
           <IssueRecommendations
+            key={`issue-rec-${modalKey}`}
             deliberationId={deliberationId}
             userContent={messageContent}
             onIssueSelected={handleIssueSelected}
             onRelationshipsChange={handleIssueRecommendationsChange}
+            onReset={() => setIssueRecommendations([])}
             className="mb-4"
           />
 
@@ -391,11 +414,13 @@ export const IbisSubmissionModal = ({
                 <Badge variant="outline">Smart + Manual</Badge>
               </div>
               <EnhancedRelationshipSelector
+                key={`enhanced-rel-${modalKey}`}
                 deliberationId={deliberationId}
                 content={messageContent}
                 title={formData.title}
                 nodeType={formData.nodeType as 'issue' | 'position' | 'argument'}
                 onRelationshipsChange={handleSmartConnectionsChange}
+                onReset={() => setSmartConnections([])}
               />
             </div>
           ) : (
@@ -413,16 +438,56 @@ export const IbisSubmissionModal = ({
             />
           )}
 
-          {/* Relationship Summary */}
+          {/* Enhanced Relationship Summary with User Control */}
           {selectedRelationships.length > 0 && (
-            <div className="p-3 bg-muted rounded-lg">
-              <Label className="text-sm font-medium">Selected Relationships ({selectedRelationships.length})</Label>
-              <div className="mt-2 space-y-1">
+            <div className="p-3 bg-muted rounded-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Selected Relationships ({selectedRelationships.length})</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    console.log('🗑️ IbisSubmissionModal: Clearing all relationships');
+                    setSmartConnections([]);
+                    setIssueRecommendations([]);
+                  }}
+                  className="h-6 text-xs text-muted-foreground hover:text-destructive"
+                >
+                  Clear All
+                </Button>
+              </div>
+              
+              <div className="space-y-2">
                 {selectedRelationships.map((rel, index) => {
                   const node = existingNodes.find(n => n.id === rel.id);
+                  const isFromIssueRec = issueRecommendations.some(ir => ir.id === rel.id);
                   return (
-                    <div key={`${rel.id}-${rel.type}-${index}`} className="text-xs text-muted-foreground">
-                      {rel.type} → {node?.title || 'Unknown node'}
+                    <div key={`${rel.id}-${rel.type}-${index}`} className="flex items-center justify-between p-2 bg-background rounded border">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={isFromIssueRec ? "secondary" : "outline"} className="text-xs">
+                          {isFromIssueRec ? "AI Issue" : "AI Connect"}
+                        </Badge>
+                        <span className="text-sm font-medium">{rel.type}</span>
+                        <span className="text-xs text-muted-foreground">→</span>
+                        <span className="text-sm">{node?.title || 'Unknown node'}</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          console.log('🗑️ IbisSubmissionModal: Removing relationship', rel);
+                          if (isFromIssueRec) {
+                            setIssueRecommendations(prev => prev.filter(ir => ir.id !== rel.id));
+                          } else {
+                            setSmartConnections(prev => prev.filter(sc => sc.id !== rel.id));
+                          }
+                        }}
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      >
+                        ✕
+                      </Button>
                     </div>
                   );
                 })}
