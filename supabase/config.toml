@@ -96,9 +96,6 @@ import_map = "./supabase/functions/voice-to-text/import_map.json"
 verify_jwt = false
 import_map = "./supabase/functions/realtime-session/import_map.json"
 
-[functions.admin-get-users]
-verify_jwt = true
-import_map = "./supabase/functions/admin-get-users/import_map.json"
 
 [functions.link-similar-ibis-issues]
 verify_jwt = true
