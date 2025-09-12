@@ -257,20 +257,12 @@ async function processOrchestration(
       stream: false
     };
 
-    // CRITICAL: Convert character limit to proper token count with larger budget
-    const characterLimit = selectedAgent.max_response_characters || 2000;
-    const tokenLimit = Math.floor(characterLimit / 2); // Less conservative 2:1 ratio for more response space
-    
-    // Add proper token limits based on model type
-    if (selectedModel.startsWith('gpt-5') || selectedModel.startsWith('gpt-4.1') || selectedModel.startsWith('o3') || selectedModel.startsWith('o4')) {
-      openAIRequest.max_completion_tokens = tokenLimit;
-      // Note: Temperature not supported for newer models
-    } else {
-      openAIRequest.max_tokens = tokenLimit;
+    // Add temperature for legacy models only (newer models don't support it)
+    if (!selectedModel.startsWith('gpt-5') && !selectedModel.startsWith('gpt-4.1') && !selectedModel.startsWith('o3') && !selectedModel.startsWith('o4')) {
       openAIRequest.temperature = 0.7;
     }
 
-    console.log(`📤 [PHASE4] OpenAI request configured - model: ${openAIRequest.model}, tokens: ${tokenLimit} (${characterLimit} chars), max_tokens: ${openAIRequest.max_tokens || openAIRequest.max_completion_tokens}`);
+    console.log(`📤 [PHASE4] OpenAI request configured - model: ${openAIRequest.model} (no token limits, relying on system prompt character guidance)`);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -302,23 +294,17 @@ async function processOrchestration(
       ? data.choices[0]?.message?.content || ''
       : '';
 
-    // Handle empty responses with retry logic
+    // Handle empty responses with retry logic  
     if (!fullResponse || (data.choices?.[0]?.finish_reason === 'length' && fullResponse.length < 10)) {
       console.warn(`⚠️ [PHASE4] Empty/truncated OpenAI response detected - finish_reason: ${data.choices?.[0]?.finish_reason}`);
       
-      // Try one immediate retry with stricter instructions for length-constrained responses
+      // Try one immediate retry with enhanced instructions
       if (data.choices?.[0]?.finish_reason === 'length') {
-        console.log(`🔄 [PHASE4] Retrying with increased token limit for length-constrained response`);
+        console.log(`🔄 [PHASE4] Retrying with enhanced completion instructions`);
         
         const enhancedRequest = { ...openAIRequest };
-        // Double the token limit for retry
-        if (selectedModel.startsWith('gpt-5') || selectedModel.startsWith('gpt-4.1') || selectedModel.startsWith('o3') || selectedModel.startsWith('o4')) {
-          enhancedRequest.max_completion_tokens = tokenLimit * 2;
-        } else {
-          enhancedRequest.max_tokens = tokenLimit * 2;
-        }
         
-        // Add strict length instruction to system prompt
+        // Add strict completion instruction to system prompt
         enhancedRequest.messages[0].content += `\n\nCRITICAL: You MUST provide a complete response. Do not stop mid-sentence. Prioritize essential information and be concise but complete.`;
         
         try {
