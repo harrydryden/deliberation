@@ -146,7 +146,7 @@ export const KnowledgeManagement = ({ agents, loading, onLoad }: KnowledgeManage
       }
       
       // Use the robust PDF processor function
-      const processingFunction = 'robust_pdf_processor';
+      const processingFunction = 'pdf_processor';
       logger.component.update('KnowledgeManagement', { action: 'processingStart', function: processingFunction });
       
       logger.info('KnowledgeManagement: About to call edge function...');
