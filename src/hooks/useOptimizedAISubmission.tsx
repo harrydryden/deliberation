@@ -86,7 +86,7 @@ export const useOptimizedAISubmission = () => {
       async () => {
         const { supabase } = await import('@/integrations/supabase/client');
         
-        const { data, error } = await supabase.functions.invoke('evaluate_ibis_relationships', {
+        const { data, error } = await supabase.functions.invoke('relationship_evaluator', {
           body: {
             deliberationId,
             content,

@@ -89,7 +89,7 @@ export const EnhancedRelationshipSelector: React.FC<EnhancedRelationshipSelector
     
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('evaluate_ibis_relationships', {
+      const { data, error } = await supabase.functions.invoke('relationship_evaluator', {
         body: {
           deliberationId,
           content: content || title,

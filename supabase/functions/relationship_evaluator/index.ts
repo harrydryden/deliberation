@@ -1,6 +1,7 @@
 import { serve } from "std/http/server.ts";
 import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
+// touch: trigger redeploy
 
 // Inlined utilities to avoid cross-folder import issues
 const corsHeaders = {

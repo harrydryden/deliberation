@@ -20,7 +20,7 @@ port = 54324
 verify_jwt = true
 import_map = "functions/import_map.json"
 
-[functions.evaluate_ibis_relationships]
+[functions.relationship_evaluator]
 verify_jwt = true
 import_map = "functions/import_map.json"
 
