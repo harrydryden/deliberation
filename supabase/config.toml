@@ -16,64 +16,49 @@ port = 54323
 enabled = true
 port = 54324
 
-# Canonical function entries (each with its own import map)
-[functions.pdf_processor]
-verify_jwt = true
-import_map = "./supabase/functions/pdf_processor/import_map.json"
-
-[functions.relationship_evaluator]
-verify_jwt = true
-import_map = "./supabase/functions/relationship_evaluator/import_map.json"
-
-[functions.realtime_session]
-verify_jwt = false
-import_map = "./supabase/functions/realtime_session/import_map.json"
-
-[functions.admin_get_users]
-verify_jwt = true
-import_map = "./supabase/functions/admin_get_users/import_map.json"
-
+# Edge Functions
 [functions.admin_get_users_v2]
 verify_jwt = true
-import_map = "./supabase/functions/admin_get_users_v2/import_map.json"
 
 [functions.agent_orchestration_stream]
 verify_jwt = true
-import_map = "./supabase/functions/agent_orchestration_stream/import_map.json"
-
-[functions.classify_message]
-verify_jwt = true
-import_map = "./supabase/functions/classify_message/import_map.json"
-
-[functions.ibis_embeddings]
-verify_jwt = true
-import_map = "./supabase/functions/ibis_embeddings/import_map.json"
-
-[functions.link_similar_ibis_issues]
-verify_jwt = true
-import_map = "./supabase/functions/link_similar_ibis_issues/import_map.json"
-
-[functions.generate_notion_statement]
-verify_jwt = true
-import_map = "./supabase/functions/generate_notion_statement/import_map.json"
-
-[functions.knowledge_query]
-verify_jwt = true
-import_map = "./supabase/functions/knowledge_query/import_map.json"
-
-[functions.voice_to_text]
-verify_jwt = true
-import_map = "./supabase/functions/voice_to_text/import_map.json"
-
-[functions.generate_issue_recommendations]
-verify_jwt = true
-import_map = "./supabase/functions/generate_issue_recommendations/import_map.json"
-
-[functions.generate_proactive_prompt]
-verify_jwt = true
-import_map = "./supabase/functions/generate_proactive_prompt/import_map.json"
 
 [functions.calculate_user_stance]
 verify_jwt = true
-import_map = "./supabase/functions/calculate_user_stance/import_map.json"
+
+[functions.classify_message]
+verify_jwt = true
+
+[functions.generate_agent_response]
+verify_jwt = true
+
+[functions.generate_issue_recommendations]
+verify_jwt = true
+
+[functions.generate_notion_statement]
+verify_jwt = true
+
+[functions.generate_proactive_prompt]
+verify_jwt = true
+
+[functions.ibis_embeddings]
+verify_jwt = true
+
+[functions.knowledge_query]
+verify_jwt = true
+
+[functions.link_similar_ibis_issues]
+verify_jwt = true
+
+[functions.pdf_processor]
+verify_jwt = true
+
+[functions.realtime_session]
+verify_jwt = false
+
+[functions.relationship_evaluator]
+verify_jwt = true
+
+[functions.voice_to_text]
+verify_jwt = true
 

@@ -36,7 +36,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const lastLoadedDeliberationRef = useRef<string | null>(null);
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { triggerAgentOrchestration } = useAgentOrchestrationTrigger();
+  const { triggerAgentResponse } = useAgentOrchestrationTrigger();
   const realtimeConnection = useRealtimeConnection(deliberationId);
   
   // Initialize recovery system for the queue
@@ -223,7 +223,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       
       // Trigger agent orchestration after message is saved and verified
       try {
-        await triggerAgentOrchestration(saved.id, deliberationId, queuedMessage.mode, setTypingState);
+        await triggerAgentResponse(saved.id, deliberationId);
         
         logger.info(' Agent orchestration completed successfully', { 
           messageId: queuedMessage.id,
@@ -281,7 +281,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       
       logger.error('Failed to process queued message', error as Error);
     }
-  }, [user, deliberationId, messageQueue, messageService, toast, triggerAgentOrchestration, setTypingState]);
+  }, [user, deliberationId, messageQueue, messageService, toast, triggerAgentResponse, setTypingState]);
 
   // Event-driven queue processor - triggers when queue changes
   useEffect(() => {
