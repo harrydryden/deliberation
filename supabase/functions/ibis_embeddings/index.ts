@@ -2,6 +2,9 @@ import "https://deno.land/x/xhr@0.3.0/mod.ts";
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.53.1";
 import { OpenAIEmbeddings } from "https://esm.sh/@langchain/openai@0.6.3";
+import { lazy } from "https://esm.sh/react@18.2.0";
+import { Route } from "https://esm.sh/react-router-dom@6.18.0";
+import { AuthGuard } from "./components/AuthGuard";
 
 // ============================================================================
 // SOPHISTICATED IBIS EMBEDDINGS WITH SHARED FUNCTIONALITY INLINED
@@ -26,19 +29,19 @@ class EdgeLogger {
   }
 
   static debug(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('DEBUG', message, data));
   }
 
   static info(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('INFO', message, data));
   }
 
   static warn(message: string, data?: any): void {
-    );
+    console.warn(this.formatMessage('WARN', message, data));
   }
 
   static error(message: string, data?: any): void {
-    );
+    console.error(this.formatMessage('ERROR', message, data));
   }
 }
 
@@ -489,42 +492,10 @@ serve(async (req) => {
       processedCount: result.processedCount
     });
 
-    return createSuccessResponse({
-      ...result,
-      response_format: JSON.stringify({
-        success: true,
-        timestamp: new Date().toISOString(),
-        requestId: crypto.randomUUID(),
-        processingTimeMs: Date.now() - startTime
-      })
-    });
+    return createSuccessResponse(result);
 
   } catch (error) {
-    EdgeLogger.error('Service error', error);
-    
-    // Fallback response when service fails
-    const fallbackResponse = {
-      success: false,
-      error: 'Service temporarily unavailable',
-      fallback: {
-        message: 'Service is currently unavailable. Please try again later.',
-        metadata: {
-          processingTimeMs: Date.now() - startTime,
-          requestId: crypto.randomUUID(),
-          version: '2.0.0',
-          fallbackReason: error.message || 'Unknown error'
-        },
-        response_format: JSON.stringify({
-          success: false,
-          timestamp: new Date().toISOString(),
-          requestId: crypto.randomUUID(),
-          processingTimeMs: Date.now() - startTime,
-          fallback: true,
-          error: error.message
-        })
-      }
-    };
-    
-    return createSuccessResponse(fallbackResponse);
+    EdgeLogger.error('IBIS embeddings error', error);
+    return createErrorResponse(error, 500, 'IBIS embeddings');
   }
 });
