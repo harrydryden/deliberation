@@ -64,7 +64,53 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
           throw new Error(response.error?.message || response.data?.error || 'Edge function returned invalid data');
         }
 
-        return response.data.users;
+        const rawUsers = response.data.users as any[];
+
+        // Enrich with profiles and deliberations to expose access codes and participation
+        const [profilesRes, participantsRes, deliberationsRes] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('id, user_role, access_code_1, access_code_2, is_archived, archived_at, archived_by, archive_reason'),
+          supabase
+            .from('participants')
+            .select('user_id, deliberation_id, role'),
+          supabase
+            .from('deliberations')
+            .select('id, title')
+        ]);
+
+        const profiles = profilesRes.data || [];
+        const participants = participantsRes.data || [];
+        const allDeliberations = deliberationsRes.data || [];
+
+        const profileById = new Map(profiles.map((p: any) => [p.id, p]));
+        const titleByDelibId = new Map(allDeliberations.map((d: any) => [d.id, d.title]));
+        const delibsByUser = new Map<string, { id: string; title: string; role: string }[]>();
+
+        participants.forEach((p: any) => {
+          const list = delibsByUser.get(p.user_id) || [];
+          const title = titleByDelibId.get(p.deliberation_id);
+          if (title) list.push({ id: p.deliberation_id, title, role: p.role || 'participant' });
+          delibsByUser.set(p.user_id, list);
+        });
+
+        return rawUsers.map((u: any) => {
+          const prof = profileById.get(u.id);
+          return {
+            id: u.id,
+            email: u.email ?? null,
+            role: prof?.user_role ?? u.role ?? 'user',
+            accessCode1: prof?.access_code_1 ?? null,
+            accessCode2: prof?.access_code_2 ?? null,
+            isArchived: prof?.is_archived ?? false,
+            archivedAt: prof?.archived_at ?? null,
+            archivedBy: prof?.archived_by ?? null,
+            archiveReason: prof?.archive_reason ?? null,
+            deliberations: delibsByUser.get(u.id) || [],
+            createdAt: u.created_at ?? u.createdAt ?? null,
+            lastSignInAt: u.last_sign_in_at ?? u.lastSignInAt ?? null
+          };
+        });
       } catch (e) {
         // Fallback: degrade gracefully to profiles list so Admin stays usable
         logger.warn('admin_get_users_v2 failed, falling back to client-side profiles fetch', e as any);
@@ -79,26 +125,28 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
         // Attempt to enrich with deliberations (best-effort)
         const { data: participants } = await supabase
           .from('participants')
-          .select('user_id, deliberation_id');
+          .select('user_id, deliberation_id, role');
         const { data: deliberations } = await supabase
           .from('deliberations')
           .select('id, title');
-        const delibTitleById = new Map((deliberations || []).map(d => [d.id, d.title]));
-        const delibsByUser = new Map<string, string[]>();
-        (participants || []).forEach(p => {
+        const titleById = new Map((deliberations || []).map((d: any) => [d.id, d.title]));
+        const delibsByUser = new Map<string, { id: string; title: string; role: string }[]>();
+        (participants || []).forEach((p: any) => {
           const arr = delibsByUser.get(p.user_id) || [];
-          const title = delibTitleById.get(p.deliberation_id);
-          if (title) arr.push(title);
+          const title = titleById.get(p.deliberation_id);
+          if (title) arr.push({ id: p.deliberation_id, title, role: p.role || 'participant' });
           delibsByUser.set(p.user_id, arr);
         });
-        return (profiles || []).map(p => ({
+        return (profiles || []).map((p: any) => ({
           id: p.id,
           email: null,
           role: p.user_role,
-          access_codes: [p.access_code_1, p.access_code_2].filter(Boolean),
-          created_at: p.created_at,
-          last_sign_in: null,
-          email_confirmed: null,
+          accessCode1: p.access_code_1 ?? null,
+          accessCode2: p.access_code_2 ?? null,
+          isArchived: p.is_archived ?? false,
+          archivedAt: p.archived_at ?? null,
+          archivedBy: p.archived_by ?? null,
+          archiveReason: p.archive_reason ?? null,
           deliberations: delibsByUser.get(p.id) || []
         }));
       }
