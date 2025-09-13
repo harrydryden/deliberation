@@ -68,19 +68,19 @@ class EdgeLogger {
   }
 
   static debug(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('DEBUG', message, data));
   }
 
   static info(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('INFO', message, data));
   }
 
   static warn(message: string, data?: any): void {
-    );
+    console.warn(this.formatMessage('WARN', message, data));
   }
 
   static error(message: string, data?: any): void {
-    );
+    console.error(this.formatMessage('ERROR', message, data));
   }
 }
 
@@ -794,7 +794,7 @@ class AgentOrchestrator {
         const standardMatch = agentConfig.response_style.match(/Keep responses to no more than (\d+) characters/);
         if (standardMatch) {
           const characterLimit = parseInt(standardMatch[1]);
-          prompt += `\n\n CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
+          prompt += `\n\n⚠️ CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
         }
       }
       
@@ -826,7 +826,7 @@ class AgentOrchestrator {
       }
       
       if (characterLimit && !prompt.includes('CRITICAL: Your response must be NO MORE THAN')) {
-        prompt += `\n\n CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
+        prompt += `\n\n⚠️ CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
       }
     }
 

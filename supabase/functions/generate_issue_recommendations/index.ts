@@ -24,19 +24,19 @@ class EdgeLogger {
   }
 
   static debug(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('DEBUG', message, data));
   }
 
   static info(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('INFO', message, data));
   }
 
   static warn(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('WARN', message, data));
   }
 
   static error(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('ERROR', message, data));
   }
 }
 
@@ -558,8 +558,8 @@ serve(async (req) => {
     // Add metadata to error response
     const errorResponse = createErrorResponse(error, 500, 'issue recommendations');
     const errorData = await errorResponse.json();
-    
-    return createSuccessResponse({
+
+    return createSuccessResponse({ 
       ...errorData,
       metadata: {
         processingTimeMs: Date.now() - startTime,

@@ -24,19 +24,19 @@ class EdgeLogger {
   }
 
   static debug(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('DEBUG', message, data));
   }
 
   static info(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('INFO', message, data));
   }
 
   static warn(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('WARN', message, data));
   }
 
   static error(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('ERROR', message, data));
   }
 }
 
@@ -365,13 +365,13 @@ function createErrorResponse(error: any, status: number = 500, context?: string)
   EdgeLogger.error(`${context || 'Edge Function'} Error`, { errorId, error: error?.message });
   
   return new Response(
-    JSON.stringify({
+    JSON.stringify({ 
       error: error?.message || 'An unexpected error occurred',
       errorId,
       context,
       timestamp: new Date().toISOString()
     }),
-    {
+    { 
       status,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     }
@@ -381,7 +381,7 @@ function createErrorResponse(error: any, status: number = 500, context?: string)
 function createSuccessResponse(data: any): Response {
   return new Response(
     JSON.stringify(data),
-    {
+    { 
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     }
   );
@@ -493,7 +493,7 @@ serve(async (req) => {
     // Add metadata to error response
     const errorResponse = createErrorResponse(error, 500, 'admin user retrieval');
     const errorData = await errorResponse.json();
-    
+
     return createSuccessResponse({
       ...errorData,
       response_format: JSON.stringify({
