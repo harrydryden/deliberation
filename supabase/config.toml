@@ -33,6 +33,10 @@ import_map = "./supabase/functions/realtime_session/import_map.json"
 verify_jwt = true
 import_map = "./supabase/functions/admin_get_users/import_map.json"
 
+[functions.admin_get_users_v2]
+verify_jwt = true
+import_map = "./supabase/functions/admin_get_users_v2/import_map.json"
+
 [functions.agent_orchestration_stream]
 verify_jwt = true
 import_map = "./supabase/functions/agent_orchestration_stream/import_map.json"
