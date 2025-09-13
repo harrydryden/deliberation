@@ -27,19 +27,18 @@ export const useProductionHealthMonitor = (enabled: boolean = true) => {
     if (!isMonitoring) {
       // Start monitoring with 60 second intervals in production
       const intervalMs = process.env.NODE_ENV === 'production' ? 60000 : 30000;
-      healthMonitor.startMonitoring(intervalMs);
+      healthMonitor.startMonitoring();
       setIsMonitoring(true);
       logger.info('Health monitoring started', { intervalMs });
     }
 
     // Initial health check
-    healthMonitor.forceHealthCheck().then(() => {
-      setHealthStatus(healthMonitor.getHealthStatus());
-    });
+    const healthResult = healthMonitor.forceHealthCheck();
+    setHealthStatus(healthResult as any);
 
     // Set up periodic status updates
     const statusInterval = setInterval(() => {
-      setHealthStatus(healthMonitor.getHealthStatus());
+    setHealthStatus(healthMonitor.getHealthStatus() as any);
     }, 30000); // Update UI every 30 seconds
 
     return () => {
@@ -58,8 +57,8 @@ export const useProductionHealthMonitor = (enabled: boolean = true) => {
   }, []);
 
   const forceHealthCheck = async () => {
-    await healthMonitor.forceHealthCheck();
-    setHealthStatus(healthMonitor.getHealthStatus());
+    const result = healthMonitor.forceHealthCheck();
+    setHealthStatus(result as any);
   };
 
   return {

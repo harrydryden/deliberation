@@ -30,7 +30,7 @@ export class AdminRepository extends SupabaseBaseRepository implements IAdminRep
         activeDeliberations: data.activeDeliberations || 0,
       };
 
-      logger.info({ stats }, 'System stats retrieved successfully via RPC');
+      logger.info('Admin stats retrieved successfully');
       return stats;
     } catch (error) {
       logger.error({ error }, 'Admin repository getSystemStats failed');
@@ -50,7 +50,7 @@ export class AdminRepository extends SupabaseBaseRepository implements IAdminRep
         throw error;
       }
 
-      logger.info({ deliberationId }, 'Deliberation messages cleared successfully');
+      logger.info('Deliberation messages cleared successfully');
     } catch (error) {
       logger.error({ error, deliberationId }, 'Admin repository clearDeliberationMessages failed');
       throw error;
@@ -93,7 +93,7 @@ export class AdminRepository extends SupabaseBaseRepository implements IAdminRep
         throw nodesError;
       }
 
-      logger.info({ deliberationId }, 'Deliberation IBIS data cleared successfully');
+      logger.info('Deliberation IBIS data cleared successfully');
     } catch (error) {
       logger.error({ error, deliberationId }, 'Admin repository clearDeliberationIbis failed');
       throw error;

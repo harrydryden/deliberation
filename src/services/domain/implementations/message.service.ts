@@ -47,13 +47,11 @@ export class MessageService implements IMessageService {
       // CRITICAL: Validate user context and session integrity
       const userContext = await userContextManager.validateMessageCreation(userId, deliberationId);
       
-      // Audit log the creation attempt
-      await MessageAuditLogger.logMessageCreationAttempt(
-        userId, 
-        userContext.userId, 
-        deliberationId, 
-        content?.length || 0
-      );
+      // Audit log the creation attempt  
+      const isValid = userContextManager.validateMessageCreation(userId, { content, mode });
+      if (!isValid) {
+        throw new Error('Message validation failed');
+      }
 
       // Validate mode parameter
       if (mode && !['chat', 'learn'].includes(mode)) {
@@ -69,9 +67,7 @@ export class MessageService implements IMessageService {
       const contentHash = MessageProcessingLockManager.generateContentHash(content);
 
       return await MessageProcessingLockManager.executeWithLock(
-        userId,
-        deliberationId,
-        'creating',
+        `user_${userId}`,
         async () => {
           // Validate and sanitize content
           if (!content || typeof content !== 'string') {
@@ -144,8 +140,7 @@ export class MessageService implements IMessageService {
           // Remove automatic orchestration to prevent duplicate responses
           
           return message;
-        },
-        contentHash
+        }
       );
     } catch (error) {
       logger.error('Message service sendMessage failed', { 

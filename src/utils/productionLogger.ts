@@ -104,3 +104,13 @@ class ProductionLogger {
 }
 
 export const logger = new ProductionLogger();
+export const productionLogger = logger;
+
+// Legacy component logger for gradual migration
+export const createComponentLogger = (context: string) => ({
+  log: (message: string, data?: any) => logger.info(`[${context}] ${message}`, data),
+  info: (message: string, data?: any) => logger.info(`[${context}] ${message}`, data),
+  debug: (message: string, data?: any) => logger.debug(`[${context}] ${message}`, data),
+  warn: (message: string, data?: any) => logger.warn(`[${context}] ${message}`, data),
+  error: (message: string, error?: any, data?: any) => logger.error(`[${context}] ${message}`, error, data),
+});
