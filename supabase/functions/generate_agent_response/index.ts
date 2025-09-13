@@ -19,16 +19,16 @@ class EdgeLogger {
     const dataStr = data ? ` | ${JSON.stringify(data)}` : '';
     return `[${timestamp}] [${level}] ${message}${dataStr}`;
   }
-  static debug(message, data) {
+  static debug(message: string, data?: any): void {
     console.log(this.formatMessage('DEBUG', message, data));
   }
-  static info(message, data) {
+  static info(message: string, data?: any): void {
     console.log(this.formatMessage('INFO', message, data));
   }
-  static warn(message, data) {
+  static warn(message: string, data?: any): void {
     console.log(this.formatMessage('WARN', message, data));
   }
-  static error(message, data) {
+  static error(message: string, data?: any): void {
     console.error(this.formatMessage('ERROR', message, data));
   }
 }
