@@ -1136,7 +1136,8 @@ serve(async (req) => {
       messageId, 
       deliberationId,
       conversationContext = {},
-      mode = 'chat'
+      mode = 'chat',
+      debug = false
     } = requestBody;
 
     let message = rawMessage;
@@ -1192,14 +1193,56 @@ serve(async (req) => {
     );
     EdgeLogger.info('Agent selected', { selectedAgentType });
 
-    // Get agent configuration
-    const agentConfig = await orchestrator.getAgentConfig(selectedAgentType, deliberationId);
-    if (!agentConfig) {
-      return createErrorResponse(
-        new Error(`No active configuration found for agent type: ${selectedAgentType}`),
-        404,
-        'Agent configuration'
-      );
+    // Get agent configuration (fresh fetch in debug mode to bypass cache)
+    let agentConfig: any = null;
+    let debugInfo: any = undefined;
+
+    if (debug) {
+      const { data: localAgent } = await serviceClient
+        .from('agent_configurations')
+        .select('id, name, description, agent_type, goals, response_style, is_active, is_default, deliberation_id, prompt_overrides, facilitator_config, preferred_model')
+        .eq('deliberation_id', deliberationId)
+        .eq('agent_type', selectedAgentType)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      const { data: globalAgent } = await serviceClient
+        .from('agent_configurations')
+        .select('id, name, description, agent_type, goals, response_style, is_active, is_default, deliberation_id, prompt_overrides, facilitator_config, preferred_model')
+        .eq('agent_type', selectedAgentType)
+        .eq('is_default', true)
+        .is('deliberation_id', null)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      const usedSource = localAgent ? 'local' : 'global';
+      agentConfig = localAgent || globalAgent;
+
+      if (!agentConfig) {
+        return createErrorResponse(
+          new Error(`No active configuration found for agent type: ${selectedAgentType}`),
+          404,
+          'Agent configuration'
+        );
+      }
+
+      debugInfo = {
+        deliberationId,
+        selectedAgentType,
+        localAgent: localAgent ? { id: localAgent.id, name: localAgent.name } : null,
+        globalAgent: globalAgent ? { id: globalAgent.id, name: globalAgent.name } : null,
+        usedAgentSource: usedSource
+      };
+    } else {
+      const fetched = await orchestrator.getAgentConfig(selectedAgentType, deliberationId);
+      if (!fetched) {
+        return createErrorResponse(
+          new Error(`No active configuration found for agent type: ${selectedAgentType}`),
+          404,
+          'Agent configuration'
+        );
+      }
+      agentConfig = fetched;
     }
 
     // Generate sophisticated system prompt
@@ -1208,6 +1251,45 @@ serve(async (req) => {
       conversationContext,
       deliberationId
     });
+
+    // Enrich debug info with prompt/template details
+    if (debug) {
+      let templateSource: 'local' | 'global' | 'none' = 'none';
+      // Check for deliberation-specific template
+      const { data: localTemplate } = await serviceClient
+        .from('prompt_templates')
+        .select('id')
+        .eq('category', 'system_prompt')
+        .ilike('name', `%${selectedAgentType}%`)
+        .eq('deliberation_id', deliberationId)
+        .eq('is_active', true)
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (localTemplate) {
+        templateSource = 'local';
+      } else {
+        const { data: globalTemplate } = await serviceClient
+          .from('prompt_templates')
+          .select('id')
+          .eq('category', 'system_prompt')
+          .ilike('name', `%${selectedAgentType}%`)
+          .is('deliberation_id', null)
+          .eq('is_active', true)
+          .order('version', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (globalTemplate) templateSource = 'global';
+      }
+
+      debugInfo = {
+        ...debugInfo,
+        promptOverrideUsed: Boolean(agentConfig?.prompt_overrides?.system_prompt),
+        templateSource,
+        systemPromptPreview: systemPrompt ? String(systemPrompt).slice(0, 400) : ''
+      };
+    }
 
     // Select optimal model
     const selectedModel = orchestrator.selectOptimalModel(analysis, agentConfig);
@@ -1248,7 +1330,8 @@ serve(async (req) => {
           agentSelectionTime: Date.now() - startTime - (analysis.processingTime || 0),
           totalProcessingTime: Date.now() - startTime
         }
-      }
+      },
+      debugInfo
     };
 
     EdgeLogger.info('Orchestration completed successfully', {

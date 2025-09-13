@@ -32,7 +32,8 @@ export function useAgentOrchestrationTrigger() {
         const requestBody: any = {
           messageId,
           deliberationId,
-          mode
+          mode,
+          debug: true
         };
         
         // Include message content if available for better reliability
@@ -52,6 +53,13 @@ export function useAgentOrchestrationTrigger() {
         }
 
         finalOrchestrationResult = orchData;
+
+        if (orchData?.debugInfo) {
+          const used = orchData.debugInfo.usedAgentSource || 'unknown';
+          const agentName = orchData?.selectedAgent?.name || orchData?.debugInfo?.localAgent?.name || 'Unknown agent';
+          toast.message(`Agent selected: ${agentName} (${used})`);
+          console.info('Agent orchestration debug:', orchData.debugInfo);
+        }
       }
 
       // Then call generate_agent_response with the orchestration result
@@ -63,7 +71,8 @@ export function useAgentOrchestrationTrigger() {
             messageId,
             deliberationId,
             message: messageContent,
-            mode
+            mode,
+            debug: true
           }
         }
       );
