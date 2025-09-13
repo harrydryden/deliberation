@@ -633,7 +633,8 @@ class AgentOrchestrator {
     analysis: AnalysisResult, 
     conversationContext: ConversationContext,
     deliberationId?: string,
-    availableKnowledge?: Record<string, boolean>
+    availableKnowledge?: Record<string, boolean>,
+    mode: 'chat' | 'learn' = 'chat'
   ): Promise<string> {
     const agentTypes = ['bill_agent', 'peer_agent', 'flow_agent'];
     const agentConfigs = new Map<string, AgentConfig | null>();
@@ -678,6 +679,12 @@ class AgentOrchestrator {
     );
     
     EdgeLogger.info(`Request flags - isParticipantRequest: ${isParticipantRequest}, isQuestion: ${isQuestion}`);
+
+    // Force bill agent selection for learn mode (Policy Q&A)
+    if (mode === 'learn') {
+      EdgeLogger.info('LEARN MODE: Forcing bill_agent selection for Policy Q&A');
+      return 'bill_agent';
+    }
 
     const factors = {
       complexity: analysis.complexity || 0.5,
@@ -835,7 +842,7 @@ class AgentOrchestrator {
           .from('prompt_templates')
           .select('template_text, variables')
           .eq('category', 'system_prompt')
-          .eq('agent_type', agentType)
+          .ilike('name', `%${agentType}%`)
           .eq('deliberation_id', deliberationId)
           .eq('is_active', true)
           .order('version', { ascending: false })
@@ -852,7 +859,7 @@ class AgentOrchestrator {
         .from('prompt_templates')
         .select('template_text, variables')
         .eq('category', 'system_prompt')
-        .eq('agent_type', agentType)
+        .ilike('name', `%${agentType}%`)
         .is('deliberation_id', null)
         .eq('is_active', true)
         .order('version', { ascending: false })
@@ -1165,7 +1172,9 @@ serve(async (req) => {
     const selectedAgentType = await orchestrator.selectOptimalAgent(
       analysis, 
       conversationContext, 
-      deliberationId
+      deliberationId,
+      undefined,
+      mode
     );
     EdgeLogger.info('Agent selected', { selectedAgentType });
 

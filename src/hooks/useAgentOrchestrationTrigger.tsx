@@ -15,7 +15,8 @@ export function useAgentOrchestrationTrigger() {
     messageId: string,
     deliberationId: string,
     orchestrationResult?: any,
-    messageContent?: string
+    messageContent?: string,
+    mode: 'chat' | 'learn' = 'chat'
   ): Promise<AgentOrchestrationResult> => {
     if (isLoading) {
       return { success: false, error: 'Agent orchestration already in progress' };
@@ -30,7 +31,8 @@ export function useAgentOrchestrationTrigger() {
       if (!finalOrchestrationResult) {
         const requestBody: any = {
           messageId,
-          deliberationId
+          deliberationId,
+          mode
         };
         
         // Include message content if available for better reliability
@@ -60,7 +62,8 @@ export function useAgentOrchestrationTrigger() {
             orchestrationResult: finalOrchestrationResult,
             messageId,
             deliberationId,
-            message: messageContent
+            message: messageContent,
+            mode
           }
         }
       );
