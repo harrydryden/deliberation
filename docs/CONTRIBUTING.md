@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thank you for considering contributing to the Democratic Deliberation Platform! This guide will help you get started with contributing to the project.
+Thank you for considering contributing to the Democratic Deliberation Platform! This guide will help you get started with contributing to the project. We're excited to have you join our community.
 
 ## Table of Contents
 
@@ -14,9 +14,9 @@ Thank you for considering contributing to the Democratic Deliberation Platform! 
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ and npm
-- Git
-- Basic understanding of React, TypeScript, and Supabase
+- **Node.js 18+** and npm
+- **Git** for version control
+- Basic understanding of **React**, **TypeScript**, and **Supabase**
 
 ### Local Setup
 1. Fork the repository
@@ -25,7 +25,7 @@ Thank you for considering contributing to the Democratic Deliberation Platform! 
 4. Start development server: `npm run dev`
 
 ### Understanding the Architecture
-Before contributing, familiarize yourself with:
+Before contributing, familiarise yourself with:
 - [Clean Architecture principles](docs/architecture/ADR-001-single-backend-architecture.md)
 - [Repository Pattern](docs/architecture/ADR-002-repository-pattern.md)
 - [Dependency Injection](docs/architecture/ADR-003-dependency-injection.md)
@@ -39,16 +39,6 @@ Before contributing, familiarize yourself with:
 - `docs/description` - Documentation updates
 - `refactor/description` - Code refactoring
 
-### Commit Messages
-Follow conventional commits:
-```
-type(scope): description
-
-feat(auth): add OAuth integration
-fix(chat): resolve message ordering issue
-docs(api): update authentication endpoints
-test(components): add AuthForm tests
-```
 
 ## Code Standards
 
@@ -82,7 +72,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ user, onEdit }) => {
  * Service for managing user operations
  * 
  * Provides CRUD operations for users with proper error handling
- * and logging. All operations are authenticated and authorized.
+ * and logging. All operations are authenticated and authorised.
  */
 export class UserService implements IUserService {
   /**
@@ -246,9 +236,12 @@ Create ADRs for significant architectural decisions in `docs/architecture/`.
 
 ## Recognition
 
-Contributors will be recognized in:
+Contributors will be recognised in:
 - README.md contributors section
 - Release notes for significant contributions
 - Project documentation
 
 Thank you for contributing to making democratic deliberation more accessible and effective!
+
+### Commit Messages
+Follow conventional commits:
