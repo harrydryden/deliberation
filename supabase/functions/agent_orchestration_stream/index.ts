@@ -141,15 +141,29 @@ class ModelConfigManager {
       throw new Error(`Unknown model: ${modelName}`);
     }
 
+    const isNewModel = modelName.startsWith('gpt-5') || 
+                       modelName.startsWith('gpt-4.1') || 
+                       modelName.startsWith('o3') || 
+                       modelName.startsWith('o4');
+
     const params: any = {
       model: modelName,
       messages,
-      max_tokens: Math.min(config.maxTokens, options.maxTokens || config.maxTokens),
       stream: options.stream || false
     };
 
-    if (config.supportsTemperature && options.temperature !== undefined) {
-      params.temperature = options.temperature;
+    const maxTokens = Math.min(config.maxTokens, options.maxTokens || config.maxTokens);
+
+    if (isNewModel) {
+      // Newer models use max_completion_tokens
+      params.max_completion_tokens = maxTokens;
+      // Do NOT send temperature for newer models
+    } else {
+      // Legacy models use max_tokens
+      params.max_tokens = maxTokens;
+      if (config.supportsTemperature && options.temperature !== undefined) {
+        params.temperature = options.temperature;
+      }
     }
 
     if (options.responseFormat === 'json') {

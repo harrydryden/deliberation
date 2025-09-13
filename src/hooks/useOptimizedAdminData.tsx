@@ -55,7 +55,7 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
       
       try {
         const response = await supabase.functions.invoke('admin_get_users_v2', {
-          method: 'GET',
+          body: {},
           headers
         });
         if (response.error) {
