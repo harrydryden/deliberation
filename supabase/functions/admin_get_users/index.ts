@@ -45,7 +45,7 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    console.log('Admin get users request received');
+    console.log('Admin get users request received - schema fixed');
 
     // Initialize Supabase clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
