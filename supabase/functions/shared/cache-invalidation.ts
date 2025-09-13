@@ -24,7 +24,6 @@ export class CacheInvalidationService {
           table: 'agent_configurations' 
         }, 
         (payload: any) => {
-          console.log('🔄 Agent configuration changed, invalidating caches:', payload);
           this.invalidateAgentCaches(payload);
         }
       )
@@ -40,7 +39,6 @@ export class CacheInvalidationService {
           table: 'prompt_templates' 
         }, 
         (payload: any) => {
-          console.log('🔄 Prompt template changed, invalidating caches:', payload);
           this.invalidatePromptCaches(payload);
         }
       )
@@ -56,7 +54,6 @@ export class CacheInvalidationService {
           table: 'agent_knowledge' 
         }, 
         (payload: any) => {
-          console.log('🔄 Agent knowledge changed, invalidating related caches:', payload);
           this.invalidateKnowledgeCaches(payload);
         }
       )
@@ -78,8 +75,7 @@ export class CacheInvalidationService {
       try {
         callback(eventType, key);
       } catch (error) {
-        console.error('Cache invalidation callback error:', error);
-      }
+        }
     });
   }
 
@@ -99,8 +95,7 @@ export class CacheInvalidationService {
     // Also invalidate response caches that might be affected
     this.notify('response_cache_invalidate', `agent:${agentType}`);
 
-    console.log(`🧹 Invalidated caches for agent: ${agentType}, deliberation: ${deliberationId || 'global'}`);
-  }
+    }
 
   // Handle prompt template changes
   private invalidatePromptCaches(payload: any): void {
@@ -113,8 +108,7 @@ export class CacheInvalidationService {
     this.notify('prompt_template_changed', record.name);
     this.notify('agent_config_invalidate_all');
     
-    console.log(`🧹 Invalidated all agent caches due to prompt template change: ${record.name}`);
-  }
+    }
 
   // Handle agent knowledge changes
   private invalidateKnowledgeCaches(payload: any): void {
@@ -129,8 +123,7 @@ export class CacheInvalidationService {
     // Also invalidate response caches for bill agent (most likely to use knowledge)
     this.notify('response_cache_invalidate', 'agent:bill_agent');
 
-    console.log(`🧹 Invalidated knowledge caches for agent: ${record.agent_id}`);
-  }
+    }
 
   // Manual cache invalidation
   invalidateAgent(agentType: string, deliberationId?: string): void {

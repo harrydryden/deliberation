@@ -81,8 +81,7 @@ describe('Critical Performance Issues', () => {
 
   it('should render main components within performance budget', async () => {
     const renderTimes: number[] = [];
-    
-    // Test multiple renders to check consistency
+
     for (let i = 0; i < 5; i++) {
       const startTime = performance.now();
       const { unmount } = render(<App />);

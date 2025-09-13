@@ -1,11 +1,411 @@
-import { serve } from "std/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.53.1";
 
-// Inlined utilities to avoid cross-folder import issues
+// ============================================================================
+// SOPHISTICATED IBIS ISSUE LINKING WITH SHARED FUNCTIONALITY INLINED
+// ============================================================================
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept, cache-control, x-requested-with',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Max-Age': '86400'
 };
+
+// ============================================================================
+// ENHANCED EDGE LOGGER
+// ============================================================================
+
+class EdgeLogger {
+  private static formatMessage(level: string, message: string, data?: any): string {
+    const timestamp = new Date().toISOString();
+    const dataStr = data ? ` | ${JSON.stringify(data)}` : '';
+    return `[${timestamp}] [${level}] ${message}${dataStr}`;
+  }
+
+  static debug(message: string, data?: any): void {
+    );
+  }
+
+  static info(message: string, data?: any): void {
+    );
+  }
+
+  static warn(message: string, data?: any): void {
+    );
+  }
+
+  static error(message: string, data?: any): void {
+    );
+  }
+}
+
+// ============================================================================
+// CIRCUIT BREAKER IMPLEMENTATION
+// ============================================================================
+
+class CircuitBreaker {
+  private static readonly CIRCUIT_BREAKER_ID = 'ibis_issue_linking';
+  private static readonly CIRCUIT_BREAKER_THRESHOLD = 3;
+  private static readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute
+
+  constructor(private supabase: any) {}
+
+  async isOpen(): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase
+        .from('circuit_breaker_state')
+        .select('*')
+        .eq('id', CircuitBreaker.CIRCUIT_BREAKER_ID)
+        .maybeSingle();
+
+      if (error || !data) return false;
+
+      const now = Date.now();
+      const lastFailureTime = new Date(data.last_failure_time).getTime();
+      
+      if (data.failure_count >= CircuitBreaker.CIRCUIT_BREAKER_THRESHOLD) {
+        const timeSinceLastFailure = now - lastFailureTime;
+        
+        if (timeSinceLastFailure < CircuitBreaker.CIRCUIT_BREAKER_TIMEOUT) {
+          EdgeLogger.warn(`Circuit breaker OPEN - ${Math.ceil((CircuitBreaker.CIRCUIT_BREAKER_TIMEOUT - timeSinceLastFailure) / 1000)}s remaining`);
+          return true;
+        } else {
+          await this.reset();
+          return false;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      EdgeLogger.warn('Circuit breaker check failed, assuming closed', error);
+      return false;
+    }
+  }
+
+  async recordFailure(): Promise<void> {
+    try {
+      const now = new Date();
+      const { data: currentState } = await this.supabase
+        .from('circuit_breaker_state')
+        .select('failure_count')
+        .eq('id', CircuitBreaker.CIRCUIT_BREAKER_ID)
+        .maybeSingle();
+
+      const newFailureCount = (currentState?.failure_count || 0) + 1;
+      
+      await this.supabase
+        .from('circuit_breaker_state')
+        .upsert({
+          id: CircuitBreaker.CIRCUIT_BREAKER_ID,
+          failure_count: newFailureCount,
+          last_failure_time: now,
+          is_open: newFailureCount >= CircuitBreaker.CIRCUIT_BREAKER_THRESHOLD,
+          updated_at: now
+        }, { onConflict: 'id' });
+
+      EdgeLogger.info(`Circuit breaker failure recorded: ${newFailureCount}/${CircuitBreaker.CIRCUIT_BREAKER_THRESHOLD}`);
+    } catch (error) {
+      EdgeLogger.error('Failed to record circuit breaker failure', error);
+    }
+  }
+
+  async reset(): Promise<void> {
+    try {
+      await this.supabase
+        .from('circuit_breaker_state')
+        .update({
+          failure_count: 0,
+          is_open: false,
+          updated_at: new Date()
+        })
+        .eq('id', CircuitBreaker.CIRCUIT_BREAKER_ID);
+      EdgeLogger.info('Circuit breaker RESET');
+    } catch (error) {
+      EdgeLogger.error('Failed to reset circuit breaker', error);
+    }
+  }
+}
+
+// ============================================================================
+// ENHANCED IBIS ISSUE LINKING SERVICE
+// ============================================================================
+
+class IBISIssueLinkingService {
+  private circuitBreaker: CircuitBreaker;
+  private supabase: any;
+  private openaiApiKey: string;
+
+  constructor(supabase: any, openaiApiKey: string) {
+    this.supabase = supabase;
+    this.openaiApiKey = openaiApiKey;
+    this.circuitBreaker = new CircuitBreaker(supabase);
+  }
+
+  async linkSimilarIssues(deliberationId: string, threshold: number = 0.7): Promise<any> {
+    const startTime = Date.now();
+    
+    // Circuit breaker check
+    if (await this.circuitBreaker.isOpen()) {
+      EdgeLogger.warn('Circuit breaker OPEN - skipping issue linking');
+      return this.generateEmptyResponse('Circuit breaker open');
+    }
+
+    try {
+      EdgeLogger.info('Starting IBIS issue linking', {
+        deliberationId,
+        threshold
+      });
+
+      // Fetch all issues for this deliberation
+      const { data: issues, error: issuesError } = await this.supabase
+        .from('ibis_nodes')
+        .select('id, title, description, node_type, created_at')
+        .eq('deliberation_id', deliberationId)
+        .eq('node_type', 'issue')
+        .order('created_at', { ascending: true });
+
+      if (issuesError) {
+        throw new Error(`Failed to fetch issues: ${issuesError.message}`);
+      }
+
+      if (!issues || issues.length < 2) {
+        EdgeLogger.info('Insufficient issues for linking', {
+          deliberationId,
+          issueCount: issues?.length || 0
+        });
+        return this.generateEmptyResponse('Insufficient issues');
+      }
+
+      EdgeLogger.debug('Issues fetched for linking', {
+        count: issues.length,
+        deliberationId
+      });
+
+      // Find similar issues using AI
+      const similarPairs = await this.findSimilarIssuesWithAI(issues, threshold);
+
+      // Create relationships in database
+      const relationshipsCreated = await this.createRelationships(similarPairs);
+
+      const duration = Date.now() - startTime;
+      EdgeLogger.info('IBIS issue linking completed successfully', {
+        deliberationId,
+        issuesAnalyzed: issues.length,
+        similarPairsFound: similarPairs.length,
+        relationshipsCreated,
+        duration
+      });
+
+      // Reset circuit breaker on success
+      await this.circuitBreaker.reset();
+
+      return {
+        success: true,
+        issuesAnalyzed: issues.length,
+        similarPairsFound: similarPairs.length,
+        relationshipsCreated,
+        similarPairs: similarPairs.slice(0, 10), // Return top 10 for response
+        metadata: {
+          deliberationId,
+          threshold,
+          processingTimeMs: duration
+        }
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      EdgeLogger.error('IBIS issue linking failed', {
+        error: error.message,
+        duration,
+        deliberationId
+      });
+
+      await this.circuitBreaker.recordFailure();
+      
+      return this.generateErrorResponse(error.message);
+    }
+  }
+
+  private async findSimilarIssuesWithAI(issues: any[], threshold: number): Promise<any[]> {
+    const systemPrompt = `You are an expert analyst identifying similar issues in a deliberation.
+
+Analyze the provided issues and identify pairs that are conceptually similar or related. Consider:
+1. Thematic similarity (same topic area)
+2. Conceptual overlap (related problems)
+3. Logical connections (one builds on another)
+4. Temporal relationships (sequential or parallel concerns)
+
+Return a JSON array of similar issue pairs with this structure:
+[
+  {
+    "issue1Id": "id1",
+    "issue1Title": "Title 1",
+    "issue2Id": "id2", 
+    "issue2Title": "Title 2",
+    "similarityScore": 0.0-1.0,
+    "relationshipType": "similar|related|builds_on|parallel|sequential",
+    "reasoning": "Brief explanation of the similarity"
+  }
+]
+
+Only include pairs with similarity scores >= ${threshold}.`;
+
+    const issuesContext = issues.map((issue, index) => 
+      `${index + 1}. ID: ${issue.id}\nTitle: ${issue.title}\nDescription: ${issue.description || 'No description'}\n---`
+    ).join('\n');
+
+    const userPrompt = `Analyze these ${issues.length} issues and find similar pairs:
+
+${issuesContext}
+
+Identify pairs that are conceptually similar or related. Focus on meaningful connections that would be valuable for deliberation participants to understand.`;
+
+    const messages_array = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ];
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: messages_array,
+        max_tokens: 2000,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    
+    if (!content) {
+      throw new Error('Empty response from OpenAI');
+    }
+
+    try {
+      const result = JSON.parse(content);
+      
+      if (!Array.isArray(result)) {
+        throw new Error('Response is not an array');
+      }
+
+      // Validate and filter similar pairs
+      const validPairs = result
+        .filter(pair => pair.issue1Id && pair.issue2Id && pair.similarityScore >= threshold)
+        .filter(pair => issues.some(issue => issue.id === pair.issue1Id) && issues.some(issue => issue.id === pair.issue2Id))
+        .map(pair => ({
+          issue1Id: pair.issue1Id,
+          issue1Title: pair.issue1Title || 'Unknown',
+          issue2Id: pair.issue2Id,
+          issue2Title: pair.issue2Title || 'Unknown',
+          similarityScore: Math.max(0, Math.min(1, pair.similarityScore || 0.5)),
+          relationshipType: pair.relationshipType || 'similar',
+          reasoning: pair.reasoning || 'AI-generated similarity'
+        }))
+        .sort((a, b) => b.similarityScore - a.similarityScore);
+
+      EdgeLogger.debug('AI similarity analysis completed', {
+        requested: 'similar pairs',
+        generated: result.length,
+        valid: validPairs.length,
+        threshold
+      });
+
+      return validPairs;
+
+    } catch (parseError) {
+      EdgeLogger.error('Failed to parse AI similarity analysis', {
+        error: parseError.message,
+        content: content.substring(0, 200)
+      });
+      throw new Error('Invalid response format from AI');
+    }
+  }
+
+  private async createRelationships(similarPairs: any[]): Promise<number> {
+    let createdCount = 0;
+
+    for (const pair of similarPairs) {
+      try {
+        const { error } = await this.supabase
+          .from('ibis_relationships')
+          .upsert({
+            source_node_id: pair.issue1Id,
+            target_node_id: pair.issue2Id,
+            relationship_type: pair.relationshipType,
+            strength: pair.similarityScore,
+            reasoning: pair.reasoning,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'source_node_id,target_node_id' });
+
+        if (error) {
+          EdgeLogger.warn('Failed to create relationship', {
+            error: error.message,
+            pair: `${pair.issue1Id} -> ${pair.issue2Id}`
+          });
+        } else {
+          createdCount++;
+        }
+      } catch (error) {
+        EdgeLogger.warn('Error creating relationship', {
+          error: error.message,
+          pair: `${pair.issue1Id} -> ${pair.issue2Id}`
+        });
+      }
+    }
+
+    EdgeLogger.debug('Relationships created', {
+      requested: similarPairs.length,
+      created: createdCount
+    });
+
+    return createdCount;
+  }
+
+  private generateEmptyResponse(reason: string): any {
+    return {
+      success: true,
+      issuesAnalyzed: 0,
+      similarPairsFound: 0,
+      relationshipsCreated: 0,
+      similarPairs: [],
+      reason,
+      metadata: {
+        processingTimeMs: 0
+      }
+    };
+  }
+
+  private generateErrorResponse(errorMessage: string): any {
+    return {
+      success: false,
+      issuesAnalyzed: 0,
+      similarPairsFound: 0,
+      relationshipsCreated: 0,
+      similarPairs: [],
+      error: errorMessage,
+      metadata: {
+        processingTimeMs: 0,
+        reason: 'Linking failed'
+      }
+    };
+  }
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
 function handleCORSPreflight(request: Request): Response | null {
   if (request.method === 'OPTIONS') {
@@ -16,7 +416,7 @@ function handleCORSPreflight(request: Request): Response | null {
 
 function createErrorResponse(error: any, status: number = 500, context?: string): Response {
   const errorId = crypto.randomUUID();
-  console.error(`[${errorId}] ${context || 'Edge Function'} Error:`, error);
+  EdgeLogger.error(`${context || 'Edge Function'} Error`, { errorId, error: error?.message });
   
   return new Response(
     JSON.stringify({
@@ -42,6 +442,10 @@ function createSuccessResponse(data: any): Response {
 }
 
 async function parseAndValidateRequest<T>(request: Request, requiredFields: string[] = []): Promise<T> {
+  const requestId = crypto.randomUUID().slice(0, 8);
+  
+  EdgeLogger.debug('Parsing IBIS issue linking request', { requestId, requiredFields });
+  
   try {
     const body = await request.json();
     
@@ -51,286 +455,120 @@ async function parseAndValidateRequest<T>(request: Request, requiredFields: stri
       }
     }
     
+    EdgeLogger.debug('Request validation successful', { requestId });
     return body as T;
   } catch (error: any) {
+    EdgeLogger.error('Request parsing failed', { requestId, error: error.message });
     throw new Error(`Request parsing failed: ${error.message}`);
   }
 }
 
-function validateAndGetEnvironment() {
+function getOpenAIKey(): string {
+  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!apiKey) {
+    throw new Error('OpenAI API key not configured');
+  }
+  return apiKey;
+}
+
+async function validateAndGetEnvironment() {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 
-  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
-    throw new Error('Missing required Supabase environment variables');
+  if (!supabaseUrl || !supabaseServiceKey || !openaiApiKey) {
+    const missing = [];
+    if (!supabaseUrl) missing.push('SUPABASE_URL');
+    if (!supabaseServiceKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+    if (!openaiApiKey) missing.push('OPENAI_API_KEY');
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
 
   return {
-    supabase: createClient(supabaseUrl, supabaseServiceKey)
+    supabase: createClient(supabaseUrl, supabaseServiceKey),
+    openaiApiKey
   };
 }
 
-const EdgeLogger = {
-  debug: (message: string, data?: any) => console.log(`🔍 ${message}`, data),
-  info: (message: string, data?: any) => console.log(`ℹ️ ${message}`, data),
-  error: (message: string, error?: any) => console.error(`❌ ${message}`, error),
-};
+// ============================================================================
+// INTERFACES
+// ============================================================================
 
-// Process base64 in chunks to prevent memory issues
-function processBase64Chunks(base64String: string, chunkSize = 32768) {
-  const chunks: Uint8Array[] = [];
-  let position = 0;
-
-  while (position < base64String.length) {
-    const chunk = base64String.slice(position, position + chunkSize);
-    const binaryChunk = atob(chunk);
-    const bytes = new Uint8Array(binaryChunk.length);
-
-    for (let i = 0; i < binaryChunk.length; i++) {
-      bytes[i] = binaryChunk.charCodeAt(i);
-    }
-
-    chunks.push(bytes);
-    position += chunkSize;
-  }
-
-  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-  const result = new Uint8Array(totalLength);
-  let offset = 0;
-
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  return result;
-}
-
-// Cosine similarity calculation
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (!a?.length || !b?.length || a.length !== b.length) return 0;
-  let dot = 0, normA = 0, normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
-interface RequestBody {
-  deliberationId?: string;
-  nodeId?: string;
+interface LinkingRequest {
+  deliberationId: string;
   threshold?: number;
-  nodeType?: 'issue' | 'position' | 'argument';
-  force?: boolean;
 }
 
-interface SimilarityScore {
-  id: string;
-  similarity: number;
-}
-
-// Conservative auto-linking constants
-const AUTO_LINK_THRESHOLD = 0.90; // Very high confidence required
-const MAX_AUTO_LINKS_PER_NODE = 2; // Maximum auto-generated relationships per node
-
-// Check if a node already has enough auto-generated relationships
-async function getAutoRelationshipCount(supabase: any, nodeId: string): Promise<number> {
-  const { data, error } = await supabase
-    .from("ibis_relationships")
-    .select("id")
-    .or(`source_node_id.eq.${nodeId},target_node_id.eq.${nodeId}`)
-    .eq("created_by", null); // Auto-generated relationships have null created_by
-  
-  if (error) {
-    EdgeLogger.error("Error checking auto relationship count", error);
-    return 0;
-  }
-  
-  return data?.length || 0;
-}
+// ============================================================================
+// MAIN EDGE FUNCTION
+// ============================================================================
 
 serve(async (req) => {
-  // Handle CORS preflight with shared utility
   const corsResponse = handleCORSPreflight(req);
   if (corsResponse) return corsResponse;
 
   try {
-    const { deliberationId, nodeId, threshold = AUTO_LINK_THRESHOLD, nodeType } = await parseAndValidateRequest(req);
+    EdgeLogger.info('IBIS issue linking function called', { 
+      method: req.method, 
+      url: req.url 
+    });
 
-    EdgeLogger.info("Starting auto-linking process", {
+    const { deliberationId, threshold = 0.7 }: LinkingRequest = await parseAndValidateRequest(req, ['deliberationId']);
+    const { supabase, openaiApiKey } = await validateAndGetEnvironment();
+
+    EdgeLogger.info('Processing IBIS issue linking request', {
       deliberationId,
-      nodeId,
-      threshold,
-      nodeType,
-      autoThreshold: AUTO_LINK_THRESHOLD,
-      maxLinksPerNode: MAX_AUTO_LINKS_PER_NODE
+      threshold
     });
 
-    // Get environment and clients with caching
-    const { supabase } = validateAndGetEnvironment();
-
-    // Fetch target nodes with embeddings of the requested type
-    const TYPE = nodeType || 'issue';
-    let query = supabase
-      .from("ibis_nodes")
-      .select("id, title, description, node_type, embedding, deliberation_id")
-      .eq("node_type", TYPE);
-
-    if (deliberationId) query = query.eq("deliberation_id", deliberationId);
-    if (nodeId) query = query.eq("id", nodeId);
-
-    const { data: targetNodes, error: targetError } = await query;
-    if (targetError) throw targetError;
-
-    // Decide on the nodes to analyze
-    let nodes = targetNodes || [];
+    // Create IBIS issue linking service
+    const linkingService = new IBISIssueLinkingService(supabase, openaiApiKey);
     
-    // If a specific node is requested, compare it against all other nodes in its deliberation
-    if (nodeId) {
-      const deliberation = targetNodes?.[0]?.deliberation_id;
-      if (!deliberation) {
-        return createSuccessResponse({ success: false, processed: 0, reason: "node_not_found" });
-      }
-      const { data: others, error: othersErr } = await supabase
-        .from("ibis_nodes")
-        .select("id, title, description, node_type, embedding, deliberation_id")
-        .eq("deliberation_id", deliberation)
-        .eq("node_type", TYPE)
-        .neq("id", nodeId);
-      if (othersErr) throw othersErr;
-      nodes = [...targetNodes, ...(others || [])];
-    }
+    // Link similar issues
+    const result = await linkingService.linkSimilarIssues(deliberationId, threshold);
 
-    const nodesWithEmb = nodes.filter((n: any) => Array.isArray(n.embedding) && n.embedding.length > 0);
-
-    if (nodesWithEmb.length < 2) {
-      return createSuccessResponse({ success: true, processed: 0, reason: "insufficient_embeddings" });
-    }
-
-    // Group by deliberation to avoid cross-deliberation links
-    const deliberationGroups = nodesWithEmb.reduce((acc, node) => {
-      const key = node.deliberation_id;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(node);
-      return acc;
-    }, {} as Record<string, any[]>);
-
-    let created = 0;
-    let skipped = 0;
-    
-    for (const [currentDeliberationId, groupNodes] of Object.entries(deliberationGroups)) {
-      if (groupNodes.length < 2) continue;
-
-      // Calculate similarities within the group
-      const similarities: Array<{ from: any; to: any; similarity: number }> = [];
-      
-      for (let i = 0; i < groupNodes.length; i++) {
-        for (let j = i + 1; j < groupNodes.length; j++) {
-          const node1 = groupNodes[i];
-          const node2 = groupNodes[j];
-          const sim = cosineSimilarity(node1.embedding, node2.embedding);
-          
-          if (sim >= threshold) {
-            similarities.push({ from: node1, to: node2, similarity: sim });
-          }
-        }
-      }
-
-      // Sort by similarity score (highest first) for conservative selection
-      similarities.sort((a, b) => b.similarity - a.similarity);
-      
-      EdgeLogger.info(`Found ${similarities.length} potential relationships above threshold`, {
-        deliberationId: currentDeliberationId,
-        threshold,
-        highestSim: similarities[0]?.similarity
-      });
-
-      // Conservative auto-linking: process only top similarities
-      for (const { from, to, similarity } of similarities) {
-        try {
-          // Check if both nodes already have enough auto-generated relationships
-          const fromAutoCount = await getAutoRelationshipCount(supabase, from.id);
-          const toAutoCount = await getAutoRelationshipCount(supabase, to.id);
-          
-          if (fromAutoCount >= MAX_AUTO_LINKS_PER_NODE || toAutoCount >= MAX_AUTO_LINKS_PER_NODE) {
-            EdgeLogger.debug(`Skipping - nodes have enough auto links`, {
-              from: from.title,
-              fromCount: fromAutoCount,
-              to: to.title,
-              toCount: toAutoCount,
-              maxAllowed: MAX_AUTO_LINKS_PER_NODE
-            });
-            skipped++;
-            continue;
-          }
-
-          // Check for existing relationships (use correct column names)
-          const { data: existing } = await supabase
-            .from("ibis_relationships")
-            .select("id")
-            .or(`and(source_node_id.eq.${from.id},target_node_id.eq.${to.id}),and(source_node_id.eq.${to.id},target_node_id.eq.${from.id})`)
-            .limit(1);
-
-          if (existing && existing.length > 0) {
-            EdgeLogger.debug(`Skipping existing relationship: ${from.title} <-> ${to.title}`);
-            skipped++;
-            continue;
-          }
-
-          // Create auto-generated relationship with correct schema
-          const { error: insertError } = await supabase
-            .from("ibis_relationships")
-            .insert({
-              source_node_id: from.id,
-              target_node_id: to.id,
-              relationship_type: "relates_to", // Use valid relationship type
-              deliberation_id: currentDeliberationId,
-              created_by: null // NULL indicates auto-generated
-            });
-
-          if (!insertError) {
-            created++;
-            EdgeLogger.info(`Created auto-similarity link`, {
-              from: from.title,
-              to: to.title,
-              similarity: similarity.toFixed(3),
-              deliberationId: currentDeliberationId
-            });
-            
-            // Stop after creating MAX_AUTO_LINKS_PER_NODE relationships to be conservative
-            if (created >= MAX_AUTO_LINKS_PER_NODE * 2) {
-              EdgeLogger.info("Reached conservative auto-link limit, stopping");
-              break;
-            }
-          } else {
-            EdgeLogger.error(`Failed to create relationship:`, insertError);
-          }
-        } catch (error) {
-          EdgeLogger.error(`Error processing relationship ${from.id} -> ${to.id}:`, error);
-        }
-      }
-    }
-
-    EdgeLogger.info("Auto-linking process completed", {
-      created,
-      skipped,
-      threshold,
-      maxLinksPerNode: MAX_AUTO_LINKS_PER_NODE
+    EdgeLogger.info('IBIS issue linking completed', {
+      success: result.success,
+      similarPairsFound: result.similarPairsFound,
+      relationshipsCreated: result.relationshipsCreated
     });
 
-    return createSuccessResponse({ 
-      success: true, 
-      created,
-      skipped,
-      threshold,
-      maxLinksPerNode: MAX_AUTO_LINKS_PER_NODE
+    return createSuccessResponse({
+      ...result,
+      response_format: JSON.stringify({
+        success: true,
+        timestamp: new Date().toISOString(),
+        requestId: crypto.randomUUID(),
+        processingTimeMs: Date.now() - startTime
+      })
     });
+
   } catch (error) {
-    EdgeLogger.error("link-similar-ibis-issues error:", error);
-    return createErrorResponse(error, 500, 'link-similar-ibis-issues');
+    EdgeLogger.error('Service error', error);
+    
+    // Fallback response when service fails
+    const fallbackResponse = {
+      success: false,
+      error: 'Service temporarily unavailable',
+      fallback: {
+        message: 'Service is currently unavailable. Please try again later.',
+        metadata: {
+          processingTimeMs: Date.now() - startTime,
+          requestId: crypto.randomUUID(),
+          version: '2.0.0',
+          fallbackReason: error.message || 'Unknown error'
+        },
+        response_format: JSON.stringify({
+          success: false,
+          timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
+          processingTimeMs: Date.now() - startTime,
+          fallback: true,
+          error: error.message
+        })
+      }
+    };
+    
+    return createSuccessResponse(fallbackResponse);
   }
 });

@@ -30,8 +30,8 @@ export const useAgentOrchestrationTrigger = () => {
       onTypingChange?.(true);
       currentPhase = 'CALLING_EDGE_FUNCTION';
       
-      logger.debug(`🚀 [TRIGGER] Starting agent orchestration for message ${messageId} in deliberation ${deliberationId}`);
-      logger.debug(`📡 [TRIGGER] Calling agent-orchestration-stream function`);
+      logger.debug(` [TRIGGER] Starting agent orchestration for message ${messageId} in deliberation ${deliberationId}`);
+      logger.debug(`� [TRIGGER] Calling agent-orchestration-stream function`);
       
       // Enhanced function call with timeout
       const timeoutController = new AbortController();
@@ -80,7 +80,7 @@ export const useAgentOrchestrationTrigger = () => {
       }
 
       currentPhase = 'COMPLETED';
-      logger.debug(`✅ [TRIGGER] Agent orchestration completed in ${duration}ms:`, data);
+      logger.debug(` [TRIGGER] Agent orchestration completed in ${duration}ms:`, data);
       
       // Enhanced success feedback
       const agentName = data?.agentName || data?.agentType || 'Agent';
@@ -115,7 +115,7 @@ export const useAgentOrchestrationTrigger = () => {
     } finally {
       // Always clear typing indicator
       onTypingChange?.(false);
-      logger.debug(`🏁 [TRIGGER] Agent orchestration trigger completed (final phase: ${currentPhase})`);
+      logger.debug(` [TRIGGER] Agent orchestration trigger completed (final phase: ${currentPhase})`);
     }
   }, [toast]);
 

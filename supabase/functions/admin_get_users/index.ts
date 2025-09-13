@@ -1,5 +1,5 @@
-import { serve } from "std/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.53.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,8 +15,6 @@ function handleCORSPreflight(request: Request): Response | null {
 
 function createErrorResponse(error: any, status: number = 500, context?: string): Response {
   const errorId = crypto.randomUUID();
-  console.error(`[${errorId}] ${context || 'admin_get_users error'}:`, error);
-  
   return new Response(
     JSON.stringify({ 
       error: error?.message || 'Internal server error', 
@@ -45,8 +43,6 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    console.log('Admin get users request received - schema fixed');
-
     // Initialize Supabase clients
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -77,7 +73,6 @@ serve(async (req) => {
     );
 
     if (authError || !user) {
-      console.error('Authentication failed:', authError);
       return createErrorResponse(new Error('Authentication failed'), 401);
     }
 
@@ -89,11 +84,8 @@ serve(async (req) => {
       .single();
 
     if (profileError || !profile || profile.user_role !== 'admin') {
-      console.warn('Non-admin user attempted access:', user.id);
       return createErrorResponse(new Error('Admin access required'), 403);
     }
-
-    console.log('Admin access verified for user:', user.id);
 
     // Fetch all user profiles - get all first, then filter in code if needed
     const { data: profiles, error: profilesError } = await adminSupabase
@@ -117,8 +109,7 @@ serve(async (req) => {
       .select('user_id, deliberation_id');
 
     if (participantsError) {
-      console.warn('Failed to fetch participants:', participantsError);
-    }
+      }
 
     // Fetch deliberation titles for associated participations
     const deliberationIds = Array.from(new Set((participants || []).map((p: any) => p.deliberation_id))).filter(Boolean);
@@ -130,8 +121,7 @@ serve(async (req) => {
         .in('id', deliberationIds);
 
       if (deliberationsError) {
-        console.warn('Failed to fetch deliberations:', deliberationsError);
-      } else {
+        } else {
         deliberationsMap = (deliberations || []).reduce((acc: any, d: any) => {
           acc[d.id] = { id: d.id, title: d.title, notion: d.notion };
           return acc;
@@ -164,8 +154,6 @@ serve(async (req) => {
         })
       };
     }) || [];
-
-    console.log(`Successfully retrieved ${combinedUsers.length} users`);
 
     return createSuccessResponse({
       users: combinedUsers,

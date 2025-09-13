@@ -52,7 +52,6 @@ export class IssueRecommendationService {
         return this.getFallbackRecommendations(existingIssues, maxRecommendations);
       }
 
-      // AI service now returns properly formatted recommendations, just validate and return
       const validRecommendations = aiRecommendations.filter(rec => 
         rec.issueId && 
         rec.title && 

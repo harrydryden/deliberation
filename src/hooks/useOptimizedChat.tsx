@@ -112,14 +112,14 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
           // Check for duplicates - more robust checking
           const exists = prev.messages.some(m => m.id === chatMessage.id);
           if (exists) {
-            logger.debug('🔍 Skipping duplicate realtime message', { 
+            logger.debug(' Skipping duplicate realtime message', { 
               messageId: chatMessage.id,
               messageType: message.message_type 
             });
             return prev;
           }
           
-          logger.debug('📨 Adding realtime message', { 
+          logger.debug(' Adding realtime message', { 
             messageId: chatMessage.id, 
             type: message.message_type,
             currentCount: prev.messages.length 
@@ -176,7 +176,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     if (!user || !deliberationId || !messageQueue) return;
     
     try {
-      logger.info('🚀 Starting message processing', { 
+      logger.info(' Starting message processing', { 
         messageId: queuedMessage.id, 
         content: queuedMessage.content.substring(0, 50) + '...',
         mode: queuedMessage.mode
@@ -199,7 +199,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       setChatState(prev => {
         const exists = prev.messages.some(m => m.id === userMessage.id);
         if (exists) {
-          logger.debug('🔍 Skipping duplicate optimistic message', { messageId: userMessage.id });
+          logger.debug(' Skipping duplicate optimistic message', { messageId: userMessage.id });
           return prev;
         }
         
@@ -225,7 +225,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       try {
         await triggerAgentOrchestration(saved.id, deliberationId, queuedMessage.mode, setTypingState);
         
-        logger.info('✅ Agent orchestration completed successfully', { 
+        logger.info(' Agent orchestration completed successfully', { 
           messageId: queuedMessage.id,
           dbMessageId: saved.id
         });
@@ -234,7 +234,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
         messageQueue.updateMessageStatus(queuedMessage.id, 'completed');
         
       } catch (orchestrationError) {
-        logger.error('🚨 Agent orchestration failed', orchestrationError as Error, {
+        logger.error(' Agent orchestration failed', orchestrationError as Error, {
           messageId: queuedMessage.id,
           dbMessageId: saved.id
         });
@@ -250,7 +250,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       
       // Force refresh messages after agent response
       setTimeout(() => {
-        logger.info('🔄 Force refreshing messages after agent response');
+        logger.info(' Force refreshing messages after agent response');
         lastLoadedDeliberationRef.current = null; // Reset to force reload
         loadMessages();
       }, 1000);
@@ -258,7 +258,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
     } catch (error) {
       const errorMsg = getErrorMessage(error);
       
-      logger.error('❌ Message processing failed', { 
+      logger.error(' Message processing failed', { 
         messageId: queuedMessage.id,
         error: errorMsg,
         retries: queuedMessage.retries,
@@ -300,7 +300,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
         return;
       }
 
-      logger.info('📋 Processing queued message', { 
+      logger.info(' Processing queued message', { 
         messageId: nextMessage.id, 
         queuePosition: nextMessage.queuePosition,
         retries: nextMessage.retries,
@@ -351,7 +351,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
 
     // Maximum typing duration - auto-clear after 30 seconds
     const typingTimeout = setTimeout(() => {
-      logger.info('⚠️ Auto-clearing stuck typing indicator after 30 seconds');
+      logger.info(' Auto-clearing stuck typing indicator after 30 seconds');
       setChatState(prev => ({ ...prev, isTyping: false }));
     }, 30000);
 

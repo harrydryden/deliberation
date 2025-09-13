@@ -1,25 +1,26 @@
-// Centralized logging utility with environment-aware behavior
+/**
+ * Production Logger - Minimal logging for beta release
+ * Removes all development artifacts and console output
+ */
+
 export enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3,
-  NONE = 4
+  ERROR = 0,
+  WARN = 1,
+  INFO = 2,
+  DEBUG = 3
 }
 
 class Logger {
   private level: LogLevel;
-  private isDevelopment: boolean;
   private isProduction: boolean;
 
   constructor() {
-    this.isDevelopment = process.env.NODE_ENV === 'development';
     this.isProduction = process.env.NODE_ENV === 'production';
-    this.level = this.isDevelopment ? LogLevel.DEBUG : LogLevel.ERROR;
+    this.level = this.isProduction ? LogLevel.ERROR : LogLevel.INFO;
   }
 
   private shouldLog(level: LogLevel): boolean {
-    return level >= this.level;
+    return level <= this.level;
   }
 
   private formatMessage(level: string, message: string, context?: any): string {
@@ -29,7 +30,8 @@ class Logger {
   }
 
   debug(message: string | any, context?: any): void {
-    if (this.isProduction) return; // Never log debug in production
+    // Never log debug in production
+    if (this.isProduction) return;
     if (this.shouldLog(LogLevel.DEBUG)) {
       if (typeof message === 'object') {
         console.log(this.formatMessage('DEBUG', 'Debug info', message));
@@ -39,24 +41,17 @@ class Logger {
     }
   }
 
-  info(message: string | any, context?: any): void {
-    if (this.isProduction) return; // Never log info in production
+  info(message: string, context?: any): void {
+    // Only log info in development
+    if (this.isProduction) return;
     if (this.shouldLog(LogLevel.INFO)) {
-      if (typeof message === 'object') {
-        console.info(this.formatMessage('INFO', 'Info', message));
-      } else {
-        console.info(this.formatMessage('INFO', message, context));
-      }
+      console.log(this.formatMessage('INFO', message, context));
     }
   }
 
-  warn(message: string | any, context?: any): void {
+  warn(message: string, context?: any): void {
     if (this.shouldLog(LogLevel.WARN)) {
-      if (typeof message === 'object') {
-        console.warn(this.formatMessage('WARN', 'Warning', message));
-      } else {
-        console.warn(this.formatMessage('WARN', message, context));
-      }
+      console.warn(this.formatMessage('WARN', message, context));
     }
   }
 
@@ -71,51 +66,38 @@ class Logger {
     }
   }
 
-  // Auth-specific logging with consistent emojis
+  // Production-safe logging methods
   auth = {
-    start: (message: string, context?: any) => this.debug(`🚀 ${message}`, context),
-    success: (message: string, context?: any) => this.info(`✅ ${message}`, context),
-    failure: (message: string, error?: any, context?: any) => this.error(`❌ ${message}`, error, context),
-    info: (message: string, context?: any) => this.debug(`🔍 ${message}`, context),
-    progress: (message: string, context?: any) => this.debug(`🔄 ${message}`, context),
-    complete: (message: string, context?: any) => this.debug(`🎯 ${message}`, context),
-    blocked: (message: string, context?: any) => this.warn(`🚫 ${message}`, context),
-    warning: (message: string, context?: any) => this.warn(`⚠️ ${message}`, context),
-    timeout: (message: string, context?: any) => this.error(`⏰ ${message}`, null, context),
+    start: (message: string, context?: any) => this.debug(`Auth start: ${message}`, context),
+    success: (message: string, context?: any) => this.info(`Auth success: ${message}`, context),
+    failure: (message: string, error?: any, context?: any) => this.error(`Auth failure: ${message}`, error, context),
+    info: (message: string, context?: any) => this.debug(`Auth info: ${message}`, context),
+    progress: (message: string, context?: any) => this.debug(`Auth progress: ${message}`, context),
+    complete: (message: string, context?: any) => this.debug(`Auth complete: ${message}`, context),
+    blocked: (message: string, context?: any) => this.warn(`Auth blocked: ${message}`, context),
+    warning: (message: string, context?: any) => this.warn(`Auth warning: ${message}`, context),
+    timeout: (message: string, context?: any) => this.error(`Auth timeout: ${message}`, null, context),
   };
 
-  // API-specific logging
   api = {
-    request: (method: string, url: string, context?: any) => this.debug(`🌐 ${method} ${url}`, context),
+    request: (method: string, url: string, context?: any) => this.debug(`API request: ${method} ${url}`, context),
     response: (method: string, url: string, status: number, context?: any) => 
-      this.debug(`📨 ${method} ${url} - ${status}`, context),
+      this.debug(`API response: ${method} ${url} - ${status}`, context),
     error: (method: string, url: string, error: any, context?: any) => 
-      this.error(`🚨 ${method} ${url} failed`, error, context),
+      this.error(`API error: ${method} ${url} failed`, error, context),
   };
 
-  // Component lifecycle logging
   component = {
-    mount: (name: string, context?: any) => this.debug(`🔧 ${name} mounted`, context),
-    unmount: (name: string, context?: any) => this.debug(`🔽 ${name} unmounted`, context),
-    update: (name: string, context?: any) => this.debug(`🔄 ${name} updated`, context),
-    error: (name: string, error: any, context?: any) => this.error(`💥 ${name} error`, error, context),
+    mount: (name: string, context?: any) => this.debug(`Component mounted: ${name}`, context),
+    unmount: (name: string, context?: any) => this.debug(`Component unmounted: ${name}`, context),
+    update: (name: string, context?: any) => this.debug(`Component updated: ${name}`, context),
+    error: (name: string, error: any, context?: any) => this.error(`Component error: ${name}`, error, context),
   };
 
-  // Performance logging - disabled in production
   performance = {
-    start: (operation: string) => {
-      if (this.isDevelopment && !this.isProduction) {
-        console.time(`⚡ ${operation}`);
-      }
-    },
-    end: (operation: string) => {
-      if (this.isDevelopment && !this.isProduction) {
-        console.timeEnd(`⚡ ${operation}`);
-      }
-    },
     mark: (operation: string, context?: any) => {
       if (!this.isProduction) {
-        this.debug(`📊 ${operation}`, context);
+        this.debug(`Performance mark: ${operation}`, context);
       }
     },
   };

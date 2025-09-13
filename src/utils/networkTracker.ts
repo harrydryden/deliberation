@@ -102,9 +102,9 @@ export class NetworkPerformanceTracker {
 
     const threshold = thresholds[type as keyof typeof thresholds] || thresholds.api;
 
-    if (duration < threshold.fast) return '🚀 FAST';
-    if (duration < threshold.slow) return '⚠️ SLOW';
-    return '🐌 VERY SLOW';
+    if (duration < threshold.fast) return ' FAST';
+    if (duration < threshold.slow) return ' SLOW';
+    return '� VERY SLOW';
   }
 
   private getSlowThreshold(type: string): number {

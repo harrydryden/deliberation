@@ -15,8 +15,6 @@ interface FunctionDefinition {
 }
 
 async function auditAndFix() {
-  console.log('🔍 COMPREHENSIVE EDGE FUNCTION AUDIT & FIX\n');
-
   // 1. Parse config.toml to get expected functions
   const configText = await Deno.readTextFile('../config.toml');
   const functionMatches = configText.match(/\[functions\.([^\]]+)\]/g) || [];
@@ -24,7 +22,7 @@ async function auditAndFix() {
     .map(match => match.match(/\[functions\.([^\]]+)\]/)?.[1])
     .filter(Boolean) as string[];
 
-  console.log(`📋 Functions in config.toml: ${configFunctions.join(', ')}`);
+  }`);
 
   // 2. Check actual function directories
   const actualFunctions: string[] = [];
@@ -35,11 +33,10 @@ async function auditAndFix() {
       }
     }
   } catch (error) {
-    console.error('❌ Failed to read functions directory:', error.message);
     return;
   }
 
-  console.log(`📁 Actual function directories: ${actualFunctions.join(', ')}`);
+  }`);
 
   // 3. Identify mismatches and create missing functions
   const analysis: FunctionDefinition[] = [];
@@ -60,7 +57,6 @@ async function auditAndFix() {
 
     // Create missing function directory and basic index.ts
     if (!def.exists) {
-      console.log(`🔧 Creating missing function: ${funcName}`);
       await Deno.mkdir(functionPath, { recursive: true });
       
       // Create basic index.ts template
@@ -78,8 +74,6 @@ serve(async (req) => {
   }
 
   try {
-    // TODO: Implement ${funcName} logic here
-    console.log('${funcName} function called');
     
     return new Response(
       JSON.stringify({ 
@@ -93,8 +87,6 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('${funcName} error:', error);
-    
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
@@ -111,9 +103,7 @@ serve(async (req) => {
 `;
       
       await Deno.writeTextFile(indexPath, indexTemplate);
-      console.log(`✅ Created ${indexPath}`);
-    } else if (!def.hasIndex) {
-      console.log(`🔧 Creating missing index.ts for: ${funcName}`);
+      } else if (!def.hasIndex) {
       const indexTemplate = `import { serve } from "std/http/server.ts";
 
 const corsHeaders = {
@@ -128,8 +118,6 @@ serve(async (req) => {
   }
 
   try {
-    // TODO: Implement ${funcName} logic here
-    console.log('${funcName} function called');
     
     return new Response(
       JSON.stringify({ 
@@ -143,8 +131,6 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('${funcName} error:', error);
-    
     return new Response(
       JSON.stringify({ 
         error: 'Internal server error',
@@ -161,21 +147,19 @@ serve(async (req) => {
 `;
       
       await Deno.writeTextFile(indexPath, indexTemplate);
-      console.log(`✅ Created ${indexPath}`);
-    }
+      }
   }
 
   // 4. Check for orphaned directories
   for (const actualFunc of actualFunctions) {
     if (!configFunctions.includes(actualFunc)) {
-      console.warn(`⚠️  Orphaned function directory: ${actualFunc} (not in config.toml)`);
+      `);
     }
   }
 
   // 5. Final validation
-  console.log('\n' + '='.repeat(60));
-  console.log('📊 FINAL ARCHITECTURE STATUS:');
-  console.log('='.repeat(60));
+  );
+  );
   
   let allGood = true;
   for (const func of analysis) {
@@ -186,21 +170,16 @@ serve(async (req) => {
     const nowHasIndex = existsSync(indexPath);
     
     if (nowExists && nowHasIndex) {
-      console.log(`✅ ${func.name}: Ready for deployment`);
-    } else {
-      console.error(`❌ ${func.name}: Still missing files`);
+      } else {
       allGood = false;
     }
   }
   
-  console.log('\n' + '='.repeat(60));
+  );
   if (allGood) {
-    console.log('🎉 ALL EDGE FUNCTIONS ARE NOW DEPLOYMENT-READY!');
-    console.log('🚀 The "Entrypoint path does not exist" errors should be resolved.');
-  } else {
-    console.error('❌ Some functions still have issues - please check the output above.');
-  }
-  console.log('='.repeat(60));
+    } else {
+    }
+  );
 }
 
 // Run the audit and fix

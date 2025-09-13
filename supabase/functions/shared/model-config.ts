@@ -81,7 +81,6 @@ export class ModelConfigManager {
   static getConfig(modelName: string): ModelConfig {
     const config = MODEL_CONFIGS[modelName];
     if (!config) {
-      console.warn(`Unknown model: ${modelName}, falling back to default`);
       return MODEL_CONFIGS['gpt-5-2025-08-07'];
     }
     return config;
@@ -145,7 +144,7 @@ export class ModelConfigManager {
     // This ensures we don't constrain responses due to system prompt length
     const responseTokens = Math.floor(config.maxTokens * 0.75); // Use 75% of model capacity for responses
     
-    console.log(`🎯 Using ${responseTokens} response tokens (75% of ${config.maxTokens} model capacity)`);
+    `);
     
     // Base parameters
     const params: any = {
@@ -178,7 +177,7 @@ export class ModelConfigManager {
     // Use 3:1 ratio (more conservative) with minimum 1000 token floor
     const baseTokens = Math.ceil(characterLimit / 3) + 100;
     const tokens = Math.max(baseTokens, 1000); // Ensure minimum 1000 tokens for meaningful responses
-    console.log(`🎯 Converting ${characterLimit} chars to ${tokens} tokens (3:1 ratio + 100 buffer, min 1000)`);
+    `);
     return tokens;
   }
   

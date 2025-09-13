@@ -265,7 +265,7 @@ export const AgentManagement: React.FC = () => {
         max="4000"
         helpText={
           form.formData.character_limit < 1000 
-            ? "⚠️ Warning: Limits below 1000 may cause blank responses from GPT-5 models."
+            ? " Warning: Limits below 1000 may cause blank responses from GPT-5 models."
             : "Recommended: 1500+ for reliable responses with GPT-5 models."
         }
         className={form.formData.character_limit < 1000 ? "border-orange-500" : ""}

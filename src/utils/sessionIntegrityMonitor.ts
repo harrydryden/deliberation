@@ -45,7 +45,7 @@ export class SessionIntegrityMonitor {
   }
   
   private async handleUserChange(oldUserId: string, newUserId: string, event: string): Promise<void> {
-    logger.warn('🚨 Session user change detected', {
+    logger.warn(' Session user change detected', {
       event,
       oldUserId: oldUserId.substring(0, 8),
       newUserId: newUserId.substring(0, 8),

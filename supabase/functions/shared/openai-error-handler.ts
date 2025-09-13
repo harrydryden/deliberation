@@ -51,7 +51,7 @@ export class OpenAIErrorHandler {
           const retryAfter = response.headers.get('retry-after');
           const delay = retryAfter ? parseInt(retryAfter) * 1000 : this.calculateBackoffDelay(attempt, finalConfig);
           
-          console.log(`Rate limited. Retrying in ${delay}ms (attempt ${attempt + 1}/${finalConfig.maxRetries + 1})`);
+          `);
           
           if (attempt < finalConfig.maxRetries) {
             await this.sleep(delay);
@@ -62,7 +62,7 @@ export class OpenAIErrorHandler {
         // Handle server errors with retry
         if (response.status >= 500 && attempt < finalConfig.maxRetries) {
           const delay = this.calculateBackoffDelay(attempt, finalConfig);
-          console.log(`Server error ${response.status}. Retrying in ${delay}ms (attempt ${attempt + 1}/${finalConfig.maxRetries + 1})`);
+          `);
           await this.sleep(delay);
           continue;
         }
@@ -75,7 +75,6 @@ export class OpenAIErrorHandler {
             // Try to modify request for non-streaming mode
             const fallbackRequest = this.createFallbackRequest(request);
             if (fallbackRequest && attempt === 0) {
-              console.log('Organization verification issue. Trying fallback request...');
               return this.makeRequest(fallbackRequest, { ...config, maxRetries: 1 });
             }
           }
@@ -88,12 +87,11 @@ export class OpenAIErrorHandler {
         lastError = error as Error;
         
         if (attempt === finalConfig.maxRetries) {
-          console.error(`OpenAI request failed after ${finalConfig.maxRetries + 1} attempts:`, error);
           break;
         }
 
         const delay = this.calculateBackoffDelay(attempt, finalConfig);
-        console.log(`Request failed. Retrying in ${delay}ms (attempt ${attempt + 1}/${finalConfig.maxRetries + 1}):`, error.message);
+        :`, error.message);
         await this.sleep(delay);
       }
     }
@@ -138,7 +136,6 @@ export class OpenAIErrorHandler {
               onChunk(content, false);
             }
           } catch (parseError) {
-            console.warn('Failed to parse SSE chunk:', parseError);
             // Continue processing other chunks
           }
         }
@@ -147,7 +144,6 @@ export class OpenAIErrorHandler {
       onChunk('', true); // Signal completion
       return fullResponse;
     } catch (error) {
-      console.error('Stream reading error:', error);
       if (onError) {
         onError(error as Error);
       }
@@ -189,8 +185,7 @@ export class OpenAIErrorHandler {
         };
       }
     } catch (error) {
-      console.warn('Failed to create fallback request:', error);
-    }
+      }
 
     return null;
   }

@@ -90,7 +90,6 @@ describe('Admin Service Integration', () => {
     
     mockAdminRepository.createBulkUsers.mockResolvedValue({ users: expectedUsers });
 
-    // Test repository method directly since service method may not exist
     const result = await mockAdminRepository.createBulkUsers(count, roleType);
 
     expect(result.users).toHaveLength(count);

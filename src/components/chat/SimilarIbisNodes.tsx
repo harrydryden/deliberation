@@ -77,9 +77,9 @@ const SimilarIbisNodes: React.FC<SimilarIbisNodesProps> = ({
   const getNodeTypeIcon = (nodeType: string) => {
     switch (nodeType) {
       case 'issue': return '❓';
-      case 'position': return '💭';
-      case 'argument': return '📝';
-      default: return '📄';
+      case 'position': return '�';
+      case 'argument': return '�';
+      default: return '';
     }
   };
 

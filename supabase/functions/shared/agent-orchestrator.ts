@@ -127,12 +127,9 @@ export class AgentOrchestrator {
   async getAgentConfig(agentType: string, deliberationId?: string): Promise<AgentConfig | null> {
     const cacheKey = `${agentType}:${deliberationId || 'global'}`;
     
-    console.log(`🔄 Fetching agent config: ${agentType} for deliberation: ${deliberationId}`);
-    
     // Check cache first - proper cache behavior
     const cached = agentConfigCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < AGENT_CACHE_DURATION) {
-      console.log(`🚀 Agent config cache hit: ${agentType}`);
       return cached.agent;
     }
     
@@ -150,18 +147,15 @@ export class AgentOrchestrator {
           .maybeSingle();
         
         if (localError) {
-          console.warn(`Error fetching local ${agentType} agent:`, localError);
-        }
+          }
         
         if (localAgent) {
-          console.log(`✅ Found local ${agentType} agent`);
           agentConfig = localAgent;
         }
       }
       
       // Step 2: Fallback to global agent
       if (!agentConfig) {
-        console.log(`No local ${agentType} agent found, trying global agent`);
         const { data: globalAgent, error: globalError } = await this.supabase
           .from('agent_configurations')
           .select('*')
@@ -172,11 +166,9 @@ export class AgentOrchestrator {
           .maybeSingle();
         
         if (globalError) {
-          console.warn(`Error fetching global ${agentType} agent:`, globalError);
-        }
+          }
         
         if (globalAgent) {
-          console.log(`✅ Found global ${agentType} agent`);
           agentConfig = globalAgent;
         }
       }
@@ -187,7 +179,6 @@ export class AgentOrchestrator {
       return agentConfig;
       
     } catch (error) {
-      console.error(`Failed to fetch ${agentType} agent configuration:`, error);
       // Cache null result to avoid repeated failures
       this.cacheAgentConfig(cacheKey, null);
       return null;
@@ -223,14 +214,14 @@ export class AgentOrchestrator {
         const standardMatch = agentConfig.response_style.match(/Keep responses to no more than (\d+) characters/);
         if (standardMatch) {
           const characterLimit = parseInt(standardMatch[1]);
-          prompt += `\n\n⚠️ CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
+          prompt += `\n\n CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
         } else {
           // Fallback to flexible regex for existing agents
           const responseStyle = agentConfig.response_style.toLowerCase();
           const characterMatch = responseStyle.match(/(?:no more than|maximum|max|limit.*?to)\s*(\d+)\s*characters?/);
           if (characterMatch) {
             const characterLimit = parseInt(characterMatch[1]);
-            prompt += `\n\n⚠️ CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
+            prompt += `\n\n CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
           }
         }
       }
@@ -261,20 +252,16 @@ export class AgentOrchestrator {
         .maybeSingle();
       
       if (error) {
-        console.warn(`Failed to fetch prompt template ${templateName}:`, error);
         return this.getHardcodedFallback(agentType);
       }
       
       if (data?.template_text) {
-        console.log(`✅ Using database prompt template: ${templateName}`);
         return data.template_text;
       }
       
-      console.log(`⚠️ No template found for ${templateName}`);
       throw new Error(`Template ${templateName} not found in database`);
       
     } catch (error) {
-      console.error('Error fetching prompt template:', error);
       throw new Error(`Failed to fetch template ${templateName}: ${error.message}`);
     }
   }
@@ -286,7 +273,6 @@ export class AgentOrchestrator {
         .rpc('get_prompt_template', { template_name: templateName });
 
       if (error) {
-        console.error(`RPC error getting template ${templateName}:`, error);
         return this.getFallbackTemplate(templateName);
       }
 
@@ -294,10 +280,8 @@ export class AgentOrchestrator {
         return templateData[0].template_text;
       }
 
-      console.warn(`Template ${templateName} not found or empty, using fallback`);
       return this.getFallbackTemplate(templateName);
     } catch (error) {
-      console.error(`Failed to get template ${templateName}:`, error);
       return this.getFallbackTemplate(templateName);
     }
   }
@@ -344,12 +328,9 @@ export class AgentOrchestrator {
           ibisNodeCount = nodeData.length;
         }
       } catch (error) {
-        console.error('Error fetching IBIS node count:', error);
-      }
+        }
     }
 
-    console.log(`📊 IBIS nodes in deliberation: ${ibisNodeCount}`);
-    
     const scores = {
       bill_agent: 0,
       peer_agent: 0,
@@ -363,8 +344,6 @@ export class AgentOrchestrator {
       (analysis as any).content || ''
     );
     
-    console.log(`🔍 [SCORING] Request flags - isParticipantRequest: ${isParticipantRequest}, isQuestion: ${isQuestion}`);
-
     // Enhanced scoring with agent configuration awareness
     const factors = {
       complexity: analysis.complexity || 0.5,
@@ -388,46 +367,40 @@ export class AgentOrchestrator {
     // Intent-based scoring adjustments with enhanced precision
     if (factors.intent === 'policy' || factors.requiresExpertise) {
       billScore += 18; // Strong boost for policy/expertise
-      console.log(`🎯 Policy/expertise boost: +18 points for ${factors.intent}`);
-    } else if (factors.intent === 'participant' || factors.intent === 'argument') {
+      } else if (factors.intent === 'participant' || factors.intent === 'argument') {
       peerScore += 12; // Strong boost for participant synthesis
-      console.log(`👥 Participant synthesis boost: +12 points for ${factors.intent}`);
-    } else if (factors.intent === 'question') {
+      } else if (factors.intent === 'question') {
       // Conditional question boost - reduced for participant requests
       const questionBoost = isParticipantRequest ? 2 : 8;
       flowScore += questionBoost;
-      console.log(`❓ Process clarification boost: +${questionBoost} points for ${factors.intent}${isParticipantRequest ? ' (reduced due to participant request)' : ''}`);
+      ' : ''}`);
     }
     
     // CRITICAL: Participant request boost for peer agent
     if (isParticipantRequest) {
       peerScore += 25; // Massive boost for participant-focused requests
-      console.log(`🎯 [PARTICIPANT REQUEST] Peer agent boost: +25 points - prioritizing participant synthesis`);
-    }
+      }
 
     // IBIS node count penalties/bonuses with enhanced logic
     if (ibisNodeCount !== undefined) {
-      console.log(`📊 IBIS nodes in deliberation: ${ibisNodeCount}`);
-      
       if (ibisNodeCount < 5) {
         // Early map building phase - but reduce penalty for participant requests
         if (!isParticipantRequest) {
           const flowBoost = Math.max(8, 16 - (ibisNodeCount * 2)); // 16 points when 0 nodes, scaling down
           flowScore += flowBoost;
-          console.log(`🚀 Flow agent boost: +${flowBoost} points (${ibisNodeCount}/10 nodes - building structure)`);
+          `);
           
           // Reduced penalty for peer agent in early phases, none for participant requests
           const peerPenalty = Math.max(2, 6 - (ibisNodeCount * 1)); // Much reduced penalty
           peerScore -= peerPenalty;
-          console.log(`🚫 Peer agent penalty: -${peerPenalty} points (${ibisNodeCount}/10 nodes - building structure)`);
+          `);
         } else {
-          console.log(`🎯 [PARTICIPANT REQUEST] Skipping early-map penalties for peer agent`);
-        }
+          }
       } else if (ibisNodeCount >= 8) {
         // Rich discussion phase - boost peer agent for synthesis
         const peerBoost = Math.min(15, 5 + ibisNodeCount); // Scale with node count
         peerScore += peerBoost;
-        console.log(`🎭 Peer agent boost: +${peerBoost} points (${ibisNodeCount} nodes - rich discussion)`);
+        `);
       }
     }
 
@@ -459,18 +432,7 @@ export class AgentOrchestrator {
       overrideUsed = true;
     }
 
-    console.log(`🔬 Enhanced agent scoring results:`, {
-      scores: { bill_agent: billScore, peer_agent: peerScore, flow_agent: flowScore },
-      factors: {
-        complexity: factors.complexity,
-        requiresExpertise: factors.requiresExpertise,
-        intent: factors.intent,
-        originalIntent: factors.originalIntent,
-        isParticipantRequest,
-        isQuestion,
-        topicRelevance: factors.topicRelevance,
-        messageCount: factors.messageCount,
-        recentMessageTypes: factors.recentMessageTypes.slice(0, 5),
+    ,
         hasKnowledge: factors.hasKnowledge,
         ibisNodeCount
       },
@@ -496,7 +458,6 @@ export class AgentOrchestrator {
     
     // Circuit breaker check - persistent via database
     if (await this.isCircuitBreakerOpen()) {
-      console.warn('🚫 Circuit breaker OPEN - skipping analysis, using intelligent defaults');
       await this.recordAnalysisMetrics('analysis', null, false, Date.now() - startTime, 'Circuit breaker open', deliberationId);
       return this.generateIntelligentDefaults(content);
     }
@@ -504,8 +465,6 @@ export class AgentOrchestrator {
     const safeContent = content || '';
     const contentPreview = safeContent.length > 0 ? safeContent.substring(0, 100) + '...' : '[empty content]';
     
-    console.log(`🔍 [ANALYSIS] Starting optimized analysis for: "${contentPreview}"`);
-
     // Streamlined model hierarchy - only 2 models for performance
     const modelHierarchy = [
       'gpt-5-2025-08-07',
@@ -517,8 +476,6 @@ export class AgentOrchestrator {
     // Try each model with 8 second total timeout
     for (const modelName of modelHierarchy) {
       try {
-        console.log(`🤖 [ANALYSIS] Attempting with model: ${modelName}`);
-        
         const result = await this.attemptAnalysisWithModel(
           safeContent, 
           openAIApiKey, 
@@ -528,8 +485,6 @@ export class AgentOrchestrator {
 
         if (result) {
           const duration = Date.now() - startTime;
-          console.log(`✅ [ANALYSIS] Success with ${modelName} in ${duration}ms`);
-          
           // SUCCESS-BASED RECOVERY: Reset circuit breaker on successful analysis
           await this.resetCircuitBreakerOnSuccess();
           
@@ -538,14 +493,12 @@ export class AgentOrchestrator {
         }
       } catch (error) {
         lastError = error;
-        console.warn(`⚠️ [ANALYSIS] ${modelName} failed:`, error.message);
         continue; // Try next model
       }
     }
 
     // All models failed - record failure and use intelligent fallback
     const duration = Date.now() - startTime;
-    console.error('❌ [ANALYSIS] All models failed, recording failure and using intelligent defaults');
     await this.recordAnalysisFailure();
     await this.recordAnalysisMetrics('analysis', 'all_failed', false, duration, lastError?.message, deliberationId);
     
@@ -562,11 +515,7 @@ export class AgentOrchestrator {
     const totalTimeoutMs = 8000; // Total timeout for all attempts
     const remainingTime = Math.max(1000, totalTimeoutMs - (Date.now() - startTime));
     
-    console.log(`🎯 [ANALYSIS] Model ${modelName}, ${remainingTime}ms remaining`);
-
     const systemMessage = await this.getSystemMessage('message_analysis_system_message');
-    console.log(`📝 [ANALYSIS] System message length: ${systemMessage.length} chars`);
-
     // Use ModelConfigManager for proper parameter handling
     const { ModelConfigManager } = await import('./model-config.ts');
     
@@ -582,18 +531,9 @@ export class AgentOrchestrator {
 
     // Enhanced response validation for newer models
     if (!ModelConfigManager.supportsFeature(modelName, 'temperature')) {
-      console.log(`🔧 [ANALYSIS] Using text response for newer model ${modelName}`);
-    } else {
+      } else {
       apiParams.response_format = { type: "json_object" };
-      console.log(`🔧 [ANALYSIS] Using JSON response for legacy model ${modelName}`);
-    }
-
-    console.log(`📤 [ANALYSIS] API request params:`, {
-      model: apiParams.model,
-      tokens: apiParams.max_tokens || apiParams.max_completion_tokens,
-      hasResponseFormat: !!apiParams.response_format,
-      hasTemperature: !!apiParams.temperature
-    });
+      }
 
     // Make the API call with remaining time timeout
     const analysisPromise = fetch('https://api.openai.com/v1/chat/completions', {
@@ -613,22 +553,19 @@ export class AgentOrchestrator {
     ]);
 
     const elapsed = Date.now() - startTime;
-    console.log(`📡 [ANALYSIS] Response received: ${response.status} in ${elapsed}ms`);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`❌ [ANALYSIS] OpenAI error ${response.status}:`, errorText.substring(0, 200));
+      );
       throw new Error(`OpenAI API error: ${response.status} - ${errorText.substring(0, 100)}`);
     }
 
     const data = await response.json();
     const analysisContent = data.choices?.[0]?.message?.content;
     
-    console.log(`📄 [ANALYSIS] Raw response:`, analysisContent?.substring(0, 200) + '...');
+    + '...');
 
     // Enhanced response validation
     if (!analysisContent || analysisContent.trim().length === 0) {
-      console.warn(`❌ Empty/invalid response from ${modelName}`);
       throw new Error('Empty analysis content received from OpenAI');
     }
 
@@ -639,14 +576,11 @@ export class AgentOrchestrator {
       try {
         parsedResult = JSON.parse(analysisContent);
       } catch (parseError) {
-        console.error(`❌ [ANALYSIS] JSON parse error:`, parseError);
         throw new Error(`Invalid JSON response from ${modelName}: ${analysisContent.substring(0, 100)}`);
       }
     } else {
       parsedResult = this.parseTextAnalysisResponse(analysisContent);
     }
-
-    console.log(`🔧 [ANALYSIS] Parsed result:`, parsedResult);
 
     // Validate and format the result
     const result: AnalysisResult = {
@@ -660,11 +594,6 @@ export class AgentOrchestrator {
     };
 
     // Enhanced logging with normalized intent
-    console.log(`✅ [ANALYSIS] Validated result:`, {
-      ...result,
-      originalIntent: parsedResult.intent,
-      normalizedIntent: result.intent
-    });
     return result;
   }
 
@@ -700,10 +629,8 @@ export class AgentOrchestrator {
         }
       }
       
-      console.log(`🔧 [ANALYSIS] Parsed from text:`, result);
       return result;
     } catch (error) {
-      console.error(`❌ [ANALYSIS] Text parsing failed:`, error);
       throw new Error(`Failed to parse text analysis response: ${content.substring(0, 100)}`);
     }
   }
@@ -718,7 +645,6 @@ export class AgentOrchestrator {
         .maybeSingle();
 
       if (error) {
-        console.warn('Circuit breaker state check failed, assuming closed:', error);
         return false;
       }
 
@@ -741,11 +667,11 @@ export class AgentOrchestrator {
         
         if (timeSinceLastFailure < adaptiveTimeout) {
           const remainingSeconds = Math.ceil((adaptiveTimeout - timeSinceLastFailure) / 1000);
-          console.log(`🚫 Circuit breaker OPEN - ${remainingSeconds}s remaining (adaptive timeout)`);
+          `);
           return true; // Circuit is still open
         } else {
           // Reset circuit breaker after adaptive timeout
-          console.log(`🔄 Circuit breaker adaptive timeout reached (${adaptiveTimeout}ms) - resetting`);
+          - resetting`);
           await this.resetCircuitBreaker();
           return false;
         }
@@ -753,7 +679,6 @@ export class AgentOrchestrator {
       
       return false;
     } catch (error) {
-      console.warn('Circuit breaker check failed, assuming closed:', error);
       return false;
     }
   }
@@ -785,17 +710,12 @@ export class AgentOrchestrator {
         });
 
       if (error) {
-        console.error('Failed to record analysis failure:', error);
-      } else {
-        console.log(`📊 Analysis failure recorded: ${newFailureCount}/${AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD}`);
-        
+        } else {
         if (newFailureCount >= AgentOrchestrator.CIRCUIT_BREAKER_THRESHOLD) {
-          console.warn('🚫 Circuit breaker ACTIVATED - analysis disabled for 1 minute');
-        }
+          }
       }
     } catch (error) {
-      console.error('Failed to record analysis failure:', error);
-    }
+      }
   }
 
   // Enhanced circuit breaker reset with success-based recovery
@@ -820,14 +740,11 @@ export class AgentOrchestrator {
           .eq('id', AgentOrchestrator.CIRCUIT_BREAKER_ID);
 
         if (error) {
-          console.error('Failed to reset circuit breaker on success:', error);
-        } else {
-          console.log('🔄 Circuit breaker RESET - analysis succeeding again');
-        }
+          } else {
+          }
       }
     } catch (error) {
-      console.error('Failed to reset circuit breaker on success:', error);
-    }
+      }
   }
 
   // Progressive failure reduction for sustained success
@@ -851,12 +768,10 @@ export class AgentOrchestrator {
           .eq('id', AgentOrchestrator.CIRCUIT_BREAKER_ID);
 
         if (!error && newCount < currentState.failure_count) {
-          console.log(`📉 Progressive recovery: failure count reduced to ${newCount}`);
-        }
+          }
       }
     } catch (error) {
-      console.error('Failed to reduce failure count:', error);
-    }
+      }
   }
 
   private async resetCircuitBreaker(): Promise<void> {
@@ -871,13 +786,10 @@ export class AgentOrchestrator {
         .eq('id', AgentOrchestrator.CIRCUIT_BREAKER_ID);
 
       if (error) {
-        console.error('Failed to reset circuit breaker:', error);
-      } else {
-        console.log('🔄 Circuit breaker manually RESET');
-      }
+        } else {
+        }
     } catch (error) {
-      console.error('Failed to reset circuit breaker:', error);
-    }
+      }
   }
 
   // Analysis metrics tracking
@@ -902,11 +814,9 @@ export class AgentOrchestrator {
         });
 
       if (error) {
-        console.warn('Failed to record analysis metrics:', error);
-      }
+        }
     } catch (error) {
-      console.warn('Failed to record analysis metrics:', error);
-    }
+      }
   }
 
   private validateIntent(intent: any): string | null {
@@ -936,8 +846,7 @@ export class AgentOrchestrator {
     
     // Enhanced logging for intent normalization
     if (mappedIntent && mappedIntent !== normalizedIntent) {
-      console.log(`🔄 [INTENT] Normalized "${normalizedIntent}" → "${mappedIntent}"`);
-    }
+      }
     
     return mappedIntent || null; // Return null if no mapping found (will default to 'general')
   }
@@ -957,8 +866,6 @@ export class AgentOrchestrator {
     const wordCount = content.split(/\s+/).length;
     const sentenceCount = (content.match(/[.!?]+/g) || []).length;
     const questionCount = (content.match(/\?/g) || []).length;
-    
-    console.log(`🧠 [DEFAULTS] Generating optimized defaults for ${contentLength} chars, ${wordCount} words`);
     
     // Enhanced keyword analysis with weighted scoring
     const keywords = {
@@ -1011,7 +918,7 @@ export class AgentOrchestrator {
     const hasParticipantRequest = this.detectParticipantRequest(content);
     
     if (hasParticipantRequest) {
-      console.log(`🎯 [INTENT] Participant-focused request detected: "${content.substring(0, 50)}..." - prioritizing peer synthesis`);
+      }..." - prioritizing peer synthesis`);
       intent = 'participant_request';
     } else if (matches.policy.score > 0.5 || matches.expertise.score > 1) {
       intent = 'policy_expertise';
@@ -1057,16 +964,7 @@ export class AgentOrchestrator {
       content
     };
 
-    console.log(`🧠 [DEFAULTS] Optimized result:`, {
-      ...result,
-      originalIntent,
-      normalizedIntent,
-      factors: {
-        contentLength,
-        wordCount,
-        totalScore,
-        weightedMatches: Object.fromEntries(
-          Object.entries(matches).map(([k, v]) => [k, v.score])
+    .map(([k, v]) => [k, v.score])
         )
       }
     });
@@ -1109,8 +1007,7 @@ export class AgentOrchestrator {
     }
     
     keysToDelete.forEach(key => agentConfigCache.delete(key));
-    console.log(`🧹 Agent cache cleanup: removed ${keysToDelete.length} entries`);
-  }
+    }
 
   // CACHE INVALIDATION
   invalidateAgentCache(agentType?: string, deliberationId?: string): void {
@@ -1132,8 +1029,7 @@ export class AgentOrchestrator {
       // Clear all cache
       agentConfigCache.clear();
     }
-    console.log(`🔄 Invalidated agent cache: ${agentType || 'all'}`);
-  }
+    }
 
   private enhancePromptWithContext(prompt: string, agentType: string, context?: any): string {
     if (!context) return prompt;
@@ -1160,7 +1056,7 @@ export class AgentOrchestrator {
       
       // Add character limit instruction if found and not already in template
       if (characterLimit && !prompt.includes('CRITICAL: Your response must be NO MORE THAN')) {
-        prompt += `\n\n⚠️ CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
+        prompt += `\n\n CRITICAL: Your response must be NO MORE THAN ${characterLimit} CHARACTERS. This is a hard limit that must be strictly enforced. Keep responses concise and focused.`;
       }
     }
 
@@ -1199,7 +1095,6 @@ export class AgentOrchestrator {
       }
     } else {
       // For non-peer agents, explicitly state no IBIS access
-      console.log(`🚫 IBIS access restricted for agent type: ${agentType}`);
       prompt += `\n\nIBIS ACCESS: You do not have access to the deliberation's IBIS discussion map. Focus on your specialized role without referencing specific discussion points or issues from the IBIS structure.`;
     }
 

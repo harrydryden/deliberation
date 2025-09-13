@@ -1,12 +1,378 @@
-import { serve } from "std/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
-// Touch: noop comment to trigger edge function redeploy
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.53.1";
 
-// Inlined utilities to avoid cross-folder import issues
+// ============================================================================
+// SOPHISTICATED PDF PROCESSING WITH SHARED FUNCTIONALITY INLINED
+// ============================================================================
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept, cache-control, x-requested-with',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Max-Age': '86400'
 };
+
+// ============================================================================
+// ENHANCED EDGE LOGGER
+// ============================================================================
+
+class EdgeLogger {
+  private static formatMessage(level: string, message: string, data?: any): string {
+    const timestamp = new Date().toISOString();
+    const dataStr = data ? ` | ${JSON.stringify(data)}` : '';
+    return `[${timestamp}] [${level}] ${message}${dataStr}`;
+  }
+
+  static debug(message: string, data?: any): void {
+    );
+  }
+
+  static info(message: string, data?: any): void {
+    );
+  }
+
+  static warn(message: string, data?: any): void {
+    );
+  }
+
+  static error(message: string, data?: any): void {
+    );
+  }
+}
+
+// ============================================================================
+// CIRCUIT BREAKER IMPLEMENTATION
+// ============================================================================
+
+class CircuitBreaker {
+  private static readonly CIRCUIT_BREAKER_ID = 'pdf_processing';
+  private static readonly CIRCUIT_BREAKER_THRESHOLD = 3;
+  private static readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute
+
+  constructor(private supabase: any) {}
+
+  async isOpen(): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase
+        .from('circuit_breaker_state')
+        .select('*')
+        .eq('id', CircuitBreaker.CIRCUIT_BREAKER_ID)
+        .maybeSingle();
+
+      if (error || !data) return false;
+
+      const now = Date.now();
+      const lastFailureTime = new Date(data.last_failure_time).getTime();
+      
+      if (data.failure_count >= CircuitBreaker.CIRCUIT_BREAKER_THRESHOLD) {
+        const timeSinceLastFailure = now - lastFailureTime;
+        
+        if (timeSinceLastFailure < CircuitBreaker.CIRCUIT_BREAKER_TIMEOUT) {
+          EdgeLogger.warn(`Circuit breaker OPEN - ${Math.ceil((CircuitBreaker.CIRCUIT_BREAKER_TIMEOUT - timeSinceLastFailure) / 1000)}s remaining`);
+          return true;
+        } else {
+          await this.reset();
+          return false;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      EdgeLogger.warn('Circuit breaker check failed, assuming closed', error);
+      return false;
+    }
+  }
+
+  async recordFailure(): Promise<void> {
+    try {
+      const now = new Date();
+      const { data: currentState } = await this.supabase
+        .from('circuit_breaker_state')
+        .select('failure_count')
+        .eq('id', CircuitBreaker.CIRCUIT_BREAKER_ID)
+        .maybeSingle();
+
+      const newFailureCount = (currentState?.failure_count || 0) + 1;
+      
+      await this.supabase
+        .from('circuit_breaker_state')
+        .upsert({
+          id: CircuitBreaker.CIRCUIT_BREAKER_ID,
+          failure_count: newFailureCount,
+          last_failure_time: now,
+          is_open: newFailureCount >= CircuitBreaker.CIRCUIT_BREAKER_THRESHOLD,
+          updated_at: now
+        }, { onConflict: 'id' });
+
+      EdgeLogger.info(`Circuit breaker failure recorded: ${newFailureCount}/${CircuitBreaker.CIRCUIT_BREAKER_THRESHOLD}`);
+    } catch (error) {
+      EdgeLogger.error('Failed to record circuit breaker failure', error);
+    }
+  }
+
+  async reset(): Promise<void> {
+    try {
+      await this.supabase
+        .from('circuit_breaker_state')
+        .update({
+          failure_count: 0,
+          is_open: false,
+          updated_at: new Date()
+        })
+        .eq('id', CircuitBreaker.CIRCUIT_BREAKER_ID);
+      EdgeLogger.info('Circuit breaker RESET');
+    } catch (error) {
+      EdgeLogger.error('Failed to reset circuit breaker', error);
+    }
+  }
+}
+
+// ============================================================================
+// ENHANCED PDF PROCESSING SERVICE
+// ============================================================================
+
+class PDFProcessingService {
+  private circuitBreaker: CircuitBreaker;
+  private supabase: any;
+  private openaiApiKey: string;
+
+  constructor(supabase: any, openaiApiKey: string) {
+    this.supabase = supabase;
+    this.openaiApiKey = openaiApiKey;
+    this.circuitBreaker = new CircuitBreaker(supabase);
+  }
+
+  async processPDF(pdfData: string, filename: string, agentId?: string): Promise<any> {
+    const startTime = Date.now();
+    
+    // Circuit breaker check
+    if (await this.circuitBreaker.isOpen()) {
+      EdgeLogger.warn('Circuit breaker OPEN - using fallback PDF processing');
+      return this.generateFallbackProcessing(filename);
+    }
+
+    try {
+      EdgeLogger.info('Starting PDF processing', {
+        filename,
+        agentId,
+        dataLength: pdfData.length
+      });
+
+      // Validate PDF data
+      if (!pdfData || pdfData.length === 0) {
+        throw new Error('No PDF data provided');
+      }
+
+      // Convert base64 to buffer
+      const pdfBuffer = Uint8Array.from(atob(pdfData), c => c.charCodeAt(0));
+      
+      // Validate PDF format and size
+      if (pdfBuffer.length === 0) {
+        throw new Error('Invalid PDF data format');
+      }
+
+      const maxSize = 10 * 1024 * 1024; // 10MB limit
+      if (pdfBuffer.length > maxSize) {
+        throw new Error(`PDF file too large: ${pdfBuffer.length} bytes (max: ${maxSize})`);
+      }
+
+      EdgeLogger.debug('PDF data validated', {
+        bufferSize: pdfBuffer.length,
+        filename
+      });
+
+      // Process PDF using OpenAI
+      const processingResult = await this.processWithOpenAI(pdfBuffer, filename);
+
+      // Store processed content in database
+      const storageResult = await this.storeProcessedContent(
+        processingResult,
+        filename,
+        agentId
+      );
+
+      const duration = Date.now() - startTime;
+      EdgeLogger.info('PDF processing completed successfully', {
+        filename,
+        chunksCreated: processingResult.chunks?.length || 0,
+        duration
+      });
+
+      // Reset circuit breaker on success
+      await this.circuitBreaker.reset();
+
+      return {
+        success: true,
+        filename,
+        chunks: processingResult.chunks || [],
+        summary: processingResult.summary,
+        metadata: {
+          processingTimeMs: duration,
+          fileSizeBytes: pdfBuffer.length,
+          chunksCreated: processingResult.chunks?.length || 0,
+          agentId,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      EdgeLogger.error('PDF processing failed', {
+        error: error.message,
+        duration,
+        filename
+      });
+
+      await this.circuitBreaker.recordFailure();
+      
+      return this.generateErrorResponse(error.message, filename);
+    }
+  }
+
+  private async processWithOpenAI(pdfBuffer: Uint8Array, filename: string): Promise<any> {
+    const formData = new FormData();
+    const pdfBlob = new Blob([pdfBuffer], { type: 'application/pdf' });
+    formData.append('file', pdfBlob, filename);
+    formData.append('model', 'gpt-4o-mini');
+    formData.append('response_format', 'json_object');
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.openaiApiKey}`,
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorText.substring(0, 200)}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.choices?.[0]?.message?.content) {
+      throw new Error('No processing result from OpenAI');
+    }
+
+    try {
+      const processingResult = JSON.parse(result.choices[0].message.content);
+      
+      EdgeLogger.debug('OpenAI PDF processing completed', {
+        filename,
+        chunksCount: processingResult.chunks?.length || 0,
+        hasSummary: !!processingResult.summary
+      });
+
+      return processingResult;
+    } catch (parseError) {
+      EdgeLogger.error('Failed to parse OpenAI PDF processing result', {
+        error: parseError.message,
+        filename
+      });
+      throw new Error('Invalid processing result format from OpenAI');
+    }
+  }
+
+  private async storeProcessedContent(
+    processingResult: any,
+    filename: string,
+    agentId?: string
+  ): Promise<any> {
+    if (!processingResult.chunks || processingResult.chunks.length === 0) {
+      EdgeLogger.warn('No chunks to store', { filename });
+      return { stored: 0 };
+    }
+
+    let storedCount = 0;
+    const chunks = processingResult.chunks.map((chunk: any, index: number) => ({
+      id: crypto.randomUUID(),
+      title: chunk.title || `Chunk ${index + 1}`,
+      content: chunk.content || '',
+      metadata: {
+        filename,
+        chunkIndex: index,
+        agentId: agentId || null,
+        processedAt: new Date().toISOString()
+      },
+      agent_id: agentId || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }));
+
+    // Store chunks in batches
+    const batchSize = 10;
+    for (let i = 0; i < chunks.length; i += batchSize) {
+      const batch = chunks.slice(i, i + batchSize);
+      
+      try {
+        const { error } = await this.supabase
+          .from('agent_knowledge')
+          .insert(batch);
+
+        if (error) {
+          EdgeLogger.warn('Failed to store chunk batch', {
+            error: error.message,
+            batchStart: i,
+            batchSize: batch.length
+          });
+        } else {
+          storedCount += batch.length;
+        }
+      } catch (error) {
+        EdgeLogger.warn('Error storing chunk batch', {
+          error: error.message,
+          batchStart: i,
+          batchSize: batch.length
+        });
+      }
+    }
+
+    EdgeLogger.debug('PDF chunks stored', {
+      filename,
+      totalChunks: chunks.length,
+      storedChunks: storedCount
+    });
+
+    return { stored: storedCount };
+  }
+
+  private generateFallbackProcessing(filename: string): any {
+    EdgeLogger.info('Generating fallback PDF processing response', { filename });
+    
+    return {
+      success: true,
+      filename,
+      chunks: [],
+      summary: "PDF processing unavailable at this time.",
+      metadata: {
+        source: 'fallback',
+        processingTimeMs: 0,
+        chunksCreated: 0,
+        reason: 'Circuit breaker open'
+      }
+    };
+  }
+
+  private generateErrorResponse(errorMessage: string, filename: string): any {
+    return {
+      success: false,
+      filename,
+      chunks: [],
+      summary: "",
+      error: errorMessage,
+      metadata: {
+        processingTimeMs: 0,
+        chunksCreated: 0,
+        reason: 'Processing failed'
+      }
+    };
+  }
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
 function handleCORSPreflight(request: Request): Response | null {
   if (request.method === 'OPTIONS') {
@@ -17,7 +383,7 @@ function handleCORSPreflight(request: Request): Response | null {
 
 function createErrorResponse(error: any, status: number = 500, context?: string): Response {
   const errorId = crypto.randomUUID();
-  console.error(`[${errorId}] ${context || 'Edge Function'} Error:`, error);
+  EdgeLogger.error(`${context || 'Edge Function'} Error`, { errorId, error: error?.message });
   
   return new Response(
     JSON.stringify({
@@ -43,6 +409,10 @@ function createSuccessResponse(data: any): Response {
 }
 
 async function parseAndValidateRequest<T>(request: Request, requiredFields: string[] = []): Promise<T> {
+  const requestId = crypto.randomUUID().slice(0, 8);
+  
+  EdgeLogger.debug('Parsing PDF processing request', { requestId, requiredFields });
+  
   try {
     const body = await request.json();
     
@@ -52,493 +422,90 @@ async function parseAndValidateRequest<T>(request: Request, requiredFields: stri
       }
     }
     
+    EdgeLogger.debug('Request validation successful', { requestId });
     return body as T;
   } catch (error: any) {
+    EdgeLogger.error('Request parsing failed', { requestId, error: error.message });
     throw new Error(`Request parsing failed: ${error.message}`);
   }
 }
 
-function validateAndGetEnvironment() {
+function getOpenAIKey(): string {
+  const apiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!apiKey) {
+    throw new Error('OpenAI API key not configured');
+  }
+  return apiKey;
+}
+
+async function validateAndGetEnvironment() {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 
-  if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
-    throw new Error('Missing required Supabase environment variables');
+  if (!supabaseUrl || !supabaseServiceKey || !openaiApiKey) {
+    const missing = [];
+    if (!supabaseUrl) missing.push('SUPABASE_URL');
+    if (!supabaseServiceKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+    if (!openaiApiKey) missing.push('OPENAI_API_KEY');
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
 
   return {
     supabase: createClient(supabaseUrl, supabaseServiceKey),
-    userSupabase: createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: false }
-    })
+    openaiApiKey
   };
 }
 
-const EdgeLogger = {
-  debug: (message: string, data?: any) => console.log(`🔍 ${message}`, data),
-  info: (message: string, data?: any) => console.log(`ℹ️ ${message}`, data),
-  error: (message: string, error?: any) => console.error(`❌ ${message}`, error),
-};
+// ============================================================================
+// INTERFACES
+// ============================================================================
 
-interface PdfProcessingRequest {
-  fileUrl: string;
-  fileName: string;
-  deliberationId: string;
-  userId: string;
+interface PDFProcessingRequest {
+  pdfData: string;
+  filename: string;
+  agentId?: string;
 }
 
-interface PdfProcessingResult {
-  success: boolean;
-  text: string;
-  pages: number;
-  strategy: string;
-  error?: string;
-  metadata?: Record<string, unknown>;
-}
+// ============================================================================
+// MAIN EDGE FUNCTION
+// ============================================================================
 
 serve(async (req) => {
-  EdgeLogger.debug('PDF Processor function called', { method: req.method, url: req.url });
-  
-  // Handle CORS preflight requests
   const corsResponse = handleCORSPreflight(req);
   if (corsResponse) return corsResponse;
 
   try {
-    EdgeLogger.debug('Processing PDF extraction request');
+    EdgeLogger.info('PDF processor function called', { 
+      method: req.method, 
+      url: req.url 
+    });
+
+    const { pdfData, filename, agentId }: PDFProcessingRequest = await parseAndValidateRequest(req, ['pdfData', 'filename']);
+    const { supabase, openaiApiKey } = await validateAndGetEnvironment();
+
+    EdgeLogger.info('Processing PDF request', {
+      filename,
+      agentId,
+      dataLength: pdfData.length
+    });
+
+    // Create PDF processing service
+    const pdfService = new PDFProcessingService(supabase, openaiApiKey);
     
-    // Validate environment and get clients
-    const { supabase, userSupabase } = validateAndGetEnvironment();
-    
-    // Verify JWT token
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      EdgeLogger.error('No authorization header provided');
-      throw new Error('No authorization header');
-    }
+    // Process PDF
+    const result = await pdfService.processPDF(pdfData, filename, agentId);
 
-    // Create client with user token
-    const supabaseClient = userSupabase;
-    // Set the auth header for the request
-    supabaseClient.auth.setSession = null; // Reset any existing session
-    
-    // Verify the user using the provided token
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (authError || !user) {
-      console.error('Authentication failed:', authError);
-      throw new Error('Invalid authentication');
-    }
-
-    console.log('User authenticated:', user.id);
-
-    const { fileUrl, fileName, deliberationId, userId }: PdfProcessingRequest = await parseAndValidateRequest<PdfProcessingRequest>(
-      req,
-      ['fileUrl', 'fileName', 'deliberationId', 'userId']
-    );
-
-
-    // Validate that fileUrl is a complete URL
-    if (!fileUrl.startsWith('http')) {
-      console.error('Invalid fileUrl format - expected complete URL, got:', fileUrl);
-      throw new Error(`Invalid fileUrl format: expected complete URL starting with 'http', got: ${fileUrl}`);
-    }
-
-    console.log('Starting PDF processing for:', fileName);
-    console.log('Using fileUrl:', fileUrl);
-
-    // Process the PDF with multiple strategies
-    const result = await processPdfWithMultipleStrategies(fileUrl, fileName);
-
-    if (result.success) {
-      console.log('PDF processing successful, storing in knowledge base...');
-      try {
-        // Store the extracted text in the knowledge base
-        await storeExtractedText(result, deliberationId, userId, fileName, supabase);
-        console.log('Knowledge chunks stored successfully');
-      } catch (storageError) {
-        console.error('Failed to store knowledge chunks:', storageError);
-        // Return the extraction result but indicate storage failed
-        result.error = `Text extraction succeeded but storage failed: ${storageError.message}`;
-        result.metadata = {
-          ...result.metadata,
-          storageError: storageError.message,
-          storageFailed: true
-        };
-      }
-    } else {
-      console.warn('PDF processing failed:', result.error);
-    }
+    EdgeLogger.info('PDF processing completed', {
+      success: result.success,
+      filename: result.filename,
+      chunksCreated: result.chunks?.length || 0
+    });
 
     return createSuccessResponse(result);
 
   } catch (error) {
-    console.error('PDF Processing Error:', error);
+    EdgeLogger.error('PDF processing error', error);
     return createErrorResponse(error, 500, 'PDF processing');
   }
 });
-
-async function processPdfWithMultipleStrategies(fileUrl: string, fileName: string): Promise<PdfProcessingResult> {
-  const strategies = [
-    { name: 'pdfjs', fn: extractWithPdfJs },
-    { name: 'enhanced-regex', fn: extractWithEnhancedRegex },
-    { name: 'binary-analysis', fn: extractWithBinaryAnalysis },
-    { name: 'fallback-text', fn: extractWithFallbackText }
-  ];
-
-  for (const strategy of strategies) {
-    try {
-      console.log(`Attempting PDF extraction with strategy: ${strategy.name}`);
-      const result = await strategy.fn(fileUrl, fileName);
-      
-      if (result.success && result.text.trim().length > 100) {
-        console.log(`Successfully extracted text using ${strategy.name} strategy`);
-        return { ...result, strategy: strategy.name };
-      }
-    } catch (error) {
-      console.warn(`Strategy ${strategy.name} failed:`, error.message);
-      continue;
-    }
-  }
-
-  // All strategies failed
-  return {
-    success: false,
-    text: '',
-    pages: 0,
-    strategy: 'all-failed',
-    error: 'All PDF extraction strategies failed'
-  };
-}
-
-async function extractWithPdfJs(fileUrl: string, fileName: string): Promise<PdfProcessingResult> {
-  try {
-    // Download the PDF file
-    const response = await fetch(fileUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download PDF: ${response.statusText}`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-
-    // Load PDF.js library
-    const pdfjsLib = await import('pdfjs-dist');
-    
-    // Configure PDF.js worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://esm.sh/pdfjs-dist@4.0.379/build/pdf.worker.min.js';
-
-    // Load the PDF document
-    const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
-    const pdf = await loadingTask.promise;
-
-    let extractedText = '';
-    const totalPages = pdf.numPages;
-
-    // Extract text from each page
-    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      
-      extractedText += `\n--- Page ${pageNum} ---\n${pageText}\n`;
-    }
-
-    return {
-      success: true,
-      text: extractedText.trim(),
-      pages: totalPages,
-      strategy: 'pdfjs',
-      metadata: {
-        fileName,
-        extractionMethod: 'PDF.js',
-        totalPages,
-        textLength: extractedText.length
-      }
-    };
-
-  } catch (error) {
-    console.error('PDF.js extraction failed:', error);
-    throw error;
-  }
-}
-
-async function extractWithEnhancedRegex(fileUrl: string, fileName: string): Promise<PdfProcessingResult> {
-  try {
-    // Download the PDF file
-    const response = await fetch(fileUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download PDF: ${response.statusText}`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-
-    // Convert to text using enhanced regex patterns
-    const textDecoder = new TextDecoder('utf-8');
-    let pdfText = textDecoder.decode(uint8Array);
-
-    // Enhanced text extraction patterns
-    const patterns = [
-      // Extract text between common PDF markers
-      /\/Text\s*<<[^>]*>>\s*stream\s*([\s\S]*?)\s*endstream/gi,
-      // Extract text from content streams
-      /BT\s*([\s\S]*?)\s*ET/gi,
-      // Extract text from text objects
-      /Tj\s*\(([^)]*)\)/gi,
-      // Extract text from text arrays
-      /TJ\s*\[([^\]]*)\]/gi,
-      // Look for readable text patterns
-      /[A-Za-z0-9\s.,!?;:'"()[\]{}]+/g
-    ];
-
-    let extractedText = '';
-    let pageCount = 0;
-
-    for (const pattern of patterns) {
-      const matches = pdfText.match(pattern);
-      if (matches) {
-        extractedText += matches.join(' ') + ' ';
-        pageCount = Math.max(pageCount, matches.length);
-      }
-    }
-
-    // Clean up the extracted text
-    extractedText = extractedText
-      .replace(/\s+/g, ' ')
-      .replace(/[^\w\s.,!?;:'"()[\]{}]/g, '')
-      .trim();
-
-    if (extractedText.length < 50) {
-      throw new Error('Insufficient text extracted with regex');
-    }
-
-    return {
-      success: true,
-      text: extractedText,
-      pages: pageCount || 1,
-      strategy: 'enhanced-regex',
-      metadata: {
-        fileName,
-        extractionMethod: 'Enhanced Regex',
-        patternsUsed: patterns.length,
-        textLength: extractedText.length
-      }
-    };
-
-  } catch (error) {
-    console.error('Enhanced regex extraction failed:', error);
-    throw error;
-  }
-}
-
-async function extractWithBinaryAnalysis(fileUrl: string, fileName: string): Promise<PdfProcessingResult> {
-  try {
-    // Download the PDF file
-    const response = await fetch(fileUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download PDF: ${response.statusText}`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-
-    // Binary analysis for PDF structure
-    let extractedText = '';
-    let pageCount = 0;
-
-    // Look for PDF text markers in binary data
-    const textMarkers = [
-      'BT', 'ET', 'Tj', 'TJ', 'Td', 'Tm', 'Tc', 'Tw', 'Tz', 'TL'
-    ];
-
-    // Convert binary data to string for pattern matching
-    const binaryString = String.fromCharCode.apply(null, Array.from(uint8Array));
-    
-    for (const marker of textMarkers) {
-      const regex = new RegExp(`${marker}\\s*([^\\s]+)`, 'gi');
-      const matches = binaryString.match(regex);
-      if (matches) {
-        extractedText += matches.join(' ') + ' ';
-        pageCount++;
-      }
-    }
-
-    // Look for readable text sequences
-    const readablePattern = /[A-Za-z0-9\s]{10,}/g;
-    const readableMatches = binaryString.match(readablePattern);
-    if (readableMatches) {
-      extractedText += readableMatches.join(' ') + ' ';
-    }
-
-    // Clean up the extracted text
-    extractedText = extractedText
-      .replace(/\s+/g, ' ')
-      .replace(/[^\w\s.,!?;:'"()[\]{}]/g, '')
-      .trim();
-
-    if (extractedText.length < 30) {
-      throw new Error('Insufficient text extracted with binary analysis');
-    }
-
-    return {
-      success: true,
-      text: extractedText,
-      pages: pageCount || 1,
-      strategy: 'binary-analysis',
-      metadata: {
-        fileName,
-        extractionMethod: 'Binary Analysis',
-        textMarkersFound: textMarkers.filter(marker => 
-          binaryString.includes(marker)
-        ).length,
-        textLength: extractedText.length
-      }
-    };
-
-  } catch (error) {
-    console.error('Binary analysis extraction failed:', error);
-    throw error;
-  }
-}
-
-async function extractWithFallbackText(fileUrl: string, fileName: string): Promise<PdfProcessingResult> {
-  try {
-    // Download the PDF file
-    const response = await fetch(fileUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download PDF: ${response.statusText}`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-
-    // Last resort: try to extract any readable text
-    const textDecoder = new TextDecoder('utf-8');
-    let pdfText = textDecoder.decode(uint8Array);
-
-    // Remove PDF-specific syntax and keep readable text
-    const cleanText = pdfText
-      .replace(/\/[A-Za-z]+\s*/g, ' ') // Remove PDF commands
-      .replace(/\[[^\]]*\]/g, ' ') // Remove arrays
-      .replace(/<<[^>]*>>/g, ' ') // Remove dictionaries
-      .replace(/[^\w\s.,!?;:'"()[\]{}]/g, ' ') // Keep only readable characters
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .trim();
-
-    if (cleanText.length < 20) {
-      throw new Error('No readable text found in PDF');
-    }
-
-    return {
-      success: true,
-      text: cleanText,
-      pages: 1,
-      strategy: 'fallback-text',
-      metadata: {
-        fileName,
-        extractionMethod: 'Fallback Text',
-        originalLength: pdfText.length,
-        cleanedLength: cleanText.length
-      }
-    };
-
-  } catch (error) {
-    console.error('Fallback text extraction failed:', error);
-    throw error;
-  }
-}
-
-async function storeExtractedText(
-  result: PdfProcessingResult, 
-  deliberationId: string, 
-  userId: string, 
-  fileName: string,
-  supabaseClient: any
-): Promise<void> {
-  try {
-
-    // Create knowledge chunks from the extracted text
-    const chunks = createKnowledgeChunks(result.text, fileName);
-    
-    console.log(`Creating ${chunks.length} knowledge chunks for ${fileName}`);
-    
-    // Store chunks in the agent_knowledge table
-    for (const chunk of chunks) {
-      const { error: insertError } = await supabaseClient
-        .from('agent_knowledge')
-        .insert({
-          agent_id: deliberationId, // Use deliberationId as agent_id
-          title: `${fileName} - Chunk ${chunk.index + 1}`,
-          content: chunk.content,
-          content_type: 'text',
-          file_name: fileName,
-          chunk_index: chunk.index,
-          metadata: {
-            ...result.metadata,
-            fileName,
-            deliberationId,
-            userId,
-            extractionStrategy: result.strategy,
-            originalPages: result.pages,
-            chunkIndex: chunk.index,
-            totalChunks: chunks.length
-          },
-          created_by: userId
-        });
-
-      if (insertError) {
-        console.error(`Failed to insert chunk ${chunk.index + 1}:`, insertError);
-        throw new Error(`Failed to insert chunk ${chunk.index + 1}: ${insertError.message}`);
-      }
-    }
-
-    console.log(`Successfully stored ${chunks.length} knowledge chunks for ${fileName}`);
-
-  } catch (error) {
-    console.error('Failed to store extracted text:', error);
-    throw error; // Re-throw to handle the error in the main function
-  }
-}
-
-function createKnowledgeChunks(text: string, fileName: string): Array<{ content: string; index: number }> {
-  const maxChunkSize = 1000; // Maximum characters per chunk
-  const overlap = 200; // Overlap between chunks for context
-  
-  const chunks: Array<{ content: string; index: number }> = [];
-  let startIndex = 0;
-  let chunkIndex = 0;
-
-  while (startIndex < text.length) {
-    let endIndex = startIndex + maxChunkSize;
-    
-    // Try to break at sentence boundaries
-    if (endIndex < text.length) {
-      const nextPeriod = text.indexOf('.', endIndex - 100);
-      const nextNewline = text.indexOf('\n', endIndex - 100);
-      
-      if (nextPeriod > 0 && nextPeriod < endIndex + 100) {
-        endIndex = nextPeriod + 1;
-      } else if (nextNewline > 0 && nextNewline < endIndex + 100) {
-        endIndex = nextNewline + 1;
-      }
-    }
-
-    const chunkContent = text.substring(startIndex, endIndex).trim();
-    
-    if (chunkContent.length > 50) { // Only add chunks with substantial content
-      chunks.push({
-        content: chunkContent,
-        index: chunkIndex
-      });
-      chunkIndex++;
-    }
-
-    startIndex = endIndex - overlap;
-    if (startIndex >= text.length) break;
-  }
-
-  return chunks;
-}

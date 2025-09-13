@@ -33,8 +33,7 @@ test.describe('Admin Flow End-to-End', () => {
 
   test('admin can navigate between tabs', async ({ page }) => {
     await page.goto('/admin');
-    
-    // Test tab navigation
+
     await page.click('text=Agent Management');
     await expect(page.locator('text=Global Agents')).toBeVisible();
     

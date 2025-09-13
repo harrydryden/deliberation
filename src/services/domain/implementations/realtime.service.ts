@@ -17,7 +17,7 @@ export class RealtimeService implements IRealtimeService {
             filter: deliberationId ? `deliberation_id=eq.${deliberationId}` : undefined,
           },
            (payload) => {
-            logger.info('📨 New message received via realtime', { 
+            logger.info(' New message received via realtime', { 
               messageId: payload.new.id,
               messageType: payload.new.message_type,
               deliberationId: payload.new.deliberation_id,

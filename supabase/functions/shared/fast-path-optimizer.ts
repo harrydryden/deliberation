@@ -233,7 +233,7 @@ export function checkFastPath(content: string): {
   // Check for exact cache matches first
   for (const pattern of FAST_PATH_PATTERNS) {
     if (pattern.regex.test(content)) {
-      console.log(`🎯 Fast path pattern matched: "${pattern.id}" -> ${pattern.agent} (confidence: ${pattern.confidence})`);
+      `);
       
       // Check cache for this pattern
       const cached = fastPathCache.get(pattern.cacheKey);
@@ -265,7 +265,7 @@ export function checkFastPath(content: string): {
     if (matchRatio >= 0.7) { // 70% word match threshold
       const adjustedConfidence = pattern.confidence * matchRatio * 0.8; // Reduce confidence for fuzzy matches
       
-      console.log(`🎯 Fuzzy fast path match: "${pattern.id}" -> ${pattern.agent} (confidence: ${adjustedConfidence.toFixed(2)})`);
+      })`);
       
       return {
         agent: pattern.agent,
@@ -282,8 +282,7 @@ export function checkFastPath(content: string): {
 // Cache a successful fast-path response
 export function cacheFastPathResponse(pattern: FastPathPattern, content: string, agentType: string): void {
   fastPathCache.set(pattern.cacheKey, content, agentType);
-  console.log(`💾 Cached fast-path response for pattern: ${pattern.id}`);
-}
+  }
 
 // Get cache statistics for monitoring
 export function getFastPathStats() {
@@ -311,10 +310,7 @@ export function clearFastPathCache(): void {
 
 // Preload common responses (can be called on startup)
 export async function preloadFastPathResponses(supabase: any): Promise<void> {
-  console.log('🚀 Preloading fast-path responses...');
-  
   // This could be expanded to preload from database or configuration
   // For now, we just log the initialization
   const stats = getFastPathStats();
-  console.log('📊 Fast-path system initialized:', stats);
-}
+  }

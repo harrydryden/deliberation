@@ -52,7 +52,7 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
       completionTimeouts.current.delete(messageId);
     }
 
-    logger.info('🗑️ Message removed from queue', { messageId });
+    logger.info('� Message removed from queue', { messageId });
   }, []);
 
   const addToQueue = useCallback((content: string, parentMessageId?: string, mode: 'chat' | 'learn' = 'chat'): string => {
@@ -76,7 +76,7 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
       };
     });
 
-    logger.info('📋 Message added to queue', { 
+    logger.info(' Message added to queue', { 
       messageId, 
       queuePosition: queuedMessage.queuePosition,
       mode
@@ -211,7 +211,7 @@ export const useMessageQueue = (maxConcurrent: number = 3) => {
     const message = queueState.queue.find(msg => msg.id === messageId);
     if (message && message.retries < queueState.maxRetries) {
       updateMessageStatus(messageId, 'queued');
-      logger.info('🔄 Message retry initiated', { messageId, retries: message.retries });
+      logger.info(' Message retry initiated', { messageId, retries: message.retries });
     }
   }, [queueState.queue, queueState.maxRetries, updateMessageStatus]);
 

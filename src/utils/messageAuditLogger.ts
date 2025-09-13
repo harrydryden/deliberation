@@ -56,7 +56,7 @@ export class MessageAuditLogger {
       }
     };
     
-    logger.info('🔍 Message creation attempt', {
+    logger.info(' Message creation attempt', {
       userId: userId.substring(0, 8),
       sessionUserId: sessionUserId.substring(0, 8),
       deliberationId: deliberationId?.substring(0, 8),
@@ -78,7 +78,7 @@ export class MessageAuditLogger {
       }
     };
     
-    logger.info('✅ Message creation successful', {
+    logger.info(' Message creation successful', {
       messageId: messageId.substring(0, 8),
       userId: userId.substring(0, 8),
       deliberationId: deliberationId?.substring(0, 8)
@@ -98,7 +98,7 @@ export class MessageAuditLogger {
       }
     };
     
-    logger.error('❌ Message creation failed', {
+    logger.error(' Message creation failed', {
       userId: userId.substring(0, 8),
       deliberationId: deliberationId?.substring(0, 8),
       error
@@ -120,7 +120,7 @@ export class MessageAuditLogger {
       }
     };
     
-    logger.error('🚨 CRITICAL: User mismatch detected', {
+    logger.error(' CRITICAL: User mismatch detected', {
       providedUserId: providedUserId.substring(0, 8),
       sessionUserId: sessionUserId.substring(0, 8),
       deliberationId: deliberationId?.substring(0, 8),

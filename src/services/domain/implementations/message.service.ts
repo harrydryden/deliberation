@@ -29,7 +29,7 @@ export class MessageService implements IMessageService {
   ): Promise<Message> {
     try {
       // PHASE 1: Mode parameter logging in message service
-      logger.info('📨 [PHASE1] Message service sendMessage called', {
+      logger.info(' [PHASE1] Message service sendMessage called', {
         messageType,
         deliberationId: deliberationId?.substring(0, 8),
         mode,
@@ -57,7 +57,7 @@ export class MessageService implements IMessageService {
 
       // Validate mode parameter
       if (mode && !['chat', 'learn'].includes(mode)) {
-        logger.warn('⚠️ [PHASE1] Invalid mode in message service', {
+        logger.warn(' [PHASE1] Invalid mode in message service', {
           invalidMode: mode,
           defaultingTo: 'chat',
           userId: userId.substring(0, 8)
@@ -96,7 +96,7 @@ export class MessageService implements IMessageService {
           } as any;
 
           // PHASE 1: Log message data before creation
-          logger.info('💾 [PHASE1] Creating message with mode', {
+          logger.info('� [PHASE1] Creating message with mode', {
             messageType,
             deliberationId: deliberationId?.substring(0, 8),
             userId: userId.substring(0, 8),
@@ -164,7 +164,6 @@ export class MessageService implements IMessageService {
       throw error;
     }
   }
-
 
   async getUserMessages(userId: string): Promise<Message[]> {
     try {

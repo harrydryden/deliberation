@@ -105,7 +105,7 @@ describe('Performance Validation - Production Readiness', () => {
 
   describe('P2 Performance & UX Improvements Validation', () => {
     it('F005: Message Ordering Stability - Consistent sorting performance', () => {
-      // Test message sorting algorithm performance
+      
       const messages = Array.from({ length: 1000 }, (_, i) => ({
         id: `msg-${i}`,
         created_at: new Date(Date.now() + i * 1000).toISOString(),
@@ -234,8 +234,7 @@ describe('Performance Validation - Production Readiness', () => {
       expect(maxLatency).toBeLessThan(20); // < 20ms max
       expect(p95Latency).toBeLessThan(10); // < 10ms p95
       
-      console.log(`Performance Metrics:
-        Average Latency: ${avgLatency.toFixed(2)}ms
+      }ms
         Max Latency: ${maxLatency.toFixed(2)}ms
         P95 Latency: ${p95Latency.toFixed(2)}ms
       `);

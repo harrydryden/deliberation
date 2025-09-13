@@ -120,7 +120,7 @@ export const MessageInput = memo(forwardRef<MessageInputRef, MessageInputProps>(
     <div className="border-t bg-background p-4">
       {isRestored && message.trim() && (
         <div className="mb-2 text-xs text-muted-foreground opacity-75">
-          💾 Draft restored
+          � Draft restored
         </div>
       )}
       <form onSubmit={handleSubmit} className="flex gap-2 items-end">

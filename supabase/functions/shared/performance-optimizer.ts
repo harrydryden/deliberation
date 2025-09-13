@@ -36,10 +36,7 @@ export async function withTimeout<T>(
     const result = await Promise.race([promise, timeoutPromise]);
     return result;
   } catch (error) {
-    console.warn(`⏰ ${operation} timed out or failed:`, error);
-    
     if (fallbackValue !== undefined) {
-      console.log(`🔄 Using fallback value for ${operation}`);
       return fallbackValue;
     }
     
@@ -72,7 +69,7 @@ export async function executeTieredOperations<T>(
   };
 
   // Tier 1: Critical operations (5 seconds each, parallel)
-  console.log('🚀 Executing Tier 1 (Critical) operations...');
+  operations...');
   const criticalPromises = operations.critical.map(async (op) => {
     try {
       const result = await withTimeout(
@@ -82,9 +79,7 @@ export async function executeTieredOperations<T>(
         op.fallback
       );
       results.critical[op.name] = result;
-      console.log(`✅ Critical operation ${op.name} completed`);
-    } catch (error) {
-      console.warn(`❌ Critical operation ${op.name} failed:`, error);
+      } catch (error) {
       results.critical[op.name] = op.fallback || null;
     }
   });
@@ -92,17 +87,14 @@ export async function executeTieredOperations<T>(
   await Promise.allSettled(criticalPromises);
   
   const criticalTime = Date.now() - startTime;
-  console.log(`📊 Tier 1 completed in ${criticalTime}ms`);
-
   // Check total timeout before proceeding
   if (criticalTime > config.total * 0.6) {
-    console.warn('⏰ Running out of time, skipping secondary operations');
     results.totalTime = Date.now() - startTime;
     return results;
   }
 
   // Tier 2: Secondary operations (7 seconds each, parallel)
-  console.log('🔄 Executing Tier 2 (Secondary) operations...');
+  operations...');
   const secondaryPromises = operations.secondary.map(async (op) => {
     try {
       const result = await withTimeout(
@@ -112,9 +104,7 @@ export async function executeTieredOperations<T>(
         op.fallback
       );
       results.secondary[op.name] = result;
-      console.log(`✅ Secondary operation ${op.name} completed`);
-    } catch (error) {
-      console.warn(`❌ Secondary operation ${op.name} failed:`, error);
+      } catch (error) {
       results.secondary[op.name] = op.fallback || null;
     }
   });
@@ -122,18 +112,15 @@ export async function executeTieredOperations<T>(
   await Promise.allSettled(secondaryPromises);
   
   const secondaryTime = Date.now() - startTime;
-  console.log(`📊 Tier 2 completed in ${secondaryTime}ms`);
-
   // Check total timeout before optional operations
   if (secondaryTime > config.total * 0.8) {
-    console.warn('⏰ Running out of time, skipping optional operations');
     results.totalTime = Date.now() - startTime;
     return results;
   }
 
   // Tier 3: Optional operations (remaining time, parallel)
   const remainingTime = Math.max(1000, config.total - secondaryTime);
-  console.log(`🎯 Executing Tier 3 (Optional) operations with ${remainingTime}ms remaining...`);
+  operations with ${remainingTime}ms remaining...`);
   
   const optionalPromises = operations.optional.map(async (op) => {
     try {
@@ -144,9 +131,7 @@ export async function executeTieredOperations<T>(
         op.fallback
       );
       results.optional[op.name] = result;
-      console.log(`✅ Optional operation ${op.name} completed`);
-    } catch (error) {
-      console.warn(`❌ Optional operation ${op.name} failed:`, error);
+      } catch (error) {
       results.optional[op.name] = op.fallback || null;
     }
   });
@@ -154,8 +139,6 @@ export async function executeTieredOperations<T>(
   await Promise.allSettled(optionalPromises);
 
   results.totalTime = Date.now() - startTime;
-  console.log(`📊 All tiers completed in ${results.totalTime}ms`);
-
   return results;
 }
 
@@ -176,7 +159,6 @@ export async function withRetry<T>(
       
       if (attempt <= maxRetries) {
         const delay = baseDelay * Math.pow(2, attempt - 1) + Math.random() * 1000;
-        console.log(`🔄 ${operation} attempt ${attempt} failed, retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }

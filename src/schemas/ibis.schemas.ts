@@ -25,7 +25,6 @@ export const IBISRelationshipSchema = z.object({
   created_by: z.string().uuid('Invalid user ID')
 });
 
-// AI Classification Schema
 export const AIClassificationSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   keywords: z.array(z.string()).default([]),

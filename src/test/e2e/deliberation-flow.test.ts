@@ -61,8 +61,7 @@ test.describe('Deliberation Flow End-to-End', () => {
     // Should see chat interface
     await expect(page.locator('[data-testid="message-input"]')).toBeVisible();
     await expect(page.locator('[data-testid="message-list"]')).toBeVisible();
-    
-    // Test sending a message
+
     await page.fill('[data-testid="message-input"]', 'Hello, this is a test message');
     await page.press('[data-testid="message-input"]', 'Enter');
     

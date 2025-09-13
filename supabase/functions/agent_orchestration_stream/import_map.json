@@ -1,9 +1,9 @@
 {
   "imports": {
     "std/": "https://deno.land/std@0.224.0/",
-    "xhr": "https://deno.land/x/xhr@0.1.0/mod.ts",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.52.1",
-    "pdfjs-dist": "https://esm.sh/pdfjs-dist@4.0.379",
+    "xhr": "https://deno.land/x/xhr@0.3.0/mod.ts",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.53.1",
+    "pdfjs-dist": "https://esm.sh/pdfjs-dist@3.11.174",
     "langchain/": "https://esm.sh/langchain@0.3.30/",
     "@langchain/openai": "https://esm.sh/@langchain/openai@0.6.3",
     "@langchain/community": "https://esm.sh/@langchain/community@0.3.49",

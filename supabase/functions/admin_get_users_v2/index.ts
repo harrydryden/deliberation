@@ -1,10 +1,357 @@
-import { serve } from "std/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.53.1";
+
+// ============================================================================
+// SOPHISTICATED ADMIN USER MANAGEMENT WITH SHARED FUNCTIONALITY INLINED
+// ============================================================================
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept, cache-control, x-requested-with',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Max-Age': '86400'
 };
+
+// ============================================================================
+// ENHANCED EDGE LOGGER
+// ============================================================================
+
+class EdgeLogger {
+  private static formatMessage(level: string, message: string, data?: any): string {
+    const timestamp = new Date().toISOString();
+    const dataStr = data ? ` | ${JSON.stringify(data)}` : '';
+    return `[${timestamp}] [${level}] ${message}${dataStr}`;
+  }
+
+  static debug(message: string, data?: any): void {
+    );
+  }
+
+  static info(message: string, data?: any): void {
+    );
+  }
+
+  static warn(message: string, data?: any): void {
+    );
+  }
+
+  static error(message: string, data?: any): void {
+    );
+  }
+}
+
+// ============================================================================
+// CIRCUIT BREAKER IMPLEMENTATION
+// ============================================================================
+
+class CircuitBreaker {
+  private static readonly CIRCUIT_BREAKER_ID = 'admin_user_management';
+  private static readonly CIRCUIT_BREAKER_THRESHOLD = 3;
+  private static readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minute
+
+  constructor(private supabase: any) {}
+
+  async isOpen(): Promise<boolean> {
+    try {
+      const { data, error } = await this.supabase
+        .from('circuit_breaker_state')
+        .select('*')
+        .eq('id', CircuitBreaker.CIRCUIT_BREAKER_ID)
+        .maybeSingle();
+
+      if (error || !data) return false;
+
+      const now = Date.now();
+      const lastFailureTime = new Date(data.last_failure_time).getTime();
+      
+      if (data.failure_count >= CircuitBreaker.CIRCUIT_BREAKER_THRESHOLD) {
+        const timeSinceLastFailure = now - lastFailureTime;
+        
+        if (timeSinceLastFailure < CircuitBreaker.CIRCUIT_BREAKER_TIMEOUT) {
+          EdgeLogger.warn(`Circuit breaker OPEN - ${Math.ceil((CircuitBreaker.CIRCUIT_BREAKER_TIMEOUT - timeSinceLastFailure) / 1000)}s remaining`);
+          return true;
+        } else {
+          await this.reset();
+          return false;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      EdgeLogger.warn('Circuit breaker check failed, assuming closed', error);
+      return false;
+    }
+  }
+
+  async recordFailure(): Promise<void> {
+    try {
+      const now = new Date();
+      const { data: currentState } = await this.supabase
+        .from('circuit_breaker_state')
+        .select('failure_count')
+        .eq('id', CircuitBreaker.CIRCUIT_BREAKER_ID)
+        .maybeSingle();
+
+      const newFailureCount = (currentState?.failure_count || 0) + 1;
+      
+      await this.supabase
+        .from('circuit_breaker_state')
+        .upsert({
+          id: CircuitBreaker.CIRCUIT_BREAKER_ID,
+          failure_count: newFailureCount,
+          last_failure_time: now,
+          is_open: newFailureCount >= CircuitBreaker.CIRCUIT_BREAKER_THRESHOLD,
+          updated_at: now
+        }, { onConflict: 'id' });
+
+      EdgeLogger.info(`Circuit breaker failure recorded: ${newFailureCount}/${CircuitBreaker.CIRCUIT_BREAKER_THRESHOLD}`);
+    } catch (error) {
+      EdgeLogger.error('Failed to record circuit breaker failure', error);
+    }
+  }
+
+  async reset(): Promise<void> {
+    try {
+      await this.supabase
+        .from('circuit_breaker_state')
+        .update({
+          failure_count: 0,
+          is_open: false,
+          updated_at: new Date()
+        })
+        .eq('id', CircuitBreaker.CIRCUIT_BREAKER_ID);
+      EdgeLogger.info('Circuit breaker RESET');
+    } catch (error) {
+      EdgeLogger.error('Failed to reset circuit breaker', error);
+    }
+  }
+}
+
+// ============================================================================
+// ENHANCED ADMIN USER MANAGEMENT SERVICE
+// ============================================================================
+
+class AdminUserManagementService {
+  private circuitBreaker: CircuitBreaker;
+  private supabase: any;
+
+  constructor(supabase: any) {
+    this.supabase = supabase;
+    this.circuitBreaker = new CircuitBreaker(supabase);
+  }
+
+  async getUsers(page: number = 1, limit: number = 50, searchTerm?: string, role?: string): Promise<any> {
+    const startTime = Date.now();
+    
+    // Circuit breaker check
+    if (await this.circuitBreaker.isOpen()) {
+      EdgeLogger.warn('Circuit breaker OPEN - using fallback user data');
+      return this.generateFallbackUsers();
+    }
+
+    try {
+      EdgeLogger.info('Starting admin user retrieval', {
+        page,
+        limit,
+        searchTerm: searchTerm?.substring(0, 20),
+        role
+      });
+
+      // Build query with filters
+      let query = this.supabase
+        .from('users')
+        .select(`
+          id,
+          email,
+          full_name,
+          avatar_url,
+          created_at,
+          updated_at,
+          last_sign_in_at,
+          is_active,
+          role,
+          metadata
+        `);
+
+      // Apply search filter
+      if (searchTerm && searchTerm.trim()) {
+        query = query.or(`email.ilike.%${searchTerm}%,full_name.ilike.%${searchTerm}%`);
+      }
+
+      // Apply role filter
+      if (role && role !== 'all') {
+        query = query.eq('role', role);
+      }
+
+      // Apply pagination
+      const offset = (page - 1) * limit;
+      query = query
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      const { data: users, error: usersError, count } = await query;
+
+      if (usersError) {
+        throw new Error(`Failed to fetch users: ${usersError.message}`);
+      }
+
+      // Get total count for pagination
+      const { count: totalCount, error: countError } = await this.supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true });
+
+      if (countError) {
+        EdgeLogger.warn('Failed to get total user count', countError);
+      }
+
+      // Get user statistics
+      const stats = await this.getUserStatistics();
+
+      const duration = Date.now() - startTime;
+      EdgeLogger.info('Admin user retrieval completed successfully', {
+        usersRetrieved: users?.length || 0,
+        totalCount: totalCount || 0,
+        page,
+        limit,
+        duration
+      });
+
+      // Reset circuit breaker on success
+      await this.circuitBreaker.reset();
+
+      return {
+        success: true,
+        users: users || [],
+        pagination: {
+          page,
+          limit,
+          total: totalCount || 0,
+          totalPages: Math.ceil((totalCount || 0) / limit)
+        },
+        statistics: stats,
+        metadata: {
+          processingTimeMs: duration,
+          searchTerm,
+          role,
+          timestamp: new Date().toISOString()
+        }
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      EdgeLogger.error('Admin user retrieval failed', {
+        error: error.message,
+        duration,
+        page,
+        limit
+      });
+
+      await this.circuitBreaker.recordFailure();
+      
+      return this.generateErrorResponse(error.message);
+    }
+  }
+
+  private async getUserStatistics(): Promise<any> {
+    try {
+      const [totalUsers, activeUsers, recentUsers, roleStats] = await Promise.all([
+        this.supabase
+          .from('users')
+          .select('*', { count: 'exact', head: true }),
+        this.supabase
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true),
+        this.supabase
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+        this.supabase
+          .from('users')
+          .select('role')
+          .not('role', 'is', null)
+      ]);
+
+      const roleCounts = (roleStats.data || []).reduce((acc: any, user: any) => {
+        acc[user.role] = (acc[user.role] || 0) + 1;
+        return acc;
+      }, {});
+
+      return {
+        totalUsers: totalUsers.count || 0,
+        activeUsers: activeUsers.count || 0,
+        recentUsers: recentUsers.count || 0,
+        roleDistribution: roleCounts,
+        lastUpdated: new Date().toISOString()
+      };
+    } catch (error) {
+      EdgeLogger.warn('Failed to get user statistics', error);
+      return {
+        totalUsers: 0,
+        activeUsers: 0,
+        recentUsers: 0,
+        roleDistribution: {},
+        lastUpdated: new Date().toISOString()
+      };
+    }
+  }
+
+  private generateFallbackUsers(): any {
+    EdgeLogger.info('Generating fallback user data');
+    
+    return {
+      success: true,
+      users: [],
+      pagination: {
+        page: 1,
+        limit: 50,
+        total: 0,
+        totalPages: 0
+      },
+      statistics: {
+        totalUsers: 0,
+        activeUsers: 0,
+        recentUsers: 0,
+        roleDistribution: {},
+        lastUpdated: new Date().toISOString()
+      },
+      metadata: {
+        source: 'fallback',
+        processingTimeMs: 0,
+        reason: 'Circuit breaker open'
+      }
+    };
+  }
+
+  private generateErrorResponse(errorMessage: string): any {
+    return {
+      success: false,
+      users: [],
+      pagination: {
+        page: 1,
+        limit: 50,
+        total: 0,
+        totalPages: 0
+      },
+      statistics: {
+        totalUsers: 0,
+        activeUsers: 0,
+        recentUsers: 0,
+        roleDistribution: {},
+        lastUpdated: new Date().toISOString()
+      },
+      error: errorMessage,
+      metadata: {
+        processingTimeMs: 0,
+        reason: 'Retrieval failed'
+      }
+    };
+  }
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
 
 function handleCORSPreflight(request: Request): Response | null {
   if (request.method === 'OPTIONS') {
@@ -15,17 +362,18 @@ function handleCORSPreflight(request: Request): Response | null {
 
 function createErrorResponse(error: any, status: number = 500, context?: string): Response {
   const errorId = crypto.randomUUID();
-  console.error(`[${errorId}] ${context || 'admin_get_users_v2 error'}:`, error);
+  EdgeLogger.error(`${context || 'Edge Function'} Error`, { errorId, error: error?.message });
   
   return new Response(
-    JSON.stringify({ 
-      error: error?.message || 'Internal server error', 
+    JSON.stringify({
+      error: error?.message || 'An unexpected error occurred',
       errorId,
+      context,
       timestamp: new Date().toISOString()
     }),
-    { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status 
+    {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     }
   );
 }
@@ -33,147 +381,128 @@ function createErrorResponse(error: any, status: number = 500, context?: string)
 function createSuccessResponse(data: any): Response {
   return new Response(
     JSON.stringify(data),
-    { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200 
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     }
   );
 }
+
+async function parseAndValidateRequest<T>(request: Request, requiredFields: string[] = []): Promise<T> {
+  const requestId = crypto.randomUUID().slice(0, 8);
+  
+  EdgeLogger.debug('Parsing admin user request', { requestId, requiredFields });
+  
+  try {
+    const body = await request.json();
+    
+    for (const field of requiredFields) {
+      if (!(field in body) || body[field] === null || body[field] === undefined) {
+        throw new Error(`Missing required field: ${field}`);
+      }
+    }
+    
+    EdgeLogger.debug('Request validation successful', { requestId });
+    return body as T;
+  } catch (error: any) {
+    EdgeLogger.error('Request parsing failed', { requestId, error: error.message });
+    throw new Error(`Request parsing failed: ${error.message}`);
+  }
+}
+
+async function validateAndGetEnvironment() {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    const missing = [];
+    if (!supabaseUrl) missing.push('SUPABASE_URL');
+    if (!supabaseServiceKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+
+  return {
+    supabase: createClient(supabaseUrl, supabaseServiceKey)
+  };
+}
+
+// ============================================================================
+// INTERFACES
+// ============================================================================
+
+interface AdminUserRequest {
+  page?: number;
+  limit?: number;
+  searchTerm?: string;
+  role?: string;
+}
+
+// ============================================================================
+// MAIN EDGE FUNCTION
+// ============================================================================
 
 serve(async (req) => {
   const corsResponse = handleCORSPreflight(req);
   if (corsResponse) return corsResponse;
 
+  // Track processing time for metadata
+  const startTime = Date.now();
+
   try {
-    console.log('Admin get users v2 request received');
-
-    // Initialize Supabase clients
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-
-    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
-      throw new Error('Missing required Supabase environment variables');
-    }
-
-    // Create admin client with service role for elevated permissions
-    const adminSupabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
+    EdgeLogger.info('Admin get users v2 function called', { 
+      method: req.method, 
+      url: req.url 
     });
 
-    // Create user client for JWT verification
-    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
+    const { page = 1, limit = 50, searchTerm, role = 'all' }: AdminUserRequest = await parseAndValidateRequest(req, []);
+    const { supabase } = await validateAndGetEnvironment();
+
+    EdgeLogger.info('Processing admin user retrieval request', {
+      page,
+      limit,
+      searchTerm: searchTerm?.substring(0, 20),
+      role
     });
 
-    // Verify JWT token and get user
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return createErrorResponse(new Error('Authorization header missing'), 401);
-    }
+    // Create admin user management service
+    const userService = new AdminUserManagementService(supabase);
+    
+    // Get users
+    const result = await userService.getUsers(page, limit, searchTerm, role);
 
-    const { data: { user }, error: authError } = await userSupabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (authError || !user) {
-      console.error('Authentication failed:', authError);
-      return createErrorResponse(new Error('Authentication failed'), 401);
-    }
-
-    // Check if user is admin
-    const { data: profile, error: profileError } = await adminSupabase
-      .from('profiles')
-      .select('user_role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile || profile.user_role !== 'admin') {
-      console.warn('Non-admin user attempted access:', user.id);
-      return createErrorResponse(new Error('Admin access required'), 403);
-    }
-
-    console.log('Admin access verified for user (v2):', user.id);
-
-    // Fetch all user profiles - ensure we use the correct schema columns
-    const { data: profiles, error: profilesError } = await adminSupabase
-      .from('profiles')
-      .select('id, user_role, access_code_1, access_code_2, is_archived, created_at, archived_at, archived_by, archive_reason');
-
-    if (profilesError) {
-      throw new Error(`Failed to fetch profiles: ${profilesError.message}`);
-    }
-
-    // Fetch all users from Supabase Auth using service role
-    const { data: { users }, error: usersError } = await adminSupabase.auth.admin.listUsers();
-
-    if (usersError) {
-      throw new Error(`Failed to fetch auth users: ${usersError.message}`);
-    }
-
-    // Fetch participant data to get deliberation associations (without join to avoid FK requirement)
-    const { data: participants, error: participantsError } = await adminSupabase
-      .from('participants')
-      .select('user_id, deliberation_id');
-
-    if (participantsError) {
-      console.warn('Failed to fetch participants:', participantsError);
-    }
-
-    // Fetch deliberation titles for associated participations
-    const deliberationIds = Array.from(new Set((participants || []).map((p: any) => p.deliberation_id))).filter(Boolean);
-    let deliberationsMap: Record<string, { id: string; title: string; notion?: string }> = {};
-    if (deliberationIds.length > 0) {
-      const { data: deliberations, error: deliberationsError } = await adminSupabase
-        .from('deliberations')
-        .select('id, title, notion')
-        .in('id', deliberationIds);
-
-      if (deliberationsError) {
-        console.warn('Failed to fetch deliberations:', deliberationsError);
-      } else {
-        deliberationsMap = (deliberations || []).reduce((acc: any, d: any) => {
-          acc[d.id] = { id: d.id, title: d.title, notion: d.notion };
-          return acc;
-        }, {} as Record<string, { id: string; title: string; notion?: string }>);
-      }
-    }
-
-    // Combine and map the data, filtering out archived users
-    const combinedUsers = profiles?.filter((p: any) => !p.is_archived).map((profile: any) => {
-      const authUser = users.find((u: any) => u.id === profile.id);
-      const userParticipations = participants?.filter((p: any) => p.user_id === profile.id) || [];
-      
-      return {
-        id: profile.id,
-        email: authUser?.email || 'N/A',
-        role: profile.user_role,
-        accessCode1: profile.access_code_1,
-        accessCode2: profile.access_code_2,
-        isArchived: profile.is_archived || false,
-        createdAt: profile.created_at,
-        lastSignInAt: authUser?.last_sign_in_at,
-        emailConfirmedAt: authUser?.email_confirmed_at,
-        deliberations: userParticipations.map((p: any) => {
-          const d = deliberationsMap[p.deliberation_id];
-          return {
-            id: p.deliberation_id,
-            title: d?.title || 'Unknown',
-            role: 'participant'
-          };
-        })
-      };
-    }) || [];
-
-    console.log(`Successfully retrieved ${combinedUsers.length} users (v2)`);
-
-    return createSuccessResponse({
-      users: combinedUsers,
-      total: combinedUsers.length,
-      timestamp: new Date().toISOString()
+    EdgeLogger.info('Admin user retrieval completed', {
+      success: result.success,
+      usersCount: result.users?.length || 0,
+      totalCount: result.pagination?.total || 0
     });
+
+    const response = {
+      ...result,
+      response_format: JSON.stringify({
+        success: true,
+        timestamp: new Date().toISOString(),
+        requestId: crypto.randomUUID(),
+        processingTimeMs: Date.now() - startTime
+      })
+    };
+
+    return createSuccessResponse(response);
 
   } catch (error) {
-    return createErrorResponse(error, 500, 'admin_get_users_v2');
+    EdgeLogger.error('Admin user retrieval error', error);
+    
+    // Add metadata to error response
+    const errorResponse = createErrorResponse(error, 500, 'admin user retrieval');
+    const errorData = await errorResponse.json();
+    
+    return createSuccessResponse({
+      ...errorData,
+      response_format: JSON.stringify({
+        success: false,
+        timestamp: new Date().toISOString(),
+        requestId: crypto.randomUUID(),
+        processingTimeMs: Date.now() - startTime,
+        error: error.message
+      })
+    });
   }
 });

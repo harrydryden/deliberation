@@ -124,8 +124,7 @@ describe('Chat UI Performance Tests', () => {
           onRemoveMessage={() => {}}
         />
       );
-      
-      // Test multiple re-renders with same data (should be memoized)
+
       for (let i = 0; i < 10; i++) {
         rerender(
           <MessageQueueStatus

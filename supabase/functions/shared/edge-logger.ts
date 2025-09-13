@@ -11,7 +11,7 @@ export class EdgeLogger {
   static info(message: string, context?: LogContext): void {
     if (this.isProduction) return; // Completely disabled in production
     
-    console.log(`[INFO] ${message}`, context ? JSON.stringify(context, null, 2) : '');
+    : '');
   }
 
   static error(message: string, error?: any, context?: LogContext): void {
@@ -19,26 +19,25 @@ export class EdgeLogger {
     const errorInfo = error ? (error instanceof Error ? error.message : String(error)) : '';
     const contextStr = context ? JSON.stringify(context, null, 2) : '';
     
-    console.error(`[ERROR] ${message}`, errorInfo, contextStr);
-  }
+    }
 
   static warn(message: string, context?: LogContext): void {
     if (this.isProduction) return; // Disabled in production
     
-    console.warn(`[WARN] ${message}`, context ? JSON.stringify(context, null, 2) : '');
+    : '');
   }
 
   static debug(message: string, context?: LogContext): void {
     if (this.isProduction) return; // Completely disabled in production
     
-    console.log(`[DEBUG] ${message}`, context ? JSON.stringify(context, null, 2) : '');
+    : '');
   }
 
   static perf(operation: string, duration: number, context?: LogContext): void {
     if (this.isProduction && duration < 5000) return; // Only log slow operations in production
     
     const level = duration > 5000 ? 'SLOW' : 'FAST';
-    console.log(`[PERF-${level}] ${operation}: ${duration.toFixed(2)}ms`, 
+    }ms`, 
       context ? JSON.stringify(context, null, 2) : '');
   }
 }

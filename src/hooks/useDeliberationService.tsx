@@ -14,7 +14,7 @@ interface DeliberationService {
 export const useDeliberationService = (): DeliberationService => {
   const { user } = useSupabaseAuth();
   
-  // 🔧 FIX: Memoize the service object to prevent recreation on every render
+  //  FIX: Memoize the service object to prevent recreation on every render
   return useMemo(() => ({
     async getDeliberations(): Promise<any[]> {
       logger.info('Starting getDeliberations with Supabase Auth');
@@ -214,6 +214,6 @@ export const useDeliberationService = (): DeliberationService => {
 
       if (error) throw error;
     }
-    // 🔧 FIX: Close useMemo with user dependency
+    //  FIX: Close useMemo with user dependency
   }), [user]);
 };

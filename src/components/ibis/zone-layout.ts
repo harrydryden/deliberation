@@ -274,7 +274,7 @@ export const applyConcentricLayout = (
     });
   }
   
-  logger.debug('🎯 Zone layout - Final result:', {
+  logger.debug(' Zone layout - Final result:', {
     positionsCount: positions.size,
     zones,
     samplePositions: Array.from(positions.entries()).slice(0, 2)

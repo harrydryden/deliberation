@@ -14,11 +14,8 @@ export function getCachedEnvironment(): CachedEnvironment {
   
   // Return cached environment if valid and recent
   if (environmentCache && (now - environmentCache.timestamp) < CACHE_DURATION) {
-    console.log('🚀 Using cached environment variables');
     return environmentCache;
   }
-  
-  console.log('🔄 Refreshing environment cache...');
   
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -40,11 +37,9 @@ export function getCachedEnvironment(): CachedEnvironment {
     timestamp: now
   };
   
-  console.log('✅ Environment cache refreshed');
   return environmentCache;
 }
 
 export function invalidateEnvironmentCache(): void {
   environmentCache = null;
-  console.log('🗑️ Environment cache invalidated');
-}
+  }

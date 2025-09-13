@@ -135,7 +135,7 @@ export const LocalAgentCreationModal = ({ deliberations, onCreateAgent, loading 
             />
             {formData.character_limit < 1000 && (
               <p className="text-xs text-orange-600 font-medium">
-                ⚠️ Warning: Character limits below 1000 may result in blank responses from GPT-5 models.
+                 Warning: Character limits below 1000 may result in blank responses from GPT-5 models.
               </p>
             )}
             <p className="text-xs text-muted-foreground">

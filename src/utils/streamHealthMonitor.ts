@@ -36,7 +36,7 @@ export class StreamHealthMonitor {
 
     this.connections.set(connectionId, metrics);
     
-    logger.info('🌊 Stream connection started', {
+    logger.info('� Stream connection started', {
       connectionId,
       messageId,
       timestamp: new Date().toISOString()
@@ -55,7 +55,7 @@ export class StreamHealthMonitor {
     metrics.chunksReceived += 1;
     metrics.isHealthy = true;
 
-    logger.debug('📊 Stream activity recorded', {
+    logger.debug(' Stream activity recorded', {
       connectionId,
       bytesReceived,
       totalBytes: metrics.bytesReceived,
@@ -71,7 +71,7 @@ export class StreamHealthMonitor {
     metrics.disconnections += 1;
     metrics.isHealthy = false;
 
-    logger.warn('🔌 Stream disconnection recorded', {
+    logger.warn('� Stream disconnection recorded', {
       connectionId,
       reason,
       disconnectionCount: metrics.disconnections,
@@ -86,7 +86,7 @@ export class StreamHealthMonitor {
 
     const duration = Date.now() - metrics.startTime;
     
-    logger.info('🏁 Stream connection ended', {
+    logger.info(' Stream connection ended', {
       connectionId,
       reason,
       duration,
@@ -138,7 +138,7 @@ export class StreamHealthMonitor {
           this.connections.delete(connectionId);
         });
       } else {
-        logger.warn('⚕️ Stale stream connections detected', {
+        logger.warn('⚕ Stale stream connections detected', {
           staleCount: staleConnections.length,
           totalConnections: this.connections.size,
           staleConnections: staleConnections.slice(0, 3) // Only log first 3 to avoid spam
@@ -158,7 +158,7 @@ export class StreamHealthMonitor {
     const totalBytes = connections.reduce((sum, c) => sum + c.bytesReceived, 0);
     const totalChunks = connections.reduce((sum, c) => sum + c.chunksReceived, 0);
 
-    logger.info('📊 Stream health summary', {
+    logger.info(' Stream health summary', {
       totalConnections: connections.length,
       healthyConnections,
       unhealthyConnections: connections.length - healthyConnections,
