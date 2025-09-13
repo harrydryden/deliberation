@@ -7,8 +7,8 @@ import { systemMonitor } from '@/services/system-monitoring.service';
 import { streamHealthMonitor } from '@/utils/streamHealthMonitor';
 
 /**
- * Dedicated hook for triggering agent orchestration
- * Centralizes the agent trigger logic with proper error handling and monitoring
+ * Dedicated hook for triggering agent orchestration and response generation
+ * Centralizes the two-phase agent processing with proper error handling and monitoring
  */
 export const useAgentOrchestrationTrigger = () => {
   const { toast } = useToast();
@@ -22,22 +22,20 @@ export const useAgentOrchestrationTrigger = () => {
     const startTime = Date.now();
     const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Enhanced status tracking
+    // Enhanced status tracking for two-phase processing
     let currentPhase = 'INITIALIZING';
     
     try {
       // Set typing indicator and initial status
       onTypingChange?.(true);
-      currentPhase = 'CALLING_EDGE_FUNCTION';
+
+      // ============================================================================
+      // PHASE 1: AGENT ORCHESTRATION
+      // ============================================================================
+      currentPhase = 'ORCHESTRATION';
+      logger.debug(`�� [PHASE 1] Starting agent orchestration for message ${messageId} in deliberation ${deliberationId}`);
       
-      logger.debug(` [TRIGGER] Starting agent orchestration for message ${messageId} in deliberation ${deliberationId}`);
-      logger.debug(`� [TRIGGER] Calling agent-orchestration-stream function`);
-      
-      // Enhanced function call with timeout
-      const timeoutController = new AbortController();
-      const timeoutId = setTimeout(() => timeoutController.abort(), 45000); // 45 second timeout
-      
-      const { data, error } = await supabase.functions.invoke('agent_orchestration_stream', {
+      const { data: orchestrationData, error: orchestrationError } = await supabase.functions.invoke('agent_orchestration_stream', {
         body: { 
           messageId, 
           deliberationId,
@@ -45,46 +43,39 @@ export const useAgentOrchestrationTrigger = () => {
         }
       });
 
-      clearTimeout(timeoutId);
-      currentPhase = 'PROCESSING_RESPONSE';
-      
-      const duration = Date.now() - startTime;
-      
-      if (error) {
-        productionLogger.error(`Agent orchestration failed in ${currentPhase}`, error);
-        
-        // Enhanced error handling based on error type
-        let errorMessage = 'Failed to generate agent response';
-        let errorTitle = 'Agent Response Failed';
-        
-        if (error.message?.includes('timeout') || error.message?.includes('aborted')) {
-          errorMessage = 'Agent response timed out. Please try again.';
-          errorTitle = 'Response Timeout';
-        } else if (error.message?.includes('OpenAI')) {
-          errorMessage = 'AI service temporarily unavailable. Please try again.';
-          errorTitle = 'AI Service Error';
-        } else if (error.message?.includes('authentication') || error.message?.includes('authorization')) {
-          errorMessage = 'Authentication error. Please refresh and try again.';
-          errorTitle = 'Authentication Error';
-        } else if (error.message?.includes('agent')) {
-          errorMessage = 'No active agents found for this deliberation.';
-          errorTitle = 'Agent Configuration Error';
+      if (orchestrationError) {
+        throw new Error(`Orchestration failed: ${orchestrationError.message}`);
+      }
+
+      logger.debug(`✅ [PHASE 1] Orchestration completed, selected agent: ${orchestrationData.selectedAgent.type}`);
+
+      // ============================================================================
+      // PHASE 2: AGENT RESPONSE GENERATION
+      // ============================================================================
+      currentPhase = 'RESPONSE_GENERATION';
+      logger.debug(`🤖 [PHASE 2] Starting response generation with ${orchestrationData.selectedAgent.type}`);
+
+      const { data: responseData, error: responseError } = await supabase.functions.invoke('generate_agent_response', {
+        body: {
+          orchestrationResult: orchestrationData,
+          messageId,
+          deliberationId,
+          mode
         }
-        
-        toast({
-          variant: "destructive",
-          title: errorTitle,
-          description: errorMessage,
-        });
-        return;
+      });
+
+      if (responseError) {
+        throw new Error(`Response generation failed: ${responseError.message}`);
       }
 
       currentPhase = 'COMPLETED';
-      logger.debug(` [TRIGGER] Agent orchestration completed in ${duration}ms:`, data);
-      
+      const duration = Date.now() - startTime;
+
+      logger.debug(`🎉 [PHASE 2] Response generation completed in ${duration}ms`);
+
       // Enhanced success feedback
-      const agentName = data?.agentName || data?.agentType || 'Agent';
-      const responseLength = data?.responseLength || 0;
+      const agentName = responseData?.agent?.name || responseData?.agent?.type || 'Agent';
+      const responseLength = responseData?.metadata?.responseLength || responseData?.agentMessage?.content?.length || 0;
       
       toast({
         title: "Agent Response Generated",
@@ -93,18 +84,33 @@ export const useAgentOrchestrationTrigger = () => {
 
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      productionLogger.error(`Agent orchestration error in ${currentPhase}`, error);
+      productionLogger.error(`Agent processing failed in ${currentPhase}`, error);
       
-      // Handle specific error types
+      // Enhanced error handling based on phase and error type
       let errorMessage = 'Failed to generate agent response';
       let errorTitle = 'Agent Response Error';
       
-      if (error.name === 'AbortError') {
+      if (currentPhase === 'ORCHESTRATION') {
+        errorMessage = 'Failed to select appropriate agent. Please try again.';
+        errorTitle = 'Agent Selection Error';
+      } else if (currentPhase === 'RESPONSE_GENERATION') {
+        errorMessage = 'Failed to generate response. Please try again.';
+        errorTitle = 'Response Generation Error';
+      } else if (error.name === 'AbortError') {
         errorMessage = 'Agent response timed out after 45 seconds. Please try again.';
         errorTitle = 'Response Timeout';
       } else if (error.message?.includes('Failed to fetch')) {
         errorMessage = 'Network error. Please check your connection and try again.';
         errorTitle = 'Network Error';
+      } else if (error.message?.includes('OpenAI')) {
+        errorMessage = 'AI service temporarily unavailable. Please try again.';
+        errorTitle = 'AI Service Error';
+      } else if (error.message?.includes('authentication') || error.message?.includes('authorization')) {
+        errorMessage = 'Authentication error. Please refresh and try again.';
+        errorTitle = 'Authentication Error';
+      } else if (error.message?.includes('agent')) {
+        errorMessage = 'No active agents found for this deliberation.';
+        errorTitle = 'Agent Configuration Error';
       }
       
       toast({
@@ -115,7 +121,7 @@ export const useAgentOrchestrationTrigger = () => {
     } finally {
       // Always clear typing indicator
       onTypingChange?.(false);
-      logger.debug(` [TRIGGER] Agent orchestration trigger completed (final phase: ${currentPhase})`);
+      logger.debug(`�� [TRIGGER] Agent processing completed (final phase: ${currentPhase})`);
     }
   }, [toast]);
 
