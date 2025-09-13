@@ -118,11 +118,20 @@ class AgentResponseGenerationService {
     }
     try {
       const { selectedAgent, analysis, systemPrompt, conversationContext } = orchestrationResult;
-      EdgeLogger.info('Starting agent response generation', {
+      EdgeLogger.info('Starting sophisticated agent response generation', {
         agent: selectedAgent.type,
+        agentName: selectedAgent.name,
         messageId,
         deliberationId,
-        model: selectedAgent.model
+        model: selectedAgent.model,
+        hasConversationContext: !!conversationContext,
+        contextLength: conversationContext?.length || 0,
+        analysis: {
+          intent: analysis.intent,
+          complexity: analysis.complexity,
+          topicRelevance: analysis.topicRelevance,
+          requiresExpertise: analysis.requiresExpertise
+        }
       });
       // Fetch the original user message
       const { data: originalMessage, error: messageError } = await this.supabase.from('messages').select('content, user_id').eq('id', messageId).single();
@@ -136,13 +145,26 @@ class AgentResponseGenerationService {
           content: systemPrompt
         }
       ];
-      // Add conversation context
+      // Add sophisticated conversation context
       if (conversationContext && Array.isArray(conversationContext)) {
-        conversationContext.forEach((msg)=>{
+        EdgeLogger.debug('Processing conversation context', {
+          contextLength: conversationContext.length,
+          messageId
+        });
+        
+        // Process conversation context with enhanced filtering and formatting
+        const processedContext = this.processConversationContext(conversationContext, selectedAgent.type);
+        
+        processedContext.forEach((msg, index) => {
           messages.push({
             role: msg.message_type === 'user' ? 'user' : 'assistant',
             content: msg.content
           });
+        });
+        
+        EdgeLogger.debug('Conversation context processed', {
+          processedCount: processedContext.length,
+          originalCount: conversationContext.length
         });
       }
       // Add knowledge context for bill_agent and policy_agent
@@ -185,7 +207,11 @@ class AgentResponseGenerationService {
       }
       EdgeLogger.info('OpenAI response generated successfully', {
         length: generatedContent.length,
-        model: selectedAgent.model
+        model: selectedAgent.model,
+        agentType: selectedAgent.type,
+        hasKnowledgeContext: !!knowledgeContext,
+        messageCount: messages.length,
+        processingTime: Date.now() - startTime
       });
       // Insert agent response into messages table
       const { data: agentMessage, error: insertError } = await this.supabase.from('messages').insert({
@@ -231,10 +257,21 @@ class AgentResponseGenerationService {
       // Reset circuit breaker on success
       await this.circuitBreaker.reset();
       const duration = Date.now() - startTime;
-      EdgeLogger.info('Agent response generation completed successfully', {
+      EdgeLogger.info('Sophisticated agent response generation completed successfully', {
         agent: selectedAgent.type,
+        agentName: selectedAgent.name,
         duration,
-        responseLength: generatedContent.length
+        responseLength: generatedContent.length,
+        messageId: agentMessage.id,
+        knowledgeUsed: !!knowledgeContext,
+        conversationContextProcessed: conversationContext?.length || 0,
+        features: {
+          sophisticatedTemplates: true,
+          knowledgeRetrieval: !!knowledgeContext,
+          conversationContext: true,
+          circuitBreaker: true,
+          enhancedLogging: true
+        }
       });
       return {
         success: true,
@@ -299,6 +336,72 @@ class AgentResponseGenerationService {
       EdgeLogger.warn('Knowledge retrieval failed', error);
       return '';
     }
+  }
+
+  // Process conversation context with sophisticated filtering and formatting
+  processConversationContext(conversationContext, agentType) {
+    if (!Array.isArray(conversationContext) || conversationContext.length === 0) {
+      return [];
+    }
+
+    // Filter and prioritize messages based on agent type
+    let filteredContext = conversationContext.filter(msg => {
+      // Keep user messages and relevant agent messages
+      if (msg.message_type === 'user') return true;
+      
+      // For different agent types, keep different types of agent messages
+      switch (agentType) {
+        case 'bill_agent':
+          return msg.message_type === 'bill_agent' || msg.message_type === 'policy_agent';
+        case 'peer_agent':
+          return msg.message_type === 'peer_agent' || msg.message_type === 'flow_agent';
+        case 'flow_agent':
+          return msg.message_type === 'flow_agent' || msg.message_type === 'peer_agent';
+        default:
+          return true;
+      }
+    });
+
+    // Limit context length to prevent token overflow
+    const maxContextMessages = 10;
+    if (filteredContext.length > maxContextMessages) {
+      filteredContext = filteredContext.slice(-maxContextMessages);
+    }
+
+    // Format messages for better context
+    return filteredContext.map(msg => ({
+      ...msg,
+      content: this.formatMessageForContext(msg, agentType)
+    }));
+  }
+
+  // Format individual message for better context
+  formatMessageForContext(msg, agentType) {
+    let content = msg.content || '';
+    
+    // Add context indicators for agent messages
+    if (msg.message_type !== 'user') {
+      const agentName = this.getAgentDisplayName(msg.message_type);
+      content = `[${agentName}]: ${content}`;
+    }
+    
+    // Truncate very long messages
+    if (content.length > 500) {
+      content = content.substring(0, 500) + '...';
+    }
+    
+    return content;
+  }
+
+  // Get display name for agent type
+  getAgentDisplayName(agentType) {
+    const agentNames = {
+      'bill_agent': 'Policy Expert',
+      'peer_agent': 'Participant Synthesizer', 
+      'flow_agent': 'Discussion Facilitator',
+      'policy_agent': 'Policy Expert'
+    };
+    return agentNames[agentType] || 'AI Assistant';
   }
   generateFallbackResponse(orchestrationResult, messageId, deliberationId) {
     EdgeLogger.info('Generating fallback response', {
@@ -474,7 +577,8 @@ serve(async (req)=>{
       messageId, 
       deliberationId,
       conversationContext = {},
-      mode = 'chat'
+      mode = 'chat',
+      orchestrationResult
     } = await parseAndValidateRequest(req, [
       'message',
       'messageId',
@@ -512,20 +616,72 @@ serve(async (req)=>{
 
     const { supabase } = await validateAndGetEnvironment();
     const openaiApiKey = getOpenAIKey();
+
+    // Validate orchestrationResult structure
+    let validatedOrchestrationResult = orchestrationResult;
+    if (!orchestrationResult || !orchestrationResult.selectedAgent || !orchestrationResult.analysis || !orchestrationResult.systemPrompt) {
+      EdgeLogger.warn('Invalid or missing orchestrationResult, calling orchestration service', {
+        hasOrchestrationResult: !!orchestrationResult,
+        hasSelectedAgent: !!orchestrationResult?.selectedAgent,
+        hasAnalysis: !!orchestrationResult?.analysis,
+        hasSystemPrompt: !!orchestrationResult?.systemPrompt
+      });
+
+      try {
+        // Call agent_orchestration_stream internally as fallback
+        const orchestrationResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/agent_orchestration_stream`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message,
+            messageId,
+            deliberationId,
+            conversationContext,
+            mode
+          })
+        });
+
+        if (!orchestrationResponse.ok) {
+          throw new Error(`Orchestration service failed: ${orchestrationResponse.status}`);
+        }
+
+        const orchestrationData = await orchestrationResponse.json();
+        if (!orchestrationData.success) {
+          throw new Error(`Orchestration failed: ${orchestrationData.error || 'Unknown error'}`);
+        }
+
+        validatedOrchestrationResult = orchestrationData;
+        EdgeLogger.info('Successfully obtained orchestration result from fallback service', {
+          selectedAgent: validatedOrchestrationResult.selectedAgent?.type,
+          hasAnalysis: !!validatedOrchestrationResult.analysis
+        });
+      } catch (fallbackError) {
+        EdgeLogger.error('Fallback orchestration failed', fallbackError);
+        return createErrorResponse(
+          new Error(`Failed to obtain agent orchestration: ${fallbackError.message}`),
+          500,
+          'Orchestration fallback'
+        );
+      }
+    }
+
     EdgeLogger.info('Processing agent response generation request', {
       messageId,
       deliberationId,
-      agentType: orchestrationResult.selectedAgent.type,
+      agentType: validatedOrchestrationResult.selectedAgent.type,
       mode
     });
     // Create agent response generation service
     const responseService = new AgentResponseGenerationService(supabase, openaiApiKey);
     // Generate agent response
-    const result = await responseService.generateAgentResponse(orchestrationResult, messageId, deliberationId, mode);
+    const result = await responseService.generateAgentResponse(validatedOrchestrationResult, messageId, deliberationId, mode);
     EdgeLogger.info('Agent response generation completed', {
       success: result.success,
-      agentType: orchestrationResult.selectedAgent.type,
-      responseLength: result.agentMessage?.content?.length || 0
+      agentType: validatedOrchestrationResult.selectedAgent.type,
+      responseLength: (result as any).agentMessage?.content?.length || 0
     });
     return createSuccessResponse(result);
   } catch (error) {

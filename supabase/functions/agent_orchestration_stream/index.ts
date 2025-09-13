@@ -768,8 +768,23 @@ class AgentOrchestrator {
     return finalSelection;
   }
 
-  // System prompt generation
+  // System prompt generation with sophisticated template integration
   async generateSystemPrompt(agentConfig: AgentConfig | null, agentType: string, context?: any): Promise<string> {
+    // First, try to get a sophisticated prompt template from the database
+    let templatePrompt = await this.getPromptTemplate(agentType, context?.deliberationId);
+    
+    if (templatePrompt) {
+      EdgeLogger.debug('Using sophisticated prompt template', {
+        agentType,
+        templateLength: templatePrompt.length
+      });
+      return this.enhancePromptWithContext(templatePrompt, agentType, {
+        ...context,
+        agentConfig
+      });
+    }
+
+    // Fallback to agent config overrides
     if (agentConfig?.prompt_overrides?.system_prompt) {
       return this.enhancePromptWithContext(agentConfig.prompt_overrides.system_prompt, agentType, {
         ...context,
@@ -809,6 +824,82 @@ class AgentOrchestrator {
       ...context,
       agentConfig
     });
+  }
+
+  // Fetch sophisticated prompt template from database
+  private async getPromptTemplate(agentType: string, deliberationId?: string): Promise<string | null> {
+    try {
+      // First try to get a deliberation-specific template
+      if (deliberationId) {
+        const { data: localTemplate, error: localError } = await this.supabase
+          .from('prompt_templates')
+          .select('template_text, variables')
+          .eq('category', 'system_prompt')
+          .eq('agent_type', agentType)
+          .eq('deliberation_id', deliberationId)
+          .eq('is_active', true)
+          .order('version', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!localError && localTemplate) {
+          return this.processTemplate(localTemplate.template_text, localTemplate.variables, deliberationId);
+        }
+      }
+
+      // Fallback to global template
+      const { data: globalTemplate, error: globalError } = await this.supabase
+        .from('prompt_templates')
+        .select('template_text, variables')
+        .eq('category', 'system_prompt')
+        .eq('agent_type', agentType)
+        .is('deliberation_id', null)
+        .eq('is_active', true)
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!globalError && globalTemplate) {
+        return this.processTemplate(globalTemplate.template_text, globalTemplate.variables, deliberationId);
+      }
+
+      EdgeLogger.debug('No prompt template found', { agentType, deliberationId });
+      return null;
+    } catch (error) {
+      EdgeLogger.warn('Failed to fetch prompt template', { error: error.message, agentType, deliberationId });
+      return null;
+    }
+  }
+
+  // Process template with variable substitution
+  private processTemplate(templateText: string, variables: any, deliberationId?: string): string {
+    if (!variables || typeof variables !== 'object') {
+      return templateText;
+    }
+
+    let processedTemplate = templateText;
+    
+    // Replace common variables
+    const replacements: Record<string, string> = {
+      '{deliberation_id}': deliberationId || 'current deliberation',
+      '{timestamp}': new Date().toISOString(),
+      '{date}': new Date().toLocaleDateString(),
+      '{time}': new Date().toLocaleTimeString()
+    };
+
+    // Add any custom variables from the template
+    if (variables.custom) {
+      Object.entries(variables.custom).forEach(([key, value]) => {
+        replacements[`{${key}}`] = String(value);
+      });
+    }
+
+    // Apply all replacements
+    Object.entries(replacements).forEach(([placeholder, value]) => {
+      processedTemplate = processedTemplate.replace(new RegExp(placeholder, 'g'), value);
+    });
+
+    return processedTemplate;
   }
 
   private enhancePromptWithContext(prompt: string, agentType: string, context?: any): string {
@@ -1031,42 +1122,20 @@ serve(async (req) => {
 
     // If message is missing but messageId is provided, fetch the message content
     if ((!message || message.trim().length === 0) && messageId) {
-      EdgeLogger.info('Attempting to fetch message content', { messageId });
-      
       const { data: msg, error } = await serviceClient
         .from('messages')
         .select('content')
         .eq('id', messageId)
         .maybeSingle();
         
-      if (error) {
-        EdgeLogger.error('Database error fetching message', { 
-          messageId, 
-          error: error.message, 
-          code: error.code,
-          details: error.details 
-        });
+      if (error || !msg?.content) {
         return createErrorResponse(
-          new Error(`Database error fetching message: ${error.message}`), 
+          new Error('Could not resolve message by messageId'), 
           400, 
-          'Database query failed'
+          'Request validation'
         );
       }
-      
-      if (!msg?.content) {
-        EdgeLogger.error('Message not found or has no content', { messageId, msg });
-        return createErrorResponse(
-          new Error(`Message not found or has no content for messageId: ${messageId}`), 
-          404, 
-          'Message not found'
-        );
-      }
-      
       message = msg.content;
-      EdgeLogger.info('Successfully fetched message content', { 
-        messageId, 
-        contentLength: message.length 
-      });
     }
 
     if (!message || !deliberationId) {
