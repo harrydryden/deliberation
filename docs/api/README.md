@@ -1,6 +1,6 @@
 # API Documentation
 
-This document provides comprehensive documentation for the Democratic Deliberation Platform API.
+This document provides comprehensive documentation for the Democratic Deliberation Platform API. We've designed it to be straightforward and well-documented for developers.
 
 ## Base URL
 
@@ -11,9 +11,6 @@ This document provides comprehensive documentation for the Democratic Deliberati
 
 All protected endpoints require a JWT token in the Authorization header:
 
-```
-Authorization: Bearer <jwt_token>
-```
 
 ## Core Endpoints
 
@@ -309,3 +306,57 @@ curl -X POST http://localhost:3000/api/messages \
   -H "Content-Type: application/json" \
   -d '{"content":"Hello world","deliberationId":"uuid"}'
 ```
+
+## Edge Functions
+
+The platform also includes Supabase Edge Functions for advanced functionality:
+
+### classify_message
+Classifies user messages and assigns stance scores.
+
+### knowledge_query
+Queries the knowledge base using RAG (Retrieval Augmented Generation).
+
+### agent_orchestration_stream
+Orchestrates AI agents for intelligent conversation management.
+
+### generate_issue_recommendations
+Generates issue recommendations based on conversation context.
+
+### calculate_user_stance
+Calculates aggregated user stance scores.
+
+### ibis_embeddings
+Computes embeddings for IBIS (Issue-Based Information System) nodes.
+
+### relationship_evaluator
+Evaluates relationships between IBIS nodes.
+
+### link_similar_ibis_issues
+Links similar IBIS issues for better organisation.
+
+### generate_notion_statement
+Generates notion statements for deliberations.
+
+### generate_proactive_prompt
+Generates proactive prompts to guide conversations.
+
+### admin_get_users_v2
+Admin function for user management.
+
+### realtime_session
+Manages real-time session functionality.
+
+### voice_to_text
+Converts voice input to text.
+
+### pdf_processor
+Processes PDF documents for knowledge extraction.
+
+## Support
+
+For API-related questions or issues:
+- Check the error responses above
+- Review the WebSocket events documentation
+- Test with the provided SDK examples
+- Contact the development team for assistance
