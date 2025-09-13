@@ -53,15 +53,52 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
         'Content-Type': 'application/json'
       };
       
-      const response = await supabase.functions.invoke('admin_get_users_v2', {
-        method: 'GET',
-        headers
-      });
-      
-      if (response.error) {
-        throw new Error(`Edge Function returned a non-2xx status code: ${response.error.message || 'Unknown error'}`);
+      try {
+        const response = await supabase.functions.invoke('admin_get_users_v2', {
+          method: 'GET',
+          headers
+        });
+        if (response.error) {
+          throw new Error(response.error.message || 'Edge function error');
+        }
+        return response.data?.users || [];
+      } catch (e) {
+        // Fallback: degrade gracefully to profiles list so Admin stays usable
+        logger.warn('admin_get_users_v2 failed, falling back to client-side profiles fetch', e as any);
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, user_role, access_code_1, access_code_2, created_at')
+          .order('created_at', { ascending: false })
+          .limit(2000);
+        if (profilesError) {
+          throw profilesError;
+        }
+        // Attempt to enrich with deliberations (best-effort)
+        const { data: participants } = await supabase
+          .from('participants')
+          .select('user_id, deliberation_id');
+        const { data: deliberations } = await supabase
+          .from('deliberations')
+          .select('id, title');
+        const delibTitleById = new Map((deliberations || []).map(d => [d.id, d.title]));
+        const delibsByUser = new Map<string, string[]>();
+        (participants || []).forEach(p => {
+          const arr = delibsByUser.get(p.user_id) || [];
+          const title = delibTitleById.get(p.deliberation_id);
+          if (title) arr.push(title);
+          delibsByUser.set(p.user_id, arr);
+        });
+        return (profiles || []).map(p => ({
+          id: p.id,
+          email: null,
+          role: p.user_role,
+          access_codes: [p.access_code_1, p.access_code_2].filter(Boolean),
+          created_at: p.created_at,
+          last_sign_in: null,
+          email_confirmed: null,
+          deliberations: delibsByUser.get(p.id) || []
+        }));
       }
-      return response.data?.users || [];
     }
   );
 

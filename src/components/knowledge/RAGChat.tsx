@@ -76,7 +76,30 @@ export function RAGChat({ agents }: RAGChatProps) {
       }
 
       if (hasError) {
-        throw new Error(hasError.message || 'Query failed');
+        // Client-side fallback: simple keyword search on agent_knowledge
+        try {
+          const { data: rows, error: kgError } = await supabase
+            .from('agent_knowledge')
+            .select('id, title, content, content_type, file_name, chunk_index, metadata, created_at')
+            .eq('agent_id', selectedAgent)
+            .ilike('content', `%${inputMessage}%`)
+            .limit(5);
+          if (kgError) throw kgError;
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            type: 'assistant',
+            content: rows && rows.length > 0 
+              ? `Found ${rows.length} matching knowledge chunks.`
+              : 'No relevant knowledge found for this query.',
+            timestamp: new Date(),
+            knowledgeChunks: rows?.length || 0,
+            relevantKnowledge: rows || []
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+          return;
+        } catch (fallbackErr: any) {
+          throw new Error(fallbackErr.message || 'Query failed');
+        }
       }
 
       const assistantMessage: Message = {
@@ -87,7 +110,6 @@ export function RAGChat({ agents }: RAGChatProps) {
         knowledgeChunks: responseData?.knowledgeChunks || 0,
         relevantKnowledge: responseData?.relevantKnowledge || []
       };
-
       setMessages(prev => [...prev, assistantMessage]);
 
       if (responseData?.knowledgeChunks === 0) {
