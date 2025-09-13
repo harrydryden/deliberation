@@ -1,20 +1,20 @@
 # Environment Configuration Guide
 
-This guide explains how to configure the Democratic Deliberation Platform for production deployment and self-hosting.
+This guide explains how to configure the Democratic Deliberation Platform for production deployment and self-hosting. We'll walk you through everything you need to know about setting up your environment variables properly.
 
 ## Required Environment Variables
 
 ### Core Supabase Configuration
 
-The application requires these environment variables to function:
+The application needs these environment variables to function properly:
 
 ```bash
 # Supabase Database Configuration (REQUIRED)
-VITE_SUPABASE_URL="https://your-project-id.supabase.co"
+VITE_SUPABASE_URL="https://iowsxuxkgvpgrvvklwyt.supabase.co"
 VITE_SUPABASE_PUBLISHABLE_KEY="your-publishable-anon-key"
 
 # Alternative naming for production environments
-SUPABASE_URL="https://your-project-id.supabase.co" 
+SUPABASE_URL="https://iowsxuxkgvpgrvvklwyt.supabase.co" 
 SUPABASE_ANON_KEY="your-publishable-anon-key"
 ```
 
@@ -22,7 +22,7 @@ SUPABASE_ANON_KEY="your-publishable-anon-key"
 
 ```bash
 # Project identification (optional)
-VITE_SUPABASE_PROJECT_ID="your-project-id"
+VITE_SUPABASE_PROJECT_ID="iowsxuxkgvpgrvvklwyt"
 
 # Build environment
 NODE_ENV="production"  # or "development"
@@ -32,18 +32,22 @@ NODE_ENV="production"  # or "development"
 
 ### 1. Development Setup
 
-1. Copy the example environment file:
+Getting started locally is straightforward:
+
+1. Create a `.env` file in your project root:
    ```bash
-   cp .env.example .env
+   touch .env
    ```
 
-2. Update `.env` with your Supabase project values:
+2. Add your Supabase project values to `.env`:
    ```bash
-   VITE_SUPABASE_URL="https://your-project-id.supabase.co"
+   VITE_SUPABASE_URL="https://iowsxuxkgvpgrvvklwyt.supabase.co"
    VITE_SUPABASE_PUBLISHABLE_KEY="your-actual-publishable-key"
+   VITE_SUPABASE_PROJECT_ID="iowsxuxkgvpgrvvklwyt"
+   NODE_ENV="development"
    ```
 
-3. Start development server:
+3. Start the development server:
    ```bash
    npm run dev
    ```
@@ -54,18 +58,14 @@ NODE_ENV="production"  # or "development"
 
 Add environment variables in your deployment platform:
 
-```
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-NODE_ENV=production
-```
 
 #### Docker Deployment
 
 ```dockerfile
 # Set environment variables in your Dockerfile or docker-compose.yml
-ENV VITE_SUPABASE_URL=https://your-project-id.supabase.co
+ENV VITE_SUPABASE_URL=https://iowsxuxkgvpgrvvklwyt.supabase.co
 ENV VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+ENV VITE_SUPABASE_PROJECT_ID=iowsxuxkgvpgrvvklwyt
 ENV NODE_ENV=production
 ```
 
@@ -73,8 +73,9 @@ ENV NODE_ENV=production
 
 ```bash
 # Set environment variables on your server
-export SUPABASE_URL="https://your-project-id.supabase.co"
+export SUPABASE_URL="https://iowsxuxkgvpgrvvklwyt.supabase.co"
 export SUPABASE_ANON_KEY="your-publishable-key"
+export SUPABASE_PROJECT_ID="iowsxuxkgvpgrvvklwyt"
 export NODE_ENV="production"
 ```
 
@@ -86,13 +87,37 @@ If you're running your own Supabase instance:
 # Point to your self-hosted instance
 VITE_SUPABASE_URL="https://your-domain.com"
 VITE_SUPABASE_PUBLISHABLE_KEY="your-self-hosted-anon-key"
+VITE_SUPABASE_PROJECT_ID="your-project-id"
 ```
+
+## Getting Your Supabase Keys
+
+### 1. Access Your Supabase Dashboard
+
+1. Go to [https://supabase.com/dashboard](https://supabase.com/dashboard)
+2. Sign in to your account
+3. Select your project: **iowsxuxkgvpgrvvklwyt**
+
+### 2. Get Your API Keys
+
+1. In your project dashboard, go to **Settings** → **API**
+2. Copy the following values:
+   - **Project URL**: `https://iowsxuxkgvpgrvvklwyt.supabase.co`
+   - **anon/public key**: This is your `VITE_SUPABASE_PUBLISHABLE_KEY`
+   - **Project ID**: `iowsxuxkgvpgrvvklwyt`
+
+### 3. Service Role Key (Optional)
+
+- **service_role key**: Only needed for admin operations
+- **Never expose this in frontend code**
+- Only use in secure backend environments
 
 ## Security Considerations
 
 ### ✅ Safe to Expose
 - `VITE_SUPABASE_URL` - Public API endpoint
 - `VITE_SUPABASE_PUBLISHABLE_KEY` - Public anon key (Row Level Security protects data)
+- `VITE_SUPABASE_PROJECT_ID` - Public project identifier
 - `NODE_ENV` - Build environment
 
 ### ❌ Never Expose
@@ -133,16 +158,7 @@ Run this command to test your environment setup:
 npm run build
 ```
 
-If build succeeds, your environment is configured correctly.
-
-## Migration from Lovable
-
-If migrating from Lovable development environment:
-
-1. Remove any hard-coded fallback values
-2. Set up proper environment variables
-3. Test in production-like environment
-4. Verify all functionality works without development dependencies
+If the build succeeds, your environment is configured correctly.
 
 ## Support
 
@@ -150,3 +166,4 @@ For deployment-specific questions:
 - Check your hosting platform's documentation
 - Verify Supabase project settings
 - Test with a minimal configuration first
+  
