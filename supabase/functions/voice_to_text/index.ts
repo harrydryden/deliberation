@@ -23,19 +23,19 @@ class EdgeLogger {
   }
 
   static debug(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('DEBUG', message, data));
   }
 
   static info(message: string, data?: any): void {
-    );
+    console.log(this.formatMessage('INFO', message, data));
   }
 
   static warn(message: string, data?: any): void {
-    );
+    console.warn(this.formatMessage('WARN', message, data));
   }
 
   static error(message: string, data?: any): void {
-    );
+    console.error(this.formatMessage('ERROR', message, data));
   }
 }
 
