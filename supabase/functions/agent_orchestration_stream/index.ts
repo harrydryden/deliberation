@@ -945,6 +945,32 @@ async function validateAndGetEnvironment() {
   };
 }
 
+function buildOpenAIParams(model: string, messages: any[], agentType: string) {
+  const isNewModel = model.startsWith('gpt-5') || 
+                    model.startsWith('gpt-4.1') || 
+                    model.startsWith('o3') || 
+                    model.startsWith('o4');
+
+  const base: any = {
+    model,
+    messages
+  };
+
+  const maxTokens = agentType === 'bill_agent' ? 1000 : 800;
+
+  if (isNewModel) {
+    // Newer models
+    base.max_completion_tokens = maxTokens;
+    // Do NOT send temperature
+  } else {
+    // Legacy models (e.g., gpt-4o-mini)
+    base.max_tokens = maxTokens;
+    base.temperature = 0.7;
+  }
+
+  return base;
+}
+
 // ============================================================================
 // MAIN EDGE FUNCTION
 // ============================================================================
@@ -994,11 +1020,32 @@ serve(async (req) => {
     // Parse request body
     const requestBody = await req.json();
     const { 
-      message, 
+      message: rawMessage, 
+      messageId, 
       deliberationId,
       conversationContext = {},
       mode = 'chat'
     } = requestBody;
+
+    let message = rawMessage;
+
+    // If message is missing but messageId is provided, fetch the message content
+    if ((!message || message.trim().length === 0) && messageId) {
+      const { data: msg, error } = await serviceClient
+        .from('messages')
+        .select('content')
+        .eq('id', messageId)
+        .maybeSingle();
+        
+      if (error || !msg?.content) {
+        return createErrorResponse(
+          new Error('Could not resolve message by messageId'), 
+          400, 
+          'Request validation'
+        );
+      }
+      message = msg.content;
+    }
 
     if (!message || !deliberationId) {
       return createErrorResponse(

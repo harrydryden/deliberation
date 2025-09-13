@@ -164,18 +164,15 @@ class AgentResponseGenerationService {
         messageCount: messages.length,
         hasKnowledgeContext: !!knowledgeContext
       });
+      const openaiParams = buildOpenAIParams(selectedAgent.model, messages, selectedAgent.type);
+
       const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.openaiApiKey}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: selectedAgent.model,
-          messages: messages,
-          max_completion_tokens: selectedAgent.type === 'bill_agent' ? 1000 : 800,
-          temperature: selectedAgent.model.includes('gpt-4') ? 0.7 : undefined
-        })
+        body: JSON.stringify(openaiParams),
       });
       if (!openaiResponse.ok) {
         const errorText = await openaiResponse.text();
@@ -436,6 +433,31 @@ async function validateAndGetEnvironment() {
     supabase: createClient(supabaseUrl, supabaseServiceKey)
   };
 }
+function buildOpenAIParams(model: string, messages: any[], agentType: string) {
+  const isNewModel = model.startsWith('gpt-5') || 
+                    model.startsWith('gpt-4.1') || 
+                    model.startsWith('o3') || 
+                    model.startsWith('o4');
+
+  const base: any = {
+    model,
+    messages
+  };
+
+  const maxTokens = agentType === 'bill_agent' ? 1000 : 800;
+
+  if (isNewModel) {
+    // Newer models
+    base.max_completion_tokens = maxTokens;
+    // Do NOT send temperature
+  } else {
+    // Legacy models (e.g., gpt-4o-mini)
+    base.max_tokens = maxTokens;
+    base.temperature = 0.7;
+  }
+
+  return base;
+}
 // ============================================================================
 // MAIN EDGE FUNCTION
 // ============================================================================
@@ -447,11 +469,47 @@ serve(async (req)=>{
       method: req.method,
       url: req.url
     });
-    const { orchestrationResult, messageId, deliberationId, mode = 'chat' } = await parseAndValidateRequest(req, [
-      'orchestrationResult',
+    const { 
+      message: rawMessage, 
+      messageId, 
+      deliberationId,
+      conversationContext = {},
+      mode = 'chat'
+    } = await parseAndValidateRequest(req, [
+      'message',
       'messageId',
       'deliberationId'
     ]);
+
+    let message = rawMessage;
+
+    // If message is missing but messageId is provided, fetch the message content
+    if ((!message || message.trim().length === 0) && messageId) {
+      const { supabase } = await validateAndGetEnvironment();
+      const { data: msg, error } = await supabase
+        .from('messages')
+        .select('content')
+        .eq('id', messageId)
+        .maybeSingle();
+      
+      if (error || !msg?.content) {
+        return createErrorResponse(
+          new Error('Could not resolve message by messageId'), 
+          400, 
+          'Request validation'
+        );
+      }
+      message = msg.content;
+    }
+
+    if (!message || !deliberationId) {
+      return createErrorResponse(
+        new Error('Missing required fields: message and deliberationId'),
+        400,
+        'Request validation'
+      );
+    }
+
     const { supabase } = await validateAndGetEnvironment();
     const openaiApiKey = getOpenAIKey();
     EdgeLogger.info('Processing agent response generation request', {
