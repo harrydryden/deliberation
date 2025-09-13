@@ -214,12 +214,13 @@ class AgentResponseGenerationService {
         processingTime: Date.now() - startTime
       });
       // Insert agent response into messages table
+      EdgeLogger.debug('Inserting agent message', { usedUserId: originalMessage.user_id, agentType: selectedAgent.type });
       const { data: agentMessage, error: insertError } = await this.supabase.from('messages').insert({
         content: generatedContent,
         message_type: selectedAgent.type,
         deliberation_id: deliberationId,
         parent_message_id: messageId,
-        user_id: null,
+        user_id: originalMessage.user_id,
         agent_context: {
           orchestrationId: orchestrationResult.metadata?.requestId,
           model: selectedAgent.model,
