@@ -1,6 +1,7 @@
 {
   "imports": {
     "std/": "https://deno.land/std@0.208.0/",
+    "xhr": "https://deno.land/x/xhr@0.1.0/mod.ts",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.52.1",
     "pdfjs-dist": "https://esm.sh/pdfjs-dist@4.0.379",
     "langchain/": "https://esm.sh/langchain@0.3.30/",

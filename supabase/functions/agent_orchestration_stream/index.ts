@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.52.1";
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
 
 // Inlined utilities to avoid cross-folder import issues
 const corsHeaders = {
@@ -133,7 +133,20 @@ class AgentOrchestrator {
   }
   
   async generateSystemPrompt(agent: any, agentType: string, context: any) {
-    return `You are ${agent.name || agentType}. ${agent.description || 'You assist in deliberation discussions.'}`;
+    let basePrompt = `You are ${agent.name || agentType}. ${agent.description || 'You assist in deliberation discussions.'}`;
+    
+    // Add knowledge context if available
+    if (context.knowledge && context.knowledge.hasKnowledge) {
+      basePrompt += `\n\nRelevant Knowledge Base Information:\n${context.knowledge.response}`;
+      
+      if (context.knowledge.sources && context.knowledge.sources.length > 0) {
+        basePrompt += `\n\nSources: ${context.knowledge.sources.map(s => s.title).join(', ')}`;
+      }
+      
+      basePrompt += `\n\nPlease incorporate this knowledge into your response when relevant.`;
+    }
+    
+    return basePrompt;
   }
 }
 
@@ -319,13 +332,57 @@ async function processOrchestration(
     console.log(`🎯 [PHASE2] Final selection: ${selectedAgent.name} (${selectedAgentType}) - Mode: ${mode}`);
     console.log(`✅ [PHASE2] Orchestrated selection: ${selectedAgent.name} (${selectedAgentType})`);
 
+    // Phase 2.5: Knowledge Retrieval for knowledge-enabled agents
+    let knowledgeContext = null;
+    if (selectedAgent.id) {
+      console.log(`🔍 [PHASE2.5] Checking for agent knowledge: ${selectedAgent.name}`);
+      
+      try {
+        // Check if agent has knowledge by querying agent_knowledge table
+        const { data: hasKnowledge, error: knowledgeCheckError } = await serviceClient
+          .from('agent_knowledge')
+          .select('id')
+          .eq('agent_id', selectedAgent.id)
+          .limit(1);
+
+        if (!knowledgeCheckError && hasKnowledge && hasKnowledge.length > 0) {
+          console.log(`💡 [PHASE2.5] Agent has knowledge, querying knowledge base for: "${message.content.substring(0, 100)}..."`);
+          
+          // Call knowledge_query function
+          const { data: knowledgeResult, error: knowledgeError } = await serviceClient.functions.invoke('knowledge_query', {
+            body: {
+              query: message.content,
+              agentId: selectedAgent.id,
+              maxResults: 3
+            }
+          });
+
+          if (!knowledgeError && knowledgeResult && knowledgeResult.success) {
+            knowledgeContext = {
+              response: knowledgeResult.response,
+              sources: knowledgeResult.sources || [],
+              hasKnowledge: true
+            };
+            console.log(`✅ [PHASE2.5] Knowledge retrieved successfully - ${knowledgeResult.sources?.length || 0} sources found`);
+          } else {
+            console.warn(`⚠️ [PHASE2.5] Knowledge query failed:`, knowledgeError?.message || 'Unknown error');
+          }
+        } else {
+          console.log(`ℹ️ [PHASE2.5] Agent has no knowledge base content`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ [PHASE2.5] Knowledge retrieval error:`, error);
+      }
+    }
+
     // Phase 3: System Prompt Construction with IBIS context for peer_agent
     console.log(`📝 [PHASE3] Building system prompt with orchestrator`);
     
     let context = {
       deliberationId,
       messageAnalysis,
-      conversationLength: recentMessages?.length || 0
+      conversationLength: recentMessages?.length || 0,
+      knowledge: knowledgeContext
     };
     
     // Fetch relevant IBIS nodes for peer_agent (Pia) using semantic similarity
