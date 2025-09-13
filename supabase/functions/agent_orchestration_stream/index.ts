@@ -1031,20 +1031,42 @@ serve(async (req) => {
 
     // If message is missing but messageId is provided, fetch the message content
     if ((!message || message.trim().length === 0) && messageId) {
+      EdgeLogger.info('Attempting to fetch message content', { messageId });
+      
       const { data: msg, error } = await serviceClient
         .from('messages')
         .select('content')
         .eq('id', messageId)
         .maybeSingle();
         
-      if (error || !msg?.content) {
+      if (error) {
+        EdgeLogger.error('Database error fetching message', { 
+          messageId, 
+          error: error.message, 
+          code: error.code,
+          details: error.details 
+        });
         return createErrorResponse(
-          new Error('Could not resolve message by messageId'), 
+          new Error(`Database error fetching message: ${error.message}`), 
           400, 
-          'Request validation'
+          'Database query failed'
         );
       }
+      
+      if (!msg?.content) {
+        EdgeLogger.error('Message not found or has no content', { messageId, msg });
+        return createErrorResponse(
+          new Error(`Message not found or has no content for messageId: ${messageId}`), 
+          404, 
+          'Message not found'
+        );
+      }
+      
       message = msg.content;
+      EdgeLogger.info('Successfully fetched message content', { 
+        messageId, 
+        contentLength: message.length 
+      });
     }
 
     if (!message || !deliberationId) {

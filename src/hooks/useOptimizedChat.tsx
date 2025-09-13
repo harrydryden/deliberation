@@ -223,7 +223,7 @@ export const useOptimizedChat = (deliberationId?: string, messageQueue?: ReturnT
       
       // Trigger agent orchestration after message is saved and verified
       try {
-        await triggerAgentResponse(saved.id, deliberationId);
+        await triggerAgentResponse(saved.id, deliberationId, undefined, queuedMessage.content);
         
         logger.info(' Agent orchestration completed successfully', { 
           messageId: queuedMessage.id,

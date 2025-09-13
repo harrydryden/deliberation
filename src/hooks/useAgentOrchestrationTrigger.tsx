@@ -14,7 +14,8 @@ export function useAgentOrchestrationTrigger() {
   const triggerAgentResponse = async (
     messageId: string,
     deliberationId: string,
-    orchestrationResult?: any
+    orchestrationResult?: any,
+    messageContent?: string
   ): Promise<AgentOrchestrationResult> => {
     if (isLoading) {
       return { success: false, error: 'Agent orchestration already in progress' };
@@ -27,13 +28,20 @@ export function useAgentOrchestrationTrigger() {
       let finalOrchestrationResult = orchestrationResult;
       
       if (!finalOrchestrationResult) {
+        const requestBody: any = {
+          messageId,
+          deliberationId
+        };
+        
+        // Include message content if available for better reliability
+        if (messageContent) {
+          requestBody.message = messageContent;
+        }
+        
         const { data: orchData, error: orchError } = await supabase.functions.invoke(
           'agent_orchestration_stream',
           {
-            body: {
-              messageId,
-              deliberationId
-            }
+            body: requestBody
           }
         );
 
