@@ -59,7 +59,8 @@ export function useAgentOrchestrationTrigger() {
           body: {
             orchestrationResult: finalOrchestrationResult,
             messageId,
-            deliberationId
+            deliberationId,
+            message: messageContent
           }
         }
       );
