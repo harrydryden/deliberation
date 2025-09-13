@@ -55,13 +55,16 @@ export const useOptimizedAdminData = (): OptimizedAdminData => {
       
       try {
         const response = await supabase.functions.invoke('admin_get_users_v2', {
-          body: {},
+          body: { page: 1, limit: 50 },
           headers
         });
-        if (response.error) {
-          throw new Error(response.error.message || 'Edge function error');
+
+        // Validate edge function response and fall back on invalid data
+        if (response.error || response.data?.error || !Array.isArray(response.data?.users)) {
+          throw new Error(response.error?.message || response.data?.error || 'Edge function returned invalid data');
         }
-        return response.data?.users || [];
+
+        return response.data.users;
       } catch (e) {
         // Fallback: degrade gracefully to profiles list so Admin stays usable
         logger.warn('admin_get_users_v2 failed, falling back to client-side profiles fetch', e as any);
