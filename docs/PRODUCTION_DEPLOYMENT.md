@@ -1,30 +1,34 @@
-# Production Self-Hosting Guide
+# Production Deployment Guide
 
-This guide provides instructions for deploying the Democratic Deliberation Platform in a production environment.
+This guide walks you through deploying the Democratic Deliberation Platform to your own infrastructure. We've designed it to be straightforward and reliable for production use.
 
-## Overview
+## What You'll Need
 
-The platform has been prepared for self-hosting with the following changes:
-- ✅ Removed hard-coded development credentials
-- ✅ Environment-based configuration
-- ✅ Production-ready security settings
-- ✅ Removed development-only dependencies
+Before you begin, make sure you have:
+- **Node.js 18+** or Docker installed
+- A **Supabase project** (either hosted or self-hosted)
+- An **SSL certificate** for your production domain
+- Basic familiarity with web server configuration
 
-## Prerequisites
+## Getting Started
 
-- Node.js 18+ or Docker
-- Supabase project (hosted or self-hosted)
-- SSL certificate for production domain
+The platform has been thoroughly prepared for production deployment with:
+- ✅ All development credentials removed
+- ✅ Environment-based configuration implemented
+- ✅ Production-ready security settings configured
+- ✅ Development dependencies cleaned up
 
 ## Deployment Options
 
 ### Option 1: Docker Deployment (Recommended)
 
+This is the easiest way to get started. Docker handles all the dependencies and configuration for you.
+
 ```bash
-# Build production image
+# Build the production image
 docker build -t deliberation-platform .
 
-# Run with environment variables
+# Run with your environment variables
 docker run -d \
   --name deliberation-app \
   -p 8080:8080 \
@@ -36,28 +40,34 @@ docker run -d \
 
 ### Option 2: Traditional Server Deployment
 
+If you prefer a more traditional approach:
+
 ```bash
-# Install dependencies
+# Install production dependencies
 npm ci --only=production
 
-# Build application
+# Build the application
 npm run build
 
-# Serve built files (using your preferred web server)
+# Serve the built files (using your preferred web server)
 # Example with a simple HTTP server:
 npx serve -s dist -p 8080
 ```
 
 ### Option 3: Platform Deployment (Vercel, Netlify, etc.)
 
+For managed hosting platforms:
+
 1. Connect your git repository
-2. Set environment variables in platform dashboard
+2. Set environment variables in the platform dashboard
 3. Deploy automatically on push
 
-## Required Environment Variables
+## Environment Configuration
+
+You'll need to set these environment variables:
 
 ```bash
-# Core Configuration
+# Core Configuration (Required)
 VITE_SUPABASE_URL="https://your-project.supabase.co"
 VITE_SUPABASE_PUBLISHABLE_KEY="your-publishable-key"
 NODE_ENV="production"
@@ -68,7 +78,7 @@ VITE_SUPABASE_PROJECT_ID="your-project-id"
 
 ## Database Setup
 
-### 1. Supabase Hosted
+### Using Supabase Hosted
 
 1. Create a new Supabase project
 2. Run the provided migrations:
@@ -78,13 +88,11 @@ VITE_SUPABASE_PROJECT_ID="your-project-id"
    
    # Or manually run SQL files from supabase/migrations/
    ```
-
 3. Set up Row Level Security policies (included in migrations)
 
-### 2. Self-Hosted Supabase
+### Self-Hosted Supabase
 
-Follow [Supabase self-hosting guide](https://supabase.com/docs/guides/self-hosting) then:
-
+Follow the [Supabase self-hosting guide](https://supabase.com/docs/guides/self-hosting), then:
 1. Update `VITE_SUPABASE_URL` to your instance
 2. Run database migrations
 3. Configure edge functions
@@ -93,18 +101,18 @@ Follow [Supabase self-hosting guide](https://supabase.com/docs/guides/self-hosti
 
 ### SSL/TLS Certificate
 
-Ensure your domain has a valid SSL certificate. For production:
+Make sure your domain has a valid SSL certificate. For production:
 - Use a reverse proxy (Nginx, Apache, Cloudflare)
 - Enable HTTPS redirect
 - Set proper security headers
 
 ### Content Security Policy
 
-The application includes production-ready CSP settings. To customize:
+The application includes production-ready CSP settings. To customise:
 
 1. Edit `src/config/security.ts`
 2. Update `connect-src` directive for your domain
-3. Rebuild application
+3. Rebuild the application
 
 ### Database Security
 
@@ -113,19 +121,21 @@ The application includes production-ready CSP settings. To customize:
 - Use least-privilege principle for service roles
 - Regular security audits
 
-## Performance Optimization
+## Performance Optimisation
 
-### Build Optimization
+### Build Optimisation
 
 ```bash
-# Production build with optimizations
+# Production build with optimisations
 npm run build
 
-# Analyze bundle size
+# Analyse bundle size
 npm run build -- --analyze
 ```
 
 ### Server Configuration
+
+Here's an example Nginx configuration:
 
 ```nginx
 # Example Nginx configuration
@@ -208,7 +218,7 @@ In production, the application:
    ```
 
 2. **Database Connection Errors**
-   - Verify Supabase URL accessibility
+   - Verify Supabase URL is accessible
    - Check firewall rules
    - Validate API keys
 
@@ -249,7 +259,7 @@ Consider integrating:
 - Infrastructure monitoring (Datadog, New Relic)
 - User analytics (PostHog, Google Analytics)
 
-## Checklist for Production Deployment
+## Production Deployment Checklist
 
 - [ ] Environment variables configured
 - [ ] Database migrations applied
