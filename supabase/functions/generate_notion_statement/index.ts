@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.52.1";
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
 
 // Inlined utilities to avoid cross-folder import issues
 const corsHeaders = {

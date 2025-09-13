@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
+import { serve } from "std/http/server.ts";
 
 // Import shared utilities for performance and consistency
 // Self-contained utilities (inlined to avoid path resolution issues)

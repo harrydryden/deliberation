@@ -1,11 +1,11 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.52.1";
-import { SupabaseVectorStore } from "npm:@langchain/community@0.3.49/vectorstores/supabase";
-import { OpenAIEmbeddings, ChatOpenAI } from "npm:@langchain/openai@0.6.3";
-import { createStuffDocumentsChain } from "npm:langchain@0.3.30/chains/combine_documents";
-import { createRetrievalChain } from "npm:langchain@0.3.30/chains/retrieval";
-import { ChatPromptTemplate } from "npm:@langchain/core@0.3.30/prompts";
+import "xhr";
+import { serve } from "std/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
+import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
+import { OpenAIEmbeddings, ChatOpenAI } from "@langchain/openai";
+import { createStuffDocumentsChain } from "langchain/chains/combine_documents";
+import { createRetrievalChain } from "langchain/chains/retrieval";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
