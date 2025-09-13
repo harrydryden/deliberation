@@ -41,7 +41,6 @@ vi.mock('@/services/domain/implementations/ibis.service', () => ({
       { id: 'node-1', title: 'Existing Issue', node_type: 'issue' },
       { id: 'node-2', title: 'Existing Position', node_type: 'position' }
     ]);
-    generateRootIssues = vi.fn().mockResolvedValue({ success: true });
   }
 }));
 
@@ -127,31 +126,6 @@ describe('IBIS Integration (F010)', () => {
       
       await waitFor(() => {
         expect(mockSubmitToIbis).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Root Issue Generation', () => {
-    it('should handle root issue generation when no nodes exist', async () => {
-      // Mock empty nodes
-      vi.mocked(require('@/services/domain/implementations/ibis.service').IBISService).mockImplementation(() => ({
-        getExistingNodes: vi.fn().mockResolvedValue([]),
-        generateRootIssues: vi.fn().mockResolvedValue({ success: true })
-      }));
-
-      render(<IbisSubmissionModal {...defaultProps} />);
-      
-      await waitFor(() => {
-        expect(screen.getByText('No IBIS nodes exist yet')).toBeInTheDocument();
-        expect(screen.getByText('Suggest Root Issues')).toBeInTheDocument();
-      });
-      
-      // Click suggest root issues
-      const suggestButton = screen.getByText('Suggest Root Issues');
-      fireEvent.click(suggestButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText('Generating...')).toBeInTheDocument();
       });
     });
   });

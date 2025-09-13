@@ -21,7 +21,6 @@ type DeliberationForm = {
   notion: string;
   is_public: boolean;
   max_participants: number;
-  generate_ibis_roots: boolean;
   status: 'draft' | 'active' | 'concluded';
   facilitator_id?: string;
 };
@@ -38,7 +37,6 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
       notion: '',
       is_public: true,
       max_participants: 50,
-      generate_ibis_roots: true,
       status: 'draft' as const,
       facilitator_id: undefined
     },
@@ -74,9 +72,8 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
     },
     onSubmit: async (data) => {
       // Create deliberation
-      const { generate_ibis_roots, ...deliberationData } = data;
       const createData: any = {
-        ...deliberationData,
+        ...data,
         status: data.status || 'draft',
         facilitator_id: data.facilitator_id || null,
         start_time: null,
@@ -84,7 +81,6 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
       };
       const deliberation = await deliberationService.createDeliberation(createData);
       
-      // AI generation disabled - this feature has been replaced with manual IBIS node creation
       toast.success('Deliberation created successfully. You can add IBIS nodes manually through the admin interface.');
       
       setCreateOpen(false);
@@ -189,14 +185,6 @@ export const DeliberationCreation = ({ onDeliberationCreated }: DeliberationCrea
                 label="Public deliberation"
                 checked={form.formData.is_public}
                 onChange={(checked) => form.updateField('is_public', checked)}
-              />
-              
-              <FormField
-                type="switch"
-                label="Generate initial IBIS root issues with AI"
-                checked={form.formData.generate_ibis_roots}
-                onChange={(checked) => form.updateField('generate_ibis_roots', checked)}
-                description="Use AI to create starting discussion points"
               />
               
               <FormField

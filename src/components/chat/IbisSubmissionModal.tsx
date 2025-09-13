@@ -69,7 +69,6 @@ export const IbisSubmissionModal = ({
     title: string;
     node_type: string;
   }>>([]);
-  const [isGeneratingRoots, setIsGeneratingRoots] = useState(false);
   
   // Use custom hooks for better separation of concerns
   const { submitToIbis, isSubmitting } = useIbisSubmission(
@@ -196,19 +195,6 @@ export const IbisSubmissionModal = ({
     setSelectedIssueId(selectedIssueId === issueId ? null : issueId);
   };
 
-  const handleGenerateRootIssues = async () => {
-    setIsGeneratingRoots(true);
-    try {
-      logger.info('Manual root issue generation is no longer supported. Use the "Create Issues" button in admin interface.');
-      // This feature has been replaced with manual creation in the admin interface
-      await loadExistingNodes(); // Just reload to refresh
-    } catch (error) {
-      logger.error('Error refreshing nodes:', error);
-    } finally {
-      setIsGeneratingRoots(false);
-    }
-  };
-
   const getNodeTypeDescription = (nodeType: string) => {
     const option = NODE_TYPE_OPTIONS.find(opt => opt.value === nodeType);
     return option?.description || '';
@@ -229,7 +215,7 @@ export const IbisSubmissionModal = ({
           </div>
         )}
 
-        {/* No existing nodes - suggest root issues */}
+        {/* No existing nodes - create manually */}
         {existingNodes.length === 0 && !isClassifying && (
           <div className="p-3 bg-muted rounded-lg space-y-3">
             <div className="flex items-center gap-2">
@@ -237,28 +223,8 @@ export const IbisSubmissionModal = ({
               <span className="text-sm font-medium">No IBIS nodes exist yet</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Start this deliberation by generating AI-suggested root issues, or create your own manually.
+              Create initial nodes manually through the admin interface to get started.
             </p>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              onClick={handleGenerateRootIssues} 
-              disabled={isGeneratingRoots}
-              className="flex items-center gap-2"
-            >
-              {isGeneratingRoots ? (
-                <>
-                  <LoadingSpinner className="h-3 w-3" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Lightbulb className="h-3 w-3" />
-                  Suggest Root Issues
-                </>
-              )}
-            </Button>
           </div>
         )}
 

@@ -237,12 +237,6 @@ export class PromptService {
     return renderedPrompt;
   }
 
-  /**
-   * Get the default IBIS generation prompt
-   */
-  async getDefaultIbisGenerationPrompt(): Promise<PromptTemplate | null> {
-    return this.getPromptTemplate('Default IBIS Root Generation');
-  }
 
   /**
    * Get the issue recommendation prompt

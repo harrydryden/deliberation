@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { MessageSquare, Eye, GitBranch, Map, Edit, Lightbulb, RefreshCw } from 'lucide-react';
+import { MessageSquare, Eye, GitBranch, Map, Edit } from 'lucide-react';
 import { Deliberation } from '@/types/index';
 import { useNavigate } from 'react-router-dom';
 import { IbisNodeManagement } from '../IbisNodeManagement';
@@ -14,14 +14,10 @@ import { productionLogger } from '@/utils/productionLogger';
 
 interface DeliberationActionsMenuProps {
   deliberation: Deliberation;
-  generatingRoots: string | null;
-  onGenerateRoots: (id: string) => void;
 }
 
 export const DeliberationActionsMenu = ({ 
-  deliberation, 
-  generatingRoots,
-  onGenerateRoots
+  deliberation
 }: DeliberationActionsMenuProps) => {
   const [selectedDeliberation, setSelectedDeliberation] = useState<Deliberation | null>(null);
   const [editMode, setEditMode] = useState<'nodes' | 'map' | null>(null);
@@ -152,20 +148,6 @@ export const DeliberationActionsMenu = ({
             />
           </DialogContent>
         </Dialog>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onGenerateRoots(deliberation.id)}
-          disabled={generatingRoots === deliberation.id}
-        >
-          {generatingRoots === deliberation.id ? (
-            <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-          ) : (
-            <Lightbulb className="w-4 h-4 mr-1" />
-          )}
-          Generate Roots
-        </Button>
       </div>
     </>
   );
