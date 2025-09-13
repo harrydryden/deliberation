@@ -170,7 +170,8 @@ class AgentResponseGenerationService {
       // Add knowledge context for bill_agent and policy_agent
       let knowledgeContext = '';
       if (selectedAgent.type === 'bill_agent' || selectedAgent.type === 'policy_agent') {
-        knowledgeContext = await this.fetchKnowledgeContext(originalMessage.content);
+        const agentId = orchestrationResult?.selectedAgent?.id;
+        knowledgeContext = await this.fetchKnowledgeContext(originalMessage.content, agentId);
         if (knowledgeContext) {
           messages[0].content += `\n\nRelevant Context:\n${knowledgeContext}`;
         }
@@ -314,14 +315,16 @@ class AgentResponseGenerationService {
       return this.generateErrorResponse(error.message, orchestrationResult, messageId, deliberationId);
     }
   }
-  async fetchKnowledgeContext(query) {
+  async fetchKnowledgeContext(query, agentId) {
     try {
       EdgeLogger.debug('Fetching knowledge context', {
-        queryLength: query.length
+        queryLength: query.length,
+        hasAgentId: !!agentId
       });
       const { data: knowledgeData, error: knowledgeError } = await this.supabase.functions.invoke('knowledge_query', {
         body: {
           query: query,
+          agentId,
           maxResults: 5,
           threshold: 0.7
         }

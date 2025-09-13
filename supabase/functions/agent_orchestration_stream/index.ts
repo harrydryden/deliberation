@@ -1202,6 +1202,7 @@ serve(async (req) => {
     const response = {
       success: true,
       selectedAgent: {
+        id: agentConfig.id,
         type: selectedAgentType,
         name: agentConfig.name,
         description: agentConfig.description,
