@@ -1,0 +1,378 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============= ENUMS =============
+
+enum AppRole {
+  admin
+  user
+  @@map("app_role")
+}
+
+enum DeliberationStatus {
+  draft
+  active
+  concluded
+  archived
+  @@map("deliberation_status")
+}
+
+enum MessageType {
+  user
+  bill_agent
+  peer_agent
+  flow_agent
+  facilitator
+  @@map("message_type")
+}
+
+enum ParticipantRole {
+  facilitator
+  participant
+  observer
+  @@map("participant_role")
+}
+
+enum IbisNodeType {
+  issue
+  position
+  argument
+  question
+  @@map("ibis_node_type")
+}
+
+// ============= CORE MODELS =============
+
+model Profile {
+  id            String     @id
+  createdAt     DateTime?  @default(now()) @map("created_at")
+  isArchived    Boolean?   @default(false) @map("is_archived")
+  archivedAt    DateTime?  @map("archived_at")
+  archivedBy    String?    @map("archived_by")  // UUID as String
+  archiveReason String?    @map("archive_reason")
+  userRole      AppRole?   @default(user) @map("user_role")
+  accessCode1   String?    @map("access_code_1")
+  accessCode2   String?    @map("access_code_2")
+
+  @@map("profiles")
+}
+
+model Message {
+  id               String      @id @default(uuid())
+  content          String
+  messageType      MessageType @default(user) @map("message_type")
+  userId           String?     @map("user_id")  // UUID as String referencing auth.users
+  deliberationId   String?     @map("deliberation_id")  // UUID as String
+  parentMessageId  String?     @map("parent_message_id")
+  agentContext     Json?       @map("agent_context")
+  submittedToIbis  Boolean     @default(false) @map("submitted_to_ibis")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @default(now()) @map("updated_at")
+
+  // Relations
+  deliberation  Deliberation? @relation(fields: [deliberationId], references: [id])
+  parentMessage Message?      @relation("MessageReplies", fields: [parentMessageId], references: [id])
+  replies       Message[]     @relation("MessageReplies")
+  ibisNodes     IbisNode[]
+  ratings       AgentRating[]
+
+  @@map("messages")
+}
+
+model AgentConfiguration {
+  id                     String    @id @default(uuid())
+  agentType             String    @map("agent_type")
+  name                  String
+  description           String?
+  goals                 String[]
+  responseStyle         String?   @map("response_style")
+  isActive              Boolean   @default(false) @map("is_active")
+  isDefault             Boolean   @default(false) @map("is_default")
+  createdBy             String?   @map("created_by")  // UUID as String
+  deliberationId        String?   @map("deliberation_id")  // UUID as String
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @default(now()) @map("updated_at")
+  presetQuestions       Json      @default("[]") @map("preset_questions")
+  facilitatorConfig     Json      @default("{}") @map("facilitator_config")
+  promptOverrides       Json      @default("{}") @map("prompt_overrides")
+  preferredModel        String?   @map("preferred_model")
+  maxResponseCharacters Int?      @default(800) @map("max_response_characters")
+
+  // Relations
+  deliberation        Deliberation?        @relation(fields: [deliberationId], references: [id])
+  knowledge           AgentKnowledge[]
+  facilitatorSessions FacilitatorSession[]
+
+  @@map("agent_configurations")
+}
+
+model AgentKnowledge {
+  id                String                    @id @default(uuid())
+  agentId           String?                   @map("agent_id")
+  title             String
+  content           String
+  contentType       String                    @map("content_type")
+  fileName          String?                   @map("file_name")
+  fileSize          Int?                      @map("file_size")
+  chunkIndex        Int                       @default(0) @map("chunk_index")
+  embedding         Unsupported("vector")?    // PostgreSQL vector type
+  metadata          Json                      @default("{}") @map("metadata")
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  createdBy         String?                   @map("created_by")
+  processingStatus  String?                   @default("completed") @map("processing_status")
+  storagePath       String?                   @map("storage_path")
+  originalFileSize  BigInt?                   @map("original_file_size")
+
+  // Relations
+  agent AgentConfiguration? @relation(fields: [agentId], references: [id])
+
+  @@map("agent_knowledge")
+}
+
+model Deliberation {
+  id              String             @id @default(uuid())
+  title           String
+  description     String?
+  facilitatorId   String?            @map("facilitator_id")  // UUID as String
+  status          DeliberationStatus @default(draft)
+  isPublic        Boolean            @default(false) @map("is_public")
+  startTime       DateTime?          @map("start_time")
+  endTime         DateTime?          @map("end_time")
+  maxParticipants Int?               @default(50) @map("max_participants")
+  notion          String?            // Missing field added
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @default(now()) @map("updated_at")
+
+  // Relations
+  messages          Message[]
+  participants      Participant[]
+  ibisNodes         IbisNode[]
+  agentConfigs      AgentConfiguration[]
+  agentInteractions AgentInteraction[]
+
+  @@map("deliberations")
+}
+
+model Participant {
+  id             String          @id @default(uuid())
+  userId         String?         @map("user_id")  // UUID as String referencing auth.users
+  deliberationId String?         @map("deliberation_id")
+  role           ParticipantRole @default(participant)
+  joinedAt       DateTime        @default(now()) @map("joined_at")
+  lastActive     DateTime        @default(now()) @map("last_active")
+
+  // Relations
+  deliberation Deliberation? @relation(fields: [deliberationId], references: [id])
+
+  @@map("participants")
+}
+
+model IbisNode {
+  id             String              @id @default(uuid())
+  title          String
+  description    String?
+  nodeType       IbisNodeType        @map("node_type")
+  parentNodeId   String?             @map("parent_node_id")
+  deliberationId String?             @map("deliberation_id")
+  messageId      String?             @map("message_id")
+  createdBy      String?             @map("created_by")  // UUID as String
+  positionX      Float               @default(0) @map("position_x")
+  positionY      Float               @default(0) @map("position_y")
+  embedding      Unsupported("vector")? // Missing field added
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @default(now()) @map("updated_at")
+
+  // Relations
+  parentNode   IbisNode?     @relation("IbisNodeHierarchy", fields: [parentNodeId], references: [id])
+  childNodes   IbisNode[]    @relation("IbisNodeHierarchy")
+  deliberation Deliberation? @relation(fields: [deliberationId], references: [id])
+  message      Message?      @relation(fields: [messageId], references: [id])
+  ratings      IbisNodeRating[]
+
+  @@map("ibis_nodes")
+}
+
+model AgentInteraction {
+  id              String   @id @default(uuid())
+  deliberationId  String?  @map("deliberation_id")
+  messageId       String?  @map("message_id")
+  agentType       IbisNodeType @map("agent_type")  // Fixed: should be enum not String
+  inputContext    Json?    @map("input_context")
+  outputResponse  String?  @map("output_response")
+  processingTime  Int?     @map("processing_time")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  deliberation Deliberation? @relation(fields: [deliberationId], references: [id])
+
+  @@map("agent_interactions")
+}
+
+model FacilitatorSession {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")  // UUID as String
+  deliberationId    String?   @map("deliberation_id")
+  agentConfigId     String    @map("agent_config_id")
+  lastPromptTime    DateTime? @map("last_prompt_time")
+  promptsSentCount  Int       @default(0) @map("prompts_sent_count")
+  lastActivityTime  DateTime  @default(now()) @map("last_activity_time")
+  sessionState      Json      @default("{}") @map("session_state")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @default(now()) @map("updated_at")
+
+  // Relations
+  agentConfig AgentConfiguration @relation(fields: [agentConfigId], references: [id])
+
+  @@map("facilitator_sessions")
+}
+
+model AgentRating {
+  id        String   @id @default(uuid())
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")  // UUID as String
+  rating    Int      // -1 for unhelpful, 1 for helpful
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  // Relations
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("agent_ratings")
+  @@index([messageId])
+  @@index([userId])
+  @@index([rating])
+}
+
+// ============= MISSING TABLES ADDED =============
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  action     String
+  tableName  String?   @map("table_name")
+  recordId   String?   @map("record_id")  // UUID as String
+  oldValues  Json?     @map("old_values")
+  newValues  Json?     @map("new_values")
+  userId     String?   @map("user_id")  // UUID as String
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
+model AnalysisMetric {
+  id             String    @id @default(uuid())
+  operationType  String    @map("operation_type")
+  success        Boolean
+  durationMs     Int?      @map("duration_ms")
+  errorMessage   String?   @map("error_message")
+  modelUsed      String?   @map("model_used")
+  deliberationId String?   @map("deliberation_id")  // UUID as String
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@map("analysis_metrics")
+}
+
+model CircuitBreakerState {
+  id              String    @id
+  failureCount    Int       @default(0) @map("failure_count")
+  lastFailureTime DateTime? @map("last_failure_time")
+  isOpen          Boolean   @default(false) @map("is_open")
+  updatedAt       DateTime  @default(now()) @map("updated_at")
+
+  @@map("circuit_breaker_state")
+}
+
+model FileProcessingLog {
+  id                 String    @id @default(uuid())
+  fileName           String    @map("file_name")
+  fileType           String?   @map("file_type")
+  fileSize           BigInt?   @map("file_size")
+  processingStatus   String?   @map("processing_status")
+  securityScanStatus String?   @map("security_scan_status")
+  errorDetails       Json?     @map("error_details")
+  userId             String?   @map("user_id")  // UUID as String
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@map("file_processing_logs")
+}
+
+model IbisNodeRating {
+  id             String   @id @default(uuid())
+  ibisNodeId     String   @map("ibis_node_id")
+  messageId      String   @map("message_id")
+  userId         String   @map("user_id")  // UUID as String
+  deliberationId String?  @map("deliberation_id")  // UUID as String
+  rating         Int
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  ibisNode IbisNode @relation(fields: [ibisNodeId], references: [id])
+
+  @@map("ibis_node_ratings")
+}
+
+model IbisRelationship {
+  id               String   @id @default(uuid())
+  sourceNodeId     String   @map("source_node_id")
+  targetNodeId     String   @map("target_node_id")
+  relationshipType String   @map("relationship_type")
+  deliberationId   String   @map("deliberation_id")  // UUID as String
+  createdBy        String   @map("created_by")  // UUID as String
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@map("ibis_relationships")
+}
+
+model LoginEvent {
+  id      String   @id @default(uuid())
+  userId  String   @map("user_id")  // UUID as String
+  loginAt DateTime @default(now()) @map("login_at")
+
+  @@map("login_events")
+}
+
+model MessageProcessingLock {
+  id            String   @id @default(uuid())
+  messageId     String   @map("message_id")
+  processingKey String   @map("processing_key")
+  expiresAt     DateTime @map("expires_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("message_processing_locks")
+}
+
+model PromptTemplate {
+  id             String    @id @default(uuid())
+  name           String
+  templateText   String    @map("template_text")
+  category       String    @default("general")
+  variables      Json?
+  description    String?
+  version        Int       @default(1)
+  isActive       Boolean   @default(true) @map("is_active")
+  metadata       Json?
+  deliberationId String?   @map("deliberation_id")  // UUID as String
+  createdBy      String?   @map("created_by")  // UUID as String
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@map("prompt_templates")
+}
+
+model UserStanceScore {
+  id               String    @id @default(uuid())
+  userId           String    @map("user_id")  // UUID as String
+  deliberationId   String    @map("deliberation_id")  // UUID as String
+  stanceScore      Decimal   @map("stance_score")
+  confidenceScore  Decimal   @map("confidence_score")
+  semanticAnalysis Json?     @map("semantic_analysis")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  lastUpdated      DateTime  @default(now()) @map("last_updated")
+
+  @@map("user_stance_scores")
+}

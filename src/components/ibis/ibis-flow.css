@@ -1,0 +1,161 @@
+/* Custom styles for IBIS Flow visualization */
+
+.react-flow__node {
+  cursor: pointer;
+}
+
+/* Keep selected state visible without animations */
+.react-flow__node.selected {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+.react-flow__edge {
+  cursor: pointer;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 3px;
+}
+
+/* Enhanced edge visibility - ensure edges are above background but below nodes */
+.react-flow__edge {
+  z-index: 10 !important;
+}
+
+.react-flow__edge-path {
+  stroke-width: 3px !important;
+  opacity: 1 !important;
+}
+
+/* Relationship edge styling - make them more prominent */
+.react-flow__edge[data-type="relationship"] .react-flow__edge-path {
+  stroke-width: 4px !important;
+  opacity: 1 !important;
+}
+
+.react-flow__edge[data-type="relationship"]:hover .react-flow__edge-path {
+  stroke-width: 6px !important;
+  opacity: 1 !important;
+}
+
+/* Auto-generated relationship styling */
+.react-flow__edge.auto-generated-relationship .react-flow__edge-path {
+  stroke-dasharray: 2 4 !important; /* Subtle dotted line for auto-generated */
+  opacity: 0.8 !important;
+}
+
+.react-flow__edge.auto-generated-relationship:hover .react-flow__edge-path {
+  opacity: 1 !important;
+  stroke-width: 6px !important;
+}
+
+/* Manual relationship styling */
+.react-flow__edge.manual-relationship .react-flow__edge-path {
+  opacity: 1 !important;
+}
+
+/* Hierarchy edge styling */
+.react-flow__edge[data-type="hierarchy"] .react-flow__edge-path {
+  stroke-width: 2px !important;
+  opacity: 0.7 !important;
+}
+
+.react-flow__edge[data-type="hierarchy"]:hover .react-flow__edge-path {
+  stroke-width: 3px !important;
+  opacity: 0.9 !important;
+}
+
+/* Edge labels */
+.react-flow__edge-text {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Ensure edge markers are visible */
+.react-flow__edge .react-flow__edge-path {
+  marker-end: attr(marker-end);
+}
+
+/* Custom MiniMap styling */
+.react-flow__minimap {
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.react-flow__controls {
+  background-color: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.react-flow__controls button {
+  background-color: var(--background);
+  color: var(--foreground);
+  border-bottom: 1px solid var(--border);
+}
+
+.react-flow__controls button:hover {
+  background-color: var(--muted);
+}
+
+/* Node type specific styling */
+.ibis-node-issue {
+  border-radius: 50% !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ibis-node-position {
+  border-radius: 8px !important;
+}
+
+.ibis-node-argument {
+  border-radius: 0 !important;
+  transform: rotate(45deg);
+}
+
+.ibis-node-argument .node-content {
+  transform: rotate(-45deg);
+}
+
+/* Central deliberation node styling */
+.ibis-node-deliberation {
+  border-radius: 50% !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2), 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+}
+
+.ibis-node-deliberation .node-content {
+  text-align: center;
+  color: white;
+}
+
+/* Animation for new nodes */
+@keyframes nodeAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Hide connection handles in regular view, show in admin editor */
+.react-flow__handle {
+  display: none !important;
+}
+
+/* Show handles in admin editor */
+.admin-editor .react-flow__handle {
+  display: block !important;
+}
+
+.react-flow__node.new-node {
+  animation: nodeAppear 0.3s ease-out;
+}

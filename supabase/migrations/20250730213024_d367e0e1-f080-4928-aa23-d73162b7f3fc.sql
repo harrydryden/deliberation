@@ -1,0 +1,45 @@
+-- Find functions without proper search_path settings
+SELECT 
+  proname as function_name,
+  pronamespace::regnamespace as schema_name
+FROM pg_proc 
+WHERE pronamespace = 'public'::regnamespace
+  AND prokind = 'f'
+  AND proname NOT LIKE 'vector%'
+  AND proname NOT LIKE 'halfvec%'
+  AND proname NOT LIKE 'sparsevec%'
+  AND proname NOT LIKE 'array_to_%'
+  AND proname NOT LIKE '%_distance'
+  AND proname NOT LIKE '%_product'
+  AND proname NOT LIKE 'l%_norm%'
+  AND proname NOT LIKE 'binary_quantize'
+  AND proname NOT LIKE 'subvector'
+  AND proname NOT LIKE '%handler'
+  AND proname NOT LIKE '%_support'
+  AND proname NOT LIKE '%_typmod_%'
+  AND proname NOT LIKE '%_in'
+  AND proname NOT LIKE '%_out'
+  AND proname NOT LIKE '%_recv'
+  AND proname NOT LIKE '%_send'
+  AND proname NOT LIKE '%_lt'
+  AND proname NOT LIKE '%_le'
+  AND proname NOT LIKE '%_eq'
+  AND proname NOT LIKE '%_ne'
+  AND proname NOT LIKE '%_ge'
+  AND proname NOT LIKE '%_gt'
+  AND proname NOT LIKE '%_cmp'
+  AND proname NOT LIKE '%_accum'
+  AND proname NOT LIKE '%_avg'
+  AND proname NOT LIKE '%_combine'
+  AND proname NOT LIKE '%_mul'
+  AND proname NOT LIKE '%_add'
+  AND proname NOT LIKE '%_sub'
+  AND proname NOT LIKE '%_concat'
+  AND proname NOT LIKE 'hamming_distance'
+  AND proname NOT LIKE 'jaccard_distance'
+  AND proname NOT LIKE 'cosine_distance'
+  AND proname NOT LIKE 'inner_product'
+  AND proname NOT LIKE 'l1_distance'
+  AND proname NOT LIKE 'l2_distance'
+  AND proname NOT IN ('is_admin_user', 'is_participant_in_deliberation', 'is_facilitator_of_deliberation')
+ORDER BY proname;

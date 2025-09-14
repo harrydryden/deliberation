@@ -1,0 +1,77 @@
+project_id = "iowsxuxkgvpgrvvklwyt"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+port = 54324
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["https://localhost:5173"]
+jwt_expiry = 3600
+refresh_token_rotation_enabled = true
+security_captcha_enabled = false
+security_captcha_secret = ""
+
+[functions.backfill_embeddings]
+verify_jwt = false
+
+[functions.knowledge_query]
+verify_jwt = false
+
+[functions.pdf_processor]
+verify_jwt = false
+
+[functions.generate_agent_response]
+verify_jwt = false
+
+[functions.agent_orchestration_stream]
+verify_jwt = false
+
+[functions.classify_message]
+verify_jwt = false
+
+[functions.generate_notion_statement]
+verify_jwt = false
+
+[functions.generate_proactive_prompt]
+verify_jwt = false
+
+[functions.calculate_user_stance]
+verify_jwt = false
+
+[functions.ibis_embeddings]
+verify_jwt = false
+
+[functions.link_similar_ibis_issues]
+verify_jwt = false
+
+[functions.generate_issue_recommendations]
+verify_jwt = false
+
+[functions.realtime_session]
+verify_jwt = false
+
+[functions.relationship_evaluator]
+verify_jwt = false
+
+[functions.voice_to_text]
+verify_jwt = false
+
+[functions.admin_get_users_v2]
+verify_jwt = false
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
