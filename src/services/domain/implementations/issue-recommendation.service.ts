@@ -124,7 +124,7 @@ export class IssueRecommendationService {
       const { data, error } = await supabase.functions.invoke('generate_issue_recommendations', {
         body: {
           deliberationId: this.currentDeliberationId,
-          context: content, // Fixed: parameter name should be 'context'
+          context: content,
           userId,
           maxRecommendations: 5
         }
@@ -135,7 +135,6 @@ export class IssueRecommendationService {
         throw error;
       }
 
-      // Accept recommendations even if success flag is false, as long as recommendations exist
       if (!data.recommendations || !Array.isArray(data.recommendations)) {
         logger.warn('[IssueRecommendationService] No recommendations in response', { 
           hasRecommendations: !!data.recommendations,

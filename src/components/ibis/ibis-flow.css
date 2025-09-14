@@ -38,13 +38,13 @@
   opacity: 1 !important;
 }
 
-/* Auto-generated relationship styling */
-.react-flow__edge.auto-generated-relationship .react-flow__edge-path {
-  stroke-dasharray: 2 4 !important; /* Subtle dotted line for auto-generated */
+/* System-generated relationship styling */
+.react-flow__edge.system-generated-relationship .react-flow__edge-path {
+  stroke-dasharray: 2 4 !important;
   opacity: 0.8 !important;
 }
 
-.react-flow__edge.auto-generated-relationship:hover .react-flow__edge-path {
+.react-flow__edge.system-generated-relationship:hover .react-flow__edge-path {
   opacity: 1 !important;
   stroke-width: 6px !important;
 }
